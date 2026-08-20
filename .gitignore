@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.idea/
+
+# 环境与密钥
+.env
+.env.local
+
+# 运行时产物
+*.log
