@@ -22,7 +22,8 @@ from .models import (
     RoutingAttempt,
     Step1Plan,
 )
-from .routing import route_day, validate_routed_day
+from .routing import validate_routed_day
+from .segments import route_segmented_day
 from .time_windows import resolve_effective_window
 from .transport import DEFAULT_TRANSIT_BUFFER_RATIO, TravelTimeProvider
 from .weather import evaluate_weather_availability
@@ -52,7 +53,13 @@ def route_itinerary(
         day.visit_date: list(day.allocations) for day in step1_plan.days
     }
     initial_routes = {
-        visit_date: route_day(base_by_date[visit_date], provider, buffer_ratio=buffer_ratio)
+        visit_date: route_segmented_day(
+            base_by_date[visit_date],
+            provider,
+            weather_by_date=weather_by_date,
+            buffer_ratio=buffer_ratio,
+            travel_mode=step1_plan.travel_mode,
+        ).routed_day
         for visit_date in ordered_dates
     }
 
@@ -122,11 +129,13 @@ def route_itinerary(
                 target_allocations,
                 step1_plan.travel_mode,
             )
-            candidate_route = route_day(
+            candidate_route = route_segmented_day(
                 candidate_plan,
                 provider,
+                weather_by_date=weather_by_date,
                 buffer_ratio=buffer_ratio,
-            )
+                travel_mode=step1_plan.travel_mode,
+            ).routed_day
             expected_ids = {item.attraction.id for item in target_allocations}
             routed_ids = {item.attraction.id for item in candidate_route.visits}
             if routed_ids != expected_ids:
@@ -173,6 +182,7 @@ def route_itinerary(
             )
 
     final_days = []
+    final_segmented_days = []
     validations = []
     final_unplaced_ids = {item.attraction.id for item in unplaced}
     for visit_date in ordered_dates:
@@ -181,8 +191,16 @@ def route_itinerary(
             allocations_by_date[visit_date],
             step1_plan.travel_mode,
         )
-        routed = route_day(plan, provider, buffer_ratio=buffer_ratio)
+        segmented = route_segmented_day(
+            plan,
+            provider,
+            weather_by_date=weather_by_date,
+            buffer_ratio=buffer_ratio,
+            travel_mode=step1_plan.travel_mode,
+        )
+        routed = segmented.routed_day
         final_days.append(routed)
+        final_segmented_days.append(segmented)
         validations.append(
             validate_routed_day(
                 routed,
@@ -212,6 +230,7 @@ def route_itinerary(
         tuple(reassignments),
         tuple(validations),
         all(item.valid for item in validations),
+        tuple(final_segmented_days),
     )
 
 

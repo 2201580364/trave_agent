@@ -67,6 +67,23 @@ class PaceLevel(StrEnum):
     TIGHT = "tight"
 
 
+class RouteSegment(StrEnum):
+    DAYTIME = "daytime"
+    EVENING = "evening"
+
+
+class MealStatus(StrEnum):
+    FULL = "full"
+    REDUCED = "reduced"
+    UNSCHEDULED = "unscheduled"
+
+
+class MealPlacement(StrEnum):
+    BETWEEN_SEGMENTS = "between_segments"
+    BEFORE_FIRST_VISIT = "before_first_visit"
+    AFTER_LAST_VISIT = "after_last_visit"
+
+
 @dataclass(frozen=True, slots=True)
 class Coordinate:
     lat: float
@@ -461,10 +478,54 @@ class ItineraryPlan:
     reassignments: tuple[ItineraryReassignment, ...]
     validations: tuple[RouteValidation, ...]
     valid: bool
+    segmented_days: tuple[SegmentedDay, ...] = ()
 
     def __post_init__(self) -> None:
         if self.valid != all(item.valid for item in self.validations):
             raise ValueError("itinerary validation result is inconsistent")
+        if self.segmented_days and len(self.segmented_days) != len(self.days):
+            raise ValueError("segmented day count must match routed day count")
+
+
+@dataclass(frozen=True, slots=True)
+class SegmentedDay:
+    routed_day: RoutedDay
+    daytime_route: RoutedDay | None
+    evening_route: RoutedDay | None
+    meal_plan: MealPlan
+    cross_segment_rejection_code: RejectionCode | None
+    validation: RouteValidation
+
+    def __post_init__(self) -> None:
+        if self.validation.valid == bool(self.validation.violations):
+            raise ValueError("segmented day validation result is inconsistent")
+
+
+@dataclass(frozen=True, slots=True)
+class MealPlan:
+    status: MealStatus
+    placement: MealPlacement | None
+    start_min: int | None
+    end_min: int | None
+    duration_min: int
+    notice: str
+
+    def __post_init__(self) -> None:
+        scheduled = self.status is not MealStatus.UNSCHEDULED
+        has_times = self.start_min is not None and self.end_min is not None
+        if scheduled != has_times:
+            raise ValueError("scheduled meal must contain start and end")
+        if scheduled != (self.placement is not None):
+            raise ValueError("scheduled meal must contain placement")
+        if scheduled:
+            if self.start_min is None or self.end_min is None:
+                raise ValueError("scheduled meal must contain start and end")
+            if self.start_min < 0 or self.end_min <= self.start_min:
+                raise ValueError("meal window is invalid")
+            if self.duration_min != self.end_min - self.start_min:
+                raise ValueError("meal duration does not match its window")
+        elif self.duration_min != 0:
+            raise ValueError("unscheduled meal duration must be zero")
 
 
 def _parse_month_day(value: str) -> tuple[int, int]:
