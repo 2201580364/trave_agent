@@ -6,7 +6,7 @@ Traceability: H3, C1, C2, S1, ADR-0002, ADR-0004.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 
@@ -24,6 +24,8 @@ class RejectionCode(StrEnum):
     EXTREME_WEATHER_OUTDOOR = "EXTREME_WEATHER_OUTDOOR"
     NO_WEATHER_SAFE_DATE = "NO_WEATHER_SAFE_DATE"
     WEATHER_DATA_MISSING = "WEATHER_DATA_MISSING"
+    OD_DATA_MISSING = "OD_DATA_MISSING"
+    TRANSIT_INFEASIBLE = "TRANSIT_INFEASIBLE"
 
 
 class AnchorRejectionCode(StrEnum):
@@ -39,6 +41,59 @@ class WeatherSeverity(StrEnum):
     NORMAL = "normal"
     ADVISORY = "advisory"
     EXTREME = "extreme"
+
+
+class ODBasis(StrEnum):
+    APPROXIMATE = "approximate"
+    GAODE = "gaode"
+
+
+@dataclass(frozen=True, slots=True)
+class Coordinate:
+    lat: float
+    lng: float
+
+    def __post_init__(self) -> None:
+        if not -90 <= self.lat <= 90:
+            raise ValueError("latitude must be within -90..90")
+        if not -180 <= self.lng <= 180:
+            raise ValueError("longitude must be within -180..180")
+
+
+@dataclass(frozen=True, slots=True)
+class TravelTimeResult:
+    origin_id: int
+    destination_id: int
+    travel_min: int
+    basis: ODBasis
+    data_version: str
+    fetched_at: datetime
+
+    def __post_init__(self) -> None:
+        if self.travel_min < 0:
+            raise ValueError("travel_min must be non-negative")
+        if self.origin_id == self.destination_id and self.travel_min != 0:
+            raise ValueError("same-node travel must be zero")
+        if self.origin_id != self.destination_id and self.travel_min == 0:
+            raise ValueError("travel_min must be positive for different nodes")
+        if not self.data_version:
+            raise ValueError("data_version is required")
+        if self.fetched_at.tzinfo is None:
+            raise ValueError("fetched_at must be timezone-aware")
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectionEvaluation:
+    feasible: bool
+    travel: TravelTimeResult | None
+    buffered_travel_min: int | None = None
+    earliest_next_arrival_min: int | None = None
+    slack_min: int | None = None
+    rejection_code: RejectionCode | None = None
+
+    def __post_init__(self) -> None:
+        if self.feasible == (self.rejection_code is not None):
+            raise ValueError("connection evaluation result is inconsistent")
 
 
 @dataclass(frozen=True, slots=True)
