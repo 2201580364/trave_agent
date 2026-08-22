@@ -3,7 +3,8 @@
 from .anchors import resolve_day_time_bounds
 from .availability import assign_attraction_date, assign_to_nearest_available_date, is_open_on
 from .data_gate import filter_solver_inputs
-from .day_assignment import assign_days
+from .day_assignment import assign_days, rebuild_day_plan
+from .itinerary import route_itinerary
 from .models import (
     AnchorRejectionCode,
     ArrivalEvaluation,
@@ -20,6 +21,9 @@ from .models import (
     DayTimeBounds,
     DayTimeBoundsResolution,
     EffectiveTimeWindow,
+    ItineraryPlan,
+    ItineraryReassignment,
+    ItineraryUnplaced,
     ODBasis,
     PaceLevel,
     RejectedAttraction,
@@ -28,6 +32,7 @@ from .models import (
     RouteUnplaced,
     RouteValidation,
     RouteVisit,
+    RoutingAttempt,
     SolverInputBatch,
     Step1Plan,
     TimeRule,
@@ -68,6 +73,9 @@ __all__ = [
     "DayTimeBoundsResolution",
     "EffectiveTimeWindow",
     "InMemoryTravelTimeProvider",
+    "ItineraryPlan",
+    "ItineraryReassignment",
+    "ItineraryUnplaced",
     "ODBasis",
     "PaceLevel",
     "RejectedAttraction",
@@ -76,6 +84,7 @@ __all__ = [
     "RouteUnplaced",
     "RouteValidation",
     "RouteVisit",
+    "RoutingAttempt",
     "SolverInputBatch",
     "Step1Plan",
     "TimeRule",
@@ -99,6 +108,8 @@ __all__ = [
     "is_open_on",
     "resolve_day_time_bounds",
     "resolve_effective_window",
+    "rebuild_day_plan",
     "route_day",
+    "route_itinerary",
     "validate_routed_day",
 ]

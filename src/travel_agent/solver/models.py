@@ -32,6 +32,7 @@ class RejectionCode(StrEnum):
     NO_FEASIBLE_ROUTE = "NO_FEASIBLE_ROUTE"
     ANCHOR_VIOLATION = "ANCHOR_VIOLATION"
     VISIT_DURATION_INSUFFICIENT = "VISIT_DURATION_INSUFFICIENT"
+    REASSIGNMENT_DISPLACES_EXISTING = "REASSIGNMENT_DISPLACES_EXISTING"
 
 
 class AnchorRejectionCode(StrEnum):
@@ -376,6 +377,7 @@ class Step1Plan:
     days: tuple[DayPlan, ...]
     unplaced: tuple[UnplacedAttraction, ...]
     data_rejected: tuple[RejectedAttraction, ...]
+    travel_mode: TravelMode = TravelMode.NORMAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -424,6 +426,45 @@ class RouteValidation:
     def __post_init__(self) -> None:
         if self.valid == bool(self.violations):
             raise ValueError("route validation result is inconsistent")
+
+
+@dataclass(frozen=True, slots=True)
+class RoutingAttempt:
+    visit_date: date
+    rejection_codes: tuple[RejectionCode, ...]
+
+    def __post_init__(self) -> None:
+        if not self.rejection_codes:
+            raise ValueError("routing attempt must contain at least one rejection code")
+
+
+@dataclass(frozen=True, slots=True)
+class ItineraryUnplaced:
+    attraction: Attraction
+    preferred_date: date
+    rejection_code: RejectionCode
+    attempts: tuple[RoutingAttempt, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ItineraryReassignment:
+    attraction: Attraction
+    from_date: date
+    to_date: date
+
+
+@dataclass(frozen=True, slots=True)
+class ItineraryPlan:
+    days: tuple[RoutedDay, ...]
+    unplaced: tuple[ItineraryUnplaced, ...]
+    data_rejected: tuple[RejectedAttraction, ...]
+    reassignments: tuple[ItineraryReassignment, ...]
+    validations: tuple[RouteValidation, ...]
+    valid: bool
+
+    def __post_init__(self) -> None:
+        if self.valid != all(item.valid for item in self.validations):
+            raise ValueError("itinerary validation result is inconsistent")
 
 
 def _parse_month_day(value: str) -> tuple[int, int]:

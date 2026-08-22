@@ -159,7 +159,25 @@ def assign_days(
         for visit_date in ordered_dates
         if visit_date in states
     )
-    return Step1Plan(days, tuple(unplaced), gate.rejected)
+    return Step1Plan(days, tuple(unplaced), gate.rejected, travel_mode)
+
+
+def rebuild_day_plan(
+    base: DayPlan,
+    allocations: Iterable[DayAllocation],
+    travel_mode: TravelMode,
+) -> DayPlan:
+    """Recompute derived day totals after a cross-day reassignment."""
+
+    allocation_list = list(allocations)
+    state = _DayState(
+        base.visit_date,
+        base.bounds,
+        allocation_list,
+        sum(item.required_duration_min for item in allocation_list),
+        sum(item.attraction.energy_level for item in allocation_list),
+    )
+    return _build_day_plan(state, travel_mode)
 
 
 def _date_rejection_reasons(
