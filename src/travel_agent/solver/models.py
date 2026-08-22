@@ -1,6 +1,6 @@
 """Core models for solver input gating and C1/C2 availability.
 
-Traceability: H3, C1, C2, S1, ADR-0002, ADR-0004.
+Traceability: H2, H3, C1, C2, C4, C5, C6, S1, S2, ADR-0002, ADR-0004.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ class RejectionCode(StrEnum):
     WEATHER_DATA_MISSING = "WEATHER_DATA_MISSING"
     OD_DATA_MISSING = "OD_DATA_MISSING"
     TRANSIT_INFEASIBLE = "TRANSIT_INFEASIBLE"
+    EMPTY_DAY_WINDOW = "EMPTY_DAY_WINDOW"
+    DAY_CAPACITY_EXCEEDED = "DAY_CAPACITY_EXCEEDED"
 
 
 class AnchorRejectionCode(StrEnum):
@@ -46,6 +48,18 @@ class WeatherSeverity(StrEnum):
 class ODBasis(StrEnum):
     APPROXIMATE = "approximate"
     GAODE = "gaode"
+
+
+class TravelMode(StrEnum):
+    SPEED = "speed"
+    NORMAL = "normal"
+    LEISURE = "leisure"
+
+
+class PaceLevel(StrEnum):
+    RELAXED = "relaxed"
+    BALANCED = "balanced"
+    TIGHT = "tight"
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +187,7 @@ class Attraction:
     time_rules: tuple[TimeRule, ...] = ()
     is_always_open: bool = False
     is_indoor: bool = False
+    energy_level: int = 1
     data_verified: bool = False
     conflict: bool = False
     active: bool = True
@@ -189,6 +204,8 @@ class Attraction:
             )
         if self.suggested_duration <= 0:
             raise ValueError("suggested_duration must be positive")
+        if not 1 <= self.energy_level <= 5:
+            raise ValueError("energy_level must be within 1..5")
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,6 +324,46 @@ class DayTimeBoundsResolution:
     def __post_init__(self) -> None:
         if (self.bounds is None) == (self.rejection_code is None):
             raise ValueError("day bounds resolution must contain exactly one result")
+
+
+@dataclass(frozen=True, slots=True)
+class AttractionPreference:
+    attraction: Attraction
+    preferred_date: date
+
+
+@dataclass(frozen=True, slots=True)
+class DayAllocation:
+    attraction: Attraction
+    preferred_date: date
+    assigned_date: date
+    required_duration_min: int
+
+
+@dataclass(frozen=True, slots=True)
+class UnplacedAttraction:
+    attraction: Attraction
+    preferred_date: date
+    rejection_code: RejectionCode
+    date_rejections: tuple[DateRejection, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DayPlan:
+    visit_date: date
+    bounds: DayTimeBounds
+    allocations: tuple[DayAllocation, ...]
+    used_duration_min: int
+    energy_total: int
+    pace: PaceLevel
+    pace_notice: str
+
+
+@dataclass(frozen=True, slots=True)
+class Step1Plan:
+    days: tuple[DayPlan, ...]
+    unplaced: tuple[UnplacedAttraction, ...]
+    data_rejected: tuple[RejectedAttraction, ...]
 
 
 def _parse_month_day(value: str) -> tuple[int, int]:
