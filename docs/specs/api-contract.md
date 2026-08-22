@@ -1,0 +1,78 @@
+# API 契约（P1）
+
+> 基础：RESTful，微信登录，限流。异步任务用 Celery + 轮询/WebSocket。
+
+## 端点清单
+
+| 方法 | 路径 | 说明 | 关联功能 |
+|---|---|---|---|
+| GET | `/api/attractions` | 景点列表 + 类型/室内外筛选 | #4 |
+| GET | `/api/attractions/{id}` | 景点详情（含解析后的当天时间窗） | #4 |
+| POST | `/api/trips/generate` | 一键生成分日行程（异步） | #5 |
+| GET | `/api/trips/{task_id}/status` | 查询生成任务状态 | #5 |
+| GET | `/api/trips/{id}` | 行程详情（分日安排） | #5 |
+| POST | `/api/trips/{id}/regenerate` | 替换景点 + 重新生成 | #6 |
+| POST | `/api/trips/{id}/feedback` | 👍👎 反馈 | #8 |
+| POST | `/api/trips/{id}/share-card` | 生成分享卡片（服务端渲染） | #7 |
+
+## 核心契约：生成行程
+
+### POST /api/trips/generate
+
+```json
+{
+  "city_id": 1,
+  "attraction_ids": [1,2,3,5,9],
+  "travel_mode": "normal",          // speed | normal | leisure
+  "crowd_type": "solo",
+  "start_date": "2026-09-01",
+  "end_date": "2026-09-03",
+  "arrival_time": "2026-09-01T14:00:00",
+  "departure_time": "2026-09-03T16:00:00",
+  "transport_type": "high_speed_rail"
+}
+```
+
+### 响应（异步，202）
+
+```json
+{ "task_id": "a1b2c3", "status": "pending" }
+```
+
+### GET /api/trips/{task_id}/status
+
+```json
+{ "task_id": "a1b2c3", "status": "completed", "trip_id": 100 }
+// status ∈ pending | running | completed | failed
+```
+
+### GET /api/trips/{id}（行程详情核心结构）
+
+```json
+{
+  "id": 100,
+  "weather_basis": "forecast",
+  "days": [
+    {
+      "day": 1, "weekday": 2, "weather": "light_rain",
+      "visits": [
+        { "attraction_id": 6, "arrival": "15:30", "leave": "17:30",
+          "reason": "清河坊顺路，体力适中" }
+      ],
+      "unplaced": [
+        { "attraction_id": 5, "reason": "周一闭馆" }
+      ],
+      "indoor_alternatives": [
+        { "attraction_id": 10, "reason": "备选室内景点，雨天可用" }
+      ]
+    }
+  ]
+}
+```
+
+## 关键约定
+
+- **硬约束结果机器可证**：`unplaced` 数组必须列出「未排入景点 + 原因」，不接受静默丢弃。
+- **天气标注来源**：`weather_basis` 区分 `forecast`（≤3天）与 `climate`（>3天），前端据此标注「气候参考」。
+- **LLM 只生成 `reason` 文案**：`reason`（解释理由）由 LLM 生成，但 `arrival/leave/attraction_id` 等结构由求解器确定（大模型边界规则）。
+- 异步任务超时：求解 >30s 触发降级兜底（ADR-0003 D3）。

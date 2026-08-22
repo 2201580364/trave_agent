@@ -23,6 +23,7 @@ docs/
   specs/                 需求规格 + Given/When/Then 验收标准
   research/              用户研究计划 + 结论
   test/                  测试方案 + Golden Cases + 验证报告
+  process/               AI 协作开发 Gate、权威来源与任务协议
 ```
 
 ## 核心概念
