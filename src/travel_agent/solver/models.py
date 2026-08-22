@@ -20,10 +20,25 @@ class RejectionCode(StrEnum):
     NO_MATCHING_TIME_RULE = "NO_MATCHING_TIME_RULE"
     TIME_RULE_CONFLICT = "TIME_RULE_CONFLICT"
     ARRIVAL_AFTER_LATEST_ARRIVAL = "ARRIVAL_AFTER_LATEST_ARRIVAL"
+    CLOSED_ON_DATE = "CLOSED_ON_DATE"
+    EXTREME_WEATHER_OUTDOOR = "EXTREME_WEATHER_OUTDOOR"
+    NO_WEATHER_SAFE_DATE = "NO_WEATHER_SAFE_DATE"
+    WEATHER_DATA_MISSING = "WEATHER_DATA_MISSING"
 
 
 class AnchorRejectionCode(StrEnum):
     EMPTY_DAY_WINDOW = "EMPTY_DAY_WINDOW"
+
+
+class WeatherBasis(StrEnum):
+    FORECAST = "forecast"
+    CLIMATE = "climate"
+
+
+class WeatherSeverity(StrEnum):
+    NORMAL = "normal"
+    ADVISORY = "advisory"
+    EXTREME = "extreme"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +102,7 @@ class TimeRule:
 
 @dataclass(frozen=True, slots=True)
 class Attraction:
-    """Minimum production attraction model needed by G5-C1/C2.
+    """Minimum production attraction model needed by G5-C1/C2/C5.
 
     ``open_on_dates`` represents structured exceptions such as a museum opening
     on a public holiday despite its normal weekly closure. ``closed_on_dates``
@@ -102,6 +117,7 @@ class Attraction:
     suggested_duration: int = 60
     time_rules: tuple[TimeRule, ...] = ()
     is_always_open: bool = False
+    is_indoor: bool = False
     data_verified: bool = False
     conflict: bool = False
     active: bool = True
@@ -133,17 +149,42 @@ class SolverInputBatch:
 
 
 @dataclass(frozen=True, slots=True)
+class DateRejection:
+    visit_date: date
+    reasons: tuple[RejectionCode, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class DateAssignment:
     attraction: Attraction
     preferred_date: date
     assigned_date: date | None
     rejection_code: RejectionCode | None = None
+    date_rejections: tuple[DateRejection, ...] = ()
 
     def __post_init__(self) -> None:
         has_assignment = self.assigned_date is not None
         has_rejection = self.rejection_code is not None
         if has_assignment == has_rejection:
             raise ValueError("date assignment must contain exactly one result")
+
+
+@dataclass(frozen=True, slots=True)
+class DailyWeather:
+    day: date
+    basis: WeatherBasis
+    severity: WeatherSeverity
+    condition: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherAvailability:
+    available: bool
+    rejection_code: RejectionCode | None = None
+
+    def __post_init__(self) -> None:
+        if self.available == (self.rejection_code is not None):
+            raise ValueError("weather availability result is inconsistent")
 
 
 @dataclass(frozen=True, slots=True)
