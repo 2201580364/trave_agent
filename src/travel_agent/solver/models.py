@@ -28,6 +28,10 @@ class RejectionCode(StrEnum):
     TRANSIT_INFEASIBLE = "TRANSIT_INFEASIBLE"
     EMPTY_DAY_WINDOW = "EMPTY_DAY_WINDOW"
     DAY_CAPACITY_EXCEEDED = "DAY_CAPACITY_EXCEEDED"
+    ROUTING_UNPLACED = "ROUTING_UNPLACED"
+    NO_FEASIBLE_ROUTE = "NO_FEASIBLE_ROUTE"
+    ANCHOR_VIOLATION = "ANCHOR_VIOLATION"
+    VISIT_DURATION_INSUFFICIENT = "VISIT_DURATION_INSUFFICIENT"
 
 
 class AnchorRejectionCode(StrEnum):
@@ -315,6 +319,10 @@ class DayTimeBounds:
     start_min: int
     end_min: int
 
+    def __post_init__(self) -> None:
+        if self.start_min < 0 or self.end_min < self.start_min:
+            raise ValueError("day time bounds are invalid")
+
 
 @dataclass(frozen=True, slots=True)
 class DayTimeBoundsResolution:
@@ -338,6 +346,10 @@ class DayAllocation:
     preferred_date: date
     assigned_date: date
     required_duration_min: int
+
+    def __post_init__(self) -> None:
+        if self.required_duration_min <= 0:
+            raise ValueError("required_duration_min must be positive")
 
 
 @dataclass(frozen=True, slots=True)
@@ -364,6 +376,54 @@ class Step1Plan:
     days: tuple[DayPlan, ...]
     unplaced: tuple[UnplacedAttraction, ...]
     data_rejected: tuple[RejectedAttraction, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RouteVisit:
+    attraction: Attraction
+    arrival_min: int
+    leave_min: int
+    planned_duration_min: int
+    travel_from_previous: TravelTimeResult | None = None
+    buffered_travel_from_previous_min: int = 0
+    duration_notice: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RouteUnplaced:
+    attraction: Attraction
+    rejection_code: RejectionCode
+
+
+@dataclass(frozen=True, slots=True)
+class RoutedDay:
+    visit_date: date
+    bounds: DayTimeBounds
+    visits: tuple[RouteVisit, ...]
+    unplaced: tuple[RouteUnplaced, ...]
+    total_travel_min: int
+    total_buffered_travel_min: int
+
+    def __post_init__(self) -> None:
+        if self.total_travel_min < 0 or self.total_buffered_travel_min < 0:
+            raise ValueError("route travel totals must be non-negative")
+
+
+@dataclass(frozen=True, slots=True)
+class ConstraintViolation:
+    code: RejectionCode
+    attraction_id: int | None = None
+    previous_attraction_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RouteValidation:
+    valid: bool
+    violations: tuple[ConstraintViolation, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.valid == bool(self.violations):
+            raise ValueError("route validation result is inconsistent")
 
 
 def _parse_month_day(value: str) -> tuple[int, int]:

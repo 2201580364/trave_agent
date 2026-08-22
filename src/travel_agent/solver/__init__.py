@@ -10,6 +10,7 @@ from .models import (
     Attraction,
     AttractionPreference,
     ConnectionEvaluation,
+    ConstraintViolation,
     Coordinate,
     DailyWeather,
     DateAssignment,
@@ -23,6 +24,10 @@ from .models import (
     PaceLevel,
     RejectedAttraction,
     RejectionCode,
+    RoutedDay,
+    RouteUnplaced,
+    RouteValidation,
+    RouteVisit,
     SolverInputBatch,
     Step1Plan,
     TimeRule,
@@ -35,6 +40,7 @@ from .models import (
     WeatherBasis,
     WeatherSeverity,
 )
+from .routing import route_day, validate_routed_day
 from .time_windows import evaluate_arrival, resolve_effective_window
 from .transport import (
     ApproximateTravelTimeProvider,
@@ -51,6 +57,7 @@ __all__ = [
     "AttractionPreference",
     "ApproximateTravelTimeProvider",
     "ConnectionEvaluation",
+    "ConstraintViolation",
     "Coordinate",
     "DailyWeather",
     "DateAssignment",
@@ -65,6 +72,10 @@ __all__ = [
     "PaceLevel",
     "RejectedAttraction",
     "RejectionCode",
+    "RoutedDay",
+    "RouteUnplaced",
+    "RouteValidation",
+    "RouteVisit",
     "SolverInputBatch",
     "Step1Plan",
     "TimeRule",
@@ -88,4 +99,6 @@ __all__ = [
     "is_open_on",
     "resolve_day_time_bounds",
     "resolve_effective_window",
+    "route_day",
+    "validate_routed_day",
 ]
