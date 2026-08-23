@@ -24,11 +24,39 @@
 | 体力超载 | 特种兵 8 星预算，选 3 个 4 星景点 | 分到 ≥ 2 天，单日不超 8 星 |
 | 时间锚点 | 到达 14:00 + 机场 1.5h → Day1 有效 15:30 起 | Day1 不排 17:00 关门的景点 |
 
+### 可执行杭州场景（2026-08-23 首批）
+
+公开资料快照与测试归一化边界见
+[`golden-sources-hangzhou.md`](golden-sources-hangzhou.md)。测试运行期间不访问网络。
+
+```powershell
+python -m pytest tests/golden -q
+python scripts/run_golden_cases.py
+```
+
+报告保存到：
+
+```text
+docs/test/reports/gate6-golden-latest.json
+```
+
+| ID | 场景 | 覆盖 |
+|---|---|---|
+| HZ-GC-01 | 周一闭馆博物馆自动移至周二 | C1/C2/C6 |
+| HZ-GC-02 | 下午抵达不强塞需要半天的上午景点 | C2/C4 |
+| HZ-GC-03 | 极端天气迁移室外项目并保留室内项目 | C5/C6 |
+| HZ-GC-04 | 固定晚间场次不被晚餐留白挤掉 | C2/C4/C6/S1 |
+| HZ-GC-05 | OD 缺失禁止零耗时串联并触发跨天回退 | C6 |
+| HZ-GC-06 | 七景点三日混合行程端到端守恒 | C1/C2/C4/C5/C6/S1/S2 |
+
+当前结果：`6/6` 场景通过，硬约束最终违反数为 `0`，重复运行结果一致。
+这只是 Gate 6 的 Golden Case 子门禁，不代表数据校验、性能和降级子门禁已经完成。
+
 ## 报告模板（G7 验证时填）
 
 ```
 - 硬约束单测通过率：/ 
-- Golden Case 通过数：/ 
+- Golden Case 通过数：6/6（杭州首批，仍需扩展其他城市与反例）
 - 数据校验覆盖率：data_verified 占比 %
 - 性能：N=20/D=7 求解耗时 s
 - 用户测试：认可率 %（n=）

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-23T10:32:03.751469+00:00",
+  "suite": "hangzhou-realistic-golden-cases",
+  "passed": 6,
+  "total": 6,
+  "gate_passed": true,
+  "cases": [
+    {
+      "case_id": "HZ-GC-01",
+      "title": "周一闭馆博物馆自动移至周二",
+      "passed": true,
+      "constraints": [
+        "C1",
+        "C2",
+        "C6"
+      ],
+      "evidence": [
+        "SRC-MUSEUM-HOURS",
+        "SRC-HANGZHOU-GUIDE"
+      ],
+      "details": {
+        "scheduled_dates": {
+          "2": "2026-08-24",
+          "1": "2026-08-25"
+        },
+        "quality_gate": true
+      }
+    },
+    {
+      "case_id": "HZ-GC-02",
+      "title": "下午抵达不强塞需要半天的上午景点",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4"
+      ],
+      "evidence": [
+        "SRC-LINGYIN-OFFICIAL",
+        "SRC-HANGZHOU-GUIDE"
+      ],
+      "details": {
+        "scheduled_dates": {
+          "4": "2026-08-24"
+        },
+        "unplaced": {
+          "3": "NO_AVAILABLE_DATE"
+        }
+      }
+    },
+    {
+      "case_id": "HZ-GC-03",
+      "title": "极端天气迁移室外项目并保留室内项目",
+      "passed": true,
+      "constraints": [
+        "C5",
+        "C6"
+      ],
+      "evidence": [
+        "SRC-WESTLAKE-GUIDE"
+      ],
+      "details": {
+        "scheduled_dates": {
+          "6": "2026-08-24",
+          "5": "2026-08-25"
+        },
+        "weather": {
+          "Monday": "extreme",
+          "Tuesday": "normal"
+        }
+      }
+    },
+    {
+      "case_id": "HZ-GC-04",
+      "title": "固定晚间场次不被晚餐留白挤掉",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4",
+        "C6",
+        "S1"
+      ],
+      "evidence": [
+        "SRC-FOUNTAIN-GUIDE"
+      ],
+      "details": {
+        "show_arrival_min": 1110,
+        "meal_status": "full"
+      }
+    },
+    {
+      "case_id": "HZ-GC-05",
+      "title": "OD 缺失禁止零耗时串联并触发跨天回退",
+      "passed": true,
+      "constraints": [
+        "C6"
+      ],
+      "evidence": [
+        "SRC-WESTLAKE-GUIDE"
+      ],
+      "details": {
+        "day_visit_counts": [
+          1,
+          1
+        ],
+        "reassignments": 1
+      }
+    },
+    {
+      "case_id": "HZ-GC-06",
+      "title": "三日杭州混合行程端到端守恒",
+      "passed": true,
+      "constraints": [
+        "C1",
+        "C2",
+        "C4",
+        "C5",
+        "C6",
+        "S1",
+        "S2"
+      ],
+      "evidence": [
+        "SRC-LINGYIN-OFFICIAL",
+        "SRC-WESTLAKE-GUIDE",
+        "SRC-FOUNTAIN-GUIDE"
+      ],
+      "details": {
+        "scheduled_dates": {
+          "13": "2026-08-24",
+          "12": "2026-08-24",
+          "11": "2026-08-24",
+          "14": "2026-08-25",
+          "15": "2026-08-25",
+          "16": "2026-08-26",
+          "17": "2026-08-26"
+        },
+        "scheduled_count": 7,
+        "hard_constraint_violations": 0
+      }
+    }
+  ]
+}
