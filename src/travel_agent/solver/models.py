@@ -30,6 +30,7 @@ class RejectionCode(StrEnum):
     DAY_CAPACITY_EXCEEDED = "DAY_CAPACITY_EXCEEDED"
     ROUTING_UNPLACED = "ROUTING_UNPLACED"
     NO_FEASIBLE_ROUTE = "NO_FEASIBLE_ROUTE"
+    SOLVER_TIME_LIMIT = "SOLVER_TIME_LIMIT"
     ANCHOR_VIOLATION = "ANCHOR_VIOLATION"
     VISIT_DURATION_INSUFFICIENT = "VISIT_DURATION_INSUFFICIENT"
     REASSIGNMENT_DISPLACES_EXISTING = "REASSIGNMENT_DISPLACES_EXISTING"
@@ -82,6 +83,21 @@ class MealPlacement(StrEnum):
     BETWEEN_SEGMENTS = "between_segments"
     BEFORE_FIRST_VISIT = "before_first_visit"
     AFTER_LAST_VISIT = "after_last_visit"
+
+
+class RouteSearchStatus(StrEnum):
+    EMPTY = "empty"
+    COMPLETED = "completed"
+    BEST_SO_FAR = "best_so_far"
+    TIME_LIMIT_NO_SOLUTION = "time_limit_no_solution"
+    NO_SOLUTION = "no_solution"
+    INVALID = "invalid"
+
+
+class RouteSearchPhase(StrEnum):
+    INITIAL = "initial"
+    REASSIGNMENT = "reassignment"
+    FINAL = "final"
 
 
 @dataclass(frozen=True, slots=True)
@@ -415,6 +431,49 @@ class RouteUnplaced:
 
 
 @dataclass(frozen=True, slots=True)
+class RouteSolveMetadata:
+    status: RouteSearchStatus
+    time_limit_seconds: int
+    elapsed_ms: int = field(compare=False)
+    solution_found: bool
+    search_finished: bool
+
+    def __post_init__(self) -> None:
+        if self.time_limit_seconds < 0 or self.elapsed_ms < 0:
+            raise ValueError("route solve timing must be non-negative")
+        expected_solution = self.status in {
+            RouteSearchStatus.COMPLETED,
+            RouteSearchStatus.BEST_SO_FAR,
+        }
+        if self.solution_found != expected_solution:
+            raise ValueError("route solve solution flag is inconsistent")
+        expected_finished = self.status in {
+            RouteSearchStatus.EMPTY,
+            RouteSearchStatus.COMPLETED,
+            RouteSearchStatus.NO_SOLUTION,
+            RouteSearchStatus.INVALID,
+        }
+        if self.search_finished != expected_finished:
+            raise ValueError("route solve completion flag is inconsistent")
+
+
+EMPTY_ROUTE_SOLVE_METADATA = RouteSolveMetadata(
+    RouteSearchStatus.EMPTY,
+    0,
+    0,
+    False,
+    True,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class RouteSearchAttempt:
+    visit_date: date
+    phase: RouteSearchPhase
+    metadata: RouteSolveMetadata
+
+
+@dataclass(frozen=True, slots=True)
 class RoutedDay:
     visit_date: date
     bounds: DayTimeBounds
@@ -422,6 +481,7 @@ class RoutedDay:
     unplaced: tuple[RouteUnplaced, ...]
     total_travel_min: int
     total_buffered_travel_min: int
+    solve_metadata: RouteSolveMetadata = EMPTY_ROUTE_SOLVE_METADATA
 
     def __post_init__(self) -> None:
         if self.total_travel_min < 0 or self.total_buffered_travel_min < 0:
@@ -479,6 +539,7 @@ class ItineraryPlan:
     validations: tuple[RouteValidation, ...]
     valid: bool
     segmented_days: tuple[SegmentedDay, ...] = ()
+    search_attempts: tuple[RouteSearchAttempt, ...] = ()
 
     def __post_init__(self) -> None:
         if len(self.validations) != len(self.days):
@@ -487,6 +548,67 @@ class ItineraryPlan:
             raise ValueError("itinerary validation result is inconsistent")
         if self.segmented_days and len(self.segmented_days) != len(self.days):
             raise ValueError("segmented day count must match routed day count")
+
+    @property
+    def timed_out_day_count(self) -> int:
+        return len(
+            {
+                visit_date
+                for visit_date, status in self._search_statuses()
+                if status
+                in {
+                    RouteSearchStatus.BEST_SO_FAR,
+                    RouteSearchStatus.TIME_LIMIT_NO_SOLUTION,
+                }
+            }
+        )
+
+    @property
+    def best_so_far_day_count(self) -> int:
+        return len(
+            {
+                visit_date
+                for visit_date, status in self._search_statuses()
+                if status is RouteSearchStatus.BEST_SO_FAR
+            }
+        )
+
+    @property
+    def time_limit_no_solution_day_count(self) -> int:
+        return len(
+            {
+                visit_date
+                for visit_date, status in self._search_statuses()
+                if status is RouteSearchStatus.TIME_LIMIT_NO_SOLUTION
+            }
+        )
+
+    @property
+    def no_solution_day_count(self) -> int:
+        return len(
+            {
+                visit_date
+                for visit_date, status in self._search_statuses()
+                if status
+                in {
+                    RouteSearchStatus.TIME_LIMIT_NO_SOLUTION,
+                    RouteSearchStatus.NO_SOLUTION,
+                    RouteSearchStatus.INVALID,
+                }
+            }
+        )
+
+    def _search_statuses(self) -> tuple[tuple[date, RouteSearchStatus], ...]:
+        if self.search_attempts:
+            return tuple(
+                (attempt.visit_date, attempt.metadata.status)
+                for attempt in self.search_attempts
+            )
+        return tuple(
+            (day.visit_date, day.solve_metadata.status)
+            for day in self.days
+            if day.solve_metadata.status is not RouteSearchStatus.EMPTY
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,6 +9,9 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Callable
+from typing import Any
+
+from ortools.constraint_solver import routing_enums_pb2
 
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -20,11 +23,14 @@ from travel_agent.solver import (
     DayPlan,
     DayTimeBounds,
     DegradationCode,
+    DefaultRoutingSearchExecutor,
     InMemoryTravelTimeProvider,
     MealStatus,
     ODBasis,
     PaceLevel,
     RejectionCode,
+    RouteSearchStatus,
+    RoutingSearchExecutor,
     Step1Plan,
     TimeRule,
     TravelTimeResult,
@@ -51,6 +57,21 @@ class DegradationCaseResult:
     passed: bool
     constraints: tuple[str, ...]
     details: dict[str, object]
+
+
+class ForcedStatusExecutor(RoutingSearchExecutor):
+    def __init__(self, status: int, *, return_solution: bool) -> None:
+        self.forced_status = status
+        self.return_solution = return_solution
+        self.delegate = DefaultRoutingSearchExecutor()
+
+    def solve(self, routing: Any, parameters: Any) -> Any | None:
+        if not self.return_solution:
+            return None
+        return self.delegate.solve(routing, parameters)
+
+    def status(self, routing: Any) -> int:
+        return self.forced_status
 
 
 def _attraction(
@@ -352,6 +373,109 @@ def no_dinner_slot_keeps_hard_feasible_visits() -> DegradationCaseResult:
     )
 
 
+def timeout_with_solution_returns_validated_best_so_far() -> DegradationCaseResult:
+    attraction = _attraction(39)
+    weather = _weather({MONDAY: WeatherSeverity.NORMAL})
+    step1 = assign_days(
+        (AttractionPreference(attraction, MONDAY),),
+        trip_dates=(MONDAY,),
+        weather_by_date=weather,
+        anchors=TripTimeAnchors(9 * 60, 0, 21 * 60, 0, 0),
+    )
+    executor = ForcedStatusExecutor(
+        routing_enums_pb2.RoutingSearchStatus.ROUTING_PARTIAL_SUCCESS_LOCAL_OPTIMUM_NOT_REACHED,
+        return_solution=True,
+    )
+    itinerary = route_itinerary(
+        step1,
+        InMemoryTravelTimeProvider({}),
+        weather_by_date=weather,
+        search_executor=executor,
+    )
+    quality = evaluate_solver_quality(itinerary, (attraction,))
+    degradation = evaluate_itinerary_degradation(
+        itinerary,
+        quality,
+        input_count=1,
+        day_count=1,
+    )
+    passed = (
+        quality.gate_passed
+        and itinerary.days[0].solve_metadata.status is RouteSearchStatus.BEST_SO_FAR
+        and itinerary.best_so_far_day_count == 1
+        and degradation.explainable
+        and any(
+            item.code is DegradationCode.SEARCH_BEST_SO_FAR
+            for item in degradation.notices
+        )
+    )
+    return DegradationCaseResult(
+        "DEG-07",
+        "时间上限内已有解时返回经复核的 best-so-far",
+        passed,
+        ("C1", "C2", "C4", "C5", "C6"),
+        {
+            "search_status": itinerary.days[0].solve_metadata.status.value,
+            "hard_constraint_violations": quality.hard_constraint_violations,
+        },
+    )
+
+
+def timeout_without_solution_is_explicitly_unplaced() -> DegradationCaseResult:
+    attraction = _attraction(40)
+    weather = _weather({MONDAY: WeatherSeverity.NORMAL})
+    step1 = assign_days(
+        (AttractionPreference(attraction, MONDAY),),
+        trip_dates=(MONDAY,),
+        weather_by_date=weather,
+        anchors=TripTimeAnchors(9 * 60, 0, 21 * 60, 0, 0),
+    )
+    executor = ForcedStatusExecutor(
+        routing_enums_pb2.RoutingSearchStatus.ROUTING_FAIL_TIMEOUT,
+        return_solution=False,
+    )
+    itinerary = route_itinerary(
+        step1,
+        InMemoryTravelTimeProvider({}),
+        weather_by_date=weather,
+        search_executor=executor,
+    )
+    quality = evaluate_solver_quality(itinerary, (attraction,))
+    degradation = evaluate_itinerary_degradation(
+        itinerary,
+        quality,
+        input_count=1,
+        day_count=1,
+    )
+    codes = {item.code for item in degradation.notices}
+    timeout_attempts = tuple(
+        attempt
+        for attempt in itinerary.search_attempts
+        if attempt.metadata.status is RouteSearchStatus.TIME_LIMIT_NO_SOLUTION
+    )
+    passed = (
+        quality.gate_passed
+        and bool(timeout_attempts)
+        and itinerary.time_limit_no_solution_day_count == 1
+        and itinerary.no_solution_day_count == 1
+        and itinerary.unplaced[0].rejection_code is RejectionCode.SOLVER_TIME_LIMIT
+        and degradation.explainable
+        and DegradationCode.SEARCH_TIME_LIMIT_NO_SOLUTION in codes
+        and DegradationCode.UNPLACED_ATTRACTIONS in codes
+    )
+    return DegradationCaseResult(
+        "DEG-08",
+        "时间上限内无解时明确标记而非伪称 best-so-far",
+        passed,
+        ("C1", "C2", "C4", "C5", "C6"),
+        {
+            "search_status": timeout_attempts[0].metadata.status.value,
+            "search_attempt_count": len(itinerary.search_attempts),
+            "unplaced_reason": itinerary.unplaced[0].rejection_code.value,
+        },
+    )
+
+
 CASES: tuple[Callable[[], DegradationCaseResult], ...] = (
     excessive_selection_is_conserved_and_explained,
     all_dates_closed_are_traceable,
@@ -359,6 +483,8 @@ CASES: tuple[Callable[[], DegradationCaseResult], ...] = (
     missing_od_never_becomes_zero_travel,
     evening_show_cannot_break_departure_anchor,
     no_dinner_slot_keeps_hard_feasible_visits,
+    timeout_with_solution_returns_validated_best_so_far,
+    timeout_without_solution_is_explicitly_unplaced,
 )
 
 

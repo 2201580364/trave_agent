@@ -1,13 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-23T13:11:06.296863+00:00",
-  "passed": 6,
-  "total": 6,
+  "generated_at": "2026-08-23T13:59:13.851284+00:00",
+  "passed": 8,
+  "total": 8,
   "case_suite_passed": true,
-  "gate_passed": false,
+  "gate_passed": true,
   "timeout_best_so_far": {
-    "status": "pending",
-    "reason": "Current RoutedDay/ItineraryPlan does not expose whether the OR-Tools time limit was reached."
+    "status": "passed",
+    "evidence": [
+      "DEG-07",
+      "DEG-08"
+    ]
   },
   "cases": [
     {
@@ -89,6 +92,39 @@
       "details": {
         "meal_status": "unscheduled",
         "scheduled": 2
+      }
+    },
+    {
+      "case_id": "DEG-07",
+      "title": "时间上限内已有解时返回经复核的 best-so-far",
+      "passed": true,
+      "constraints": [
+        "C1",
+        "C2",
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "details": {
+        "search_status": "best_so_far",
+        "hard_constraint_violations": 0
+      }
+    },
+    {
+      "case_id": "DEG-08",
+      "title": "时间上限内无解时明确标记而非伪称 best-so-far",
+      "passed": true,
+      "constraints": [
+        "C1",
+        "C2",
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "details": {
+        "search_status": "time_limit_no_solution",
+        "search_attempt_count": 2,
+        "unplaced_reason": "SOLVER_TIME_LIMIT"
       }
     }
   ]

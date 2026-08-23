@@ -16,6 +16,8 @@ class DegradationCode(StrEnum):
     HIGH_ATTRACTION_COUNT = "HIGH_ATTRACTION_COUNT"
     UNPLACED_ATTRACTIONS = "UNPLACED_ATTRACTIONS"
     DINNER_UNSCHEDULED = "DINNER_UNSCHEDULED"
+    SEARCH_BEST_SO_FAR = "SEARCH_BEST_SO_FAR"
+    SEARCH_TIME_LIMIT_NO_SOLUTION = "SEARCH_TIME_LIMIT_NO_SOLUTION"
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +93,26 @@ def evaluate_itinerary_degradation(
                 dinner_count,
             )
         )
+    if itinerary.best_so_far_day_count:
+        notices.append(
+            DegradationNotice(
+                DegradationCode.SEARCH_BEST_SO_FAR,
+                (
+                    f"有 {itinerary.best_so_far_day_count} 天在时间上限内返回"
+                    "经过硬约束复核的当前最佳方案"
+                ),
+                itinerary.best_so_far_day_count,
+            )
+        )
+    time_limit_without_solution = itinerary.time_limit_no_solution_day_count
+    if time_limit_without_solution:
+        notices.append(
+            DegradationNotice(
+                DegradationCode.SEARCH_TIME_LIMIT_NO_SOLUTION,
+                f"有 {time_limit_without_solution} 天在时间上限内未找到可行方案",
+                time_limit_without_solution,
+            )
+        )
 
     has_unplaced_notice = any(
         item.code is DegradationCode.UNPLACED_ATTRACTIONS for item in notices
@@ -98,9 +120,18 @@ def evaluate_itinerary_degradation(
     has_dinner_notice = any(
         item.code is DegradationCode.DINNER_UNSCHEDULED for item in notices
     )
+    has_best_so_far_notice = any(
+        item.code is DegradationCode.SEARCH_BEST_SO_FAR for item in notices
+    )
+    has_timeout_no_solution_notice = any(
+        item.code is DegradationCode.SEARCH_TIME_LIMIT_NO_SOLUTION
+        for item in notices
+    )
     explainable = (
         quality.gate_passed
         and bool(itinerary.unplaced) == has_unplaced_notice
         and bool(dinner_count) == has_dinner_notice
+        and bool(itinerary.best_so_far_day_count) == has_best_so_far_notice
+        and bool(time_limit_without_solution) == has_timeout_no_solution_notice
     )
     return DegradationReport(tuple(notices), explainable)

@@ -9,6 +9,7 @@ from datetime import datetime
 
 from travel_agent.solver import (
     ItineraryPlan,
+    RouteSearchStatus,
     SolverQualityReport,
     constraint_name_for,
 )
@@ -85,6 +86,21 @@ def build_solver_run_audit(
                     visit_date=day.visit_date.isoformat(),
                 )
             )
+    for attempt in itinerary.search_attempts:
+        if attempt.metadata.status in {
+            RouteSearchStatus.COMPLETED,
+            RouteSearchStatus.EMPTY,
+        }:
+            continue
+        events.append(
+            DecisionEvent(
+                0,
+                "SOLVER_SEARCH",
+                attempt.metadata.status.value,
+                attempt.phase.value,
+                visit_date=attempt.visit_date.isoformat(),
+            )
+        )
 
     accounting = quality.accounting
     return SolverRunAudit(
@@ -111,4 +127,8 @@ def build_solver_run_audit(
         scheduled_count=accounting.scheduled_count,
         unplaced_count=accounting.unplaced_count,
         data_rejected_count=accounting.data_rejected_count,
+        timed_out_day_count=itinerary.timed_out_day_count,
+        best_so_far_day_count=itinerary.best_so_far_day_count,
+        no_solution_day_count=itinerary.no_solution_day_count,
+        search_attempt_count=len(itinerary.search_attempts),
     )

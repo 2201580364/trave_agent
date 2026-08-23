@@ -59,6 +59,10 @@ class SolverRunAudit:
     scheduled_count: int = 0
     unplaced_count: int = 0
     data_rejected_count: int = 0
+    timed_out_day_count: int = 0
+    best_so_far_day_count: int = 0
+    no_solution_day_count: int = 0
+    search_attempt_count: int = 0
 
     def __post_init__(self) -> None:
         if self.created_at.tzinfo is None:
@@ -72,6 +76,10 @@ class SolverRunAudit:
             self.scheduled_count,
             self.unplaced_count,
             self.data_rejected_count,
+            self.timed_out_day_count,
+            self.best_so_far_day_count,
+            self.no_solution_day_count,
+            self.search_attempt_count,
         )
         if any(count < 0 for count in counts):
             raise ValueError("audit counts cannot be negative")
@@ -97,4 +105,8 @@ class SolverRunAudit:
             "scheduled_count": self.scheduled_count,
             "unplaced_count": self.unplaced_count,
             "data_rejected_count": self.data_rejected_count,
+            "timed_out_day_count": self.timed_out_day_count,
+            "best_so_far_day_count": self.best_so_far_day_count,
+            "no_solution_day_count": self.no_solution_day_count,
+            "search_attempt_count": self.search_attempt_count,
         }

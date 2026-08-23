@@ -92,8 +92,8 @@ docs/test/reports/gate6-performance-latest.json
 
 | 场景 | 目标 | 本机 5 次结果 | 状态 |
 |---|---:|---:|---|
-| N=12 / D=3 | `<30s` | P95 约 33ms | ✅ |
-| N=20 / D=7 | `<120s` | P95 约 36ms | ✅ |
+| N=12 / D=3 | `<30s` | 本机 P95 `<100ms` | ✅ |
+| N=20 / D=7 | `<120s` | 本机 P95 `<100ms` | ✅ |
 
 每次运行同时验证景点守恒、硬约束违反数为 0，以及包含日期、顺序、到离时间、未排入和
 跨天重排的结果指纹一致。该基准是单进程、离线、合成数据的算法基准，不代表 API 并发压测。
@@ -122,9 +122,12 @@ docs/test/reports/gate6-degradation-latest.json
 | DEG-04 | 单日大面积 OD 缺失 | 不按零耗时串联，无法连接的景点明确未排入 |
 | DEG-05 | 晚间场次撞末日离开锚点 | 场次不得突破 C4，明确未排入 |
 | DEG-06 | 晚餐完全无空档 | 保留硬可行景点，晚餐标记 `UNSCHEDULED` 并提示 |
+| DEG-07 | 时间上限内已有解 | 返回经最终硬约束复核的 `best_so_far` |
+| DEG-08 | 时间上限内无解 | 使用 `SOLVER_TIME_LIMIT` 明确未排入，不伪称 best-so-far |
 
-当前结果：`6/6` 通过。超时 best-so-far 仍为待验证项，因为当前 `RoutedDay/ItineraryPlan`
-尚未暴露 OR-Tools 是否命中时间上限；不得用普通快速成功案例冒充超时证据。
+当前结果：`8/8` 通过。搜索元数据区分 `completed`、`best_so_far`、
+`time_limit_no_solution`、`no_solution`、`invalid` 和 `empty`，并保存 initial、reassignment、final
+搜索尝试历史；跨天恢复不得覆盖此前发生的超时证据。
 
 ## 报告模板（G7 验证时填）
 
@@ -132,7 +135,7 @@ docs/test/reports/gate6-degradation-latest.json
 - 硬约束单测通过率：/ 
 - Golden Case 通过数：6/6（杭州首批，仍需扩展其他城市与反例）
 - 数据校验覆盖率：杭州离线快照 7/7，生产数据待接入
-- 性能：N=12/D=3 P95≈33ms；N=20/D=7 P95≈36ms（本机离线合成基准）
-- 降级反例：6/6；超时 best-so-far 待补状态元数据
+- 性能：N=12/D=3、N=20/D=7 本机 P95 均 `<100ms`（精确值见最新报告）
+- 降级反例：8/8，含有解超时和无解超时
 - 用户测试：认可率 %（n=）
 ```

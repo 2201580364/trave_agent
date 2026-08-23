@@ -19,10 +19,13 @@ from .models import (
     ItineraryReassignment,
     ItineraryUnplaced,
     RejectionCode,
+    RouteSearchAttempt,
+    RouteSearchPhase,
     RoutingAttempt,
     Step1Plan,
 )
 from .routing import validate_routed_day
+from .routing import RoutingSearchExecutor
 from .segments import route_segmented_day
 from .time_windows import resolve_effective_window
 from .transport import DEFAULT_TRANSIT_BUFFER_RATIO, TravelTimeProvider
@@ -35,6 +38,7 @@ def route_itinerary(
     *,
     weather_by_date: Mapping[date, DailyWeather],
     buffer_ratio: float = DEFAULT_TRANSIT_BUFFER_RATIO,
+    search_executor: RoutingSearchExecutor | None = None,
 ) -> ItineraryPlan:
     """Route every day and rescue Step 2 drops on another feasible date."""
 
@@ -52,16 +56,25 @@ def route_itinerary(
     allocations_by_date = {
         day.visit_date: list(day.allocations) for day in step1_plan.days
     }
-    initial_routes = {
-        visit_date: route_segmented_day(
+    search_attempts: list[RouteSearchAttempt] = []
+    initial_routes = {}
+    for visit_date in ordered_dates:
+        segmented = route_segmented_day(
             base_by_date[visit_date],
             provider,
             weather_by_date=weather_by_date,
             buffer_ratio=buffer_ratio,
             travel_mode=step1_plan.travel_mode,
-        ).routed_day
-        for visit_date in ordered_dates
-    }
+            search_executor=search_executor,
+        )
+        initial_routes[visit_date] = segmented.routed_day
+        search_attempts.append(
+            RouteSearchAttempt(
+                visit_date,
+                RouteSearchPhase.INITIAL,
+                segmented.routed_day.solve_metadata,
+            )
+        )
 
     dropped: list[tuple[date, DayAllocation, RejectionCode]] = []
     for source_date in ordered_dates:
@@ -135,7 +148,15 @@ def route_itinerary(
                 weather_by_date=weather_by_date,
                 buffer_ratio=buffer_ratio,
                 travel_mode=step1_plan.travel_mode,
+                search_executor=search_executor,
             ).routed_day
+            search_attempts.append(
+                RouteSearchAttempt(
+                    target_date,
+                    RouteSearchPhase.REASSIGNMENT,
+                    candidate_route.solve_metadata,
+                )
+            )
             expected_ids = {item.attraction.id for item in target_allocations}
             routed_ids = {item.attraction.id for item in candidate_route.visits}
             if routed_ids != expected_ids:
@@ -197,8 +218,16 @@ def route_itinerary(
             weather_by_date=weather_by_date,
             buffer_ratio=buffer_ratio,
             travel_mode=step1_plan.travel_mode,
+            search_executor=search_executor,
         )
         routed = segmented.routed_day
+        search_attempts.append(
+            RouteSearchAttempt(
+                visit_date,
+                RouteSearchPhase.FINAL,
+                routed.solve_metadata,
+            )
+        )
         final_days.append(routed)
         final_segmented_days.append(segmented)
         validations.append(
@@ -231,6 +260,7 @@ def route_itinerary(
         tuple(validations),
         all(item.valid for item in validations),
         tuple(final_segmented_days),
+        tuple(search_attempts),
     )
 
 

@@ -21,13 +21,15 @@ from .models import (
     RejectionCode,
     RoutedDay,
     RouteSegment,
+    RouteSearchStatus,
+    RouteSolveMetadata,
     RouteUnplaced,
     RouteVisit,
     SegmentedDay,
     TravelMode,
     TravelTimeResult,
 )
-from .routing import route_day, validate_routed_day
+from .routing import RoutingSearchExecutor, route_day, validate_routed_day
 from .time_windows import resolve_effective_window
 from .transport import DEFAULT_TRANSIT_BUFFER_RATIO, TravelTimeProvider
 
@@ -50,6 +52,7 @@ def route_segmented_day(
     reduced_dinner_duration_min: int = REDUCED_DINNER_DURATION_MIN,
     buffer_ratio: float = DEFAULT_TRANSIT_BUFFER_RATIO,
     travel_mode: TravelMode = TravelMode.NORMAL,
+    search_executor: RoutingSearchExecutor | None = None,
 ) -> SegmentedDay:
     """Keep evening-only nodes after daytime nodes; dinner remains a soft block."""
 
@@ -75,6 +78,7 @@ def route_segmented_day(
         provider,
         buffer_ratio,
         travel_mode,
+        search_executor,
     )
     evening_route = _route_allocations(
         day_plan,
@@ -82,6 +86,7 @@ def route_segmented_day(
         provider,
         buffer_ratio,
         travel_mode,
+        search_executor,
     )
     merged, cross_rejection, cross_buffered = _merge_segments(
         day_plan,
@@ -121,11 +126,17 @@ def _route_allocations(
     provider: TravelTimeProvider,
     buffer_ratio: float,
     travel_mode: TravelMode,
+    search_executor: RoutingSearchExecutor | None,
 ) -> RoutedDay | None:
     if not allocations:
         return None
     plan = rebuild_day_plan(base, allocations, travel_mode)
-    return route_day(plan, provider, buffer_ratio=buffer_ratio)
+    return route_day(
+        plan,
+        provider,
+        buffer_ratio=buffer_ratio,
+        search_executor=search_executor,
+    )
 
 
 def _segment_for(
@@ -146,6 +157,7 @@ def _merge_segments(
     provider: TravelTimeProvider,
     buffer_ratio: float,
 ) -> tuple[RoutedDay, RejectionCode | None, int]:
+    solve_metadata = _combine_solve_metadata(daytime, evening)
     daytime_visits = list(daytime.visits) if daytime is not None else []
     evening_visits = list(evening.visits) if evening is not None else []
     daytime_unplaced = daytime.unplaced if daytime is not None else ()
@@ -163,6 +175,7 @@ def _merge_segments(
                 (*daytime_unplaced, *evening_unplaced),
                 daytime_raw + evening_raw,
                 daytime_buffered + evening_buffered,
+                solve_metadata,
             ),
             None,
             0,
@@ -183,6 +196,7 @@ def _merge_segments(
                 daytime_raw,
                 daytime_buffered,
                 RejectionCode.OD_DATA_MISSING,
+                solve_metadata,
             ),
             RejectionCode.OD_DATA_MISSING,
             0,
@@ -203,6 +217,7 @@ def _merge_segments(
         daytime_buffered + evening_buffered + cross_buffered,
         travel,
         cross_buffered,
+        solve_metadata,
     )
     if not _times_fit(candidate):
         return (
@@ -215,6 +230,7 @@ def _merge_segments(
                 daytime_raw,
                 daytime_buffered,
                 RejectionCode.TRANSIT_INFEASIBLE,
+                solve_metadata,
             ),
             RejectionCode.TRANSIT_INFEASIBLE,
             0,
@@ -232,6 +248,7 @@ def _combined_route(
     total_buffered: int,
     cross_travel: TravelTimeResult,
     cross_buffered: int,
+    solve_metadata: RouteSolveMetadata,
 ) -> RoutedDay:
     evening_visits[0] = replace(
         evening_visits[0],
@@ -245,6 +262,7 @@ def _combined_route(
         (*daytime_unplaced, *evening_unplaced),
         total_raw,
         total_buffered,
+        solve_metadata,
     )
 
 
@@ -257,6 +275,7 @@ def _reject_evening_segment(
     daytime_raw: int,
     daytime_buffered: int,
     code: RejectionCode,
+    solve_metadata: RouteSolveMetadata,
 ) -> RoutedDay:
     rejected = tuple(RouteUnplaced(visit.attraction, code) for visit in evening_visits)
     return RoutedDay(
@@ -266,6 +285,50 @@ def _reject_evening_segment(
         (*daytime_unplaced, *evening_unplaced, *rejected),
         daytime_raw,
         daytime_buffered,
+        solve_metadata,
+    )
+
+
+def _combine_solve_metadata(
+    daytime: RoutedDay | None,
+    evening: RoutedDay | None,
+) -> RouteSolveMetadata:
+    metadata = tuple(
+        route.solve_metadata for route in (daytime, evening) if route is not None
+    )
+    if not metadata:
+        return RouteSolveMetadata(RouteSearchStatus.EMPTY, 0, 0, False, True)
+    statuses = {item.status for item in metadata}
+    has_timeout = bool(
+        statuses.intersection(
+            {
+                RouteSearchStatus.BEST_SO_FAR,
+                RouteSearchStatus.TIME_LIMIT_NO_SOLUTION,
+            }
+        )
+    )
+    if has_timeout and any(item.solution_found for item in metadata):
+        status = RouteSearchStatus.BEST_SO_FAR
+    elif has_timeout:
+        status = RouteSearchStatus.TIME_LIMIT_NO_SOLUTION
+    elif RouteSearchStatus.INVALID in statuses:
+        status = RouteSearchStatus.INVALID
+    elif RouteSearchStatus.NO_SOLUTION in statuses:
+        status = RouteSearchStatus.NO_SOLUTION
+    else:
+        status = RouteSearchStatus.COMPLETED
+    return RouteSolveMetadata(
+        status,
+        sum(item.time_limit_seconds for item in metadata),
+        sum(item.elapsed_ms for item in metadata),
+        status in {RouteSearchStatus.COMPLETED, RouteSearchStatus.BEST_SO_FAR},
+        status
+        in {
+            RouteSearchStatus.EMPTY,
+            RouteSearchStatus.COMPLETED,
+            RouteSearchStatus.NO_SOLUTION,
+            RouteSearchStatus.INVALID,
+        },
     )
 
 

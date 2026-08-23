@@ -47,6 +47,10 @@ from .models import (
     RejectionCode,
     RoutedDay,
     RouteSegment,
+    RouteSearchAttempt,
+    RouteSearchPhase,
+    RouteSearchStatus,
+    RouteSolveMetadata,
     RouteUnplaced,
     RouteValidation,
     RouteVisit,
@@ -72,7 +76,12 @@ from .quality import (
     constraint_name_for,
     evaluate_solver_quality,
 )
-from .routing import route_day, validate_routed_day
+from .routing import (
+    DefaultRoutingSearchExecutor,
+    RoutingSearchExecutor,
+    route_day,
+    validate_routed_day,
+)
 from .segments import route_segmented_day
 from .time_windows import evaluate_arrival, resolve_effective_window
 from .transport import (
@@ -99,6 +108,7 @@ __all__ = [
     "DailyWeather",
     "DataRule",
     "DataRuleResult",
+    "DefaultRoutingSearchExecutor",
     "DegradationCode",
     "DegradationNotice",
     "DegradationReport",
@@ -124,10 +134,15 @@ __all__ = [
     "RejectionCode",
     "RoutedDay",
     "RouteSegment",
+    "RouteSearchAttempt",
+    "RouteSearchPhase",
+    "RouteSearchStatus",
+    "RouteSolveMetadata",
     "RouteUnplaced",
     "RouteValidation",
     "RouteVisit",
     "RoutingAttempt",
+    "RoutingSearchExecutor",
     "SegmentedDay",
     "SolverQualityReport",
     "SolverInputBatch",

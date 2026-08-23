@@ -26,19 +26,20 @@ def main() -> int:
     args = parser.parse_args()
     results = run_degradation_cases()
     case_suite_passed = all(item.passed for item in results)
+    timeout_case_ids = {"DEG-07", "DEG-08"}
+    timeout_cases_passed = all(
+        item.passed for item in results if item.case_id in timeout_case_ids
+    ) and timeout_case_ids.issubset({item.case_id for item in results})
     payload = {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(),
         "passed": sum(item.passed for item in results),
         "total": len(results),
         "case_suite_passed": case_suite_passed,
-        "gate_passed": False,
+        "gate_passed": case_suite_passed and timeout_cases_passed,
         "timeout_best_so_far": {
-            "status": "pending",
-            "reason": (
-                "Current RoutedDay/ItineraryPlan does not expose whether the "
-                "OR-Tools time limit was reached."
-            ),
+            "status": "passed" if timeout_cases_passed else "failed",
+            "evidence": ["DEG-07", "DEG-08"],
         },
         "cases": [asdict(item) for item in results],
     }
@@ -48,8 +49,8 @@ def main() -> int:
         encoding="utf-8",
     )
     print(f"Degradation cases: {payload['passed']}/{payload['total']} passed")
-    print("Timeout best-so-far: pending explicit solver status metadata")
-    print("Complete degradation gate: pending")
+    print(f"Timeout best-so-far: {payload['timeout_best_so_far']['status']}")
+    print(f"Complete degradation gate: {payload['gate_passed']}")
     print(f"Report: {args.output}")
     return 0 if case_suite_passed else 1
 

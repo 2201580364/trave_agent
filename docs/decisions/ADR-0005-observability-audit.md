@@ -59,7 +59,9 @@ solve_run_id, solver_version, constraint_version, parameter_version,
 input_snapshot_hash, data_snapshot_version, od_basis, weather_basis,
 random_seed, duration_ratio, assignments, unplaced reason codes,
 input_count, scheduled_count, unplaced_count, data_rejected_count,
-hard_constraint_violations, elapsed_ms, status, created_at
+hard_constraint_violations, elapsed_ms, status, created_at,
+search_attempt_count, timed_out_day_count,
+best_so_far_day_count, no_solution_day_count
 ```
 
 审计决策事件记录安排日期、跨天重排的原日期/目标日期、未排入或数据拒绝原因，以及最终硬约束违反。

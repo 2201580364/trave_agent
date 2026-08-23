@@ -8,6 +8,8 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from datetime import date
+from time import perf_counter
+from typing import Any, Protocol
 
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
@@ -18,6 +20,8 @@ from .models import (
     DayAllocation,
     DayPlan,
     RejectionCode,
+    RouteSearchStatus,
+    RouteSolveMetadata,
     RoutedDay,
     RouteUnplaced,
     RouteValidation,
@@ -35,6 +39,22 @@ DEFAULT_DROP_PENALTY = 1_000_000
 DEFAULT_TIME_LIMIT_SECONDS = 2
 
 
+class RoutingSearchExecutor(Protocol):
+    """Injectable search boundary used for deterministic timeout-status tests."""
+
+    def solve(self, routing: pywrapcp.RoutingModel, parameters: Any) -> Any | None: ...
+
+    def status(self, routing: pywrapcp.RoutingModel) -> int: ...
+
+
+class DefaultRoutingSearchExecutor:
+    def solve(self, routing: pywrapcp.RoutingModel, parameters: Any) -> Any | None:
+        return routing.SolveWithParameters(parameters)
+
+    def status(self, routing: pywrapcp.RoutingModel) -> int:
+        return routing.status()
+
+
 def route_day(
     day_plan: DayPlan,
     provider: TravelTimeProvider,
@@ -42,6 +62,7 @@ def route_day(
     drop_penalty: int = DEFAULT_DROP_PENALTY,
     time_limit_seconds: int = DEFAULT_TIME_LIMIT_SECONDS,
     buffer_ratio: float = DEFAULT_TRANSIT_BUFFER_RATIO,
+    search_executor: RoutingSearchExecutor | None = None,
 ) -> RoutedDay:
     """Order one day's allocations while allowing explicit, penalized dropping."""
 
@@ -143,18 +164,34 @@ def route_day(
         routing_enums_pb2.LocalSearchMetaheuristic.GREEDY_DESCENT
     )
     search.time_limit.seconds = time_limit_seconds
-    solution = routing.SolveWithParameters(search)
+    executor = search_executor or DefaultRoutingSearchExecutor()
+    search_started = perf_counter()
+    solution = executor.solve(routing, search)
+    elapsed_ms = max(0, round((perf_counter() - search_started) * 1000))
+    raw_status = executor.status(routing)
+    metadata = _solve_metadata(
+        raw_status,
+        solution_found=solution is not None,
+        time_limit_seconds=time_limit_seconds,
+        elapsed_ms=elapsed_ms,
+    )
     if solution is None:
+        rejection_code = (
+            RejectionCode.SOLVER_TIME_LIMIT
+            if metadata.status is RouteSearchStatus.TIME_LIMIT_NO_SOLUTION
+            else RejectionCode.NO_FEASIBLE_ROUTE
+        )
         return RoutedDay(
             day_plan.visit_date,
             day_plan.bounds,
             (),
             tuple(
-                RouteUnplaced(item.attraction, RejectionCode.NO_FEASIBLE_ROUTE)
+                RouteUnplaced(item.attraction, rejection_code)
                 for item in allocations
             ),
             0,
             0,
+            metadata,
         )
 
     dropped = {
@@ -215,6 +252,45 @@ def route_day(
         unplaced,
         total_travel,
         total_buffered_travel,
+        metadata,
+    )
+
+
+def _solve_metadata(
+    raw_status: int,
+    *,
+    solution_found: bool,
+    time_limit_seconds: int,
+    elapsed_ms: int,
+) -> RouteSolveMetadata:
+    statuses = routing_enums_pb2.RoutingSearchStatus
+    if solution_found:
+        if raw_status == statuses.ROUTING_INVALID:
+            raise RuntimeError("OR-Tools returned a solution with invalid search status")
+        if raw_status in {
+            statuses.ROUTING_PARTIAL_SUCCESS_LOCAL_OPTIMUM_NOT_REACHED,
+            statuses.ROUTING_FAIL_TIMEOUT,
+        }:
+            status = RouteSearchStatus.BEST_SO_FAR
+        else:
+            status = RouteSearchStatus.COMPLETED
+    elif raw_status == statuses.ROUTING_FAIL_TIMEOUT:
+        status = RouteSearchStatus.TIME_LIMIT_NO_SOLUTION
+    elif raw_status == statuses.ROUTING_INVALID:
+        status = RouteSearchStatus.INVALID
+    else:
+        status = RouteSearchStatus.NO_SOLUTION
+    return RouteSolveMetadata(
+        status,
+        time_limit_seconds,
+        elapsed_ms,
+        solution_found,
+        status
+        in {
+            RouteSearchStatus.COMPLETED,
+            RouteSearchStatus.NO_SOLUTION,
+            RouteSearchStatus.INVALID,
+        },
     )
 
 

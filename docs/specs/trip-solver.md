@@ -133,5 +133,6 @@ P1 默认使用 `seed=0` 生成可审计重放的稳定主方案。系统重试�
 | 求解超时 | 兜底 | OR-Tools 超时返回 best-so-far（PATH_CHEAPEST_ARC 首解已内建） |
 
 降级说明由纯转换层统一生成，不改变求解结果：景点数 `>25` 时提示选择过多；存在未排入时
-必须给出数量和逐项原因；晚餐无法预留时输出“晚餐时间紧张”。超时 best-so-far 在
-`RoutedDay/ItineraryPlan` 增加明确搜索状态前仍属于待验证能力，不得仅凭 OR-Tools 配置宣称完成。
+必须给出数量和逐项原因；晚餐无法预留时输出“晚餐时间紧张”。OR-Tools 搜索状态必须区分
+有解但未完成的 `best_so_far` 与超时无解的 `time_limit_no_solution`；每次 initial、reassignment、
+final 搜索均保留尝试历史，跨天恢复不得覆盖超时证据。best-so-far 仍须通过最终硬约束复核。
