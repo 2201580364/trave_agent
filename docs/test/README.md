@@ -23,7 +23,7 @@ python -m pytest tests/solver/test_closeness.py tests/closeness -q
 python scripts/run_closeness_report.py
 ```
 
-报告为 `docs/test/reports/gate6-closeness-latest.json`。当前杭州案例来源类型是 `PUBLIC_GUIDE_SYNTHESIS`，综合接近度是可重复的技术回归证据，不是领域专家金标，也不能替代 G7 的真实专家评审和用户认可测试。
+报告为 `docs/test/reports/gate6-closeness-latest.json`。报告同时保留逐景点/逐关系的优选值、可接受值、实际值和命中结果，不能只根据综合分判断算法变化。当前杭州案例来源类型是 `PUBLIC_GUIDE_SYNTHESIS`，综合接近度是可重复的技术回归证据，不是领域专家金标，也不能替代 G7 的真实专家评审和用户认可测试。
 
 > 由领域专家手工编排的「正确行程」，是主观「合理」的客观化锚点。
 

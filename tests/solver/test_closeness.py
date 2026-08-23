@@ -9,6 +9,7 @@ from travel_agent.solver import (
     Attraction,
     BaselineProvenance,
     DayTimeBounds,
+    ExpectationOutcome,
     ItineraryBaseline,
     ItineraryPlan,
     RouteValidation,
@@ -95,6 +96,8 @@ def test_exact_reviewed_baseline_scores_every_component_as_one() -> None:
     assert report.time_bucket.score == 1
     assert report.same_day.score == 1
     assert report.adjacency.score == 1
+    assert len(report.expectation_outcomes) == 6
+    assert all(item.score == 1 for item in report.expectation_outcomes)
     assert report.overall_closeness == 1
     assert report.baseline_passed
 
@@ -119,6 +122,10 @@ def test_acceptable_non_preferred_day_and_bucket_score_point_seven() -> None:
     assert report.day_assignment.score == pytest.approx(0.7)
     assert report.time_bucket.score == pytest.approx(0.7)
     assert report.overall_closeness == pytest.approx(0.7)
+    assert tuple(item.outcome for item in report.expectation_outcomes) == (
+        ExpectationOutcome.ACCEPTABLE,
+        ExpectationOutcome.ACCEPTABLE,
+    )
     assert not report.baseline_passed
 
 
@@ -179,6 +186,8 @@ def test_missing_attraction_scores_zero() -> None:
 
     assert report.day_assignment.score == 0
     assert report.overall_closeness == 0
+    assert report.expectation_outcomes[0].actual_values == ()
+    assert report.expectation_outcomes[0].outcome is ExpectationOutcome.MISSING
 
 
 def test_baseline_rejects_duplicates_and_empty_expectations() -> None:

@@ -26,7 +26,7 @@ def main() -> int:
     args = parser.parse_args()
     result = run_hangzhou_closeness_case()
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(UTC).isoformat(),
         "suite": "hangzhou-public-guide-synthesis-closeness",
         "note": result.note,

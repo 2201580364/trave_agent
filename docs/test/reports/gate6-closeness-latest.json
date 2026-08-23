@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-08-23T14:22:18.374256+00:00",
+  "schema_version": 2,
+  "generated_at": "2026-08-23T14:37:15.344015+00:00",
   "suite": "hangzhou-public-guide-synthesis-closeness",
   "note": "Public-guide-synthesis regression evidence; not a domain-expert gold standard.",
   "baseline_id": "HZ-PUBLIC-GUIDE-3D-01",
@@ -39,6 +39,219 @@
     "matched_weight": 2.0,
     "total_weight": 2.0
   },
+  "expectation_outcomes": [
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        11
+      ],
+      "preferred_values": [
+        "2026-08-24"
+      ],
+      "acceptable_values": [
+        "2026-08-25"
+      ],
+      "actual_values": [
+        "2026-08-24"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "preferred"
+    },
+    {
+      "component": "time_bucket",
+      "attraction_ids": [
+        11
+      ],
+      "preferred_values": [
+        "morning"
+      ],
+      "acceptable_values": [
+        "afternoon"
+      ],
+      "actual_values": [
+        "afternoon"
+      ],
+      "score": 0.7,
+      "fixed": false,
+      "outcome": "acceptable"
+    },
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        12
+      ],
+      "preferred_values": [],
+      "acceptable_values": [
+        "2026-08-24",
+        "2026-08-25"
+      ],
+      "actual_values": [
+        "2026-08-24"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "acceptable"
+    },
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        13
+      ],
+      "preferred_values": [
+        "2026-08-24"
+      ],
+      "acceptable_values": [
+        "2026-08-25"
+      ],
+      "actual_values": [
+        "2026-08-24"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "preferred"
+    },
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        14
+      ],
+      "preferred_values": [
+        "2026-08-25"
+      ],
+      "acceptable_values": [
+        "2026-08-26"
+      ],
+      "actual_values": [
+        "2026-08-25"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "preferred"
+    },
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        15
+      ],
+      "preferred_values": [
+        "2026-08-25"
+      ],
+      "acceptable_values": [
+        "2026-08-24",
+        "2026-08-26"
+      ],
+      "actual_values": [
+        "2026-08-25"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "preferred"
+    },
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        16
+      ],
+      "preferred_values": [
+        "2026-08-26"
+      ],
+      "acceptable_values": [
+        "2026-08-25"
+      ],
+      "actual_values": [
+        "2026-08-26"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "preferred"
+    },
+    {
+      "component": "time_bucket",
+      "attraction_ids": [
+        16
+      ],
+      "preferred_values": [
+        "evening"
+      ],
+      "acceptable_values": [
+        "afternoon"
+      ],
+      "actual_values": [
+        "morning"
+      ],
+      "score": 0.0,
+      "fixed": false,
+      "outcome": "missed"
+    },
+    {
+      "component": "day_assignment",
+      "attraction_ids": [
+        17
+      ],
+      "preferred_values": [
+        "2026-08-26"
+      ],
+      "acceptable_values": [],
+      "actual_values": [
+        "2026-08-26"
+      ],
+      "score": 1.0,
+      "fixed": true,
+      "outcome": "preferred"
+    },
+    {
+      "component": "time_bucket",
+      "attraction_ids": [
+        17
+      ],
+      "preferred_values": [
+        "evening"
+      ],
+      "acceptable_values": [],
+      "actual_values": [
+        "evening"
+      ],
+      "score": 1.0,
+      "fixed": true,
+      "outcome": "preferred"
+    },
+    {
+      "component": "same_day",
+      "attraction_ids": [
+        11,
+        12
+      ],
+      "preferred_values": [
+        "same_day"
+      ],
+      "acceptable_values": [],
+      "actual_values": [
+        "2026-08-24",
+        "2026-08-24"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "matched"
+    },
+    {
+      "component": "adjacency",
+      "attraction_ids": [
+        11,
+        12
+      ],
+      "preferred_values": [
+        "either_direction"
+      ],
+      "acceptable_values": [],
+      "actual_values": [
+        "reverse"
+      ],
+      "score": 1.0,
+      "fixed": false,
+      "outcome": "matched"
+    }
+  ],
   "overall_closeness": 0.8916666666666666,
   "threshold": 0.75,
   "baseline_passed": true

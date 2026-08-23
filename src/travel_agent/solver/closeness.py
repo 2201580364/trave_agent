@@ -25,6 +25,14 @@ class TimeBucket(StrEnum):
     EVENING = "evening"
 
 
+class ExpectationOutcome(StrEnum):
+    PREFERRED = "preferred"
+    ACCEPTABLE = "acceptable"
+    MATCHED = "matched"
+    MISSED = "missed"
+    MISSING = "missing"
+
+
 @dataclass(frozen=True, slots=True)
 class VisitExpectation:
     attraction_id: int
@@ -114,6 +122,26 @@ class ClosenessComponent:
 
 
 @dataclass(frozen=True, slots=True)
+class ClosenessExpectationOutcome:
+    component: str
+    attraction_ids: tuple[int, ...]
+    preferred_values: tuple[str, ...]
+    acceptable_values: tuple[str, ...]
+    actual_values: tuple[str, ...]
+    score: float
+    fixed: bool
+    outcome: ExpectationOutcome
+
+    def __post_init__(self) -> None:
+        if self.component not in COMPONENT_WEIGHTS:
+            raise ValueError("unknown closeness component")
+        if not self.attraction_ids:
+            raise ValueError("expectation outcome requires attraction ids")
+        if not 0 <= self.score <= 1:
+            raise ValueError("expectation outcome score must be within 0..1")
+
+
+@dataclass(frozen=True, slots=True)
 class ItineraryClosenessReport:
     baseline_id: str
     baseline_version: str
@@ -127,6 +155,7 @@ class ItineraryClosenessReport:
     time_bucket: ClosenessComponent
     same_day: ClosenessComponent
     adjacency: ClosenessComponent
+    expectation_outcomes: tuple[ClosenessExpectationOutcome, ...]
     overall_closeness: float
     threshold: float
     baseline_passed: bool
@@ -175,6 +204,7 @@ def evaluate_itinerary_closeness(
     bucket_component = _time_bucket_component(baseline, visits)
     same_day_component = _same_day_component(baseline, visits)
     adjacency_component = _adjacency_component(baseline, itinerary)
+    outcomes = _expectation_outcomes(baseline, visits, itinerary)
     fixed_matched, fixed_total = _fixed_matches(baseline, visits, itinerary)
     fixed_score = fixed_matched / fixed_total if fixed_total else 1.0
     overall = _overall(
@@ -197,6 +227,7 @@ def evaluate_itinerary_closeness(
         bucket_component,
         same_day_component,
         adjacency_component,
+        outcomes,
         overall,
         threshold,
         hard_gate and fixed_score == 1 and overall >= threshold,
@@ -329,6 +360,120 @@ def _fixed_matches(
         reverse = (expectation.second_id, expectation.first_id) in directed
         matched += int(forward or (reverse and not expectation.directional))
     return matched, total
+
+
+def _expectation_outcomes(
+    baseline: ItineraryBaseline,
+    visits: dict[int, tuple[date, TimeBucket]],
+    itinerary: ItineraryPlan,
+) -> tuple[ClosenessExpectationOutcome, ...]:
+    outcomes: list[ClosenessExpectationOutcome] = []
+    for expectation in baseline.visit_expectations:
+        actual = visits.get(expectation.attraction_id)
+        if expectation.preferred_day is not None or expectation.acceptable_days:
+            score, outcome = _value_outcome(
+                actual[0] if actual else None,
+                (expectation.preferred_day,) if expectation.preferred_day else (),
+                tuple(sorted(expectation.acceptable_days)),
+            )
+            outcomes.append(
+                ClosenessExpectationOutcome(
+                    "day_assignment",
+                    (expectation.attraction_id,),
+                    _date_values(
+                        (expectation.preferred_day,) if expectation.preferred_day else ()
+                    ),
+                    _date_values(tuple(sorted(expectation.acceptable_days))),
+                    _date_values((actual[0],)) if actual else (),
+                    score,
+                    expectation.fixed_day,
+                    outcome,
+                )
+            )
+        if expectation.preferred_buckets or expectation.acceptable_buckets:
+            score, outcome = _value_outcome(
+                actual[1] if actual else None,
+                tuple(sorted(expectation.preferred_buckets)),
+                tuple(sorted(expectation.acceptable_buckets)),
+            )
+            outcomes.append(
+                ClosenessExpectationOutcome(
+                    "time_bucket",
+                    (expectation.attraction_id,),
+                    tuple(sorted(expectation.preferred_buckets)),
+                    tuple(sorted(expectation.acceptable_buckets)),
+                    (actual[1].value,) if actual else (),
+                    score,
+                    expectation.fixed_bucket,
+                    outcome,
+                )
+            )
+    for expectation in baseline.same_day_expectations:
+        attraction_ids = tuple(sorted(expectation.attraction_ids))
+        actual_dates = tuple(
+            visits[item][0].isoformat() for item in attraction_ids if item in visits
+        )
+        all_present = len(actual_dates) == len(attraction_ids)
+        matched = all_present and len(set(actual_dates)) == 1
+        outcomes.append(
+            ClosenessExpectationOutcome(
+                "same_day",
+                attraction_ids,
+                ("same_day",),
+                (),
+                actual_dates,
+                float(matched),
+                expectation.fixed,
+                ExpectationOutcome.MATCHED if matched else (
+                    ExpectationOutcome.MISSED if all_present else ExpectationOutcome.MISSING
+                ),
+            )
+        )
+    directed = _directed_adjacencies(itinerary)
+    for expectation in baseline.adjacency_expectations:
+        forward = (expectation.first_id, expectation.second_id) in directed
+        reverse = (expectation.second_id, expectation.first_id) in directed
+        matched = forward or (reverse and not expectation.directional)
+        actual = "forward" if forward else "reverse" if reverse else "not_adjacent"
+        outcomes.append(
+            ClosenessExpectationOutcome(
+                "adjacency",
+                (expectation.first_id, expectation.second_id),
+                ("forward",) if expectation.directional else ("either_direction",),
+                (),
+                (actual,),
+                float(matched),
+                expectation.fixed,
+                ExpectationOutcome.MATCHED if matched else ExpectationOutcome.MISSED,
+            )
+        )
+    return tuple(outcomes)
+
+
+def _value_outcome(
+    actual: object | None,
+    preferred: tuple[object, ...],
+    acceptable: tuple[object, ...],
+) -> tuple[float, ExpectationOutcome]:
+    if actual is None:
+        return 0.0, ExpectationOutcome.MISSING
+    if actual in preferred:
+        return 1.0, ExpectationOutcome.PREFERRED
+    if actual in acceptable:
+        return (0.7 if preferred else 1.0), ExpectationOutcome.ACCEPTABLE
+    return 0.0, ExpectationOutcome.MISSED
+
+
+def _date_values(values: tuple[date, ...]) -> tuple[str, ...]:
+    return tuple(value.isoformat() for value in values)
+
+
+def _directed_adjacencies(itinerary: ItineraryPlan) -> set[tuple[int, int]]:
+    directed: set[tuple[int, int]] = set()
+    for day in itinerary.days:
+        ids = [visit.attraction.id for visit in day.visits]
+        directed.update(zip(ids, ids[1:], strict=False))
+    return directed
 
 
 def _component(name: str, scores: list[float]) -> ClosenessComponent:
