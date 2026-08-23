@@ -14,6 +14,17 @@
 
 ## Golden Case 定义（核心）
 
+### 评审行程接近度（Gate 6）
+
+Golden Case 的硬约束和景点守恒门禁之外，使用 ADR-0007 定义的结构化接近度比较分天、时段、同日组合和相邻顺序。固定项必须全部命中，软接近度初始阈值为 `0.75`；软分不能补偿 C1/C2/C4/C5/C6 或景点守恒失败。
+
+```powershell
+python -m pytest tests/solver/test_closeness.py tests/closeness -q
+python scripts/run_closeness_report.py
+```
+
+报告为 `docs/test/reports/gate6-closeness-latest.json`。当前杭州案例来源类型是 `PUBLIC_GUIDE_SYNTHESIS`，综合接近度是可重复的技术回归证据，不是领域专家金标，也不能替代 G7 的真实专家评审和用户认可测试。
+
 > 由领域专家手工编排的「正确行程」，是主观「合理」的客观化锚点。
 
 示例（杭州、周一到达、3 天）：

@@ -2,6 +2,17 @@
 
 from .anchors import resolve_day_time_bounds
 from .availability import assign_attraction_date, assign_to_nearest_available_date, is_open_on
+from .closeness import (
+    AdjacencyExpectation,
+    BaselineProvenance,
+    ClosenessComponent,
+    ItineraryBaseline,
+    ItineraryClosenessReport,
+    SameDayExpectation,
+    TimeBucket,
+    VisitExpectation,
+    evaluate_itinerary_closeness,
+)
 from .data_gate import filter_solver_inputs
 from .data_validation import (
     ALLOWED_CATEGORIES,
@@ -94,10 +105,13 @@ from .weather import assign_to_nearest_feasible_date, evaluate_weather_availabil
 
 __all__ = [
     "AnchorRejectionCode",
+    "AdjacencyExpectation",
     "ALLOWED_CATEGORIES",
     "ArrivalEvaluation",
     "Attraction",
     "AttractionPreference",
+    "BaselineProvenance",
+    "ClosenessComponent",
     "AttractionDataValidation",
     "ApproximateTravelTimeProvider",
     "ConnectionEvaluation",
@@ -125,6 +139,8 @@ __all__ = [
     "ItineraryReassignment",
     "ItineraryUnplaced",
     "ItineraryAccounting",
+    "ItineraryBaseline",
+    "ItineraryClosenessReport",
     "MealPlacement",
     "MealPlan",
     "MealStatus",
@@ -144,16 +160,19 @@ __all__ = [
     "RoutingAttempt",
     "RoutingSearchExecutor",
     "SegmentedDay",
+    "SameDayExpectation",
     "SolverQualityReport",
     "SolverInputBatch",
     "Step1Plan",
     "TimeRule",
+    "TimeBucket",
     "TimeWindowResolution",
     "TravelMode",
     "TravelTimeProvider",
     "TravelTimeResult",
     "TripTimeAnchors",
     "UnplacedAttraction",
+    "VisitExpectation",
     "WeatherAvailability",
     "WeatherBasis",
     "WeatherSeverity",
@@ -164,6 +183,7 @@ __all__ = [
     "evaluate_arrival",
     "evaluate_connection",
     "evaluate_itinerary_degradation",
+    "evaluate_itinerary_closeness",
     "evaluate_solver_quality",
     "evaluate_weather_availability",
     "filter_solver_inputs",

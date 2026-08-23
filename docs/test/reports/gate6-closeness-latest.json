@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-23T14:22:18.374256+00:00",
+  "suite": "hangzhou-public-guide-synthesis-closeness",
+  "note": "Public-guide-synthesis regression evidence; not a domain-expert gold standard.",
+  "baseline_id": "HZ-PUBLIC-GUIDE-3D-01",
+  "baseline_version": "1.0.0",
+  "provenance": "public_guide_synthesis",
+  "source_refs": [
+    "SRC-LINGYIN-OFFICIAL",
+    "SRC-WESTLAKE-GUIDE",
+    "SRC-FOUNTAIN-GUIDE"
+  ],
+  "hard_gate_passed": true,
+  "fixed_item_count": 2,
+  "fixed_item_matched": 2,
+  "fixed_visit_score": 1.0,
+  "day_assignment": {
+    "name": "day_assignment",
+    "score": 1.0,
+    "matched_weight": 7.0,
+    "total_weight": 7
+  },
+  "time_bucket": {
+    "name": "time_bucket",
+    "score": 0.5666666666666667,
+    "matched_weight": 1.7,
+    "total_weight": 3
+  },
+  "same_day": {
+    "name": "same_day",
+    "score": 1.0,
+    "matched_weight": 2.0,
+    "total_weight": 2.0
+  },
+  "adjacency": {
+    "name": "adjacency",
+    "score": 1.0,
+    "matched_weight": 2.0,
+    "total_weight": 2.0
+  },
+  "overall_closeness": 0.8916666666666666,
+  "threshold": 0.75,
+  "baseline_passed": true
+}
