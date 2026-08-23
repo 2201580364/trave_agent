@@ -31,6 +31,9 @@ from travel_agent.solver import (
     AttractionPreference,
     Coordinate,
     TripTimeAnchors,
+    TimeBucket,
+    VisitPeriodPreference,
+    VisitPeriodPreferenceSource,
     WeatherSeverity,
     assign_days,
     evaluate_solver_quality,
@@ -62,6 +65,20 @@ def run_hangzhou_closeness_case() -> HangzhouClosenessResult:
         _attraction(17, "湖滨晚间表演", rules=_rule("19:30", "19:50"), duration=20),
     )
     preferred_dates = (MONDAY, MONDAY, MONDAY, MONDAY, TUESDAY, WEDNESDAY, WEDNESDAY)
+    visit_periods = {
+        11: VisitPeriodPreference(
+            frozenset({TimeBucket.MORNING}),
+            frozenset({TimeBucket.AFTERNOON}),
+            VisitPeriodPreferenceSource.PUBLIC_GUIDE_SYNTHESIS,
+            "SRC-LINGYIN-OFFICIAL",
+        ),
+        16: VisitPeriodPreference(
+            frozenset({TimeBucket.EVENING}),
+            frozenset({TimeBucket.AFTERNOON}),
+            VisitPeriodPreferenceSource.PUBLIC_GUIDE_SYNTHESIS,
+            "SRC-WESTLAKE-GUIDE",
+        ),
+    }
     weather = _weather(
         {
             MONDAY: WeatherSeverity.NORMAL,
@@ -71,7 +88,11 @@ def run_hangzhou_closeness_case() -> HangzhouClosenessResult:
     )
     step1 = assign_days(
         tuple(
-            AttractionPreference(attraction, preferred_date)
+            AttractionPreference(
+                attraction,
+                preferred_date,
+                visit_periods.get(attraction.id),
+            )
             for attraction, preferred_date in zip(attractions, preferred_dates, strict=True)
         ),
         trip_dates=(MONDAY, TUESDAY, WEDNESDAY),

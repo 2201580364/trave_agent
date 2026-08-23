@@ -15,8 +15,10 @@ from travel_agent.solver import (
     RejectionCode,
     RoutedDay,
     RouteVisit,
+    TimeBucket,
     TimeRule,
     TravelTimeResult,
+    VisitPeriodPreference,
     WeatherBasis,
     WeatherSeverity,
     route_day,
@@ -80,6 +82,38 @@ def _weather(
     return {DAY: DailyWeather(DAY, WeatherBasis.FORECAST, severity)}
 
 
+def _day_with_periods(
+    *items: tuple[Attraction, VisitPeriodPreference | None],
+    bounds: tuple[int, int] = (9 * 60, 21 * 60),
+) -> DayPlan:
+    allocations = tuple(
+        DayAllocation(
+            attraction,
+            DAY,
+            DAY,
+            math.ceil(attraction.suggested_duration * 0.6),
+            preference,
+        )
+        for attraction, preference in items
+    )
+    return DayPlan(
+        DAY,
+        DayTimeBounds(*bounds),
+        allocations,
+        sum(item.required_duration_min for item in allocations),
+        len(allocations),
+        PaceLevel.BALANCED,
+        "period preference test",
+    )
+
+
+def _period(bucket: TimeBucket) -> VisitPeriodPreference:
+    return VisitPeriodPreference(
+        frozenset({bucket}),
+        source_ref=f"TEST-{bucket.value}",
+    )
+
+
 def test_step2_routes_all_attractions_and_minimizes_raw_travel() -> None:
     first, second, third = _attraction(1), _attraction(2), _attraction(3)
     provider = InMemoryTravelTimeProvider(
@@ -109,6 +143,57 @@ def test_step2_waits_until_attraction_opens() -> None:
     result = route_day(_day(afternoon), InMemoryTravelTimeProvider({}))
 
     assert result.visits[0].arrival_min == 14 * 60
+
+
+def test_step2_waits_for_preferred_period_when_hard_feasible() -> None:
+    attraction = _attraction(1)
+
+    result = route_day(
+        _day_with_periods((attraction, _period(TimeBucket.EVENING))),
+        InMemoryTravelTimeProvider({}),
+    )
+
+    assert result.visits[0].arrival_min == 17 * 60
+
+
+def test_step2_period_preference_never_expands_c2_window() -> None:
+    attraction = _attraction(
+        1,
+        rules=(TimeRule.from_strings(("01-01", "12-31"), "09:00", "16:00"),),
+    )
+
+    result = route_day(
+        _day_with_periods((attraction, _period(TimeBucket.EVENING))),
+        InMemoryTravelTimeProvider({}),
+    )
+
+    assert len(result.visits) == 1
+    assert result.visits[0].arrival_min <= 16 * 60 - 36
+
+
+def test_step2_does_not_take_large_detour_for_period_preference() -> None:
+    preferred = _attraction(1)
+    fixed = _attraction(
+        2,
+        rules=(TimeRule.from_strings(("01-01", "12-31"), "17:00", "17:36"),),
+    )
+    provider = InMemoryTravelTimeProvider(
+        {
+            (1, 2): _travel(1, 2, 10),
+            (2, 1): _travel(2, 1, 90),
+        }
+    )
+
+    result = route_day(
+        _day_with_periods(
+            (preferred, _period(TimeBucket.EVENING)),
+            (fixed, None),
+        ),
+        provider,
+    )
+
+    assert [visit.attraction.id for visit in result.visits] == [1, 2]
+    assert result.total_travel_min == 10
 
 
 def test_step2_honors_last_entry_and_drops_infeasible_attraction() -> None:

@@ -50,6 +50,11 @@ def test_visit_period_evaluation_distinguishes_three_soft_outcomes() -> None:
 
 
 def test_visit_period_preference_requires_disjoint_buckets_and_source() -> None:
+    with pytest.raises(ValueError, match="one preferred bucket"):
+        VisitPeriodPreference(
+            frozenset({TimeBucket.MORNING, TimeBucket.EVENING}),
+            source_ref="SRC-1",
+        )
     with pytest.raises(ValueError, match="must not overlap"):
         VisitPeriodPreference(
             frozenset({TimeBucket.EVENING}),

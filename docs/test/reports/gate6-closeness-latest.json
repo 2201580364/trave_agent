@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-08-23T15:08:14.381096+00:00",
+  "generated_at": "2026-08-23T15:40:43.184975+00:00",
   "suite": "hangzhou-public-guide-synthesis-closeness",
   "note": "Public-guide-synthesis regression evidence; not a domain-expert gold standard.",
   "baseline_id": "HZ-PUBLIC-GUIDE-3D-01",
@@ -23,8 +23,8 @@
   },
   "time_bucket": {
     "name": "time_bucket",
-    "score": 0.5666666666666667,
-    "matched_weight": 1.7,
+    "score": 0.9,
+    "matched_weight": 2.7,
     "total_weight": 3
   },
   "same_day": {
@@ -178,11 +178,11 @@
         "afternoon"
       ],
       "actual_values": [
-        "morning"
+        "evening"
       ],
-      "score": 0.0,
+      "score": 1.0,
       "fixed": false,
-      "outcome": "missed"
+      "outcome": "preferred"
     },
     {
       "component": "day_assignment",
@@ -245,14 +245,14 @@
       ],
       "acceptable_values": [],
       "actual_values": [
-        "reverse"
+        "forward"
       ],
       "score": 1.0,
       "fixed": false,
       "outcome": "matched"
     }
   ],
-  "overall_closeness": 0.8916666666666666,
+  "overall_closeness": 0.975,
   "threshold": 0.75,
   "baseline_passed": true
 }

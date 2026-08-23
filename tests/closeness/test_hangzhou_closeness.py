@@ -19,5 +19,5 @@ def test_hangzhou_public_guide_closeness_case_passes() -> None:
         for item in result.report.expectation_outcomes
         if item.component == "time_bucket" and item.attraction_ids == (16,)
     )
-    assert river_street_bucket.actual_values == ("morning",)
-    assert river_street_bucket.outcome is ExpectationOutcome.MISSED
+    assert river_street_bucket.actual_values == ("evening",)
+    assert river_street_bucket.outcome is ExpectationOutcome.PREFERRED

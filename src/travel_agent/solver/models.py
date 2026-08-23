@@ -405,6 +405,8 @@ class VisitPeriodPreference:
     def __post_init__(self) -> None:
         if not self.preferred_buckets:
             raise ValueError("visit-period preference requires preferred buckets")
+        if len(self.preferred_buckets) != 1:
+            raise ValueError("P1 visit-period preference requires one preferred bucket")
         overlap = self.preferred_buckets.intersection(self.acceptable_buckets)
         if overlap:
             raise ValueError(

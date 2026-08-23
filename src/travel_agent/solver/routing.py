@@ -26,6 +26,7 @@ from .models import (
     RouteUnplaced,
     RouteValidation,
     RouteVisit,
+    TimeBucket,
 )
 from .time_windows import DEFAULT_DURATION_RATIO, resolve_effective_window
 from .transport import (
@@ -37,6 +38,8 @@ from .weather import evaluate_weather_availability
 
 DEFAULT_DROP_PENALTY = 1_000_000
 DEFAULT_TIME_LIMIT_SECONDS = 2
+DEFAULT_TRAVEL_COST_SCALE = 30
+DEFAULT_PERIOD_DEVIATION_COST = 1
 
 
 class RoutingSearchExecutor(Protocol):
@@ -62,6 +65,8 @@ def route_day(
     drop_penalty: int = DEFAULT_DROP_PENALTY,
     time_limit_seconds: int = DEFAULT_TIME_LIMIT_SECONDS,
     buffer_ratio: float = DEFAULT_TRANSIT_BUFFER_RATIO,
+    travel_cost_scale: int = DEFAULT_TRAVEL_COST_SCALE,
+    period_deviation_cost: int = DEFAULT_PERIOD_DEVIATION_COST,
     search_executor: RoutingSearchExecutor | None = None,
 ) -> RoutedDay:
     """Order one day's allocations while allowing explicit, penalized dropping."""
@@ -72,6 +77,8 @@ def route_day(
         raise ValueError("time_limit_seconds must be positive")
     if buffer_ratio < 1:
         raise ValueError("buffer_ratio must be at least 1")
+    if travel_cost_scale <= 0 or period_deviation_cost <= 0:
+        raise ValueError("routing soft-cost parameters must be positive")
     allocations = day_plan.allocations
     if not allocations:
         return RoutedDay(day_plan.visit_date, day_plan.bounds, (), (), 0, 0)
@@ -99,7 +106,11 @@ def route_day(
             allocations[from_node - 1].attraction.id,
             allocations[to_node - 1].attraction.id,
         )
-        return travel.travel_min if travel is not None else drop_penalty
+        return (
+            travel.travel_min * travel_cost_scale
+            if travel is not None
+            else drop_penalty
+        )
 
     cost_callback = routing.RegisterTransitCallback(raw_travel_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(cost_callback)
@@ -155,6 +166,23 @@ def route_day(
             routing.ActiveVar(index).SetValue(0)
         else:
             time_dimension.CumulVar(index).SetRange(earliest, latest)
+            if allocation.visit_period is not None:
+                preferred_bucket = next(iter(allocation.visit_period.preferred_buckets))
+                preferred_start, preferred_end = _preferred_period_bounds(
+                    earliest,
+                    latest,
+                    preferred_bucket,
+                )
+                time_dimension.SetCumulVarSoftLowerBound(
+                    index,
+                    preferred_start,
+                    period_deviation_cost,
+                )
+                time_dimension.SetCumulVarSoftUpperBound(
+                    index,
+                    preferred_end,
+                    period_deviation_cost,
+                )
 
     _remove_missing_od_arcs(routing, manager, allocations, provider)
 
@@ -254,6 +282,39 @@ def route_day(
         total_buffered_travel,
         metadata,
     )
+
+
+def _preferred_period_bounds(
+    earliest: int,
+    latest: int,
+    bucket: TimeBucket,
+) -> tuple[int, int]:
+    local_bounds = {
+        TimeBucket.MORNING: (0, 12 * 60 - 1),
+        TimeBucket.AFTERNOON: (12 * 60, 17 * 60 - 1),
+        TimeBucket.EVENING: (17 * 60, 24 * 60 - 1),
+    }[bucket]
+    first_day = earliest // (24 * 60) - 1
+    last_day = latest // (24 * 60) + 1
+    candidates = tuple(
+        (
+            day_offset * 24 * 60 + local_bounds[0],
+            day_offset * 24 * 60 + local_bounds[1],
+        )
+        for day_offset in range(first_day, last_day + 1)
+    )
+
+    def distance(interval: tuple[int, int]) -> tuple[int, int]:
+        start, end = interval
+        if end < earliest:
+            gap = earliest - end
+        elif start > latest:
+            gap = start - latest
+        else:
+            gap = 0
+        return gap, abs(start - earliest)
+
+    return min(candidates, key=distance)
 
 
 def _solve_metadata(
