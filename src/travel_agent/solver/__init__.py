@@ -14,6 +14,13 @@ from .closeness import (
     VisitExpectation,
     evaluate_itinerary_closeness,
 )
+from .contract import (
+    CONSTRAINT_VERSION,
+    DEFAULT_SOLVER_P1_CONTRACT,
+    PARAMETER_VERSION,
+    SOLVER_CONTRACT_VERSION,
+    SolverP1Contract,
+)
 from .data_gate import filter_solver_inputs
 from .data_validation import (
     ALLOWED_CATEGORIES,
@@ -130,11 +137,13 @@ __all__ = [
     "ConstraintCount",
     "ConstraintName",
     "ConstraintViolation",
+    "CONSTRAINT_VERSION",
     "Coordinate",
     "DailyWeather",
     "DataRule",
     "DataRuleResult",
     "DefaultRoutingSearchExecutor",
+    "DEFAULT_SOLVER_P1_CONTRACT",
     "DegradationCode",
     "DegradationNotice",
     "DegradationReport",
@@ -159,6 +168,7 @@ __all__ = [
     "MealStatus",
     "ODBasis",
     "PaceLevel",
+    "PARAMETER_VERSION",
     "RejectedAttraction",
     "RejectionCode",
     "RoutedDay",
@@ -175,8 +185,10 @@ __all__ = [
     "SegmentedDay",
     "SameDayExpectation",
     "SolverQualityReport",
+    "SolverP1Contract",
     "SolverInputBatch",
     "Step1Plan",
+    "SOLVER_CONTRACT_VERSION",
     "TimeRule",
     "TimeBucket",
     "TimeWindowResolution",

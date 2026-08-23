@@ -32,6 +32,13 @@ from .time_windows import DEFAULT_DURATION_RATIO, resolve_effective_window
 from .weather import evaluate_weather_availability
 
 
+DEFAULT_DURATION_RATIO_BY_MODE = {
+    TravelMode.SPEED: DEFAULT_DURATION_RATIO,
+    TravelMode.NORMAL: DEFAULT_DURATION_RATIO,
+    TravelMode.LEISURE: 0.7,
+}
+
+
 @dataclass(slots=True)
 class _DayState:
     visit_date: date
@@ -257,7 +264,7 @@ def _overall_rejection_code(
 
 
 def _duration_ratio(travel_mode: TravelMode) -> float:
-    return 0.7 if travel_mode is TravelMode.LEISURE else DEFAULT_DURATION_RATIO
+    return DEFAULT_DURATION_RATIO_BY_MODE[travel_mode]
 
 
 def _build_day_plan(state: _DayState, travel_mode: TravelMode) -> DayPlan:

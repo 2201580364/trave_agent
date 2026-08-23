@@ -14,6 +14,15 @@
 
 ## Golden Case 定义（核心）
 
+### P1 求解器契约快照
+
+```powershell
+python -m pytest tests/solver/test_solver_contract.py -q
+python scripts/run_solver_contract.py
+```
+
+机器可读快照：`docs/test/reports/solver-p1-contract.json`。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求升级 ADR-0009 定义的版本。
+
 ### 评审行程接近度（Gate 6）
 
 Golden Case 的硬约束和景点守恒门禁之外，使用 ADR-0007 定义的结构化接近度比较分天、时段、同日组合和相邻顺序。固定项必须全部命中，软接近度初始阈值为 `0.75`；软分不能补偿 C1/C2/C4/C5/C6 或景点守恒失败。

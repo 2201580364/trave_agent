@@ -5,6 +5,8 @@
 
 ## 文件约定
 
+已冻结的求解器公开边界见 [solver-p1-contract.md](solver-p1-contract.md)。应用、API、数据库和页面设计必须依赖该契约，而不是直接依赖求解器内部实现细节。
+
 - 每个功能一篇，命名 `xxx.md`（如 `trip-solver.md`）。
 - 头标含：关联假设（`H-x`）、关联指标、优先级。
 
