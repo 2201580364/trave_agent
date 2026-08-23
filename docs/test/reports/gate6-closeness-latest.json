@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-08-23T15:40:43.184975+00:00",
+  "generated_at": "2026-08-23T15:49:12.248997+00:00",
   "suite": "hangzhou-public-guide-synthesis-closeness",
   "note": "Public-guide-synthesis regression evidence; not a domain-expert gold standard.",
   "baseline_id": "HZ-PUBLIC-GUIDE-3D-01",

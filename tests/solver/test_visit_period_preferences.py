@@ -44,9 +44,17 @@ def test_time_bucket_boundaries(arrival_min: int, bucket: TimeBucket) -> None:
 def test_visit_period_evaluation_distinguishes_three_soft_outcomes() -> None:
     preference = _preference()
 
-    assert evaluate_visit_period(18 * 60, preference).outcome is VisitPeriodOutcome.PREFERRED
-    assert evaluate_visit_period(15 * 60, preference).outcome is VisitPeriodOutcome.ACCEPTABLE
-    assert evaluate_visit_period(10 * 60, preference).outcome is VisitPeriodOutcome.FALLBACK
+    preferred = evaluate_visit_period(18 * 60, preference)
+    acceptable = evaluate_visit_period(15 * 60, preference)
+    fallback = evaluate_visit_period(10 * 60, preference)
+
+    assert preferred.outcome is VisitPeriodOutcome.PREFERRED
+    assert preferred.deviation_min == 0
+    assert acceptable.outcome is VisitPeriodOutcome.ACCEPTABLE
+    assert acceptable.deviation_min == 120
+    assert fallback.outcome is VisitPeriodOutcome.FALLBACK
+    assert fallback.deviation_min == 420
+    assert "降级" in fallback.notice
 
 
 def test_visit_period_preference_requires_disjoint_buckets_and_source() -> None:

@@ -32,6 +32,7 @@ from .models import (
 from .routing import RoutingSearchExecutor, route_day, validate_routed_day
 from .time_windows import resolve_effective_window
 from .transport import DEFAULT_TRANSIT_BUFFER_RATIO, TravelTimeProvider
+from .visit_periods import evaluate_visit_period
 
 DEFAULT_EVENING_OPEN_MIN = 17 * 60
 DEFAULT_DINNER_EARLIEST_MIN = 16 * 60 + 30
@@ -438,10 +439,17 @@ def _fit_meal(
 
 
 def _shift_visit(visit: RouteVisit, shift: int) -> RouteVisit:
+    arrival_min = visit.arrival_min + shift
+    visit_period = (
+        evaluate_visit_period(arrival_min, visit.visit_period.preference)
+        if visit.visit_period is not None
+        else None
+    )
     return replace(
         visit,
-        arrival_min=visit.arrival_min + shift,
+        arrival_min=arrival_min,
         leave_min=visit.leave_min + shift,
+        visit_period=visit_period,
     )
 
 

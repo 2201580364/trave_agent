@@ -25,6 +25,18 @@ class DecisionEvent:
     visit_date: str | None = None
     from_date: str | None = None
     to_date: str | None = None
+    preference_source: str | None = None
+    preference_source_ref: str | None = None
+    preferred_bucket: str | None = None
+    acceptable_buckets: tuple[str, ...] = ()
+    actual_bucket: str | None = None
+    deviation_min: int | None = None
+    travel_cost_scale: int | None = None
+    period_deviation_cost: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.deviation_min is not None and self.deviation_min < 0:
+            raise ValueError("audit visit-period deviation cannot be negative")
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -35,6 +47,14 @@ class DecisionEvent:
             "visit_date": self.visit_date,
             "from_date": self.from_date,
             "to_date": self.to_date,
+            "preference_source": self.preference_source,
+            "preference_source_ref": self.preference_source_ref,
+            "preferred_bucket": self.preferred_bucket,
+            "acceptable_buckets": list(self.acceptable_buckets),
+            "actual_bucket": self.actual_bucket,
+            "deviation_min": self.deviation_min,
+            "travel_cost_scale": self.travel_cost_scale,
+            "period_deviation_cost": self.period_deviation_cost,
         }
 
 

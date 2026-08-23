@@ -417,6 +417,21 @@ class VisitPeriodPreference:
 
 
 @dataclass(frozen=True, slots=True)
+class VisitPeriodEvaluation:
+    preference: VisitPeriodPreference
+    actual_bucket: TimeBucket
+    outcome: VisitPeriodOutcome
+    deviation_min: int
+    notice: str
+
+    def __post_init__(self) -> None:
+        if self.deviation_min < 0:
+            raise ValueError("visit-period deviation must be non-negative")
+        if not self.notice:
+            raise ValueError("visit-period evaluation requires a notice")
+
+
+@dataclass(frozen=True, slots=True)
 class DayAllocation:
     attraction: Attraction
     preferred_date: date
@@ -465,6 +480,7 @@ class RouteVisit:
     travel_from_previous: TravelTimeResult | None = None
     buffered_travel_from_previous_min: int = 0
     duration_notice: str | None = None
+    visit_period: VisitPeriodEvaluation | None = None
 
 
 @dataclass(frozen=True, slots=True)

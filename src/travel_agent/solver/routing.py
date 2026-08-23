@@ -35,6 +35,7 @@ from .transport import (
     evaluate_connection,
 )
 from .weather import evaluate_weather_availability
+from .visit_periods import evaluate_visit_period, preferred_period_bounds
 
 DEFAULT_DROP_PENALTY = 1_000_000
 DEFAULT_TIME_LIMIT_SECONDS = 2
@@ -168,7 +169,7 @@ def route_day(
             time_dimension.CumulVar(index).SetRange(earliest, latest)
             if allocation.visit_period is not None:
                 preferred_bucket = next(iter(allocation.visit_period.preferred_buckets))
-                preferred_start, preferred_end = _preferred_period_bounds(
+                preferred_start, preferred_end = preferred_period_bounds(
                     earliest,
                     latest,
                     preferred_bucket,
@@ -268,6 +269,11 @@ def route_day(
                 travel,
                 buffered_travel,
                 notice,
+                (
+                    evaluate_visit_period(arrival_min, allocation.visit_period)
+                    if allocation.visit_period is not None
+                    else None
+                ),
             )
         )
         previous_allocation = allocation
@@ -282,39 +288,6 @@ def route_day(
         total_buffered_travel,
         metadata,
     )
-
-
-def _preferred_period_bounds(
-    earliest: int,
-    latest: int,
-    bucket: TimeBucket,
-) -> tuple[int, int]:
-    local_bounds = {
-        TimeBucket.MORNING: (0, 12 * 60 - 1),
-        TimeBucket.AFTERNOON: (12 * 60, 17 * 60 - 1),
-        TimeBucket.EVENING: (17 * 60, 24 * 60 - 1),
-    }[bucket]
-    first_day = earliest // (24 * 60) - 1
-    last_day = latest // (24 * 60) + 1
-    candidates = tuple(
-        (
-            day_offset * 24 * 60 + local_bounds[0],
-            day_offset * 24 * 60 + local_bounds[1],
-        )
-        for day_offset in range(first_day, last_day + 1)
-    )
-
-    def distance(interval: tuple[int, int]) -> tuple[int, int]:
-        start, end = interval
-        if end < earliest:
-            gap = earliest - end
-        elif start > latest:
-            gap = start - latest
-        else:
-            gap = 0
-        return gap, abs(start - earliest)
-
-    return min(candidates, key=distance)
 
 
 def _solve_metadata(

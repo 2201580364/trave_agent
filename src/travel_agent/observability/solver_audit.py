@@ -13,6 +13,10 @@ from travel_agent.solver import (
     SolverQualityReport,
     constraint_name_for,
 )
+from travel_agent.solver.routing import (
+    DEFAULT_PERIOD_DEVIATION_COST,
+    DEFAULT_TRAVEL_COST_SCALE,
+)
 
 from .audit import DecisionEvent, SolverRunAudit, SolverRunStatus
 
@@ -47,6 +51,29 @@ def build_solver_run_audit(
                     visit_date=day.visit_date.isoformat(),
                 )
             )
+            evaluation = visit.visit_period
+            if evaluation is not None:
+                preference = evaluation.preference
+                events.append(
+                    DecisionEvent(
+                        visit.attraction.id,
+                        "VISIT_PERIOD",
+                        evaluation.outcome.value,
+                        visit_date=day.visit_date.isoformat(),
+                        preference_source=preference.source.value,
+                        preference_source_ref=preference.source_ref,
+                        preferred_bucket=next(
+                            iter(preference.preferred_buckets)
+                        ).value,
+                        acceptable_buckets=tuple(
+                            sorted(item.value for item in preference.acceptable_buckets)
+                        ),
+                        actual_bucket=evaluation.actual_bucket.value,
+                        deviation_min=evaluation.deviation_min,
+                        travel_cost_scale=DEFAULT_TRAVEL_COST_SCALE,
+                        period_deviation_cost=DEFAULT_PERIOD_DEVIATION_COST,
+                    )
+                )
     for reassignment in itinerary.reassignments:
         events.append(
             DecisionEvent(

@@ -76,6 +76,7 @@ from .models import (
     TravelMode,
     TravelTimeResult,
     TripTimeAnchors,
+    VisitPeriodEvaluation,
     VisitPeriodOutcome,
     VisitPeriodPreference,
     VisitPeriodPreferenceSource,
@@ -108,7 +109,6 @@ from .transport import (
 )
 from .weather import assign_to_nearest_feasible_date, evaluate_weather_availability
 from .visit_periods import (
-    VisitPeriodEvaluation,
     evaluate_visit_period,
     resolve_visit_period_preference,
     time_bucket_for,

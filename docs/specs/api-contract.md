@@ -29,7 +29,14 @@
   "end_date": "2026-09-03",
   "arrival_time": "2026-09-01T14:00:00",
   "departure_time": "2026-09-03T16:00:00",
-  "transport_type": "high_speed_rail"
+  "transport_type": "high_speed_rail",
+  "visit_period_preferences": [
+    {
+      "attraction_id": 16,
+      "preferred_bucket": "evening",
+      "acceptable_buckets": ["afternoon"]
+    }
+  ]
 }
 ```
 
@@ -83,3 +90,26 @@
 - `alternative`：用户显式请求新方案，使用新 seed，但仍必须满足硬约束、景点守恒、锁定项和近优阈值；
 - 未来不得继续用含义模糊的 `regenerate` 同时表达系统重试、替换景点和“换一个方案”；
 - 当前 P1 API 不接受客户端任意 seed，也不承诺可生成替代方案。
+
+## 游览时段软偏好字段（ADR-0008）
+
+请求中的 `visit_period_preferences` 是用户级覆盖项；应用层必须与人工策展、公开攻略候选按 `user > curated > public_guide_synthesis` 合并，再将单一有效偏好交给求解器。同级冲突返回结构化校验错误，不按数组顺序覆盖。
+
+带偏好的行程项在 `visits[]` 中增加：
+
+```json
+{
+  "visit_period": {
+    "source": "curated",
+    "source_ref": "CURATOR-HZ-1",
+    "preferred_bucket": "evening",
+    "acceptable_buckets": ["afternoon"],
+    "actual_bucket": "afternoon",
+    "outcome": "acceptable",
+    "deviation_min": 90,
+    "notice": "优选 evening 时段；本次安排在可接受的 afternoon 时段"
+  }
+}
+```
+
+无时段偏好的景点返回 `visit_period: null` 或省略该字段。`fallback` 只表示体验降级，不得映射成未排入或 C2 错误。

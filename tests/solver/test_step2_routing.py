@@ -154,6 +154,10 @@ def test_step2_waits_for_preferred_period_when_hard_feasible() -> None:
     )
 
     assert result.visits[0].arrival_min == 17 * 60
+    assert result.visits[0].visit_period is not None
+    assert result.visits[0].visit_period.outcome.value == "preferred"
+    assert result.visits[0].visit_period.deviation_min == 0
+    assert "优选" in result.visits[0].visit_period.notice
 
 
 def test_step2_period_preference_never_expands_c2_window() -> None:
@@ -169,6 +173,9 @@ def test_step2_period_preference_never_expands_c2_window() -> None:
 
     assert len(result.visits) == 1
     assert result.visits[0].arrival_min <= 16 * 60 - 36
+    assert result.visits[0].visit_period is not None
+    assert result.visits[0].visit_period.outcome.value == "fallback"
+    assert result.visits[0].visit_period.deviation_min > 0
 
 
 def test_step2_does_not_take_large_detour_for_period_preference() -> None:
