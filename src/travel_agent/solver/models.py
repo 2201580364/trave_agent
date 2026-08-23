@@ -73,6 +73,24 @@ class RouteSegment(StrEnum):
     EVENING = "evening"
 
 
+class TimeBucket(StrEnum):
+    MORNING = "morning"
+    AFTERNOON = "afternoon"
+    EVENING = "evening"
+
+
+class VisitPeriodPreferenceSource(StrEnum):
+    USER = "user"
+    CURATED = "curated"
+    PUBLIC_GUIDE_SYNTHESIS = "public_guide_synthesis"
+
+
+class VisitPeriodOutcome(StrEnum):
+    PREFERRED = "preferred"
+    ACCEPTABLE = "acceptable"
+    FALLBACK = "fallback"
+
+
 class MealStatus(StrEnum):
     FULL = "full"
     REDUCED = "reduced"
@@ -372,6 +390,28 @@ class DayTimeBoundsResolution:
 class AttractionPreference:
     attraction: Attraction
     preferred_date: date
+    visit_period: VisitPeriodPreference | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VisitPeriodPreference:
+    """Soft visit-period intent; it never changes the C2 opening window."""
+
+    preferred_buckets: frozenset[TimeBucket]
+    acceptable_buckets: frozenset[TimeBucket] = field(default_factory=frozenset)
+    source: VisitPeriodPreferenceSource = VisitPeriodPreferenceSource.CURATED
+    source_ref: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.preferred_buckets:
+            raise ValueError("visit-period preference requires preferred buckets")
+        overlap = self.preferred_buckets.intersection(self.acceptable_buckets)
+        if overlap:
+            raise ValueError(
+                "preferred and acceptable visit-period buckets must not overlap"
+            )
+        if not self.source_ref.strip():
+            raise ValueError("visit-period preference requires a source reference")
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,6 +420,7 @@ class DayAllocation:
     preferred_date: date
     assigned_date: date
     required_duration_min: int
+    visit_period: VisitPeriodPreference | None = None
 
     def __post_init__(self) -> None:
         if self.required_duration_min <= 0:

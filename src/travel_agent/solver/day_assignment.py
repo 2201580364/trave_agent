@@ -149,6 +149,7 @@ def assign_days(
             preference.preferred_date,
             selected.visit_date,
             required_duration,
+            preference.visit_period,
         )
         selected.allocations.append(allocation)
         selected.used_duration_min += required_duration

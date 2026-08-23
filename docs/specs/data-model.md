@@ -44,6 +44,21 @@ CREATE TABLE attractions (
 
 ## 其余表（沿用技术选型文档 5.3，微调）
 
+### 游览时段软偏好
+
+时段偏好不是 `time_rules` 的一部分，也不直接写入景点开放时间字段。策展和公开攻略候选可使用独立数据集或偏好表保存：
+
+```text
+attraction_id
+preferred_buckets JSON
+acceptable_buckets JSON
+source ENUM('curated','public_guide_synthesis')
+source_ref VARCHAR(...)
+version
+```
+
+行程请求可携带 `source='user'` 的覆盖项。应用层按 `user > curated > public_guide_synthesis` 解析成单一有效偏好后传给求解器；同级冲突必须人工或上游裁决。该数据只用于软目标，不能修改 `time_rules`、`last_entry` 或 C2 有效窗口。
+
 - **trips**：`itinerary JSON` 存求解器输出；新增 `weather_basis ENUM('forecast','climate')` 标注天气数据来源。
 - **feedbacks**：不变。
 - **attraction_conflicts**（新增，可选）：多源冲突记录，`conflict=1` 时人工裁决留痕。

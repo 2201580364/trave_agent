@@ -11,7 +11,6 @@ from .closeness import (
     ItineraryBaseline,
     ItineraryClosenessReport,
     SameDayExpectation,
-    TimeBucket,
     VisitExpectation,
     evaluate_itinerary_closeness,
 )
@@ -72,10 +71,14 @@ from .models import (
     SolverInputBatch,
     Step1Plan,
     TimeRule,
+    TimeBucket,
     TimeWindowResolution,
     TravelMode,
     TravelTimeResult,
     TripTimeAnchors,
+    VisitPeriodOutcome,
+    VisitPeriodPreference,
+    VisitPeriodPreferenceSource,
     UnplacedAttraction,
     WeatherAvailability,
     WeatherBasis,
@@ -104,6 +107,12 @@ from .transport import (
     evaluate_connection,
 )
 from .weather import assign_to_nearest_feasible_date, evaluate_weather_availability
+from .visit_periods import (
+    VisitPeriodEvaluation,
+    evaluate_visit_period,
+    resolve_visit_period_preference,
+    time_bucket_for,
+)
 
 __all__ = [
     "AnchorRejectionCode",
@@ -177,6 +186,10 @@ __all__ = [
     "TripTimeAnchors",
     "UnplacedAttraction",
     "VisitExpectation",
+    "VisitPeriodEvaluation",
+    "VisitPeriodOutcome",
+    "VisitPeriodPreference",
+    "VisitPeriodPreferenceSource",
     "WeatherAvailability",
     "WeatherBasis",
     "WeatherSeverity",
@@ -190,15 +203,18 @@ __all__ = [
     "evaluate_itinerary_closeness",
     "evaluate_solver_quality",
     "evaluate_weather_availability",
+    "evaluate_visit_period",
     "filter_solver_inputs",
     "constraint_name_for",
     "is_open_on",
     "resolve_day_time_bounds",
     "resolve_effective_window",
+    "resolve_visit_period_preference",
     "rebuild_day_plan",
     "route_day",
     "route_itinerary",
     "route_segmented_day",
     "validate_routed_day",
     "validate_attraction_data",
+    "time_bucket_for",
 ]

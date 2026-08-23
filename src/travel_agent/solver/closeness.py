@@ -9,20 +9,15 @@ from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 
-from .models import ItineraryPlan
+from .models import ItineraryPlan, TimeBucket
 from .quality import SolverQualityReport
+from .visit_periods import time_bucket_for
 
 
 class BaselineProvenance(StrEnum):
     DOMAIN_EXPERT = "domain_expert"
     HUMAN_REVIEWED = "human_reviewed"
     PUBLIC_GUIDE_SYNTHESIS = "public_guide_synthesis"
-
-
-class TimeBucket(StrEnum):
-    MORNING = "morning"
-    AFTERNOON = "afternoon"
-    EVENING = "evening"
 
 
 class ExpectationOutcome(StrEnum):
@@ -196,7 +191,7 @@ def evaluate_itinerary_closeness(
     if not 0 <= threshold <= 1:
         raise ValueError("threshold must be within 0..1")
     visits = {
-        visit.attraction.id: (day.visit_date, _time_bucket(visit.arrival_min))
+        visit.attraction.id: (day.visit_date, time_bucket_for(visit.arrival_min))
         for day in itinerary.days
         for visit in day.visits
     }
@@ -498,11 +493,3 @@ def _overall(*components: ClosenessComponent) -> float:
         for item in available
         if item.score is not None
     ) / total_weight
-
-
-def _time_bucket(arrival_min: int) -> TimeBucket:
-    if arrival_min < 12 * 60:
-        return TimeBucket.MORNING
-    if arrival_min < 17 * 60:
-        return TimeBucket.AFTERNOON
-    return TimeBucket.EVENING

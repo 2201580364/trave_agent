@@ -10,8 +10,10 @@ from travel_agent.solver import (
     PaceLevel,
     RejectionCode,
     TimeRule,
+    TimeBucket,
     TravelMode,
     TripTimeAnchors,
+    VisitPeriodPreference,
     WeatherBasis,
     WeatherSeverity,
     assign_days,
@@ -49,6 +51,24 @@ def _attraction(
         data_verified=True,
         **kwargs,
     )
+
+
+def test_step1_preserves_visit_period_preference_for_routing() -> None:
+    attraction = _attraction(99)
+    visit_period = VisitPeriodPreference(
+        frozenset({TimeBucket.EVENING}),
+        frozenset({TimeBucket.AFTERNOON}),
+        source_ref="CURATOR-HZ-1",
+    )
+
+    result = assign_days(
+        [AttractionPreference(attraction, MONDAY, visit_period)],
+        trip_dates=(MONDAY,),
+        weather_by_date={MONDAY: _weather(MONDAY)},
+        anchors=ANCHORS,
+    )
+
+    assert result.days[0].allocations[0].visit_period is visit_period
 
 
 def test_step1_runs_data_gate_before_assignment() -> None:
