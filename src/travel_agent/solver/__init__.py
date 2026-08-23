@@ -3,6 +3,14 @@
 from .anchors import resolve_day_time_bounds
 from .availability import assign_attraction_date, assign_to_nearest_available_date, is_open_on
 from .data_gate import filter_solver_inputs
+from .data_validation import (
+    ALLOWED_CATEGORIES,
+    AttractionDataValidation,
+    DataRule,
+    DataRuleResult,
+    GeoBounds,
+    validate_attraction_data,
+)
 from .day_assignment import assign_days, rebuild_day_plan
 from .itinerary import route_itinerary
 from .models import (
@@ -71,9 +79,11 @@ from .weather import assign_to_nearest_feasible_date, evaluate_weather_availabil
 
 __all__ = [
     "AnchorRejectionCode",
+    "ALLOWED_CATEGORIES",
     "ArrivalEvaluation",
     "Attraction",
     "AttractionPreference",
+    "AttractionDataValidation",
     "ApproximateTravelTimeProvider",
     "ConnectionEvaluation",
     "ConstraintCount",
@@ -81,6 +91,8 @@ __all__ = [
     "ConstraintViolation",
     "Coordinate",
     "DailyWeather",
+    "DataRule",
+    "DataRuleResult",
     "DateAssignment",
     "DateRejection",
     "DayAllocation",
@@ -89,6 +101,7 @@ __all__ = [
     "DayTimeBoundsResolution",
     "EffectiveTimeWindow",
     "InMemoryTravelTimeProvider",
+    "GeoBounds",
     "ItineraryPlan",
     "ItineraryReassignment",
     "ItineraryUnplaced",
@@ -138,4 +151,5 @@ __all__ = [
     "route_itinerary",
     "route_segmented_day",
     "validate_routed_day",
+    "validate_attraction_data",
 ]

@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-23T11:12:40.995481+00:00",
+  "input": "tests\\data\\hangzhou_attractions_snapshot.json",
+  "target_date": "2026-08-25",
+  "record_count": 7,
+  "structurally_valid_count": 7,
+  "solver_eligible_count": 7,
+  "rule_pass_counts": {
+    "1": 7,
+    "2": 7,
+    "3": 7,
+    "4": 7,
+    "5": 7,
+    "6": 7,
+    "7": 7,
+    "8": 7,
+    "9": 7
+  },
+  "gate_passed": true,
+  "records": [
+    {
+      "attraction_id": 11,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "attraction_id": 12,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "attraction_id": 13,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "attraction_id": 14,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "attraction_id": 15,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "attraction_id": 16,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "attraction_id": 17,
+      "structurally_valid": true,
+      "solver_eligible": true,
+      "rules": [
+        {
+          "rule": 1,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 2,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 3,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 4,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 5,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 6,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 7,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 8,
+          "passed": true,
+          "errors": []
+        },
+        {
+          "rule": 9,
+          "passed": true,
+          "errors": []
+        }
+      ]
+    }
+  ]
+}

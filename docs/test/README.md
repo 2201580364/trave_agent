@@ -52,12 +52,37 @@ docs/test/reports/gate6-golden-latest.json
 当前结果：`6/6` 场景通过，硬约束最终违反数为 `0`，重复运行结果一致。
 这只是 Gate 6 的 Golden Case 子门禁，不代表数据校验、性能和降级子门禁已经完成。
 
+## 九项数据校验
+
+原始景点记录在转换为求解器 `Attraction` 前，必须逐项通过
+[`开放时间数据规范`](../domain/开放时间数据规范.md)的九条规则。
+
+```powershell
+python -m pytest tests/solver/test_data_validation.py -q
+python scripts/run_data_validation.py
+```
+
+默认离线数据快照：
+
+```text
+tests/data/hangzhou_attractions_snapshot.json
+```
+
+机器可读报告：
+
+```text
+docs/test/reports/gate6-data-validation-latest.json
+```
+
+当前杭州快照结果：`7/7` 条记录结构合法且可进入求解器，规则 1–9 各自通过 `7/7`。
+该结果只证明固定测试快照通过，不代表生产数据库已完成 80–120 个杭州景点的人工校准。
+
 ## 报告模板（G7 验证时填）
 
 ```
 - 硬约束单测通过率：/ 
 - Golden Case 通过数：6/6（杭州首批，仍需扩展其他城市与反例）
-- 数据校验覆盖率：data_verified 占比 %
+- 数据校验覆盖率：杭州离线快照 7/7，生产数据待接入
 - 性能：N=20/D=7 求解耗时 s
 - 用户测试：认可率 %（n=）
 ```

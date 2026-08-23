@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from tests.golden.hangzhou_cases import run_hangzhou_golden_cases
+from tests.golden.hangzhou_cases import run_hangzhou_golden_cases  # noqa: E402
 
 
 def main() -> int:
