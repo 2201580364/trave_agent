@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-23T13:11:06.296863+00:00",
+  "passed": 6,
+  "total": 6,
+  "case_suite_passed": true,
+  "gate_passed": false,
+  "timeout_best_so_far": {
+    "status": "pending",
+    "reason": "Current RoutedDay/ItineraryPlan does not expose whether the OR-Tools time limit was reached."
+  },
+  "cases": [
+    {
+      "case_id": "DEG-01",
+      "title": "30 个景点两天容量不足时不静默丢弃",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4",
+        "C6",
+        "S6"
+      ],
+      "details": {
+        "scheduled": 6,
+        "unplaced": 24,
+        "notice_codes": [
+          "HIGH_ATTRACTION_COUNT",
+          "UNPLACED_ATTRACTIONS"
+        ]
+      }
+    },
+    {
+      "case_id": "DEG-02",
+      "title": "所有日期闭馆时保留逐日 C1 原因",
+      "passed": true,
+      "constraints": [
+        "C1"
+      ],
+      "details": {
+        "final_reason": "NO_AVAILABLE_DATE",
+        "attempt_count": 2
+      }
+    },
+    {
+      "case_id": "DEG-03",
+      "title": "所有日期极端天气时室外景点安全降级",
+      "passed": true,
+      "constraints": [
+        "C5"
+      ],
+      "details": {
+        "final_reason": "NO_WEATHER_SAFE_DATE"
+      }
+    },
+    {
+      "case_id": "DEG-04",
+      "title": "单日大面积 OD 缺失时禁止伪造零耗时串联",
+      "passed": true,
+      "constraints": [
+        "C6"
+      ],
+      "details": {
+        "scheduled": 1,
+        "unplaced": 2
+      }
+    },
+    {
+      "case_id": "DEG-05",
+      "title": "晚间固定场次不得突破末日离开锚点",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4"
+      ],
+      "details": {
+        "final_reason": "NO_AVAILABLE_DATE"
+      }
+    },
+    {
+      "case_id": "DEG-06",
+      "title": "晚餐无空档时保留硬可行景点并提示",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4",
+        "C6",
+        "S1"
+      ],
+      "details": {
+        "meal_status": "unscheduled",
+        "scheduled": 2
+      }
+    }
+  ]
+}

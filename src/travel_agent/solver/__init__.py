@@ -11,6 +11,12 @@ from .data_validation import (
     GeoBounds,
     validate_attraction_data,
 )
+from .degradation import (
+    DegradationCode,
+    DegradationNotice,
+    DegradationReport,
+    evaluate_itinerary_degradation,
+)
 from .day_assignment import assign_days, rebuild_day_plan
 from .itinerary import route_itinerary
 from .models import (
@@ -93,6 +99,9 @@ __all__ = [
     "DailyWeather",
     "DataRule",
     "DataRuleResult",
+    "DegradationCode",
+    "DegradationNotice",
+    "DegradationReport",
     "DateAssignment",
     "DateRejection",
     "DayAllocation",
@@ -139,6 +148,7 @@ __all__ = [
     "assign_to_nearest_feasible_date",
     "evaluate_arrival",
     "evaluate_connection",
+    "evaluate_itinerary_degradation",
     "evaluate_solver_quality",
     "evaluate_weather_availability",
     "filter_solver_inputs",

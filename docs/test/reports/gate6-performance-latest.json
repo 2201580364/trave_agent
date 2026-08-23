@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-23T11:50:28.066293+00:00",
+  "environment": {
+    "python": "3.12.10",
+    "implementation": "CPython",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "ortools": "9.15.6755"
+  },
+  "environment_note": "Local deterministic synthetic benchmark; not concurrency/load testing.",
+  "implementation_note": "route_itinerary currently routes days sequentially.",
+  "repetitions": 5,
+  "gate_passed": true,
+  "cases": [
+    {
+      "case_id": "PERF-12-3",
+      "attraction_count": 12,
+      "day_count": 3,
+      "threshold_seconds": 30.0,
+      "min_ms": 15.460400012671016,
+      "mean_ms": 22.66615999978967,
+      "p50_ms": 20.070899990969338,
+      "p95_ms": 33.26609999930952,
+      "max_ms": 33.26609999930952,
+      "deterministic": true,
+      "threshold_passed": true,
+      "quality_passed": true,
+      "gate_passed": true,
+      "samples": [
+        {
+          "step1_ms": 0.1875000016298145,
+          "routing_ms": 19.744299992453307,
+          "quality_ms": 0.1390999968862161,
+          "total_ms": 20.070899990969338,
+          "scheduled_count": 12,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.15700000221841037,
+          "routing_ms": 15.218900007312186,
+          "quality_ms": 0.08450000314041972,
+          "total_ms": 15.460400012671016,
+          "scheduled_count": 12,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.2640999882714823,
+          "routing_ms": 15.839600004255772,
+          "quality_ms": 0.03310000465717167,
+          "total_ms": 16.136799997184426,
+          "scheduled_count": 12,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.1309000072069466,
+          "routing_ms": 25.527499994495884,
+          "quality_ms": 2.7381999971112236,
+          "total_ms": 28.396599998814054,
+          "scheduled_count": 12,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.5872000037925318,
+          "routing_ms": 32.640599994920194,
+          "quality_ms": 0.038300000596791506,
+          "total_ms": 33.26609999930952,
+          "scheduled_count": 12,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        }
+      ]
+    },
+    {
+      "case_id": "PERF-20-7",
+      "attraction_count": 20,
+      "day_count": 7,
+      "threshold_seconds": 120.0,
+      "min_ms": 31.14320000167936,
+      "mean_ms": 34.01886000065133,
+      "p50_ms": 34.84520000347402,
+      "p95_ms": 36.16399999009445,
+      "max_ms": 36.16399999009445,
+      "deterministic": true,
+      "threshold_passed": true,
+      "quality_passed": true,
+      "gate_passed": true,
+      "samples": [
+        {
+          "step1_ms": 0.4206000012345612,
+          "routing_ms": 32.05020001041703,
+          "quality_ms": 0.03789999755099416,
+          "total_ms": 32.508700009202585,
+          "scheduled_count": 20,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.40860001172404736,
+          "routing_ms": 34.98649998800829,
+          "quality_ms": 0.03809999907389283,
+          "total_ms": 35.43319999880623,
+          "scheduled_count": 20,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.39090000791475177,
+          "routing_ms": 34.41019999445416,
+          "quality_ms": 0.04410000110510737,
+          "total_ms": 34.84520000347402,
+          "scheduled_count": 20,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.5150999932084233,
+          "routing_ms": 30.589100002544,
+          "quality_ms": 0.039000005926936865,
+          "total_ms": 31.14320000167936,
+          "scheduled_count": 20,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        },
+        {
+          "step1_ms": 0.5169999931240454,
+          "routing_ms": 35.60620000644121,
+          "quality_ms": 0.040799990529194474,
+          "total_ms": 36.16399999009445,
+          "scheduled_count": 20,
+          "unplaced_count": 0,
+          "hard_constraint_violations": 0,
+          "gate_passed": true
+        }
+      ]
+    }
+  ]
+}
