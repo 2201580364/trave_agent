@@ -58,10 +58,12 @@ duration_ms, error_code, exception
 solve_run_id, solver_version, constraint_version, parameter_version,
 input_snapshot_hash, data_snapshot_version, od_basis, weather_basis,
 random_seed, duration_ratio, assignments, unplaced reason codes,
+input_count, scheduled_count, unplaced_count, data_rejected_count,
 hard_constraint_violations, elapsed_ms, status, created_at
 ```
 
-纯求解函数不直接写文件或数据库；调用层收集确定性结果并写审计，保持算法可测试。
+审计决策事件记录安排日期、跨天重排的原日期/目标日期、未排入或数据拒绝原因，以及最终硬约束违反。
+纯求解函数不直接写文件或数据库；调用层通过纯转换层收集确定性结果并写审计，保持算法可测试。
 
 ### D5 硬事实变更使用 revision 审计
 

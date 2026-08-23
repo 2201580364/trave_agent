@@ -50,6 +50,14 @@ from .models import (
     WeatherBasis,
     WeatherSeverity,
 )
+from .quality import (
+    ConstraintCount,
+    ConstraintName,
+    ItineraryAccounting,
+    SolverQualityReport,
+    constraint_name_for,
+    evaluate_solver_quality,
+)
 from .routing import route_day, validate_routed_day
 from .segments import route_segmented_day
 from .time_windows import evaluate_arrival, resolve_effective_window
@@ -68,6 +76,8 @@ __all__ = [
     "AttractionPreference",
     "ApproximateTravelTimeProvider",
     "ConnectionEvaluation",
+    "ConstraintCount",
+    "ConstraintName",
     "ConstraintViolation",
     "Coordinate",
     "DailyWeather",
@@ -82,6 +92,7 @@ __all__ = [
     "ItineraryPlan",
     "ItineraryReassignment",
     "ItineraryUnplaced",
+    "ItineraryAccounting",
     "MealPlacement",
     "MealPlan",
     "MealStatus",
@@ -96,6 +107,7 @@ __all__ = [
     "RouteVisit",
     "RoutingAttempt",
     "SegmentedDay",
+    "SolverQualityReport",
     "SolverInputBatch",
     "Step1Plan",
     "TimeRule",
@@ -114,8 +126,10 @@ __all__ = [
     "assign_to_nearest_feasible_date",
     "evaluate_arrival",
     "evaluate_connection",
+    "evaluate_solver_quality",
     "evaluate_weather_availability",
     "filter_solver_inputs",
+    "constraint_name_for",
     "is_open_on",
     "resolve_day_time_bounds",
     "resolve_effective_window",

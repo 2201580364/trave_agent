@@ -22,6 +22,9 @@ class DecisionEvent:
     constraint: str
     outcome: str
     reason_code: str | None = None
+    visit_date: str | None = None
+    from_date: str | None = None
+    to_date: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -29,6 +32,9 @@ class DecisionEvent:
             "constraint": self.constraint,
             "outcome": self.outcome,
             "reason_code": self.reason_code,
+            "visit_date": self.visit_date,
+            "from_date": self.from_date,
+            "to_date": self.to_date,
         }
 
 
@@ -49,6 +55,10 @@ class SolverRunAudit:
     elapsed_ms: int
     events: tuple[DecisionEvent, ...]
     created_at: datetime
+    input_count: int = 0
+    scheduled_count: int = 0
+    unplaced_count: int = 0
+    data_rejected_count: int = 0
 
     def __post_init__(self) -> None:
         if self.created_at.tzinfo is None:
@@ -57,6 +67,14 @@ class SolverRunAudit:
             raise ValueError("hard_constraint_violations cannot be negative")
         if self.elapsed_ms < 0:
             raise ValueError("elapsed_ms cannot be negative")
+        counts = (
+            self.input_count,
+            self.scheduled_count,
+            self.unplaced_count,
+            self.data_rejected_count,
+        )
+        if any(count < 0 for count in counts):
+            raise ValueError("audit counts cannot be negative")
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -75,5 +93,8 @@ class SolverRunAudit:
             "elapsed_ms": self.elapsed_ms,
             "events": [event.to_dict() for event in self.events],
             "created_at": self.created_at.isoformat(),
+            "input_count": self.input_count,
+            "scheduled_count": self.scheduled_count,
+            "unplaced_count": self.unplaced_count,
+            "data_rejected_count": self.data_rejected_count,
         }
-

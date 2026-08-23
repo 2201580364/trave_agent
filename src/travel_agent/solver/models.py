@@ -481,6 +481,8 @@ class ItineraryPlan:
     segmented_days: tuple[SegmentedDay, ...] = ()
 
     def __post_init__(self) -> None:
+        if len(self.validations) != len(self.days):
+            raise ValueError("route validation count must match routed day count")
         if self.valid != all(item.valid for item in self.validations):
             raise ValueError("itinerary validation result is inconsistent")
         if self.segmented_days and len(self.segmented_days) != len(self.days):
