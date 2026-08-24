@@ -8,7 +8,7 @@
 
 **M1 MVP（4 个月）**：行程骨架验证。只做 8 项功能，验证单一核心假设 **H3**。不做推荐、不做信息聚合、不做社区。
 
-**Gate 4 已通过，当前进入 G5 约束 TDD 实现。** G3 Spike 与 G4 设计评审已完成；实现以 `trip-solver.md V3`、ADR-0002/0003/0004 为基线。`spike/` 是历史验证原型，不是生产实现模板。
+**Gate 6 求解器技术验证已通过，当前进入 M1 应用产品化设计的 A5。** 求解器核心实现已阶段性完成，M1 对外契约已按 ADR-0009 稳定并版本化；A1 功能、A2 UI、A3 交互和 A4 应用代码架构已经完成。下一步同步 API 与持久化数据模型，再实现首个浏览器可操作纵向切片。`spike/` 是历史验证原型，不是生产实现模板。
 完整假设账本见 [docs/assumptions.md](docs/assumptions.md)。
 
 ## 技术栈速览
@@ -87,6 +87,6 @@ Gate 定义、权威来源优先级与冲突处理见 [docs/process/gates.md](do
 
 ## 当前最该做的三件事（按优先级）
 
-1. G5 按 C1 → C2 → C4 → C5 → C6 的顺序做约束 TDD，建立正式求解器模块，不继续扩写 Spike。
-2. 落地 `data_verified` 门禁、多套 `time_rules`、`close_days`、`last_entry` 与对应校验测试。
-3. 把第一条杭州 Golden Case 可执行化，并建立 C-x / S-x / H-x 测试追溯。
+1. 按 `docs/product/应用代码架构设计.md` 进入 A5，修订旧 API 和数据模型，明确 TripDraft、Trip、TripRevision、GenerationIntent、SolverRun。
+2. 定义 HTTP v1 资源、数据库索引/唯一约束、错误码、事务和幂等验收场景。
+3. A5 通过后按首个纵向切片顺序实现 FastAPI、持久化、SolverGateway 和 Taro M1 页面；持续保持 154 项求解器回归通过。
