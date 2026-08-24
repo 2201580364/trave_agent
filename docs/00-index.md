@@ -10,7 +10,7 @@
 
 | 角色 | 阅读顺序 |
 |---|---|
-| 产品 / 投资人 | [process/project-status.md](process/project-status.md) → [product/功能模块设计.md](product/功能模块设计.md) → [product/信息架构与UI设计.md](product/信息架构与UI设计.md) → [assumptions.md](assumptions.md) → [product/旅行助手产品文档.md](product/旅行助手产品文档.md) |
+| 产品 / 投资人 | [process/project-status.md](process/project-status.md) → [product/功能模块设计.md](product/功能模块设计.md) → [product/信息架构与UI设计.md](product/信息架构与UI设计.md) → [product/交互流程与状态机设计.md](product/交互流程与状态机设计.md) → [assumptions.md](assumptions.md) → [product/旅行助手产品文档.md](product/旅行助手产品文档.md) |
 | 工程师（后端/求解器） | [assumptions.md](assumptions.md) → [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/](domain/) |
 | 工程师（数据） | [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/开放时间数据规范.md](domain/开放时间数据规范.md) → [test/](test/) |
 | 测试 / 验证 | [assumptions.md](assumptions.md) → [specs/](specs/) → [test/](test/) |
