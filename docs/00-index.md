@@ -1,14 +1,18 @@
-# 文档地图与阅读顺序
+﻿# 文档地图与阅读顺序
 
 > 新人 / 新会话的入口。按角色选择阅读路径。
+
+## 当前状态入口
+
+任何新会话先读 [process/project-status.md](process/project-status.md)。该文件记录当前里程碑、正在进行的任务、已完成证据、未完成项和下一步。
 
 ## 按角色
 
 | 角色 | 阅读顺序 |
 |---|---|
-| 产品 / 投资人 | [assumptions.md](assumptions.md) → [product/旅行助手产品文档.md](product/旅行助手产品文档.md) |
-| 工程师（后端/求解器） | [assumptions.md](assumptions.md) → [product/P1 MVP技术选型文档.md](product/P1 MVP技术选型文档.md) → [domain/](domain/) |
-| 工程师（数据） | [product/P1 MVP技术选型文档.md](product/P1 MVP技术选型文档.md) → [domain/开放时间数据规范.md](domain/开放时间数据规范.md) → [test/](test/) |
+| 产品 / 投资人 | [process/project-status.md](process/project-status.md) → [product/功能模块设计.md](product/功能模块设计.md) → [assumptions.md](assumptions.md) → [product/旅行助手产品文档.md](product/旅行助手产品文档.md) |
+| 工程师（后端/求解器） | [assumptions.md](assumptions.md) → [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/](domain/) |
+| 工程师（数据） | [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/开放时间数据规范.md](domain/开放时间数据规范.md) → [test/](test/) |
 | 测试 / 验证 | [assumptions.md](assumptions.md) → [specs/](specs/) → [test/](test/) |
 
 ## 目录结构
@@ -25,6 +29,13 @@ docs/
   test/                  测试方案 + Golden Cases + 验证报告
   process/               AI 协作开发 Gate、权威来源与任务协议
 ```
+
+## 命名约定
+
+- `M1–M4`：产品路线里程碑；
+- `P0–M2`：实现优先级；
+- `G0–G7`：假设驱动开发 Gate；
+- 冻结机器 ID 中的 `M1/M1` 为兼容性标识，不再作为产品阶段术语。
 
 ## 核心概念
 

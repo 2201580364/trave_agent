@@ -1,4 +1,4 @@
-# 需求规格（Specs）
+﻿# 需求规格（Specs）
 
 > 需求规格 = 功能 + **Given/When/Then 验收标准** + 可追溯的假设编号。
 > 由 `/spec` 命令或 `spec` skill 从产品文档生成，G2 阶段产出。

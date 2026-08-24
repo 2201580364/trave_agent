@@ -1,4 +1,4 @@
-# ADR-0001：P1 求解器分层路线可行性结论（Solver Spike）
+﻿# ADR-0001：M1 求解器分层路线可行性结论（Solver Spike）
 
 - **状态**：已接受
 - **日期**：2026-08-21
@@ -22,7 +22,7 @@
 
 ## 决策
 
-P1 采用 **OR-Tools Routing Solver + AddDisjunction（可丢弃放不下的景点）** 做天内排序；**不接受**纯贪心启发式。K-Means 分天需替换为 **capacity-aware 聚类或 DBSCAN**（待定，见「何时重议」）。
+M1 采用 **OR-Tools Routing Solver + AddDisjunction（可丢弃放不下的景点）** 做天内排序；**不接受**纯贪心启发式。K-Means 分天需替换为 **capacity-aware 聚类或 DBSCAN**（待定，见「何时重议」）。
 
 ## 备选方案与权衡
 
@@ -40,7 +40,7 @@ P1 采用 **OR-Tools Routing Solver + AddDisjunction（可丢弃放不下的景�
 
 ## 何时推翻重议（触发条件）
 
-1. **P2 引入住宿位置优化时**：重评估**方案 A（多车辆建模）**——一次性求解「景点分配 + 住宿位置 + 天内排序」全局最优（技术选型文档 4.4 已记录）。
+1. **M2 引入住宿位置优化时**：重评估**方案 A（多车辆建模）**——一次性求解「景点分配 + 住宿位置 + 天内排序」全局最优（技术选型文档 4.4 已记录）。
 2. **若 K-Means 均衡问题在真实杭州数据上无法靠 capacity-aware 聚类解决**：提前上多车辆建模，而非继续打补丁。
 3. **若某天景点数 > 10**（如用户选 15 个景点只排 2 天）：单车辆 + disjunction 可能丢弃过多，需评估「跨天交换」局部搜索（LNS）。
 
@@ -48,4 +48,4 @@ P1 采用 **OR-Tools Routing Solver + AddDisjunction（可丢弃放不下的景�
 
 1. G4 详细设计：capacity-aware 聚类（每类限制景点数/能量）+ OR-Tools + disjunction 的具体设计。
 2. 用 20 个真实杭州景点跑 **Data Quality Spike**（待高德 API key），量化 LLM 抽取开放时间/闭馆日准确率。
-3. 把「每日上限」前置提示纳入 P1 交互设计（关联 H6/H7）。
+3. 把「每日上限」前置提示纳入 M1 交互设计（关联 H6/H7）。
