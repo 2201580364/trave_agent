@@ -22,6 +22,7 @@ class GenerationExecutor(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class SolverRequest:
+    solver_run_id: str
     generation_intent_id: str
     input_snapshot: dict[str, object]
     input_snapshot_hash: str

@@ -173,7 +173,9 @@ class ExecuteGenerationHandler:
             self._uow.generation_intents.save(running, expected_status=intent.status.value)
             self._uow.commit()
 
+        solver_run_id = self._ids.new_id("solver_run")
         request = SolverRequest(
+            solver_run_id,
             running.generation_intent_id,
             running.input_snapshot,
             running.input_snapshot_hash,
@@ -186,7 +188,6 @@ class ExecuteGenerationHandler:
             return self._record_failure(running, exc.code, exc.retryable)
 
         now = self._clock.now()
-        solver_run_id = self._ids.new_id("solver_run")
         run = SolverRun(
             solver_run_id, running.generation_intent_id,
             "completed" if outcome.quality_gate_passed else "failed",
