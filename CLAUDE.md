@@ -87,6 +87,6 @@ Gate 定义、权威来源优先级与冲突处理见 [docs/process/gates.md](do
 
 ## 当前最该做的三件事（按优先级）
 
-1. 按 `docs/product/应用代码架构设计.md` 和 `docs/specs/api-contract.md` 实现 A6 首个纵向切片。
-2. 先建立 FastAPI 组合根、领域/应用用例、内存仓储与 inline SolverGateway，再接 SQLAlchemy/Alembic 和 HTTP 路由。
-3. 完成真实数据库恢复和 API 集成测试后再实现 Taro M1 页面；持续保持 154 项求解器回归通过。
+1. 继续 A6-3：实现 SolverGateway、冻结契约输入转换、质量/降级映射、SolverRun 和 TripRevision 应用结果。
+2. 让 inline executor 从 queued 原子进入 running/completed/failed，并补应用与适配器契约测试。
+3. 再进入 SQLAlchemy/Alembic 和 HTTP v1；持续保持当前 161 项回归通过。

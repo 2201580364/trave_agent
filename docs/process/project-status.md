@@ -19,8 +19,8 @@
 - 更新时间：2026-08-24
 - 产品里程碑：`M1 — 行程骨架验证`
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 专家/用户验证尚未开始
-- 当前阶段：`A5 API 与持久化数据模型同步已完成，准备进入 A6 首个浏览器可操作纵向切片实现`
-- 当前任务：已完成 HTTP v1 资源、错误码、GenerationIntent 幂等、Trip/Revision/SolverRun 数据关系、约束索引、事务与迁移设计
+- 当前阶段：`A6 首个浏览器纵向切片实现中；A6-1/A6-2/A6-3 应用执行骨架已完成，下一步 A6-4 求解器生产适配`
+- 当前任务：已完成 GenerationIntent 领取、事务外求解、质量门和 Trip/Revision/SolverRun 原子完成链路，正在准备接入现有纯求解器
 - 总体判断：求解器已经可被应用层依赖，但产品尚无 UI、HTTP 入口、数据库或用户可操作闭环
 
 ## 已完成
@@ -39,7 +39,7 @@
 | A3 交互流程与状态机 | M1 详细设计完成；全路线同步完成（V1.1） | IF-01–IF-12 可进入实现；登记 IF-13–IF-24，并明确执行、Visit、小记、媒体、授权和回顾状态，见 `docs/product/交互流程与状态机设计.md` |
 | A4 应用代码架构设计 | 完成（V1.0） | 模块化单体、分层依赖、应用用例、求解器网关、事务幂等、前端目录、测试架构与纵向切片，见 `docs/product/应用代码架构设计.md` |
 
-最新稳定技术基线：154 项测试通过；Golden 6/6；降级 8/8；杭州公开攻略综合接近度 0.975。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
+最新稳定技术基线：全量 167 项测试通过，其中 Gate 6 求解器基线 154 项保持通过；Golden 6/6；降级 8/8；杭州公开攻略综合接近度 0.975。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；被冻结的是 M1 对外契约、约束语义和默认参数版本。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009 评审并升级相应版本。
 
@@ -61,10 +61,12 @@
 
 ### A6：首个浏览器可操作纵向切片
 
-- 状态：下一步
+- 状态：进行中
 - 当前输入：A4 架构、A5 HTTP v1 契约与数据库模型、冻结求解器契约
 - 首个实现切片：匿名会话 → 草稿 → 杭州景点 → GenerationIntent → inline SolverGateway → TripRevision → 恢复结果
-- 完成度：0%
+- 已完成：A6-1 领域/应用基础；A6-2 草稿与提交；A6-3 执行状态机、质量门及结果原子持久化骨架
+- 下一步：A6-4 生产 SolverGateway、发布数据快照输入构造、稳定结果映射与求解审计映射
+- 完成度：约 32%（仅指首个纵向切片，不代表 M1 MVP）
 
 ## 本轮完成（2026-08-24）
 
@@ -192,6 +194,35 @@
 - 补充 8 个 API 验收场景和 6 个数据模型验收场景；
 - A5 未扩大 M1 范围，M2–M4 仍未创建空表。
 
+### A6-1/A6-2 应用核心实现
+
+- 新增 `domain/planning`，实现 TransportType、ConfirmationStatus、TravelFacts、TripDraft 和 GenerationIntent；
+- 到达交通禁止继承，离开继承必须与到达方式一致，非“已在目的地”的进城接驳不能为 0；
+- TripDraft 使用不可变数据类和单调递增 `draft_version`，景点选择/偏好稳定排序；
+- 新增稳定应用错误：resource_not_found、draft_version_conflict、generation_intent_conflict、draft_not_ready；
+- 新增 Clock、UnitOfWork、ID、数据快照版本和 GenerationExecutor 端口；
+- 实现 CreateDraft、UpdateTravelFacts、ReplaceAttractionSelection、SubmitGeneration 用例；
+- SubmitGeneration 先按 intent ID 查重，重复提交不重新选数据版本、不重复调用执行器；
+- 首次 intent 固化规范化输入 JSON、SHA-256 hash、数据版本和确定性内部 seed；
+- 新增事务型内存 Unit of Work，未 commit 或异常时丢弃工作副本；
+- 新增 7 项应用测试，覆盖版本冲突、选择规范化、幂等双击、intent 冲突、未就绪草稿和越权隐藏；
+- 全量测试由 154 增至 161 项通过；
+- 当前尚未实现 SolverGateway、Trip/Revision 完成结果、SQLAlchemy、HTTP 或前端。
+
+### A6-3 生成执行应用闭环
+
+- 新增 Trip、不可变 TripRevision、SolverRun 领域记录，以及 complete/partial 与软降级正交表达；
+- GenerationIntent 增加 queued/failed_retryable → running 的原子领取语义，以及 completed、failed_retryable、failed_terminal 状态转换；
+- UnitOfWork 增加 Trip、TripRevision、SolverRun 仓储边界，内存事务同步支持全量回滚；
+- 定义 SolverRequest、SolverOutcome、SolverGateway 和可重试/终止 SolverExecutionError；
+- 实现 ExecuteGeneration：领取事务、事务外求解、完成事务三段分离，求解期间不持有事务；
+- 质量门通过时原子写入 SolverRun、Trip、Revision 并完成 Intent；
+- 质量门失败只保留失败 SolverRun，不生成可展示 Revision；求解异常按可重试性更新 Intent；
+- completed Intent 重复消费直接复用原 Trip/Revision，不重复调用求解器；running Intent 拒绝第二执行者领取；
+- 新增 6 项应用测试，覆盖成功闭环、partial+soft degradation、重复消费、并发领取、质量门失败和错误分类；
+- 全量测试由 161 增至 167 项通过；
+- 本切片完成应用执行骨架，下一步接入现有纯求解器的生产 SolverGateway 适配器与稳定结果映射。
+
 ## 后续队列
 
 | 顺序 | 阶段 | 内容 | 当前状态 |
@@ -203,7 +234,7 @@
 | 3.6 | A2.1/A3.1 | 全路线 UI/交互边界同步 | 已完成 |
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
-| 6 | A6 | 首个浏览器可操作纵向切片 | 下一步 |
+| 6 | A6 | 首个浏览器可操作纵向切片 | 进行中（约 32%） |
 | 7 | G7 | 真实专家评审与用户验证 | 未开始 |
 
 ## 首个可用目标
@@ -226,6 +257,7 @@
 - SQLAlchemy、数据库迁移和生产数据仓储尚未实现；
 - 地图、天气、登录等真实外部 Provider 尚未接入；
 - Taro/React 前端与任何页面尚未实现；
+- A6 已有框架无关领域/应用核心、生成执行事务骨架和内存适配器，尚无生产求解适配器、HTTP 用户入口与数据库；
 - 分享卡片尚未实现；
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；
