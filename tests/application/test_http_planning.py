@@ -274,7 +274,8 @@ def test_auth_validation_and_readiness_use_http_contract(tmp_path: Path) -> None
     )
 
     assert ready.status_code == 200
-    assert ready.json() == {"status": "ready", "database": True}
+    assert ready.json()["status"] == "ready"
+    assert ready.json()["database"] is True
     assert unauthorized.status_code == 401
     assert unauthorized.json()["error"]["code"] == "authentication_required"
     assert invalid.status_code == 422

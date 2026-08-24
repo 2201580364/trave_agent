@@ -23,6 +23,9 @@ def upgrade() -> None:
         sa.Column("device_installation_id", sa.String(128), nullable=True),
         sa.Column("expires_at", sa.String(40), nullable=False),
         sa.Column("created_at", sa.String(40), nullable=False),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8mb4",
+        mysql_collate="utf8mb4_0900_ai_ci",
     )
     op.create_index(
         "ix_anonymous_credentials_principal_id",

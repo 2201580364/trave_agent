@@ -1,6 +1,7 @@
 """Alembic environment for the modular monolith database."""
 
 from logging.config import fileConfig
+import os
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -9,6 +10,9 @@ from travel_agent.infrastructure.database import Base
 
 
 config = context.config
+database_url = os.environ.get("TRAVEL_AGENT_DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

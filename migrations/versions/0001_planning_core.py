@@ -28,6 +28,9 @@ def upgrade() -> None:
         sa.Column("visit_period_preferences", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.String(40), nullable=False),
         sa.Column("updated_at", sa.String(40), nullable=False),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8mb4",
+        mysql_collate="utf8mb4_0900_ai_ci",
     )
     op.create_index("ix_trip_drafts_principal_id", "trip_drafts", ["principal_id"])
     op.create_index("ix_trip_drafts_city_id", "trip_drafts", ["city_id"])
@@ -49,6 +52,9 @@ def upgrade() -> None:
         sa.Column("trip_id", sa.String(64), nullable=True),
         sa.Column("trip_revision_id", sa.String(64), nullable=True),
         sa.Column("failure_code", sa.String(64), nullable=True),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8mb4",
+        mysql_collate="utf8mb4_0900_ai_ci",
     )
     op.create_index(
         "ix_generation_intents_principal_id", "generation_intents", ["principal_id"]
@@ -65,6 +71,9 @@ def upgrade() -> None:
         sa.Column("current_revision_id", sa.String(64), nullable=False),
         sa.Column("created_at", sa.String(40), nullable=False),
         sa.Column("updated_at", sa.String(40), nullable=False),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8mb4",
+        mysql_collate="utf8mb4_0900_ai_ci",
     )
     op.create_index("ix_trips_principal_id", "trips", ["principal_id"])
     op.create_index("ix_trips_city_id", "trips", ["city_id"])
@@ -82,6 +91,9 @@ def upgrade() -> None:
         sa.Column("result_snapshot", sa.JSON(), nullable=False),
         sa.Column("result_snapshot_hash", sa.String(64), nullable=False),
         sa.Column("created_at", sa.String(40), nullable=False),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8mb4",
+        mysql_collate="utf8mb4_0900_ai_ci",
     )
     op.create_index("ix_trip_revisions_trip_id", "trip_revisions", ["trip_id"])
 
@@ -96,6 +108,9 @@ def upgrade() -> None:
         sa.Column("parameter_version", sa.String(64), nullable=False),
         sa.Column("audit_payload", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.String(40), nullable=False),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8mb4",
+        mysql_collate="utf8mb4_0900_ai_ci",
     )
 
 

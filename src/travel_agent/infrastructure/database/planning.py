@@ -9,7 +9,14 @@ from typing import Any, Self
 from sqlalchemy import Boolean, Integer, JSON, String, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    Session,
+    declared_attr,
+    mapped_column,
+    sessionmaker,
+)
 
 from travel_agent.application.common.errors import (
     DraftVersionConflictError,
@@ -33,7 +40,13 @@ from travel_agent.domain.planning import (
 
 
 class Base(DeclarativeBase):
-    pass
+    @declared_attr.directive
+    def __table_args__(cls) -> dict[str, str]:
+        return {
+            "mysql_engine": "InnoDB",
+            "mysql_charset": "utf8mb4",
+            "mysql_collate": "utf8mb4_0900_ai_ci",
+        }
 
 
 class TripDraftRow(Base):

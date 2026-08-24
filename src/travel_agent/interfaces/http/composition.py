@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-
 from travel_agent.application.planning import ExecuteGenerationHandler
 from travel_agent.application.planning.ports import DataSnapshotVersionProvider
 from travel_agent.infrastructure.database import (
     AnonymousIdentityService,
+    DatabaseReadiness,
+    DatabaseSettings,
     SqlAlchemyUnitOfWork,
+    build_engine,
+    build_session_factory,
 )
 from travel_agent.infrastructure.execution import InlineGenerationExecutor
 from travel_agent.infrastructure.ids import UuidIdGenerator
@@ -26,8 +27,11 @@ from .app import HttpContainer, create_app
 
 @dataclass(frozen=True, slots=True)
 class HttpSettings:
-    database_url: str
-    echo_sql: bool = False
+    database: DatabaseSettings
+
+    @classmethod
+    def from_env(cls) -> HttpSettings:
+        return cls(DatabaseSettings.from_env())
 
 
 def build_http_app(
@@ -35,18 +39,8 @@ def build_http_app(
     snapshots: DataSnapshotVersionProvider,
     published_data: PublishedSolverDataProvider,
 ):
-    connect_args = (
-        {"check_same_thread": False}
-        if settings.database_url.startswith("sqlite")
-        else {}
-    )
-    engine = create_engine(
-        settings.database_url,
-        echo=settings.echo_sql,
-        pool_pre_ping=True,
-        connect_args=connect_args,
-    )
-    sessions = sessionmaker[Session](engine, expire_on_commit=False)
+    engine = build_engine(settings.database)
+    sessions = build_session_factory(engine)
     clock = SystemClock()
     ids = UuidIdGenerator()
     uow_factory = lambda: SqlAlchemyUnitOfWork(sessions)
@@ -62,5 +56,6 @@ def build_http_app(
             InlineGenerationExecutor(execute),
             identity,
             published_data,
+            DatabaseReadiness(sessions).check,
         )
     )

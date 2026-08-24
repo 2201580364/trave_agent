@@ -52,6 +52,7 @@ class HttpContainer:
     executor: GenerationExecutor
     identity: AnonymousIdentityService
     catalog: PublishedSolverDataProvider | None = None
+    readiness: Callable[[], dict[str, object]] | None = None
 
 
 class AnonymousSessionInput(BaseModel):
@@ -199,10 +200,15 @@ def create_app(container: HttpContainer) -> FastAPI:
 
     @app.get("/health/ready")
     def health_ready() -> JSONResponse:
-        ready = container.identity.ready()
+        details = (
+            container.readiness()
+            if container.readiness is not None
+            else {"ready": container.identity.ready(), "database": True}
+        )
+        ready = bool(details["ready"])
         return JSONResponse(
             status_code=200 if ready else 503,
-            content={"status": "ready" if ready else "not_ready", "database": ready},
+            content={"status": "ready" if ready else "not_ready", **details},
         )
 
     @app.post("/api/v1/anonymous-sessions", status_code=status.HTTP_201_CREATED)
