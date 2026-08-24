@@ -19,8 +19,8 @@
 - 更新时间：2026-08-24
 - 产品里程碑：`M1 — 行程骨架验证`
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 专家/用户验证尚未开始
-- 当前阶段：`A4 应用代码架构设计已完成，准备进入 A5 API 与持久化数据模型同步`
-- 当前任务：已完成模块化单体、领域/应用/接口/基础设施分层、求解器适配、事务幂等、前端架构和首个纵向切片设计
+- 当前阶段：`A5 API 与持久化数据模型同步已完成，准备进入 A6 首个浏览器可操作纵向切片实现`
+- 当前任务：已完成 HTTP v1 资源、错误码、GenerationIntent 幂等、Trip/Revision/SolverRun 数据关系、约束索引、事务与迁移设计
 - 总体判断：求解器已经可被应用层依赖，但产品尚无 UI、HTTP 入口、数据库或用户可操作闭环
 
 ## 已完成
@@ -54,9 +54,16 @@
 
 ### A5：API 与持久化数据模型同步
 
+- 状态：已完成
+- 核心产物：`docs/specs/api-contract.md` V2.0、`docs/specs/data-model.md` V2.0
+- 关键结论：草稿/Intent/Trip/Revision 资源分离；无 `/regenerate`；到离交通事实分离；输入/结果 snapshot 版本化；草稿乐观锁、intent 原子领取、Revision/SolverRun 原子完成事务明确
+- 完成度：100%
+
+### A6：首个浏览器可操作纵向切片
+
 - 状态：下一步
-- 当前输入：A4 用例、聚合、事务、幂等、错误分层和旧规格修订清单
-- 下一产物：HTTP v1 资源与 schema、数据库实体关系、索引/唯一约束、迁移顺序、错误码和接口验收场景
+- 当前输入：A4 架构、A5 HTTP v1 契约与数据库模型、冻结求解器契约
+- 首个实现切片：匿名会话 → 草稿 → 杭州景点 → GenerationIntent → inline SolverGateway → TripRevision → 恢复结果
 - 完成度：0%
 
 ## 本轮完成（2026-08-24）
@@ -167,6 +174,24 @@
 - 标记旧 API 与数据模型中的 regenerate、单 itinerary JSON、单 transport_type、默认 Celery/WebSocket 等 A5 必修项；
 - 明确首个切片实现顺序，不包含登录、分享、在线 Provider、小记或社区。
 
+### A5 API 与持久化数据模型同步
+
+- 将旧 API 契约升级为 V2.0，统一使用 `/api/v1`；
+- 新增匿名会话、草稿、旅行事实、景点选择、生成前 review、GenerationIntent、Trip 和不可变 Revision 资源；
+- 取消含义混乱的 `/regenerate`，区分稳定重试、修改后生成和未来替代方案；
+- 到达/离开交通类型、确认状态和时间预留分别建模；
+- 定义 queued/running/completed/failed_retryable/failed_terminal 应用状态，并与求解搜索状态分离；
+- 将完成范围和软降级拆为正交维度：complete/partial + has_soft_degradation，支持“部分成功且同时软降级”；
+- 完整设计 provenance、accounting、timeline、unplaced、data_rejected 和 degradations 响应；
+- 定义 HTTP 错误码、求解拒绝码分层、匿名权限和轮询规则；
+- 数据模型升级为 principals、trip_drafts、generation_intents、solver_runs、trips、trip_revisions 等结构；
+- 使用 draft_version 乐观锁、intent 主键和 input hash、执行条件更新、revision/run 唯一约束保护并发；
+- 多开放规则、多闭馆日、具体日期例外、天气和有向 OD 形成可发布数据快照；
+- 输入/结果 snapshot 保存 Schema 版本和稳定哈希，历史 Revision 不可原地覆盖；
+- 定义求解完成短事务、失败恢复、数据保留和 Alembic 001–010 迁移顺序；
+- 补充 8 个 API 验收场景和 6 个数据模型验收场景；
+- A5 未扩大 M1 范围，M2–M4 仍未创建空表。
+
 ## 后续队列
 
 | 顺序 | 阶段 | 内容 | 当前状态 |
@@ -177,8 +202,8 @@
 | 3.5 | 产品功能完整性复审 | 全景需求追踪、缺口补齐与冲突登记 | 已完成 |
 | 3.6 | A2.1/A3.1 | 全路线 UI/交互边界同步 | 已完成 |
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
-| 5 | A5 | API 与持久化数据模型同步 | 下一步 |
-| 6 | A6 | 首个浏览器可操作纵向切片 | 未开始 |
+| 5 | A5 | API 与持久化数据模型同步 | 已完成 |
+| 6 | A6 | 首个浏览器可操作纵向切片 | 下一步 |
 | 7 | G7 | 真实专家评审与用户验证 | 未开始 |
 
 ## 首个可用目标

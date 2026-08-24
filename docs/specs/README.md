@@ -7,6 +7,13 @@
 
 已冻结的求解器公开边界见 [solver-p1-contract.md](solver-p1-contract.md)。应用、API、数据库和页面设计必须依赖该契约，而不是直接依赖求解器内部实现细节。
 
+M1 应用层规格已经完成 A5 同步：
+
+- [api-contract.md](api-contract.md) V2.0：匿名会话、草稿、GenerationIntent、Trip/Revision、错误码和接口验收；
+- [data-model.md](data-model.md) V2.0：持久化实体、唯一约束、事务、发布快照和 Alembic 顺序。
+
+旧 `/regenerate`、单一 `transport_type` 和单表 `trips.itinerary JSON` 不再是当前实现依据。
+
 - 每个功能一篇，命名 `xxx.md`（如 `trip-solver.md`）。
 - 头标含：关联假设（`H-x`）、关联指标、优先级。
 
@@ -21,11 +28,11 @@ When 求解器生成 Day 1（周一）行程
 Then 该景点不出现在 Day 1
 ```
 
-## 待写的核心规格（按优先级）
+## 后续规格队列（按优先级）
 
 1. `trip-solver.md` —— 一键生成分日行程（核心，承载 H3，最优先）
 2. `attraction-browse.md` —— 景点列表 + 类型筛选
 3. `transport-input.md` —— 大交通输入（关联 H6）
-4. `replace-regenerate.md` —— 替换景点 + 重新生成
+4. `trip-revision.md` —— 修改草稿后创建新 GenerationIntent 和 TripRevision；不使用含义模糊的 regenerate
 5. `share-card.md` —— 行程分享卡片（关联 H11）
 6. `feedback.md` —— 👍👎 反馈
