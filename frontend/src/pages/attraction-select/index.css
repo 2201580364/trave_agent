@@ -1,0 +1,12 @@
+.search-card { display: flex; gap: 10px; align-items: center; }
+.search-card .input { flex: 1; }
+.filter-chip { flex: none; min-height: 44px; padding: 0 13px; background: #fff; color: var(--muted); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
+.filter-chip--active { color: var(--brand-dark); border-color: var(--brand); background: var(--brand-soft); }
+.attraction-list { display: grid; gap: 12px; margin-top: 16px; }
+.attraction-card { display: flex; align-items: center; gap: 14px; padding: 17px; background: #fff; border: 1px solid var(--line); border-radius: 17px; }
+.attraction-card--selected { border-color: var(--brand); background: #fbfefc; box-shadow: 0 10px 24px rgba(23, 107, 81, 0.10); }
+.attraction-main { flex: 1; min-width: 0; }
+.attraction-meta { margin-top: 7px; color: #425149; font-size: 13px; }
+.select-mark { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-weight: 800; }
+.select-mark--active { color: #fff; border-color: var(--brand); background: var(--brand); }
+.selected-summary { position: fixed; z-index: 11; left: 18px; bottom: 82px; padding: 8px 12px; background: var(--ink); color: #fff; border-radius: 999px; font-size: 12px; }

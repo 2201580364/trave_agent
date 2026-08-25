@@ -1,0 +1,4 @@
+.review-summary { display: grid; gap: 14px; }
+.review-summary > view { display: flex; justify-content: space-between; gap: 20px; }
+.summary-key { color: var(--muted); }
+.check-list { display: grid; gap: 12px; margin-top: 15px; color: #405048; font-size: 14px; }
