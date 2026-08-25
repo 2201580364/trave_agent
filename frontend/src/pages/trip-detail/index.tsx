@@ -18,8 +18,8 @@ function minuteLabel(value: number) {
 
 function arrivalLabel(value: number, fixedEvent = false) {
   if (fixedEvent) return `${minuteLabel(value)} 场次`
-  const start = Math.floor(value / 15) * 15
-  return `${minuteLabel(start)}–${minuteLabel(start + 30)}`
+  const rounded = Math.round(value / 10) * 10
+  return `约 ${minuteLabel(rounded)} 到达`
 }
 
 function durationLabel(value: number) {
@@ -171,7 +171,7 @@ export default function TripDetailPage() {
                       <View className='timeline-rail'><View className='timeline-dot' /></View>
                       <View className='visit-card'>
                         <View className='section-title'>{node.name}</View>
-                        <View className='attraction-meta'>建议停留约 {durationLabel(node.planned_duration_min)}</View>
+                        <View className='attraction-meta'>计划停留约 {durationLabel(node.planned_duration_min)}</View>
                         {index > 0 && (
                           <View className='transit-note'>
                             从上一站建议 {transportModeLabel(node.transport_mode)} · 约 {transitDurationLabel(node.buffered_travel_from_previous_min ?? node.travel_from_previous_min ?? 0)}

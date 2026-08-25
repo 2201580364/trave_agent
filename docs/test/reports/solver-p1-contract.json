@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-23T16:16:56.541158+00:00",
+  "generated_at": "2026-08-25T15:06:34.295592+00:00",
   "contract_version": "solver-p1-v1",
-  "constraint_version": "constraints-p1-v1",
-  "parameter_version": "parameters-p1-2026-08-24",
+  "constraint_version": "constraints-p1-v2",
+  "parameter_version": "parameters-p1-2026-08-25",
   "duration_ratios": [
     [
       "speed",
@@ -23,6 +23,11 @@
   "drop_penalty": 1000000,
   "travel_cost_scale": 30,
   "period_deviation_cost": 1,
+  "day_spread_target_end_min": 960,
+  "day_spread_max_delay_min": 60,
+  "lunch_earliest_min": 690,
+  "lunch_latest_end_min": 840,
+  "lunch_duration_min": 60,
   "default_day_start_min": 540,
   "default_day_end_min": 1260,
   "evening_start_min": 1020,
@@ -58,7 +63,9 @@
     "S1_DURATION_RATIO",
     "S2_ENERGY_BALANCE",
     "VISIT_PERIOD",
-    "DINNER_BLOCK"
+    "DINNER_BLOCK",
+    "LUNCH_BLOCK",
+    "DAY_SPREAD"
   ],
   "search_statuses": [
     "empty",

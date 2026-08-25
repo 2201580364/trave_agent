@@ -20,8 +20,8 @@ from .models import (
     MealStatus,
     RejectionCode,
     RoutedDay,
-    RouteSegment,
     RouteSearchStatus,
+    RouteSegment,
     RouteSolveMetadata,
     RouteUnplaced,
     RouteVisit,
@@ -30,6 +30,7 @@ from .models import (
     TravelTimeResult,
 )
 from .routing import RoutingSearchExecutor, route_day, validate_routed_day
+from .schedule_refinement import refine_daytime_schedule
 from .time_windows import resolve_effective_window
 from .transport import DEFAULT_TRANSIT_BUFFER_RATIO, TravelTimeProvider
 from .visit_periods import evaluate_visit_period
@@ -95,6 +96,12 @@ def route_segmented_day(
         evening_route,
         provider,
         buffer_ratio,
+    )
+    merged = refine_daytime_schedule(
+        merged,
+        daytime_visit_count=len(daytime_route.visits) if daytime_route is not None else 0,
+        cross_buffered_min=cross_buffered,
+        dinner_duration_min=dinner_duration_min,
     )
     meal_plan = _schedule_meal(
         merged,

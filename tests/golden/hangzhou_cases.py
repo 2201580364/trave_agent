@@ -388,6 +388,90 @@ def three_day_realistic_mix_is_conserved() -> GoldenCaseResult:
     )
 
 
+def daytime_visits_are_spread_before_fixed_evening_show() -> GoldenCaseResult:
+    museum = _attraction(
+        18,
+        "浙江省博物馆（日内展开样例）",
+        rules=_rule("09:00", "17:00", "16:30"),
+        duration=120,
+        indoor=True,
+    )
+    lakefront = _attraction(
+        19,
+        "西湖湖滨（日内展开样例）",
+        rules=_rule("09:00", "17:30"),
+        duration=150,
+        energy=3,
+    )
+    show = _attraction(
+        20,
+        "湖滨喷泉灯光秀（18:30 场次）",
+        rules=_rule("18:30", "19:00"),
+        duration=30,
+    )
+    attractions = (museum, lakefront, show)
+    weather = _weather({MONDAY: WeatherSeverity.NORMAL})
+    step1 = assign_days(
+        tuple(AttractionPreference(item, MONDAY) for item in attractions),
+        trip_dates=(MONDAY,),
+        weather_by_date=weather,
+        anchors=TripTimeAnchors(9 * 60, 45, 21 * 60, 0, 0),
+    )
+    itinerary = route_itinerary(
+        step1,
+        _provider(
+            {
+                18: Coordinate(30.2525, 120.1495),
+                19: Coordinate(30.2590, 120.1650),
+                20: Coordinate(30.2592, 120.1662),
+            }
+        ),
+        weather_by_date=weather,
+    )
+    quality = evaluate_solver_quality(itinerary, attractions)
+    visits = itinerary.days[0].visits
+    first, second, fixed_show = visits
+    lunch_gap = (
+        second.arrival_min
+        - second.buffered_travel_from_previous_min
+        - first.leave_min
+    )
+    meal = itinerary.segmented_days[0].meal_plan
+    passed = (
+        quality.gate_passed
+        and {first.attraction.id, second.attraction.id} == {18, 19}
+        and first.planned_duration_min == first.attraction.suggested_duration
+        and second.planned_duration_min == second.attraction.suggested_duration
+        and second.arrival_min >= 13 * 60
+        and second.leave_min >= 15 * 60
+        and lunch_gap >= 60
+        and fixed_show.attraction.id == 20
+        and fixed_show.arrival_min == 18 * 60 + 30
+        and fixed_show.planned_duration_min == 30
+        and meal.status is MealStatus.FULL
+    )
+    return GoldenCaseResult(
+        "HZ-GC-07",
+        "两个日间景点覆盖上午和下午，18:30 固定表演与晚餐保留",
+        passed,
+        ("C2", "C4", "C6", "S1", "LUNCH_BLOCK", "DINNER_BLOCK", "DAY_SPREAD"),
+        ("SRC-MUSEUM-HOURS", "SRC-WESTLAKE-GUIDE", "SRC-FOUNTAIN-GUIDE"),
+        {
+            "visit_times": {
+                str(visit.attraction.id): {
+                    "arrival_min": visit.arrival_min,
+                    "leave_min": visit.leave_min,
+                    "planned_duration_min": visit.planned_duration_min,
+                }
+                for visit in visits
+            },
+            "lunch_gap_min": lunch_gap,
+            "dinner_status": meal.status.value,
+            "hard_constraint_violations": quality.hard_constraint_violations,
+        },
+    )
+
+
 CASES: tuple[Callable[[], GoldenCaseResult], ...] = (
     museum_closure_moves_to_tuesday,
     late_arrival_keeps_morning_site_unplaced,
@@ -395,6 +479,7 @@ CASES: tuple[Callable[[], GoldenCaseResult], ...] = (
     fixed_evening_show_survives_dinner_block,
     missing_od_enters_cross_day_recovery,
     three_day_realistic_mix_is_conserved,
+    daytime_visits_are_spread_before_fixed_evening_show,
 )
 
 

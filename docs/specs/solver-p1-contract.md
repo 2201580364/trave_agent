@@ -1,8 +1,8 @@
 ﻿# M1 求解器公开契约（solver-p1-v1）
 
-- **状态**：Frozen
-- **日期**：2026-08-24
-- **依据**：ADR-0009
+- **状态**：已稳定并版本化（求解器核心阶段性完成，可按 ADR 升级）
+- **日期**：2026-08-25
+- **依据**：ADR-0009、ADR-0010
 - **关联假设**：H3、H7
 
 ## 1. 应用层调用边界
@@ -170,6 +170,8 @@ REASSIGNMENT_DISPLACES_EXISTING
 建议时长不足但不低于硬比例
 体力节奏偏紧/偏松
 晚餐 90min → 60min → unscheduled
+午餐 60min → unscheduled（当前为结果空档派生的过渡实现）
+DAY_SPREAD 无安全余量时回退原硬可行时序
 时段 preferred → acceptable → fallback
 OD approximate（需如实标注）
 best_so_far（需如实标注）
@@ -192,6 +194,21 @@ DEFAULT_SOLVER_P1_CONTRACT
 ```
 
 修改任一默认参数必须升级 `parameter_version` 并重新生成报告。
+
+ADR-0010 当前版本：
+
+```text
+contract_version   = solver-p1-v1
+constraint_version = constraints-p1-v2
+parameter_version  = parameters-p1-2026-08-25
+
+day spread target end = 16:00
+day spread max delay  = 60min
+lunch preference      = 11:30–14:00
+lunch full duration   = 60min
+```
+
+`DAY_SPREAD` 只在 OR-Tools 已选硬可行顺序之后进行软精修：优先把最低可玩时长扩展至建议时长、保留午餐空档并覆盖下午；它不能改变顺序、突破硬窗口或牺牲固定晚间场次。
 
 ## 9. 确定性和回放
 
@@ -229,5 +246,5 @@ M1 契约不承诺：
 - 客户端自定义 seed；
 - 多峰优选时段；
 - 自动专家评分；
-- 酒店和餐厅联合优化；
+- 酒店和餐厅联合优化（M2 先实现餐厅真实节点和重排）；
 - 实时行中动态重排。

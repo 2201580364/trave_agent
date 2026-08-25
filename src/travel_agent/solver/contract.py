@@ -16,6 +16,13 @@ from .routing import (
     DEFAULT_TIME_LIMIT_SECONDS,
     DEFAULT_TRAVEL_COST_SCALE,
 )
+from .schedule_refinement import (
+    DEFAULT_DAY_SPREAD_MAX_DELAY_MIN,
+    DEFAULT_DAY_SPREAD_TARGET_END_MIN,
+    DEFAULT_LUNCH_DURATION_MIN,
+    DEFAULT_LUNCH_EARLIEST_MIN,
+    DEFAULT_LUNCH_LATEST_END_MIN,
+)
 from .segments import (
     DEFAULT_DINNER_DURATION_MIN,
     DEFAULT_DINNER_EARLIEST_MIN,
@@ -25,10 +32,9 @@ from .segments import (
 )
 from .transport import DEFAULT_TRANSIT_BUFFER_RATIO
 
-
 SOLVER_CONTRACT_VERSION = "solver-p1-v1"
-CONSTRAINT_VERSION = "constraints-p1-v1"
-PARAMETER_VERSION = "parameters-p1-2026-08-24"
+CONSTRAINT_VERSION = "constraints-p1-v2"
+PARAMETER_VERSION = "parameters-p1-2026-08-25"
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +48,11 @@ class SolverP1Contract:
     drop_penalty: int
     travel_cost_scale: int
     period_deviation_cost: int
+    day_spread_target_end_min: int
+    day_spread_max_delay_min: int
+    lunch_earliest_min: int
+    lunch_latest_end_min: int
+    lunch_duration_min: int
     default_day_start_min: int
     default_day_end_min: int
     evening_start_min: int
@@ -82,6 +93,11 @@ DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
     drop_penalty=DEFAULT_DROP_PENALTY,
     travel_cost_scale=DEFAULT_TRAVEL_COST_SCALE,
     period_deviation_cost=DEFAULT_PERIOD_DEVIATION_COST,
+    day_spread_target_end_min=DEFAULT_DAY_SPREAD_TARGET_END_MIN,
+    day_spread_max_delay_min=DEFAULT_DAY_SPREAD_MAX_DELAY_MIN,
+    lunch_earliest_min=DEFAULT_LUNCH_EARLIEST_MIN,
+    lunch_latest_end_min=DEFAULT_LUNCH_LATEST_END_MIN,
+    lunch_duration_min=DEFAULT_LUNCH_DURATION_MIN,
     default_day_start_min=DEFAULT_DAY_START_MIN,
     default_day_end_min=DEFAULT_DAY_END_MIN,
     evening_start_min=DEFAULT_EVENING_OPEN_MIN,
@@ -100,6 +116,8 @@ DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
         "S2_ENERGY_BALANCE",
         "VISIT_PERIOD",
         "DINNER_BLOCK",
+        "LUNCH_BLOCK",
+        "DAY_SPREAD",
     ),
     search_statuses=tuple(item.value for item in RouteSearchStatus),
     rejection_codes=tuple(item.value for item in RejectionCode),

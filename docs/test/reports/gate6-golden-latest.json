@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-23T16:16:56.671684+00:00",
+  "generated_at": "2026-08-25T15:06:34.571435+00:00",
   "suite": "hangzhou-realistic-golden-cases",
-  "passed": 6,
-  "total": 6,
+  "passed": 7,
+  "total": 7,
   "gate_passed": true,
   "cases": [
     {
@@ -135,6 +135,47 @@
           "17": "2026-08-26"
         },
         "scheduled_count": 7,
+        "hard_constraint_violations": 0
+      }
+    },
+    {
+      "case_id": "HZ-GC-07",
+      "title": "两个日间景点覆盖上午和下午，18:30 固定表演与晚餐保留",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4",
+        "C6",
+        "S1",
+        "LUNCH_BLOCK",
+        "DINNER_BLOCK",
+        "DAY_SPREAD"
+      ],
+      "evidence": [
+        "SRC-MUSEUM-HOURS",
+        "SRC-WESTLAKE-GUIDE",
+        "SRC-FOUNTAIN-GUIDE"
+      ],
+      "details": {
+        "visit_times": {
+          "18": {
+            "arrival_min": 585,
+            "leave_min": 705,
+            "planned_duration_min": 120
+          },
+          "19": {
+            "arrival_min": 810,
+            "leave_min": 960,
+            "planned_duration_min": 150
+          },
+          "20": {
+            "arrival_min": 1110,
+            "leave_min": 1140,
+            "planned_duration_min": 30
+          }
+        },
+        "lunch_gap_min": 97,
+        "dinner_status": "full",
         "hard_constraint_violations": 0
       }
     }

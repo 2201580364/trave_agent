@@ -12,8 +12,8 @@ def test_p1_contract_versions_and_parameters_are_frozen() -> None:
     contract = DEFAULT_SOLVER_P1_CONTRACT
 
     assert contract.contract_version == SOLVER_CONTRACT_VERSION == "solver-p1-v1"
-    assert contract.constraint_version == CONSTRAINT_VERSION == "constraints-p1-v1"
-    assert contract.parameter_version == PARAMETER_VERSION
+    assert contract.constraint_version == CONSTRAINT_VERSION == "constraints-p1-v2"
+    assert contract.parameter_version == PARAMETER_VERSION == "parameters-p1-2026-08-25"
     assert dict(contract.duration_ratios) == {
         "speed": 0.6,
         "normal": 0.6,
@@ -24,6 +24,11 @@ def test_p1_contract_versions_and_parameters_are_frozen() -> None:
     assert contract.drop_penalty == 1_000_000
     assert contract.travel_cost_scale == 30
     assert contract.period_deviation_cost == 1
+    assert contract.day_spread_target_end_min == 16 * 60
+    assert contract.day_spread_max_delay_min == 60
+    assert contract.lunch_earliest_min == 11 * 60 + 30
+    assert contract.lunch_latest_end_min == 14 * 60
+    assert contract.lunch_duration_min == 60
     assert contract.dinner_full_duration_min == 90
     assert contract.dinner_reduced_duration_min == 60
 
@@ -48,6 +53,8 @@ def test_p1_contract_freezes_public_constraint_and_status_vocabulary() -> None:
     assert "CLOSED_ON_DATE" in contract.rejection_codes
     assert "SOLVER_TIME_LIMIT" in contract.rejection_codes
     assert "TRANSIT_INFEASIBLE" in contract.rejection_codes
+    assert "LUNCH_BLOCK" in contract.soft_objectives
+    assert "DAY_SPREAD" in contract.soft_objectives
 
 
 def test_p1_contract_is_machine_serializable() -> None:
