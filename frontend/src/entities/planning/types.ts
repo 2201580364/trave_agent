@@ -78,10 +78,23 @@ export interface TripResult {
       leave_min: number
       planned_duration_min: number
       travel_from_previous_min?: number
+      buffered_travel_from_previous_min?: number
+      travel_basis?: 'approximate' | 'gaode' | null
+      transport_mode?: 'driving' | 'walking_estimate' | 'taxi_estimate' | 'transit_or_taxi_estimate' | null
+      timing_kind?: 'flexible' | 'fixed_event'
     }>
-    meal?: { status?: string; start_min?: number; end_min?: number } | null
+    lunch?: MealBreak | null
+    meal?: MealBreak | null
   }>
   unplaced?: Array<{ attraction_id: string; name: string; reason_code: string }>
   degradations?: Array<{ code: string; message: string; count: number }>
   provenance?: Record<string, unknown>
+}
+
+export interface MealBreak {
+  status?: 'full' | 'reduced' | 'unscheduled'
+  start_min?: number | null
+  end_min?: number | null
+  duration_min?: number
+  notice?: string
 }

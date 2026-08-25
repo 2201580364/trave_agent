@@ -2,6 +2,8 @@ import { Button, Input, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 
+import './index.css'
+
 import type { Attraction, Draft } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
@@ -68,7 +70,7 @@ export default function AttractionSelectPage() {
   return (
     <View className='page-shell'>
       <View className='content'>
-        <StepHeader step={2} title='想去哪里' />
+        <StepHeader step={2} title='想去哪里' backUrl='/pages/trip-time/index' />
         <View className='title'>选择真正想去的地方</View>
         <View className='subtitle'>这里只展示已发布的基础信息，不使用虚构评分或推荐理由。</View>
 

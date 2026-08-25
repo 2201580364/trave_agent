@@ -15,6 +15,7 @@ interface PlanningState {
   setDraftVersion: (version: number) => void
   setSelectedAttractions: (ids: string[]) => void
   setTrip: (tripId: string, revisionId: string) => void
+  replacePlan: (draftId: string, draftVersion: number) => void
   reset: () => void
 }
 
@@ -43,6 +44,13 @@ export const usePlanningStore = create<PlanningState>()(
       setDraftVersion: (draftVersion) => set({ draftVersion }),
       setSelectedAttractions: (selectedAttractionIds) => set({ selectedAttractionIds }),
       setTrip: (tripId, revisionId) => set({ tripId, revisionId }),
+      replacePlan: (draftId, draftVersion) => set({
+        draftId,
+        draftVersion,
+        selectedAttractionIds: [],
+        tripId: '',
+        revisionId: ''
+      }),
       reset: () => set(empty)
     }),
     { name: 'travel-agent-planning-v1', storage: createJSONStorage(() => storage) }

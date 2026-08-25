@@ -76,6 +76,7 @@ class ApproximateTravelTimeProvider:
         *,
         speed_kmh: float = 30.0,
         detour_ratio: float = 1.3,
+        minimum_travel_min: int = 1,
         data_version: str,
         fetched_at: datetime,
     ) -> None:
@@ -83,11 +84,14 @@ class ApproximateTravelTimeProvider:
             raise ValueError("speed_kmh must be positive")
         if detour_ratio < 1:
             raise ValueError("detour_ratio must be at least 1")
+        if minimum_travel_min <= 0:
+            raise ValueError("minimum_travel_min must be positive")
         if fetched_at.tzinfo is None:
             raise ValueError("fetched_at must be timezone-aware")
         self.coordinates = dict(coordinates)
         self.speed_kmh = speed_kmh
         self.detour_ratio = detour_ratio
+        self.minimum_travel_min = minimum_travel_min
         self.data_version = data_version
         self.fetched_at = fetched_at
 
@@ -111,7 +115,7 @@ class ApproximateTravelTimeProvider:
             return None
         distance_km = _haversine_km(origin, destination)
         travel_min = max(
-            1,
+            self.minimum_travel_min,
             math.ceil(distance_km * self.detour_ratio / self.speed_kmh * 60),
         )
         return TravelTimeResult(

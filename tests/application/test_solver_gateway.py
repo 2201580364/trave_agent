@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -12,9 +12,9 @@ from travel_agent.application.planning.ports import SolverExecutionError, Solver
 from travel_agent.domain.planning import CompletionKind
 from travel_agent.infrastructure.solver import (
     InMemoryPublishedSolverDataProvider,
+    ProductionSolverGateway,
     PublishedAttraction,
     PublishedSolverData,
-    ProductionSolverGateway,
 )
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -24,7 +24,6 @@ from travel_agent.solver import (
     WeatherBasis,
     WeatherSeverity,
 )
-
 
 TODAY = date(2026, 9, 1)
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=UTC)
@@ -76,15 +75,19 @@ def _published() -> PublishedSolverData:
     )
 
 
-def _request(*, attraction_ids: list[str] | None = None) -> SolverRequest:
+def _request(
+    *,
+    attraction_ids: list[str] | None = None,
+    end_date: date = TODAY,
+) -> SolverRequest:
     snapshot = {
         "schema_version": "generation-input-v1",
         "city_id": "hangzhou",
         "travel_facts": {
             "start_date": TODAY.isoformat(),
-            "end_date": TODAY.isoformat(),
+            "end_date": end_date.isoformat(),
             "arrival_at": "2026-09-01T09:00:00+08:00",
-            "departure_at": "2026-09-01T21:00:00+08:00",
+            "departure_at": f"{end_date.isoformat()}T21:00:00+08:00",
             "station_to_city_min": 0,
             "station_early_min": 0,
             "last_visit_to_station_min": 0,
@@ -116,6 +119,56 @@ def _gateway() -> ProductionSolverGateway:
     return ProductionSolverGateway(provider, FixedClock())
 
 
+def _balanced_gateway() -> ProductionSolverGateway:
+    attractions = tuple(
+        PublishedAttraction(
+            f"attr_{attraction_id}",
+            Attraction(
+                attraction_id,
+                f"景点 {attraction_id}",
+                suggested_duration=90,
+                is_always_open=True,
+                energy_level=1 + attraction_id % 3,
+                data_verified=True,
+            ),
+            Coordinate(30.25 + attraction_id / 10_000, 120.16),
+        )
+        for attraction_id in range(1, 8)
+    )
+    coordinates = {
+        item.attraction.id: item.coordinate
+        for item in attractions
+        if item.coordinate is not None
+    }
+    provider = ApproximateTravelTimeProvider(
+        coordinates,
+        data_version=VERSION,
+        fetched_at=NOW,
+    )
+    weather = {
+        visit_date: DailyWeather(
+            visit_date,
+            WeatherBasis.FORECAST,
+            WeatherSeverity.NORMAL,
+            "sunny",
+        )
+        for visit_date in (TODAY + timedelta(days=offset) for offset in range(3))
+    }
+    snapshot = PublishedSolverData(
+        VERSION,
+        "hangzhou",
+        attractions,
+        weather,
+        provider,
+        "approximate",
+        "forecast",
+    )
+    return ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((snapshot,)),
+        FixedClock(),
+    )
+
+
 def test_gateway_runs_frozen_solver_and_maps_stable_result() -> None:
     first = _gateway().solve(_request())
     second = _gateway().solve(_request())
@@ -131,8 +184,40 @@ def test_gateway_runs_frozen_solver_and_maps_stable_result() -> None:
     assert [item["node_id"] for item in nodes] == [
         item["node_id"] for item in second.result_snapshot["days"][0]["nodes"]
     ]
+    connected_node = next(
+        item for item in nodes if item["travel_from_previous_min"] > 0
+    )
+    assert connected_node["transport_mode"] == "walking_estimate"
+    assert connected_node["travel_basis"] == "approximate"
+    assert first.result_snapshot["days"][0]["lunch"]["status"] == "full"
     assert first.audit_payload["solve_run_id"] == "solver_run_1"
     assert first.audit_payload["data_snapshot_version"] == VERSION
+
+
+def test_gateway_derives_stable_balanced_dates_when_user_has_no_date_preference() -> None:
+    attraction_ids = [f"attr_{attraction_id}" for attraction_id in range(1, 8)]
+    request = _request(
+        attraction_ids=attraction_ids,
+        end_date=TODAY + timedelta(days=2),
+    )
+
+    first = _balanced_gateway().solve(request)
+    second = _balanced_gateway().solve(request)
+
+    first_counts = [len(day["nodes"]) for day in first.result_snapshot["days"]]
+    second_counts = [len(day["nodes"]) for day in second.result_snapshot["days"]]
+    scheduled_ids = {
+        node["attraction_id"]
+        for day in first.result_snapshot["days"]
+        for node in day["nodes"]
+    }
+
+    assert first_counts == second_counts
+    assert all(count > 0 for count in first_counts)
+    assert max(first_counts) - min(first_counts) <= 1
+    assert scheduled_ids == set(attraction_ids)
+    assert first.result_snapshot["accounting"]["conserved"] is True
+    assert first.result_snapshot_hash == second.result_snapshot_hash
 
 
 def test_missing_published_snapshot_is_retryable() -> None:

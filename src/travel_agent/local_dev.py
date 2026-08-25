@@ -155,8 +155,9 @@ def build_local_hangzhou_catalog(
         weather_by_date=weather,
         travel_time_provider=ApproximateTravelTimeProvider(
             coordinates,
-            speed_kmh=24,
-            detour_ratio=1.45,
+            speed_kmh=18,
+            detour_ratio=1.6,
+            minimum_travel_min=5,
             data_version="hangzhou-local-approx-od-v1",
             fetched_at=datetime.combine(today, datetime.min.time(), tzinfo=UTC),
         ),

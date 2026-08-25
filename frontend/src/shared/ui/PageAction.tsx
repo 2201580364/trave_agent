@@ -11,10 +11,19 @@ export function PageAction({
   loading?: boolean
   onClick: () => void
 }>) {
+  const isDisabled = Boolean(disabled || loading)
   return (
     <View className='action-bar'>
       <View className='action-inner'>
-        <Button className='primary' disabled={disabled || loading} loading={loading} onClick={onClick}>
+        <Button
+          className={`primary ${isDisabled ? 'primary--disabled' : ''}`}
+          disabled={isDisabled}
+          loading={loading}
+          aria-disabled={isDisabled}
+          onClick={() => {
+            if (!isDisabled) onClick()
+          }}
+        >
           {children}
         </Button>
       </View>

@@ -1,8 +1,10 @@
 import { Button, Text, View } from '@tarojs/components'
-import { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 
-import type { TripRevision } from '@/entities/planning/types'
+import './index.css'
+
+import type { Draft, MealBreak, TripRevision } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
 
@@ -14,11 +16,55 @@ function minuteLabel(value: number) {
   return `${hour}:${rest}${dayOffset ? ` +${dayOffset}天` : ''}`
 }
 
+function arrivalLabel(value: number, fixedEvent = false) {
+  if (fixedEvent) return `${minuteLabel(value)} 场次`
+  const start = Math.floor(value / 15) * 15
+  return `${minuteLabel(start)}–${minuteLabel(start + 30)}`
+}
+
+function durationLabel(value: number) {
+  if (value <= 30) return '20–30 分钟'
+  if (value <= 60) return '半小时至 1 小时'
+  if (value <= 90) return '1–1.5 小时'
+  if (value <= 120) return '1.5–2 小时'
+  const hours = Math.round(value / 30) / 2
+  return `${hours} 小时`
+}
+
+function transitDurationLabel(value: number) {
+  if (value <= 6) return '5–10 分钟'
+  if (value <= 12) return '10–15 分钟'
+  if (value <= 20) return '15–25 分钟'
+  if (value <= 30) return '25–40 分钟'
+  const start = Math.floor(value / 10) * 10
+  return `${start}–${start + 15} 分钟`
+}
+
+function dayTransitLabel(value: number) {
+  return value > 0 ? `市内接驳约 ${transitDurationLabel(value)}` : '本日无景点间接驳'
+}
+
+function transportModeLabel(mode?: string | null) {
+  if (mode === 'walking_estimate') return '步行'
+  if (mode === 'taxi_estimate') return '打车'
+  if (mode === 'transit_or_taxi_estimate') return '公交/地铁或打车'
+  return '驾车/打车'
+}
+
+function mealLabel(name: string, meal?: MealBreak | null) {
+  if (!meal || meal.status === 'unscheduled') return `${name}留白 · 未能安排`
+  const time = meal.start_min != null && meal.end_min != null
+    ? ` · 建议 ${minuteLabel(Math.floor(meal.start_min / 10) * 10)}–${minuteLabel(Math.floor(meal.end_min / 10) * 10)} 前后`
+    : ''
+  return `${name}留白${meal.status === 'reduced' ? ' · 已缩短' : ' · 已安排'}${time}`
+}
+
 export default function TripDetailPage() {
   const store = usePlanningStore()
   const [revision, setRevision] = useState<TripRevision | null>(null)
   const [activeDay, setActiveDay] = useState(0)
   const [error, setError] = useState('')
+  const [startingNew, setStartingNew] = useState(false)
 
   useDidShow(() => {
     if (!store.token || !store.tripId || !store.revisionId) return
@@ -32,12 +78,38 @@ export default function TripDetailPage() {
 
   const result = revision?.result_snapshot
   const day = result?.days[activeDay]
+  const dayTransitMin = day?.nodes.reduce(
+    (total, node) => total + (node.buffered_travel_from_previous_min ?? 0),
+    0
+  ) ?? 0
+  const startNewPlan = async () => {
+    if (!store.token) return
+    setStartingNew(true)
+    setError('')
+    try {
+      const draft = await apiRequest<Draft>('/api/v1/trip-drafts', {
+        method: 'POST',
+        token: store.token,
+        data: { city_id: 'hangzhou' }
+      })
+      store.replacePlan(draft.draft_id, draft.draft_version)
+      Taro.redirectTo({ url: '/pages/trip-time/index' })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '暂时无法新建行程。')
+    } finally {
+      setStartingNew(false)
+    }
+  }
+
   return (
     <View className='page-shell trip-page'>
       <View className='content'>
         <Text className='eyebrow'>杭州 · 规划模式</Text>
         <View className='title'>你的可执行行程</View>
         <View className='subtitle'>先看每天怎么走，再查看未排入和数据说明。</View>
+        <Button className='secondary trip-new-button' loading={startingNew} onClick={startNewPlan}>
+          ＋ 规划新行程
+        </Button>
 
         {revision?.completion_kind === 'partial_success' && (
           <View className='notice notice--warning'>部分景点未排入，已保留可执行的成功行程。</View>
@@ -73,26 +145,41 @@ export default function TripDetailPage() {
                 <View className='day-heading'>
                   <View>
                     <View className='section-title'>{day.date}</View>
-                    <View className='field-help'>交通约 {day.total_travel_min ?? 0} 分钟 · {day.weather?.basis === 'forecast' ? '天气预报' : '气候参考'}</View>
+                    <View className='field-help'>{dayTransitLabel(dayTransitMin)} · {day.weather?.basis === 'forecast' ? '天气预报' : '气候参考'}</View>
                   </View>
                   <View className='status-badge'>{day.search_status === 'best_so_far' ? '当前最优可行方案' : '已完成安排'}</View>
                 </View>
 
+                {day.nodes.some((node) => node.travel_basis === 'approximate') && (
+                  <View className='notice transit-warning'>当前接驳为本地近似估算，交通方式和耗时请在出发前用实时导航确认。</View>
+                )}
+
+                {day.nodes.length > 0 && (
+                  <View className='meal-list'>
+                    <View className='meal-block'>{mealLabel('午餐', day.lunch)}</View>
+                    <View className='meal-block'>{mealLabel('晚餐', day.meal)}</View>
+                  </View>
+                )}
+
                 <View className='timeline'>
+                  {!day.nodes.length && (
+                    <View className='notice'>本日暂无景点安排，可调整日期或景点后重新生成。</View>
+                  )}
                   {day.nodes.map((node, index) => (
                     <View key={node.node_id} className='timeline-item'>
-                      <View className='time-column'>{minuteLabel(node.arrival_min)}</View>
+                      <View className='time-column'>{arrivalLabel(node.arrival_min, node.timing_kind === 'fixed_event')}</View>
                       <View className='timeline-rail'><View className='timeline-dot' /></View>
                       <View className='visit-card'>
                         <View className='section-title'>{node.name}</View>
-                        <View className='attraction-meta'>游览约 {node.planned_duration_min} 分钟 · {minuteLabel(node.leave_min)} 离开</View>
-                        {index > 0 && <View className='transit-note'>从上一站交通约 {node.travel_from_previous_min ?? 0} 分钟</View>}
+                        <View className='attraction-meta'>建议停留约 {durationLabel(node.planned_duration_min)}</View>
+                        {index > 0 && (
+                          <View className='transit-note'>
+                            从上一站建议 {transportModeLabel(node.transport_mode)} · 约 {transitDurationLabel(node.buffered_travel_from_previous_min ?? node.travel_from_previous_min ?? 0)}
+                          </View>
+                        )}
                       </View>
                     </View>
                   ))}
-                  {day.meal && (
-                    <View className='meal-block'>晚餐留白 · {day.meal.status === 'reduced' ? '已缩短' : day.meal.status === 'unscheduled' ? '未能安排' : '已安排'}</View>
-                  )}
                 </View>
               </View>
             )}

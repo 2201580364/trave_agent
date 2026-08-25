@@ -2,6 +2,8 @@ import { Button, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 
+import './index.css'
+
 import type { Draft, GenerationIntent } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
@@ -59,7 +61,7 @@ export default function TripReviewPage() {
   return (
     <View className='page-shell'>
       <View className='content'>
-        <StepHeader step={3} title='确认行程' />
+        <StepHeader step={3} title='确认行程' backUrl='/pages/attraction-select/index' />
         <View className='title'>确认后开始安排</View>
         <View className='subtitle'>系统会严格守住物理底线，并对体验上的妥协给出说明。</View>
 
@@ -79,7 +81,7 @@ export default function TripReviewPage() {
                 <View>✓ 闭馆日和开放时间</View>
                 <View>✓ 到达与返程时间边界</View>
                 <View>✓ 天气和景点间交通</View>
-                <View>✓ 晚餐留白和分天节奏</View>
+                <View>✓ 午餐、晚餐留白和分天节奏</View>
               </View>
             </View>
 

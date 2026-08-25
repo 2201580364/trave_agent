@@ -2,6 +2,8 @@ import { Button, Picker, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
 
+import './index.css'
+
 import type { Draft } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
@@ -79,7 +81,7 @@ export default function TripTimePage() {
   return (
     <View className='page-shell'>
       <View className='content'>
-        <StepHeader step={1} title='什么时候去' />
+        <StepHeader step={1} title='什么时候去' backUrl='/pages/home/index' backLabel='返回首页' />
         <View className='title'>先确定旅行边界</View>
         <View className='subtitle'>只需要确认日期、到达和返程，其余时间预留由系统先给出稳妥默认值。</View>
 

@@ -14,7 +14,6 @@ from travel_agent.solver import (
     evaluate_connection,
 )
 
-
 NOW = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
 
 
@@ -151,6 +150,23 @@ def test_c6_approximate_provider_returns_missing_for_unknown_coordinate() -> Non
     assert provider.get_travel_time(1, 2) is None
 
 
+def test_c6_approximate_provider_applies_configured_minimum_for_short_hops() -> None:
+    provider = ApproximateTravelTimeProvider(
+        {
+            1: Coordinate(30.2590, 120.1650),
+            2: Coordinate(30.2591, 120.1651),
+        },
+        minimum_travel_min=5,
+        data_version="approx-v1",
+        fetched_at=NOW,
+    )
+
+    result = provider.get_travel_time(1, 2)
+
+    assert result is not None
+    assert result.travel_min == 5
+
+
 def test_c6_validates_coordinate_and_provider_parameters() -> None:
     with pytest.raises(ValueError, match="latitude"):
         Coordinate(100, 120)
@@ -170,6 +186,13 @@ def test_c6_validates_coordinate_and_provider_parameters() -> None:
             data_version="v1",
             fetched_at=NOW,
         )
+    with pytest.raises(ValueError, match="minimum_travel_min"):
+        ApproximateTravelTimeProvider(
+            {1: Coordinate(30, 120)},
+            minimum_travel_min=0,
+            data_version="v1",
+            fetched_at=NOW,
+        )
 
 
 def test_c6_rejects_buffer_ratio_below_one() -> None:
@@ -184,4 +207,3 @@ def test_c6_rejects_buffer_ratio_below_one() -> None:
             next_arrival_min=11 * 60,
             buffer_ratio=0.9,
         )
-

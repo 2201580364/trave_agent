@@ -2,3 +2,4 @@
 .hero-mark { width: 58px; height: 58px; display: flex; align-items: center; justify-content: center; border-radius: 18px; background: var(--brand); color: #fff; font-size: 24px; font-weight: 800; }
 .promise-list { display: grid; gap: 13px; color: #405048; font-size: 14px; }
 .home-primary { margin-top: 24px; }
+.home-secondary { width: 100%; margin-top: 12px; }

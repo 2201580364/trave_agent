@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
+from fractions import Fraction
 from time import perf_counter
 from typing import Protocol
 
@@ -35,8 +36,15 @@ from travel_agent.solver import (
     assign_days,
     evaluate_itinerary_degradation,
     evaluate_solver_quality,
+    resolve_day_time_bounds,
+    resolve_effective_window,
     route_itinerary,
 )
+
+LUNCH_EARLIEST_MIN = 11 * 60 + 30
+LUNCH_LATEST_END_MIN = 14 * 60
+LUNCH_FULL_DURATION_MIN = 60
+LUNCH_REDUCED_DURATION_MIN = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +209,11 @@ def _prepare_input(
         _text(item) for item in _list(input_snapshot["selected_attraction_ids"])
     )
     attractions = tuple(by_external_id[item] for item in selected_ids)
+    preferred_dates = _balanced_default_preferred_dates(
+        attractions,
+        trip_dates,
+        anchors,
+    )
     preference_inputs = {
         _text(item["attraction_id"]): item
         for raw in _list(input_snapshot.get("visit_period_preferences", []))
@@ -209,13 +222,73 @@ def _prepare_input(
     preferences = tuple(
         AttractionPreference(
             attraction,
-            start_date,
+            preferred_dates[attraction.id],
             _visit_period(preference_inputs.get(external_id)),
         )
         for external_id, attraction in zip(selected_ids, attractions, strict=True)
     )
     weather = {day: published.weather_by_date[day] for day in trip_dates}
     return _PreparedInput(attractions, preferences, trip_dates, weather, anchors, travel_mode)
+
+
+def _balanced_default_preferred_dates(
+    attractions: tuple[Attraction, ...],
+    trip_dates: tuple[date, ...],
+    anchors: TripTimeAnchors,
+) -> dict[int, date]:
+    """Derive stable neutral date preferences for attractions without a date input.
+
+    The public generation input currently carries visit-period preferences but no
+    attraction-level date preference. Treating that absence as a preference for
+    the first day concentrates every attraction there. Instead, this adapter
+    spreads the neutral preferences according to each day's usable C4 capacity;
+    the solver remains responsible for opening-day, weather and time-window
+    feasibility and may reassign an attraction when necessary.
+    """
+
+    capacities: dict[date, int] = {}
+    for day_index, visit_date in enumerate(trip_dates, start=1):
+        resolution = resolve_day_time_bounds(
+            day_index=day_index,
+            total_days=len(trip_dates),
+            anchors=anchors,
+        )
+        if resolution.bounds is not None:
+            capacity = resolution.bounds.end_min - resolution.bounds.start_min
+            if capacity > 0:
+                capacities[visit_date] = capacity
+
+    if not capacities:
+        return {attraction.id: trip_dates[0] for attraction in attractions}
+
+    assigned_duration = {visit_date: 0 for visit_date in capacities}
+    assigned_energy = {visit_date: 0 for visit_date in capacities}
+    assigned_count = {visit_date: 0 for visit_date in capacities}
+    preferred_dates: dict[int, date] = {}
+
+    ordered_attractions = sorted(
+        attractions,
+        key=lambda item: (-item.suggested_duration, -item.energy_level, item.id),
+    )
+    for attraction in ordered_attractions:
+        selected_date = min(
+            capacities,
+            key=lambda visit_date: (
+                Fraction(
+                    assigned_duration[visit_date] + attraction.suggested_duration,
+                    capacities[visit_date],
+                ),
+                assigned_energy[visit_date] + attraction.energy_level,
+                assigned_count[visit_date],
+                visit_date,
+            ),
+        )
+        preferred_dates[attraction.id] = selected_date
+        assigned_duration[selected_date] += attraction.suggested_duration
+        assigned_energy[selected_date] += attraction.energy_level
+        assigned_count[selected_date] += 1
+
+    return preferred_dates
 
 
 def _visit_period(raw: dict[str, object] | None) -> VisitPeriodPreference | None:
@@ -240,6 +313,17 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
         occurrences: dict[int, int] = {}
         nodes = []
         for visit in day.visits:
+            window_resolution = resolve_effective_window(
+                visit.attraction,
+                day.visit_date,
+            )
+            effective_window = window_resolution.window
+            timing_kind = (
+                "fixed_event"
+                if effective_window is not None
+                and effective_window.close_min - effective_window.open_min <= 60
+                else "flexible"
+            )
             occurrences[visit.attraction.id] = occurrences.get(visit.attraction.id, 0) + 1
             node_key = (
                 f"{request.generation_intent_id}|{day.visit_date.isoformat()}|"
@@ -266,6 +350,15 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
                         if visit.travel_from_previous is not None
                         else None
                     ),
+                    "transport_mode": (
+                        _transport_mode(
+                            visit.travel_from_previous.basis.value,
+                            visit.travel_from_previous.travel_min,
+                        )
+                        if visit.travel_from_previous is not None
+                        else None
+                    ),
+                    "timing_kind": timing_kind,
                     "duration_notice": visit.duration_notice,
                     "visit_period": _jsonable(visit.visit_period),
                 }
@@ -285,6 +378,7 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
                 "total_travel_min": day.total_travel_min,
                 "weather": _jsonable(published.weather_by_date[day.visit_date]),
                 "nodes": nodes,
+                "lunch": _lunch_plan(day),
                 "meal": _jsonable(segmented.meal_plan) if segmented is not None else None,
             }
         )
@@ -336,6 +430,67 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
         ],
         "degradations": [_jsonable(item) for item in degradation.notices],
         "quality_gate_passed": quality.gate_passed,
+    }
+
+
+def _transport_mode(travel_basis: str, travel_min: int) -> str:
+    if travel_basis == "gaode":
+        return "driving"
+    if travel_min <= 8:
+        return "walking_estimate"
+    if travel_min <= 20:
+        return "taxi_estimate"
+    return "transit_or_taxi_estimate"
+
+
+def _lunch_plan(day) -> dict[str, object] | None:
+    visits = day.visits
+    if not visits:
+        return None
+
+    intervals: list[tuple[str, int, int]] = [
+        ("before_first_visit", day.bounds.start_min, visits[0].arrival_min)
+    ]
+    intervals.extend(
+        (
+            "between_visits",
+            previous.leave_min,
+            current.arrival_min - current.buffered_travel_from_previous_min,
+        )
+        for previous, current in zip(visits, visits[1:], strict=False)
+    )
+    intervals.append(
+        ("after_last_visit", visits[-1].leave_min, day.bounds.end_min)
+    )
+
+    for duration_min, status in (
+        (LUNCH_FULL_DURATION_MIN, "full"),
+        (LUNCH_REDUCED_DURATION_MIN, "reduced"),
+    ):
+        for placement, interval_start, interval_end in intervals:
+            start_min = max(interval_start, LUNCH_EARLIEST_MIN)
+            end_limit = min(interval_end, LUNCH_LATEST_END_MIN)
+            if end_limit - start_min >= duration_min:
+                return {
+                    "status": status,
+                    "placement": placement,
+                    "start_min": start_min,
+                    "end_min": start_min + duration_min,
+                    "duration_min": duration_min,
+                    "notice": (
+                        f"已预留 {duration_min} 分钟午餐"
+                        if status == "full"
+                        else f"午餐留白缩短为 {duration_min} 分钟"
+                    ),
+                }
+
+    return {
+        "status": "unscheduled",
+        "placement": None,
+        "start_min": None,
+        "end_min": None,
+        "duration_min": 0,
+        "notice": "当日午餐时间紧张，请提前用餐或准备简餐",
     }
 
 

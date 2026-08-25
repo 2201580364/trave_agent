@@ -2,6 +2,8 @@ import { Button, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
 
+import './index.css'
+
 import type { AnonymousSession, Draft } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
@@ -11,7 +13,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const start = async () => {
+  const start = async (newPlan = false) => {
     setLoading(true)
     setError('')
     try {
@@ -26,13 +28,17 @@ export default function HomePage() {
         principalId = session.principal_id
         store.setSession(token, principalId)
       }
-      if (!store.draftId) {
+      if (newPlan || !store.draftId) {
         const draft = await apiRequest<Draft>('/api/v1/trip-drafts', {
           method: 'POST',
           token,
           data: { city_id: 'hangzhou' }
         })
-        store.setDraft(draft.draft_id, draft.draft_version)
+        if (newPlan) {
+          store.replacePlan(draft.draft_id, draft.draft_version)
+        } else {
+          store.setDraft(draft.draft_id, draft.draft_version)
+        }
       }
       Taro.navigateTo({ url: '/pages/trip-time/index' })
     } catch (cause) {
@@ -61,16 +67,21 @@ export default function HomePage() {
 
         <View className='card promise-list'>
           <View>✓ 自动避开闭馆和入园冲突</View>
-          <View>✓ 为到达、返程和晚餐留出时间</View>
+          <View>✓ 为到达、返程和午晚餐留出时间</View>
           <View>✓ 未排入的景点会说明原因</View>
         </View>
 
         {error && <View className='error'>{error}</View>}
         {store.draftId && <View className='notice'>发现未完成的规划，可以从上次保存的位置继续。</View>}
 
-        <Button className='primary home-primary' loading={loading} onClick={start}>
+        <Button className='primary home-primary' loading={loading} onClick={() => start()}>
           {store.draftId ? '继续规划' : '规划杭州行程'}
         </Button>
+        {store.draftId && (
+          <Button className='secondary home-secondary' disabled={loading} onClick={() => start(true)}>
+            新建行程
+          </Button>
+        )}
       </View>
     </View>
   )

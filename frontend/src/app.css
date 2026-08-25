@@ -47,9 +47,10 @@ button::after { border: none; }
 .action-bar { position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); background: rgba(247, 248, 244, 0.94); border-top: 1px solid rgba(223, 229, 223, 0.9); backdrop-filter: blur(12px); }
 .action-inner { max-width: 760px; margin: 0 auto; }
 .primary { width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: center; background: var(--brand); color: #fff; border-radius: 15px; font-size: 16px; font-weight: 700; }
-.primary[disabled] { opacity: 0.45; }
+.primary--disabled { opacity: 0.45; }
 .secondary { min-height: 44px; padding: 0 16px; background: #fff; color: var(--brand); border: 1px solid var(--brand); border-radius: 13px; font-size: 14px; }
 .step-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.step-back { flex: none; width: auto; min-height: 34px; margin: 0; padding: 0 10px; background: transparent; color: var(--brand); font-size: 13px; }
 .step-track { flex: 1; height: 4px; background: #dce4de; border-radius: 2px; overflow: hidden; }
 .step-fill { height: 100%; background: var(--brand); }
 .notice { margin-top: 14px; padding: 13px 14px; border-radius: 13px; background: var(--brand-soft); color: var(--brand-dark); font-size: 13px; line-height: 1.6; }
