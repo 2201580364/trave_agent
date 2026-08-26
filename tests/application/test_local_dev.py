@@ -31,6 +31,7 @@ def test_local_app_uses_migrated_database_and_serves_catalog(tmp_path: Path) -> 
     database_path = tmp_path / "local-dev.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     migration = Config("alembic.ini")
+    migration.attributes["skip_dotenv"] = True
     migration.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(migration, "head")
 

@@ -34,7 +34,7 @@ from .transport import DEFAULT_TRANSIT_BUFFER_RATIO
 
 LEGACY_SOLVER_CONTRACT_VERSION = "solver-p1-v1"
 SOLVER_CONTRACT_VERSION = "solver-p1-v2"
-CONSTRAINT_VERSION = "constraints-p1-v2"
+CONSTRAINT_VERSION = "constraints-p1-v3"
 PARAMETER_VERSION = "parameters-p1-2026-08-25"
 
 

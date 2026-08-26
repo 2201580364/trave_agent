@@ -213,7 +213,7 @@ DEFAULT_SOLVER_P1_CONTRACT
 
 ```text
 contract_version   = solver-p1-v2
-constraint_version = constraints-p1-v2
+constraint_version = constraints-p1-v3
 parameter_version  = parameters-p1-2026-08-25
 result_schema      = trip-result-v2
 

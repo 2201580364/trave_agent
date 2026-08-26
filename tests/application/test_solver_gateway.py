@@ -24,6 +24,7 @@ from travel_agent.solver import (
     InMemoryTravelTimeProvider,
     ODBasis,
     ODTravelMode,
+    TimeRule,
     TravelTimeResult,
     WeatherBasis,
     WeatherSeverity,
@@ -210,6 +211,103 @@ def _balanced_gateway() -> ProductionSolverGateway:
     )
 
 
+def _od_clustered_gateway() -> ProductionSolverGateway:
+    specifications = (
+        (1, "灵隐寺", 180, 4),
+        (2, "飞来峰", 120, 4),
+        (3, "西湖湖滨", 150, 3),
+        (4, "浙江省博物馆", 120, 2),
+        (5, "雷峰塔", 90, 3),
+        (6, "河坊街", 120, 2),
+        (7, "湖滨晚间表演", 30, 1),
+    )
+    attractions = tuple(
+        PublishedAttraction(
+            f"attr_{attraction_id}",
+            Attraction(
+                attraction_id,
+                name,
+                suggested_duration=duration,
+                time_rules=(
+                    TimeRule.from_strings(
+                        ("01-01", "12-31"),
+                        "18:30",
+                        "19:00",
+                    ),
+                )
+                if attraction_id == 7
+                else (),
+                is_always_open=attraction_id != 7,
+                energy_level=energy,
+                data_verified=True,
+            ),
+            Coordinate(30.20 + attraction_id / 100, 120.10 + attraction_id / 100),
+        )
+        for attraction_id, name, duration, energy in specifications
+    )
+    groups = {1: 1, 2: 1, 3: 2, 4: 2, 7: 2, 5: 3, 6: 3}
+    directed_costs = {
+        (1, 2): 16,
+        (2, 1): 7,
+        (3, 4): 19,
+        (4, 3): 20,
+        (3, 7): 4,
+        (7, 3): 4,
+        (4, 7): 19,
+        (7, 4): 22,
+        (5, 6): 19,
+        (6, 5): 36,
+    }
+    results = {}
+    for origin_id, *_ in specifications:
+        for destination_id, *_ in specifications:
+            if origin_id == destination_id:
+                continue
+            travel_min = directed_costs.get(
+                (origin_id, destination_id),
+                40 + abs(origin_id - destination_id),
+            )
+            mode = (
+                ODTravelMode.WALKING
+                if frozenset({origin_id, destination_id})
+                in {frozenset({1, 2}), frozenset({3, 7})}
+                else ODTravelMode.DRIVING
+            )
+            results[(origin_id, destination_id)] = TravelTimeResult(
+                origin_id,
+                destination_id,
+                travel_min,
+                ODBasis.GAODE,
+                "gaode-cluster-fixture-v1",
+                NOW,
+                mode,
+                travel_min * 250,
+            )
+    weather = {
+        visit_date: DailyWeather(
+            visit_date,
+            WeatherBasis.FORECAST,
+            WeatherSeverity.NORMAL,
+            "sunny",
+        )
+        for visit_date in (TODAY + timedelta(days=offset) for offset in range(3))
+    }
+    snapshot = PublishedSolverData(
+        VERSION,
+        "hangzhou",
+        attractions,
+        weather,
+        InMemoryTravelTimeProvider(results),
+        "gaode",
+        "forecast",
+    )
+    assert set(groups) == {item.attraction.id for item in attractions}
+    return ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((snapshot,)),
+        FixedClock(),
+    )
+
+
 def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     first = _gateway().solve(_request())
     second = _gateway().solve(_request())
@@ -299,6 +397,40 @@ def test_gateway_derives_stable_balanced_dates_when_user_has_no_date_preference(
     assert all(count > 0 for count in first_counts)
     assert max(first_counts) - min(first_counts) <= 1
     assert scheduled_ids == set(attraction_ids)
+    assert first.result_snapshot["accounting"]["conserved"] is True
+    assert first.result_snapshot_hash == second.result_snapshot_hash
+
+
+def test_gateway_keeps_nearby_attractions_together_with_published_od() -> None:
+    attraction_ids = [f"attr_{attraction_id}" for attraction_id in range(1, 8)]
+    request = _request(
+        attraction_ids=attraction_ids,
+        end_date=TODAY + timedelta(days=2),
+    )
+
+    first = _od_clustered_gateway().solve(request)
+    second = _od_clustered_gateway().solve(request)
+    dates_by_attraction = {
+        node["attraction_id"]: day["date"]
+        for day in first.result_snapshot["days"]
+        for node in day["nodes"]
+    }
+    day_counts = [len(day["nodes"]) for day in first.result_snapshot["days"]]
+    west_lake_day = next(
+        day
+        for day in first.result_snapshot["days"]
+        if any(node["attraction_id"] == "attr_3" for node in day["nodes"])
+    )
+
+    assert dates_by_attraction["attr_1"] == dates_by_attraction["attr_2"]
+    assert dates_by_attraction["attr_3"] == dates_by_attraction["attr_7"]
+    assert dates_by_attraction["attr_5"] == dates_by_attraction["attr_6"]
+    assert [node["attraction_id"] for node in west_lake_day["nodes"]] == [
+        "attr_4",
+        "attr_3",
+        "attr_7",
+    ]
+    assert sorted(day_counts) == [2, 2, 3]
     assert first.result_snapshot["accounting"]["conserved"] is True
     assert first.result_snapshot_hash == second.result_snapshot_hash
 

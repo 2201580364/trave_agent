@@ -214,6 +214,7 @@ def _prepare_input(
         attractions,
         trip_dates,
         anchors,
+        published.travel_time_provider,
     )
     preference_inputs = {
         _text(item["attraction_id"]): item
@@ -236,15 +237,16 @@ def _balanced_default_preferred_dates(
     attractions: tuple[Attraction, ...],
     trip_dates: tuple[date, ...],
     anchors: TripTimeAnchors,
+    travel_time_provider: TravelTimeProvider,
 ) -> dict[int, date]:
-    """Derive stable neutral date preferences for attractions without a date input.
+    """Derive stable, OD-aware neutral dates when users do not choose dates.
 
     The public generation input currently carries visit-period preferences but no
-    attraction-level date preference. Treating that absence as a preference for
-    the first day concentrates every attraction there. Instead, this adapter
-    spreads the neutral preferences according to each day's usable C4 capacity;
-    the solver remains responsible for opening-day, weather and time-window
-    feasibility and may reassign an attraction when necessary.
+    attraction-level date preference. Attractions are first grouped by the
+    symmetric cost of the published directed OD snapshot, with a deterministic
+    maximum cluster size. The resulting nearby groups are then balanced across
+    usable C4 capacity. Step 1 remains responsible for opening-day, weather and
+    time-window feasibility and may reassign an attraction when necessary.
     """
 
     capacities: dict[date, int] = {}
@@ -262,34 +264,133 @@ def _balanced_default_preferred_dates(
     if not capacities:
         return {attraction.id: trip_dates[0] for attraction in attractions}
 
+    cluster_count = min(len(capacities), len(attractions))
+    clusters = _cluster_attractions_by_od(
+        attractions,
+        cluster_count,
+        travel_time_provider,
+    )
     assigned_duration = {visit_date: 0 for visit_date in capacities}
     assigned_energy = {visit_date: 0 for visit_date in capacities}
     assigned_count = {visit_date: 0 for visit_date in capacities}
     preferred_dates: dict[int, date] = {}
 
-    ordered_attractions = sorted(
-        attractions,
-        key=lambda item: (-item.suggested_duration, -item.energy_level, item.id),
+    ordered_clusters = sorted(
+        clusters,
+        key=lambda cluster: (
+            -sum(item.suggested_duration for item in cluster),
+            -sum(item.energy_level for item in cluster),
+            tuple(item.id for item in cluster),
+        ),
     )
-    for attraction in ordered_attractions:
+    for cluster in ordered_clusters:
+        cluster_duration = sum(item.suggested_duration for item in cluster)
+        cluster_energy = sum(item.energy_level for item in cluster)
+        cluster_size = len(cluster)
         selected_date = min(
             capacities,
             key=lambda visit_date: (
                 Fraction(
-                    assigned_duration[visit_date] + attraction.suggested_duration,
+                    assigned_duration[visit_date] + cluster_duration,
                     capacities[visit_date],
                 ),
-                assigned_energy[visit_date] + attraction.energy_level,
-                assigned_count[visit_date],
+                assigned_energy[visit_date] + cluster_energy,
+                assigned_count[visit_date] + cluster_size,
                 visit_date,
             ),
         )
-        preferred_dates[attraction.id] = selected_date
-        assigned_duration[selected_date] += attraction.suggested_duration
-        assigned_energy[selected_date] += attraction.energy_level
-        assigned_count[selected_date] += 1
+        for attraction in cluster:
+            preferred_dates[attraction.id] = selected_date
+        assigned_duration[selected_date] += cluster_duration
+        assigned_energy[selected_date] += cluster_energy
+        assigned_count[selected_date] += cluster_size
 
     return preferred_dates
+
+
+def _cluster_attractions_by_od(
+    attractions: tuple[Attraction, ...],
+    cluster_count: int,
+    provider: TravelTimeProvider,
+) -> tuple[tuple[Attraction, ...], ...]:
+    """Create deterministic average-linkage clusters from a directed OD snapshot."""
+
+    if not attractions:
+        return ()
+    if not 1 <= cluster_count <= len(attractions):
+        raise ValueError("cluster_count must be within 1..len(attractions)")
+
+    max_cluster_size = (len(attractions) + cluster_count - 1) // cluster_count
+    clusters = [(item,) for item in sorted(attractions, key=lambda item: item.id)]
+    while len(clusters) > cluster_count:
+        candidates: list[
+            tuple[Fraction, int, tuple[int, ...], int, int]
+        ] = []
+        for left_index, left in enumerate(clusters):
+            for right_index in range(left_index + 1, len(clusters)):
+                right = clusters[right_index]
+                merged_size = len(left) + len(right)
+                if merged_size > max_cluster_size:
+                    continue
+                merged_ids = tuple(sorted(item.id for item in (*left, *right)))
+                candidates.append(
+                    (
+                        _average_cluster_od_cost(left, right, provider),
+                        merged_size,
+                        merged_ids,
+                        left_index,
+                        right_index,
+                    )
+                )
+        if not candidates:
+            raise RuntimeError("unable to form capacity-safe OD clusters")
+        _, _, _, left_index, right_index = min(candidates)
+        merged = tuple(
+            sorted(
+                (*clusters[left_index], *clusters[right_index]),
+                key=lambda item: item.id,
+            )
+        )
+        clusters = [
+            cluster
+            for index, cluster in enumerate(clusters)
+            if index not in {left_index, right_index}
+        ]
+        clusters.append(merged)
+        clusters.sort(key=lambda cluster: tuple(item.id for item in cluster))
+    return tuple(clusters)
+
+
+def _average_cluster_od_cost(
+    left: tuple[Attraction, ...],
+    right: tuple[Attraction, ...],
+    provider: TravelTimeProvider,
+) -> Fraction:
+    costs = [
+        _symmetric_od_cost(origin.id, destination.id, provider)
+        for origin in left
+        for destination in right
+    ]
+    return Fraction(sum(costs), len(costs))
+
+
+def _symmetric_od_cost(
+    origin_id: int,
+    destination_id: int,
+    provider: TravelTimeProvider,
+) -> int:
+    forward = provider.get_travel_time(origin_id, destination_id)
+    backward = provider.get_travel_time(destination_id, origin_id)
+    available = [
+        item.travel_min
+        for item in (forward, backward)
+        if item is not None
+    ]
+    if len(available) == 2:
+        return sum(available)
+    if len(available) == 1:
+        return max(available[0] * 4, 240)
+    return 10_000
 
 
 def _visit_period(raw: dict[str, object] | None) -> VisitPeriodPreference | None:

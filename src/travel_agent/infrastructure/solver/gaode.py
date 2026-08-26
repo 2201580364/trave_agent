@@ -9,16 +9,20 @@ Traceability: C6, ADR-0010, A6-8.1.
 
 from __future__ import annotations
 
+import json
 import math
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
+from os import PathLike
+from pathlib import Path
 from typing import Protocol
 
 import httpx
 
+from travel_agent.runtime_config import load_runtime_environment
 from travel_agent.solver import (
     Coordinate,
     InMemoryTravelTimeProvider,
@@ -52,9 +56,18 @@ class GaodeFailureCode(StrEnum):
 
 
 class GaodeRouteError(RuntimeError):
-    def __init__(self, code: GaodeFailureCode, message: str) -> None:
+    def __init__(
+        self,
+        code: GaodeFailureCode,
+        message: str,
+        *,
+        infocode: str | None = None,
+        occurred_at: datetime | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
+        self.infocode = infocode
+        self.occurred_at = occurred_at
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +101,14 @@ class GaodeSettings:
             raise ValueError("Gaode enabled_modes must be non-empty and unique")
 
     @classmethod
-    def from_env(cls) -> GaodeSettings:
+    def from_env(
+        cls,
+        *,
+        dotenv_path: str | PathLike[str] | None = None,
+        load_dotenv_file: bool = True,
+    ) -> GaodeSettings:
+        if load_dotenv_file:
+            load_runtime_environment(dotenv_path)
         key = os.environ.get("TRAVEL_AGENT_GAODE_API_KEY", "").strip()
         if not key:
             raise ValueError("TRAVEL_AGENT_GAODE_API_KEY is required")
@@ -213,6 +233,94 @@ class InMemoryGaodeRouteCache:
         self._entries[key] = _CacheEntry(route, expires_at)
 
 
+class GaodeRouteCache(Protocol):
+    def get(self, key: tuple[object, ...], now: datetime) -> GaodeRoute | None: ...
+
+    def put(
+        self,
+        key: tuple[object, ...],
+        route: GaodeRoute,
+        *,
+        expires_at: datetime,
+    ) -> None: ...
+
+
+class JsonFileGaodeRouteCache:
+    """Small cross-process cache containing routes but never credentials."""
+
+    def __init__(self, path: str | PathLike[str]) -> None:
+        self.path = Path(path)
+        self._entries = self._load()
+
+    def get(self, key: tuple[object, ...], now: datetime) -> GaodeRoute | None:
+        entry = self._entries.get(_cache_key_text(key))
+        if entry is None:
+            return None
+        if entry.expires_at <= now:
+            self._entries.pop(_cache_key_text(key), None)
+            self._persist()
+            return None
+        return entry.route
+
+    def put(
+        self,
+        key: tuple[object, ...],
+        route: GaodeRoute,
+        *,
+        expires_at: datetime,
+    ) -> None:
+        self._entries[_cache_key_text(key)] = _CacheEntry(route, expires_at)
+        self._persist()
+
+    def _load(self) -> dict[str, _CacheEntry]:
+        if not self.path.is_file():
+            return {}
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            raw_entries = payload["entries"]
+            if payload.get("schema_version") != 1 or not isinstance(raw_entries, dict):
+                raise ValueError
+            entries: dict[str, _CacheEntry] = {}
+            for key, raw in raw_entries.items():
+                if not isinstance(key, str) or not isinstance(raw, dict):
+                    raise ValueError
+                route = GaodeRoute(
+                    ODTravelMode(raw["mode"]),
+                    int(raw["duration_min"]),
+                    int(raw["distance_m"]),
+                    datetime.fromisoformat(raw["fetched_at"]),
+                )
+                entries[key] = _CacheEntry(
+                    route,
+                    datetime.fromisoformat(raw["expires_at"]),
+                )
+            return entries
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Gaode route cache is invalid") from exc
+
+    def _persist(self) -> None:
+        payload = {
+            "schema_version": 1,
+            "entries": {
+                key: {
+                    "mode": entry.route.mode.value,
+                    "duration_min": entry.route.duration_min,
+                    "distance_m": entry.route.distance_m,
+                    "fetched_at": entry.route.fetched_at.isoformat(),
+                    "expires_at": entry.expires_at.isoformat(),
+                }
+                for key, entry in sorted(self._entries.items())
+            },
+        }
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(self.path)
+
+
 class GaodeRouteClient:
     def __init__(
         self,
@@ -220,7 +328,7 @@ class GaodeRouteClient:
         clock: Callable[[], datetime],
         *,
         transport: GaodeHttpTransport | None = None,
-        cache: InMemoryGaodeRouteCache | None = None,
+        cache: GaodeRouteCache | None = None,
     ) -> None:
         self._settings = settings
         self._clock = clock
@@ -248,12 +356,22 @@ class GaodeRouteClient:
         cached = self._cache.get(key, now)
         if cached is not None:
             return cached
-        payload = self._transport.get_json(
-            _path_for(mode),
-            params=_params_for(self._settings, origin, destination, mode),
-            timeout_seconds=self._settings.timeout_seconds,
-        )
-        route = _parse_route(payload, mode, now)
+        try:
+            payload = self._transport.get_json(
+                _path_for(mode),
+                params=_params_for(self._settings, origin, destination, mode),
+                timeout_seconds=self._settings.timeout_seconds,
+            )
+            route = _parse_route(payload, mode, now)
+        except GaodeRouteError as exc:
+            if exc.occurred_at is not None:
+                raise
+            raise GaodeRouteError(
+                exc.code,
+                str(exc),
+                infocode=exc.infocode,
+                occurred_at=now,
+            ) from exc
         self._cache.put(
             key,
             route,
@@ -269,6 +387,7 @@ class GaodeSnapshotBuildReport:
     fallback_pair_count: int
     missing_pair_count: int
     failure_counts: tuple[tuple[str, int], ...]
+    failure_details: tuple[GaodeFailureDetail, ...] = ()
 
     @property
     def complete(self) -> bool:
@@ -279,6 +398,16 @@ class GaodeSnapshotBuildReport:
 class GaodeSnapshotBuild:
     provider: InMemoryTravelTimeProvider
     report: GaodeSnapshotBuildReport
+
+
+@dataclass(frozen=True, slots=True)
+class GaodeFailureDetail:
+    origin_id: int
+    destination_id: int
+    mode: ODTravelMode
+    code: GaodeFailureCode
+    infocode: str | None
+    occurred_at: str | None
 
 
 class GaodeODSnapshotBuilder:
@@ -297,6 +426,7 @@ class GaodeODSnapshotBuilder:
         ordered = tuple(sorted(coordinates.items()))
         results: dict[tuple[int, int], TravelTimeResult] = {}
         failures: dict[str, int] = {}
+        failure_details: list[GaodeFailureDetail] = []
         gaode_count = 0
         fallback_count = 0
         missing_count = 0
@@ -313,6 +443,20 @@ class GaodeODSnapshotBuilder:
                     except GaodeRouteError as exc:
                         pair_failures.append(exc.code)
                         failures[exc.code.value] = failures.get(exc.code.value, 0) + 1
+                        failure_details.append(
+                            GaodeFailureDetail(
+                                origin_id,
+                                destination_id,
+                                mode,
+                                exc.code,
+                                exc.infocode,
+                                (
+                                    exc.occurred_at.isoformat()
+                                    if exc.occurred_at is not None
+                                    else None
+                                ),
+                            )
+                        )
                 selected = _select_route(routes)
                 if selected is not None:
                     results[(origin_id, destination_id)] = TravelTimeResult(
@@ -359,6 +503,7 @@ class GaodeODSnapshotBuilder:
                 fallback_count,
                 missing_count,
                 tuple(sorted(failures.items())),
+                tuple(failure_details),
             ),
         )
 
@@ -380,6 +525,10 @@ def _cache_key(
         data_version,
         "strategy-0" if mode is ODTravelMode.DRIVING else "default",
     )
+
+
+def _cache_key_text(key: tuple[object, ...]) -> str:
+    return json.dumps(key, ensure_ascii=False, separators=(",", ":"))
 
 
 def _path_for(mode: ODTravelMode) -> str:
@@ -423,7 +572,11 @@ def _parse_route(
             if infocode in GAODE_RATE_LIMIT_CODES
             else GaodeFailureCode.API_ERROR
         )
-        raise GaodeRouteError(code, "Gaode API rejected the route request")
+        raise GaodeRouteError(
+            code,
+            "Gaode API rejected the route request",
+            infocode=infocode or None,
+        )
     route = payload.get("route")
     if not isinstance(route, dict):
         raise GaodeRouteError(
@@ -433,7 +586,11 @@ def _parse_route(
     collection_name = "transits" if mode is ODTravelMode.TRANSIT else "paths"
     candidates = route.get(collection_name)
     if not isinstance(candidates, list) or not candidates:
-        raise GaodeRouteError(GaodeFailureCode.NO_ROUTE, "Gaode returned no route")
+        raise GaodeRouteError(
+            GaodeFailureCode.NO_ROUTE,
+            "Gaode returned no route",
+            infocode=infocode or None,
+        )
     first = candidates[0]
     if not isinstance(first, dict):
         raise GaodeRouteError(

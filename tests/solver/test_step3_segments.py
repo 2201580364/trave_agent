@@ -145,6 +145,32 @@ def test_step3_spreads_two_daytime_visits_across_lunch_before_1830_show() -> Non
     assert result.validation.valid
 
 
+def test_step3_daytime_order_includes_real_cost_to_evening_segment() -> None:
+    museum = _attraction(1, DAY_RULE, duration=120)
+    lake = _attraction(2, DAY_RULE, duration=150)
+    light_show = _attraction(3, SHOW_RULE, duration=30)
+    provider = InMemoryTravelTimeProvider(
+        {
+            (1, 2): _travel(1, 2, 20),
+            (2, 1): _travel(2, 1, 19),
+            (1, 3): _travel(1, 3, 19),
+            (3, 1): _travel(3, 1, 22),
+            (2, 3): _travel(2, 3, 4),
+            (3, 2): _travel(3, 2, 4),
+        }
+    )
+
+    result = route_segmented_day(
+        _day(lake, museum, light_show),
+        provider,
+        weather_by_date=_weather(),
+    )
+
+    assert [item.attraction.id for item in result.routed_day.visits] == [1, 2, 3]
+    assert result.routed_day.total_travel_min == 24
+    assert result.validation.valid
+
+
 def test_step3_day_spread_falls_back_when_full_duration_would_break_window() -> None:
     first = _attraction(
         1,

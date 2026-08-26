@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-26T05:25:24.935001+00:00",
+  "generated_at": "2026-08-26T07:42:55.145950+00:00",
   "contract_version": "solver-p1-v2",
-  "constraint_version": "constraints-p1-v2",
+  "constraint_version": "constraints-p1-v3",
   "parameter_version": "parameters-p1-2026-08-25",
   "duration_ratios": [
     [

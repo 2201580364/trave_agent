@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from os import PathLike
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from travel_agent.runtime_config import load_runtime_environment
 
 EXPECTED_ALEMBIC_REVISION = "0002_anonymous_identity"
 
@@ -23,7 +25,14 @@ class DatabaseSettings:
     pool_timeout_seconds: int = 30
 
     @classmethod
-    def from_env(cls) -> DatabaseSettings:
+    def from_env(
+        cls,
+        *,
+        dotenv_path: str | PathLike[str] | None = None,
+        load_dotenv_file: bool = True,
+    ) -> DatabaseSettings:
+        if load_dotenv_file:
+            load_runtime_environment(dotenv_path)
         url = os.environ.get("TRAVEL_AGENT_DATABASE_URL", "").strip()
         if not url:
             raise ValueError("TRAVEL_AGENT_DATABASE_URL is required")

@@ -14,6 +14,7 @@ from travel_agent.infrastructure.solver import (
     GaodeRouteError,
     GaodeSettings,
     InMemoryGaodeRouteCache,
+    JsonFileGaodeRouteCache,
 )
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -86,7 +87,7 @@ def test_gaode_settings_load_env_without_exposing_key(monkeypatch) -> None:
     monkeypatch.setenv("TRAVEL_AGENT_GAODE_CACHE_TTL_SECONDS", "600")
     monkeypatch.setenv("TRAVEL_AGENT_GAODE_MODES", "walking,driving")
 
-    settings = GaodeSettings.from_env()
+    settings = GaodeSettings.from_env(load_dotenv_file=False)
 
     assert settings.timeout_seconds == 3.5
     assert settings.cache_ttl_seconds == 600
@@ -101,7 +102,7 @@ def test_gaode_settings_require_key(monkeypatch) -> None:
     monkeypatch.delenv("TRAVEL_AGENT_GAODE_API_KEY", raising=False)
 
     with pytest.raises(ValueError, match="GAODE_API_KEY"):
-        GaodeSettings.from_env()
+        GaodeSettings.from_env(load_dotenv_file=False)
 
 
 def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
@@ -205,6 +206,49 @@ def test_gaode_client_classifies_api_rate_limit() -> None:
         client.fetch(ORIGIN, DESTINATION, ODTravelMode.DRIVING)
 
     assert raised.value.code is GaodeFailureCode.RATE_LIMITED
+    assert raised.value.infocode == "10044"
+    assert raised.value.occurred_at == NOW
+
+
+def test_gaode_file_cache_reuses_routes_without_storing_key(tmp_path) -> None:
+    cache_path = tmp_path / "gaode-routes.json"
+    settings = GaodeSettings(
+        "secret-not-for-cache",
+        data_version="gaode-cache-test-v1",
+        enabled_modes=(ODTravelMode.WALKING,),
+    )
+    first_transport = FakeTransport(
+        {
+            "/v3/direction/walking": _payload(
+                duration_seconds=600,
+                distance_m=1_200,
+            )
+        }
+    )
+    first = GaodeRouteClient(
+        settings,
+        FixedClock(),
+        transport=first_transport,
+        cache=JsonFileGaodeRouteCache(cache_path),
+    )
+
+    fetched = first.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
+    second_transport = FakeTransport(
+        error=GaodeRouteError(GaodeFailureCode.TIMEOUT, "must not be called")
+    )
+    second = GaodeRouteClient(
+        settings,
+        FixedClock(),
+        transport=second_transport,
+        cache=JsonFileGaodeRouteCache(cache_path),
+    )
+
+    cached = second.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
+
+    assert cached == fetched
+    assert len(first_transport.calls) == 1
+    assert second_transport.calls == []
+    assert "secret-not-for-cache" not in cache_path.read_text(encoding="utf-8")
 
 
 def test_gaode_builder_materializes_both_directions_and_selects_walking() -> None:
@@ -302,6 +346,20 @@ def test_gaode_builder_transparently_falls_back_after_timeout() -> None:
     assert built.report.fallback_pair_count == 2
     assert built.report.missing_pair_count == 0
     assert dict(built.report.failure_counts) == {"timeout": 2}
+    assert {
+        (
+            item.origin_id,
+            item.destination_id,
+            item.mode,
+            item.code,
+            item.infocode,
+            item.occurred_at,
+        )
+        for item in built.report.failure_details
+    } == {
+        (1, 2, ODTravelMode.DRIVING, GaodeFailureCode.TIMEOUT, None, NOW.isoformat()),
+        (2, 1, ODTravelMode.DRIVING, GaodeFailureCode.TIMEOUT, None, NOW.isoformat()),
+    }
 
 
 def test_gaode_builder_reports_missing_pairs_without_fallback() -> None:
@@ -324,3 +382,8 @@ def test_gaode_builder_reports_missing_pairs_without_fallback() -> None:
     assert built.provider.get_travel_time(1, 2) is None
     assert built.report.missing_pair_count == 2
     assert not built.report.complete
+    assert len(built.report.failure_details) == 2
+    assert all(
+        item.code is GaodeFailureCode.NO_ROUTE
+        for item in built.report.failure_details
+    )

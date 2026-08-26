@@ -74,14 +74,6 @@ def route_segmented_day(
         else:
             daytime_allocations.append(allocation)
 
-    daytime_route = _route_allocations(
-        day_plan,
-        daytime_allocations,
-        provider,
-        buffer_ratio,
-        travel_mode,
-        search_executor,
-    )
     evening_route = _route_allocations(
         day_plan,
         evening_allocations,
@@ -89,6 +81,20 @@ def route_segmented_day(
         buffer_ratio,
         travel_mode,
         search_executor,
+    )
+    evening_start_id = (
+        evening_route.visits[0].attraction.id
+        if evening_route is not None and evening_route.visits
+        else None
+    )
+    daytime_route = _route_allocations(
+        day_plan,
+        daytime_allocations,
+        provider,
+        buffer_ratio,
+        travel_mode,
+        search_executor,
+        terminal_attraction_id=evening_start_id,
     )
     merged, cross_rejection, cross_buffered = _merge_segments(
         day_plan,
@@ -135,6 +141,8 @@ def _route_allocations(
     buffer_ratio: float,
     travel_mode: TravelMode,
     search_executor: RoutingSearchExecutor | None,
+    *,
+    terminal_attraction_id: int | None = None,
 ) -> RoutedDay | None:
     if not allocations:
         return None
@@ -143,6 +151,7 @@ def _route_allocations(
         plan,
         provider,
         buffer_ratio=buffer_ratio,
+        terminal_attraction_id=terminal_attraction_id,
         search_executor=search_executor,
     )
 

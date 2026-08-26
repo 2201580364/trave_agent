@@ -20,13 +20,12 @@ from .models import (
     DayAllocation,
     DayPlan,
     RejectionCode,
+    RoutedDay,
     RouteSearchStatus,
     RouteSolveMetadata,
-    RoutedDay,
     RouteUnplaced,
     RouteValidation,
     RouteVisit,
-    TimeBucket,
 )
 from .time_windows import DEFAULT_DURATION_RATIO, resolve_effective_window
 from .transport import (
@@ -34,8 +33,8 @@ from .transport import (
     TravelTimeProvider,
     evaluate_connection,
 )
-from .weather import evaluate_weather_availability
 from .visit_periods import evaluate_visit_period, preferred_period_bounds
+from .weather import evaluate_weather_availability
 
 DEFAULT_DROP_PENALTY = 1_000_000
 DEFAULT_TIME_LIMIT_SECONDS = 2
@@ -68,6 +67,7 @@ def route_day(
     buffer_ratio: float = DEFAULT_TRANSIT_BUFFER_RATIO,
     travel_cost_scale: int = DEFAULT_TRAVEL_COST_SCALE,
     period_deviation_cost: int = DEFAULT_PERIOD_DEVIATION_COST,
+    terminal_attraction_id: int | None = None,
     search_executor: RoutingSearchExecutor | None = None,
 ) -> RoutedDay:
     """Order one day's allocations while allowing explicit, penalized dropping."""
@@ -101,8 +101,20 @@ def route_day(
     def raw_travel_callback(from_index: int, to_index: int) -> int:
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        if from_node == 0 or to_node == 0:
+        if from_node == 0:
             return 0
+        if to_node == 0:
+            if terminal_attraction_id is None:
+                return 0
+            travel = provider.get_travel_time(
+                allocations[from_node - 1].attraction.id,
+                terminal_attraction_id,
+            )
+            return (
+                travel.travel_min * travel_cost_scale
+                if travel is not None
+                else drop_penalty
+            )
         travel = provider.get_travel_time(
             allocations[from_node - 1].attraction.id,
             allocations[to_node - 1].attraction.id,
@@ -387,13 +399,12 @@ def validate_routed_day(
                     attraction.id,
                 )
             )
-    if routed_day.visits:
-        if any(
-            visit.arrival_min < routed_day.bounds.start_min
-            or visit.leave_min > routed_day.bounds.end_min
-            for visit in routed_day.visits
-        ):
-            violations.append(ConstraintViolation(RejectionCode.ANCHOR_VIOLATION))
+    if routed_day.visits and any(
+        visit.arrival_min < routed_day.bounds.start_min
+        or visit.leave_min > routed_day.bounds.end_min
+        for visit in routed_day.visits
+    ):
+        violations.append(ConstraintViolation(RejectionCode.ANCHOR_VIOLATION))
     for previous, current in zip(
         routed_day.visits,
         routed_day.visits[1:],

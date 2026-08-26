@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from travel_agent.application.common.errors import DraftVersionConflictError
 from travel_agent.application.planning import ExecuteGenerationHandler
-from travel_agent.application.planning.ports import SolverOutcome
+from travel_agent.application.planning.ports import SolverOutcome, SolverRequest
 from travel_agent.domain.planning import (
     CompletionKind,
     GenerationIntent,
@@ -25,7 +25,6 @@ from travel_agent.domain.planning import (
 from travel_agent.infrastructure.database import SqlAlchemyUnitOfWork, create_schema
 from travel_agent.infrastructure.memory import SequenceIdGenerator
 
-
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
 
 
@@ -35,7 +34,7 @@ class FixedClock:
 
 
 class FakeGateway:
-    def solve(self, request: object) -> SolverOutcome:
+    def solve(self, request: SolverRequest) -> SolverOutcome:
         return SolverOutcome(
             CompletionKind.COMPLETE_SUCCESS,
             False,
@@ -46,7 +45,7 @@ class FakeGateway:
             "solver-p1-v1",
             "constraints-p1-v1",
             "parameters-p1-2026-08-24",
-            {"solve_run_id": getattr(request, "solver_run_id")},
+            {"solve_run_id": request.solver_run_id},
         )
 
 
@@ -98,9 +97,8 @@ def test_draft_optimistic_lock_rejects_stale_database_update(tmp_path: Path) -> 
         uow.drafts.save(updated, expected_version=1)
         uow.commit()
 
-    with SqlAlchemyUnitOfWork(factory) as uow:
-        with pytest.raises(DraftVersionConflictError):
-            uow.drafts.save(updated, expected_version=1)
+    with SqlAlchemyUnitOfWork(factory) as uow, pytest.raises(DraftVersionConflictError):
+        uow.drafts.save(updated, expected_version=1)
 
 
 def test_intent_status_compare_and_swap_allows_only_one_claim(tmp_path: Path) -> None:
@@ -115,19 +113,21 @@ def test_intent_status_compare_and_swap_allows_only_one_claim(tmp_path: Path) ->
         uow.generation_intents.save(claimed, expected_status="queued")
         uow.commit()
 
-    with SqlAlchemyUnitOfWork(factory) as uow:
-        with pytest.raises(ValueError, match="status conflict"):
-            uow.generation_intents.save(claimed, expected_status="queued")
+    with SqlAlchemyUnitOfWork(factory) as uow, pytest.raises(
+        ValueError, match="status conflict"
+    ):
+        uow.generation_intents.save(claimed, expected_status="queued")
 
 
 def test_uncommitted_completion_products_are_rolled_back(tmp_path: Path) -> None:
     factory = _factory(tmp_path / "planning.db")
     trip = Trip("trip_1", "principal_1", "hangzhou", "draft_1", "revision_1", NOW, NOW)
 
-    with pytest.raises(RuntimeError, match="simulate failure"):
-        with SqlAlchemyUnitOfWork(factory) as uow:
-            uow.trips.add(trip)
-            raise RuntimeError("simulate failure")
+    with pytest.raises(RuntimeError, match="simulate failure"), SqlAlchemyUnitOfWork(
+        factory
+    ) as uow:
+        uow.trips.add(trip)
+        raise RuntimeError("simulate failure")
 
     with SqlAlchemyUnitOfWork(factory) as uow:
         assert uow.trips.get("trip_1") is None
@@ -164,6 +164,7 @@ def test_execute_generation_persists_complete_graph_across_restart(tmp_path: Pat
 def test_alembic_upgrade_builds_the_same_schema(tmp_path: Path) -> None:
     database = tmp_path / "migrated.db"
     config = Config("alembic.ini")
+    config.attributes["skip_dotenv"] = True
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
 
     command.upgrade(config, "head")

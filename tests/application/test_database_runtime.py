@@ -28,7 +28,7 @@ def test_database_settings_load_pool_values_without_repr_secret(monkeypatch) -> 
     monkeypatch.setenv("TRAVEL_AGENT_DB_POOL_SIZE", "8")
     monkeypatch.setenv("TRAVEL_AGENT_DB_MAX_OVERFLOW", "12")
 
-    settings = DatabaseSettings.from_env()
+    settings = DatabaseSettings.from_env(load_dotenv_file=False)
 
     assert settings.pool_size == 8
     assert settings.max_overflow == 12
@@ -68,6 +68,7 @@ def test_readiness_distinguishes_database_from_migration_state(tmp_path: Path) -
 
     migrated = tmp_path / "migrated.db"
     config = Config("alembic.ini")
+    config.attributes["skip_dotenv"] = True
     config.set_main_option("sqlalchemy.url", f"sqlite:///{migrated}")
     command.upgrade(config, "head")
     migrated_engine = create_engine(f"sqlite:///{migrated}")

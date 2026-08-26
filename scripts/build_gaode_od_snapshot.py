@@ -20,6 +20,7 @@ from travel_agent.infrastructure.solver import (  # noqa: E402
     GaodeODSnapshotBuilder,
     GaodeRouteClient,
     GaodeSettings,
+    JsonFileGaodeRouteCache,
 )
 from travel_agent.solver import (  # noqa: E402
     ApproximateTravelTimeProvider,
@@ -36,6 +37,12 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--data-version", required=True)
     parser.add_argument(
+        "--cache",
+        type=Path,
+        default=PROJECT_ROOT / "var" / "cache" / "gaode-routes.json",
+        help="Persistent credential-free route cache used across snapshot builds.",
+    )
+    parser.add_argument(
         "--allow-approximate-fallback",
         action="store_true",
         help="Fill failed Gaode pairs with explicitly labelled approximate OD.",
@@ -51,12 +58,19 @@ def main() -> int:
         parser.error("live requests require the explicit --execute-live flag")
 
     coordinates = _load_coordinates(args.input)
-    settings = replace(GaodeSettings.from_env(), data_version=args.data_version)
+    settings = replace(
+        GaodeSettings.from_env(dotenv_path=PROJECT_ROOT / ".env"),
+        data_version=args.data_version,
+    )
 
     def clock() -> datetime:
         return datetime.now(UTC)
 
-    client = GaodeRouteClient(settings, clock)
+    client = GaodeRouteClient(
+        settings,
+        clock,
+        cache=JsonFileGaodeRouteCache(args.cache),
+    )
     fallback = None
     if args.allow_approximate_fallback:
         fallback = ApproximateTravelTimeProvider(
@@ -92,6 +106,8 @@ def main() -> int:
     print(f"Gaode: {built.report.gaode_pair_count}")
     print(f"Approximate fallback: {built.report.fallback_pair_count}")
     print(f"Missing: {built.report.missing_pair_count}")
+    print(f"Mode failures: {len(built.report.failure_details)}")
+    print(f"Cache: {args.cache}")
     print(f"Report: {args.output}")
     return 0 if built.report.complete else 2
 

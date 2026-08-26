@@ -17,7 +17,7 @@
 |---|---|
 | 前端 | Taro 4 + React 18 + TypeScript（H5 + 微信小程序），Zustand |
 | 后端 | Python 3.12 + FastAPI + SQLAlchemy 2.0 + Celery + Redis |
-| 核心求解器 | OR-Tools + scikit-learn（M1 分层：K-Means 聚类 → TSP-TW 天内排序 → 约束校验 → 时间填充） |
+| 核心求解器 | OR-Tools（M1 分层：已发布 OD 的确定性分天聚类 → TSP-TW 天内排序 → 约束校验 → 时间填充） |
 | 存储 | MySQL 8 + Redis + 腾讯云 COS |
 | LLM | 可插拔（DeepSeek 默认 / Claude / GPT） |
 | 外部 API | 高德地图、和风天气、微信开放平台 |
@@ -87,6 +87,6 @@ Gate 定义、权威来源优先级与冲突处理见 [docs/process/gates.md](do
 
 ## 当前最该做的三件事（按优先级）
 
-1. 继续 A6-3：实现 SolverGateway、冻结契约输入转换、质量/降级映射、SolverRun 和 TripRevision 应用结果。
-2. 让 inline executor 从 queued 原子进入 running/completed/failed，并补应用与适配器契约测试。
-3. 再进入 SQLAlchemy/Alembic 和 HTTP v1；持续保持当前 161 项回归通过。
+1. 完成 A6-8.1 生产接入：校准杭州入口坐标，审核并发布真实 OD 快照，接入正式 PublishedDataProvider 和组合根。
+2. 补齐高德配额看板、熔断与旧快照继续服务策略；配额确认恢复前只做离线回放，不继续联网重建。
+3. 进入 A6-8.2 真实 MySQL 与部署恢复验证；持续保持求解器、Golden、降级、接近度、数据和前端门禁通过。

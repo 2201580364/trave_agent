@@ -2,6 +2,7 @@
 
 from .gaode import (
     GaodeFailureCode,
+    GaodeFailureDetail,
     GaodeODSnapshotBuilder,
     GaodeRoute,
     GaodeRouteClient,
@@ -11,6 +12,7 @@ from .gaode import (
     GaodeSnapshotBuildReport,
     HttpxGaodeTransport,
     InMemoryGaodeRouteCache,
+    JsonFileGaodeRouteCache,
 )
 from .gateway import (
     InMemoryPublishedSolverDataProvider,
@@ -27,6 +29,7 @@ __all__ = [
     "PublishedSolverDataProvider",
     "ProductionSolverGateway",
     "GaodeFailureCode",
+    "GaodeFailureDetail",
     "GaodeODSnapshotBuilder",
     "GaodeRoute",
     "GaodeRouteClient",
@@ -36,4 +39,5 @@ __all__ = [
     "GaodeSnapshotBuildReport",
     "HttpxGaodeTransport",
     "InMemoryGaodeRouteCache",
+    "JsonFileGaodeRouteCache",
 ]

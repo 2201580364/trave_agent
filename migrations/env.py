@@ -1,15 +1,17 @@
 """Alembic environment for the modular monolith database."""
 
-from logging.config import fileConfig
 import os
+from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from travel_agent.infrastructure.database import Base
-
+from travel_agent.runtime_config import load_runtime_environment
 
 config = context.config
+if not config.attributes.get("skip_dotenv", False):
+    load_runtime_environment()
 database_url = os.environ.get("TRAVEL_AGENT_DATABASE_URL")
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))

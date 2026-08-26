@@ -35,7 +35,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE
 
 ## 3. 应用配置
 
-生产连接只通过环境变量提供：
+本地开发可在仓库根目录 `.env` 配置；真实 `.env` 已被 Git 忽略，仓库只提交 `.env.example`。生产环境仍应通过 Secret、容器或服务管理器注入同名环境变量，并覆盖 `.env`：
 
 ```text
 TRAVEL_AGENT_DATABASE_URL=mysql+pymysql://<user>:<password>@<host>:3306/travel_agent
@@ -46,7 +46,7 @@ TRAVEL_AGENT_DB_POOL_RECYCLE_SECONDS=1800
 TRAVEL_AGENT_DB_POOL_TIMEOUT_SECONDS=30
 ```
 
-密码包含 `@`、`:`、`/`、`%` 等字符时必须进行 URL 编码。不得把真实连接串写入 `alembic.ini`；`migrations/env.py` 会读取 `TRAVEL_AGENT_DATABASE_URL` 覆盖本地默认值。
+密码包含 `@`、`:`、`/`、`%` 等字符时必须进行 URL 编码。不得把真实连接串写入 `.env.example` 或 `alembic.ini`；应用与 `migrations/env.py` 会加载本地 `.env`，进程环境中的 `TRAVEL_AGENT_DATABASE_URL` 优先级更高。
 
 ## 4. 首次迁移
 
