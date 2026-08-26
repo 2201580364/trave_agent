@@ -528,6 +528,7 @@ M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约
   "trip_id": "trip_01K...",
   "revision_id": "rev_01K...",
   "revision_no": 1,
+  "result_schema_version": "trip-result-v2",
   "completion_kind": "partial_success",
   "has_soft_degradation": true,
   "summary": {},
@@ -545,7 +546,7 @@ M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约
 
 ```json
 {
-  "solver_contract_version": "solver-p1-v1",
+  "solver_contract_version": "solver-p1-v2",
   "constraint_version": "constraints-p1-v2",
   "parameter_version": "parameters-p1-2026-08-25",
   "data_snapshot_version": "hangzhou-2026-08-24",
@@ -604,7 +605,10 @@ M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约
         "transit_from_previous": {
           "travel_min": 20,
           "buffered_travel_min": 24,
-          "basis": "gaode"
+          "basis": "gaode",
+          "transport_mode": "transit",
+          "distance_m": 8200,
+          "fallback_reason": null
         },
         "visit_period": null
       },
@@ -623,6 +627,15 @@ M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约
 ```
 
 时间线顺序来自服务端结构化结果，客户端不得重排。
+
+`trip-result-v2` 的交通方式取值为：
+
+```text
+walking | transit | driving
+walking_estimate | taxi_estimate | transit_or_taxi_estimate
+```
+
+前三项表示 Provider 返回的真实模式；后三项表示近似推导。高德调用失败后允许透明降级，但此时 `basis` 必须为 `approximate`，`fallback_reason` 必须给出结构化原因（例如 `gaode_timeout`），页面必须显示估算口径。V1 历史 Revision 可以没有模式、距离和降级原因；读取端兼容 `trip-result-v1` 和 `trip-result-v2`，不得重写历史结果。
 
 #### visit_period
 

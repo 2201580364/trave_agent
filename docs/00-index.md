@@ -27,6 +27,7 @@ docs/
   specs/                 需求规格 + Given/When/Then 验收标准
   research/              用户研究计划 + 结论
   test/                  测试方案 + Golden Cases + 验证报告
+  ops/                   部署、外部 Provider、迁移与恢复操作说明
   process/               AI 协作开发 Gate、权威来源与任务协议
 ```
 
@@ -35,7 +36,7 @@ docs/
 - `M1–M4`：产品路线里程碑；
 - `P0–P2`：实现优先级；
 - `G0–G7`：假设驱动开发 Gate；
-- 冻结机器 ID 中的 `p1/P1`（如 `solver-p1-v1`）为兼容性标识，不再作为产品阶段术语。
+- 历史兼容机器 ID 中的 `p1/P1`（如 `solver-p1-v1`）不再作为产品阶段术语；当前版本以对应 ADR 和机器契约报告为准。
 
 ## 核心概念
 

@@ -30,13 +30,13 @@ from .data_validation import (
     GeoBounds,
     validate_attraction_data,
 )
+from .day_assignment import assign_days, rebuild_day_plan
 from .degradation import (
     DegradationCode,
     DegradationNotice,
     DegradationReport,
     evaluate_itinerary_degradation,
 )
-from .day_assignment import assign_days, rebuild_day_plan
 from .itinerary import route_itinerary
 from .models import (
     AnchorRejectionCode,
@@ -61,14 +61,15 @@ from .models import (
     MealPlan,
     MealStatus,
     ODBasis,
+    ODTravelMode,
     PaceLevel,
     RejectedAttraction,
     RejectionCode,
     RoutedDay,
-    RouteSegment,
     RouteSearchAttempt,
     RouteSearchPhase,
     RouteSearchStatus,
+    RouteSegment,
     RouteSolveMetadata,
     RouteUnplaced,
     RouteValidation,
@@ -77,17 +78,17 @@ from .models import (
     SegmentedDay,
     SolverInputBatch,
     Step1Plan,
-    TimeRule,
     TimeBucket,
+    TimeRule,
     TimeWindowResolution,
     TravelMode,
     TravelTimeResult,
     TripTimeAnchors,
+    UnplacedAttraction,
     VisitPeriodEvaluation,
     VisitPeriodOutcome,
     VisitPeriodPreference,
     VisitPeriodPreferenceSource,
-    UnplacedAttraction,
     WeatherAvailability,
     WeatherBasis,
     WeatherSeverity,
@@ -114,12 +115,12 @@ from .transport import (
     TravelTimeProvider,
     evaluate_connection,
 )
-from .weather import assign_to_nearest_feasible_date, evaluate_weather_availability
 from .visit_periods import (
     evaluate_visit_period,
     resolve_visit_period_preference,
     time_bucket_for,
 )
+from .weather import assign_to_nearest_feasible_date, evaluate_weather_availability
 
 __all__ = [
     "AnchorRejectionCode",
@@ -167,6 +168,7 @@ __all__ = [
     "MealPlan",
     "MealStatus",
     "ODBasis",
+    "ODTravelMode",
     "PaceLevel",
     "PARAMETER_VERSION",
     "RejectedAttraction",

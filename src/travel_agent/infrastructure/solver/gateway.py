@@ -1,4 +1,4 @@
-"""Production adapter for the frozen M1 deterministic solver contract."""
+"""Production adapter for the stable, versioned M1 deterministic solver contract."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ from travel_agent.solver import (
     TimeBucket,
     TravelMode,
     TravelTimeProvider,
+    TravelTimeResult,
     TripTimeAnchors,
     VisitPeriodPreference,
     VisitPeriodPreferenceSource,
@@ -152,7 +153,7 @@ class ProductionSolverGateway:
                 completion,
                 bool(degradation.notices),
                 quality.gate_passed,
-                "trip-result-v1",
+                "trip-result-v2",
                 result,
                 _stable_hash(result),
                 SOLVER_CONTRACT_VERSION,
@@ -350,11 +351,18 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
                         if visit.travel_from_previous is not None
                         else None
                     ),
+                    "travel_distance_m": (
+                        visit.travel_from_previous.distance_m
+                        if visit.travel_from_previous is not None
+                        else None
+                    ),
+                    "travel_fallback_reason": (
+                        visit.travel_from_previous.fallback_reason
+                        if visit.travel_from_previous is not None
+                        else None
+                    ),
                     "transport_mode": (
-                        _transport_mode(
-                            visit.travel_from_previous.basis.value,
-                            visit.travel_from_previous.travel_min,
-                        )
+                        _transport_mode(visit.travel_from_previous)
                         if visit.travel_from_previous is not None
                         else None
                     ),
@@ -384,7 +392,7 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
         )
     accounting = quality.accounting
     return {
-        "schema_version": "trip-result-v1",
+        "schema_version": "trip-result-v2",
         "provenance": {
             "solver_version": SOLVER_CONTRACT_VERSION,
             "constraint_version": CONSTRAINT_VERSION,
@@ -433,12 +441,12 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
     }
 
 
-def _transport_mode(travel_basis: str, travel_min: int) -> str:
-    if travel_basis == "gaode":
-        return "driving"
-    if travel_min <= 8:
+def _transport_mode(travel: TravelTimeResult) -> str:
+    if travel.travel_mode is not None:
+        return travel.travel_mode.value
+    if travel.travel_min <= 8:
         return "walking_estimate"
-    if travel_min <= 20:
+    if travel.travel_min <= 20:
         return "taxi_estimate"
     return "transit_or_taxi_estimate"
 

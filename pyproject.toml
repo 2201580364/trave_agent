@@ -5,11 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "travel-agent"
 version = "0.1.0"
-description = "Deterministic itinerary solver for the travel assistant P1 MVP"
+description = "Deterministic itinerary solver for the travel assistant M1 MVP"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.13,<2",
     "fastapi>=0.111,<1",
+    "httpx>=0.27,<1",
     "ortools>=9.10,<10",
     "pymysql>=1.1,<2",
     "sqlalchemy>=2.0,<3",
@@ -21,7 +22,6 @@ travel-agent-archive-logs = "travel_agent.observability.archive:main"
 
 [project.optional-dependencies]
 dev = [
-    "httpx>=0.27,<1",
     "mypy>=1.11",
     "pytest>=8.3",
     "ruff>=0.6",

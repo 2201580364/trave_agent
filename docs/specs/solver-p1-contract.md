@@ -1,8 +1,8 @@
-﻿# M1 求解器公开契约（solver-p1-v1）
+﻿# M1 求解器公开契约（当前 solver-p1-v2；历史 solver-p1-v1）
 
 - **状态**：已稳定并版本化（求解器核心阶段性完成，可按 ADR 升级）
-- **日期**：2026-08-25
-- **依据**：ADR-0009、ADR-0010
+- **日期**：2026-08-26
+- **依据**：ADR-0009、ADR-0010、ADR-0011
 - **关联假设**：H3、H7
 
 ## 1. 应用层调用边界
@@ -57,9 +57,12 @@ data_verified / conflict / active
 basis
 data_version
 fetched_at
+travel_mode（真实路网可用时）
+distance_m（可用时）
+fallback_reason（仅透明近似降级时）
 ```
 
-缺失 OD 不能按零处理。
+缺失 OD 不能按零处理。高德 HTTP 调用只发生在 OD 快照构建阶段，求解阶段只读取已构建的版本化有向 OD；A→B 与 B→A 不得互相替代。
 
 ## 3. 核心输出
 
@@ -89,6 +92,17 @@ visit_period
 ```
 
 `visit_period` 在无偏好时为空；存在偏好时包含来源、实际时段、结果、偏差分钟和提示。
+
+当前 `trip-result-v2` 的节点接驳字段还包括：
+
+```text
+transport_mode
+travel_basis
+travel_distance_m
+travel_fallback_reason
+```
+
+真实模式为 `walking/transit/driving`；近似交通使用 `walking_estimate/taxi_estimate/transit_or_taxi_estimate`。`travel_basis=gaode` 不得携带降级原因；高德失败后使用近似 OD 时，必须同时返回 `travel_basis=approximate` 和结构化 `travel_fallback_reason`。
 
 ## 4. 质量门禁
 
@@ -195,12 +209,13 @@ DEFAULT_SOLVER_P1_CONTRACT
 
 修改任一默认参数必须升级 `parameter_version` 并重新生成报告。
 
-ADR-0010 当前版本：
+当前版本：
 
 ```text
-contract_version   = solver-p1-v1
+contract_version   = solver-p1-v2
 constraint_version = constraints-p1-v2
 parameter_version  = parameters-p1-2026-08-25
+result_schema      = trip-result-v2
 
 day spread target end = 16:00
 day spread max delay  = 60min
@@ -209,6 +224,8 @@ lunch full duration   = 60min
 ```
 
 `DAY_SPREAD` 只在 OR-Tools 已选硬可行顺序之后进行软精修：优先把最低可玩时长扩展至建议时长、保留午餐空档并覆盖下午；它不能改变顺序、突破硬窗口或牺牲固定晚间场次。
+
+`solver-p1-v1` 和 `trip-result-v1` 继续作为历史回放版本保留。历史 TripRevision 不迁移、不覆盖、不原地重算；读取端兼容 V1/V2，新生成结果使用 V2。
 
 ## 9. 确定性和回放
 

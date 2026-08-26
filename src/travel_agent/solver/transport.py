@@ -63,6 +63,7 @@ class InMemoryTravelTimeProvider:
                 basis=self.default_basis,
                 data_version=self.data_version,
                 fetched_at=self.fetched_at or SYNTHETIC_FETCHED_AT,
+                distance_m=0,
             )
         return self._results.get((origin_id, destination_id))
 
@@ -108,6 +109,7 @@ class ApproximateTravelTimeProvider:
                 basis=ODBasis.APPROXIMATE,
                 data_version=self.data_version,
                 fetched_at=self.fetched_at,
+                distance_m=0,
             )
         origin = self.coordinates.get(origin_id)
         destination = self.coordinates.get(destination_id)
@@ -125,6 +127,7 @@ class ApproximateTravelTimeProvider:
             basis=ODBasis.APPROXIMATE,
             data_version=self.data_version,
             fetched_at=self.fetched_at,
+            distance_m=max(1, math.ceil(distance_km * self.detour_ratio * 1000)),
         )
 
 

@@ -21,7 +21,17 @@ python -m pytest tests/solver/test_solver_contract.py -q
 python scripts/run_solver_contract.py
 ```
 
-机器可读快照：`docs/test/reports/solver-p1-contract.json`。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求升级 ADR-0009 定义的版本。
+机器可读快照：`docs/test/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011 升级版本。
+
+### 高德 OD Provider 与 V2 结果映射
+
+自动化测试默认不访问网络，使用固定响应验证高德多模式有向 OD、缓存和失败分类：
+
+```powershell
+python -m pytest tests/application/test_gaode_provider.py tests/application/test_gaode_snapshot_script.py tests/application/test_solver_gateway.py -q
+```
+
+覆盖范围包括：环境变量读取与 Key 脱敏、缺 Key、步行/公交/驾车解析、TTL 缓存、限流、超时、A→B/B→A 独立构建、稳定模式选择、近似降级、缺边、快照构建的显式联网开关和发布数据门禁，以及 `trip-result-v2` 对真实交通模式、道路距离和降级原因的映射。真实联网只允许按 [`gaode-od-snapshot.md`](../ops/gaode-od-snapshot.md) 显式启用，不进入常规测试或 Gate 6 离线回归。
 
 ### 评审行程接近度（Gate 6）
 
@@ -68,6 +78,7 @@ docs/test/reports/gate6-golden-latest.json
 | HZ-GC-04 | 固定晚间场次不被晚餐留白挤掉 | C2/C4/C6/S1 |
 | HZ-GC-05 | OD 缺失禁止零耗时串联并触发跨天回退 | C6 |
 | HZ-GC-06 | 七景点三日混合行程端到端守恒 | C1/C2/C4/C5/C6/S1/S2 |
+| HZ-GC-07 | 两个日间景点、午餐空档与 18:30 固定表演稳定展开 | C2/C4/C6/S1/S2 |
 
 当前结果：`7/7` 场景通过，硬约束最终违反数为 `0`，重复运行结果一致。HZ-GC-07 覆盖“两个日间景点 + 18:30 固定表演”的建议时长扩展、午餐空档和下午展开。
 这只是 Gate 6 的 Golden Case 子门禁，不代表数据校验、性能和降级子门禁已经完成。

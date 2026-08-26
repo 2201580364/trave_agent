@@ -80,7 +80,9 @@ export interface TripResult {
       travel_from_previous_min?: number
       buffered_travel_from_previous_min?: number
       travel_basis?: 'approximate' | 'gaode' | null
-      transport_mode?: 'driving' | 'walking_estimate' | 'taxi_estimate' | 'transit_or_taxi_estimate' | null
+      travel_distance_m?: number | null
+      travel_fallback_reason?: string | null
+      transport_mode?: 'walking' | 'transit' | 'driving' | 'walking_estimate' | 'taxi_estimate' | 'transit_or_taxi_estimate' | null
       timing_kind?: 'flexible' | 'fixed_event'
     }>
     lunch?: MealBreak | null

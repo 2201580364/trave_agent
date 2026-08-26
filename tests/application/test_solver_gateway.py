@@ -21,6 +21,10 @@ from travel_agent.solver import (
     Attraction,
     Coordinate,
     DailyWeather,
+    InMemoryTravelTimeProvider,
+    ODBasis,
+    ODTravelMode,
+    TravelTimeResult,
     WeatherBasis,
     WeatherSeverity,
 )
@@ -119,6 +123,43 @@ def _gateway() -> ProductionSolverGateway:
     return ProductionSolverGateway(provider, FixedClock())
 
 
+def _gateway_with_od(
+    *,
+    basis: ODBasis,
+    travel_mode: ODTravelMode | None,
+    distance_m: int,
+    fallback_reason: str | None = None,
+) -> ProductionSolverGateway:
+    published = _published()
+    results = {
+        (origin_id, destination_id): TravelTimeResult(
+            origin_id=origin_id,
+            destination_id=destination_id,
+            travel_min=12,
+            basis=basis,
+            data_version=VERSION,
+            fetched_at=NOW,
+            travel_mode=travel_mode,
+            distance_m=distance_m,
+            fallback_reason=fallback_reason,
+        )
+        for origin_id, destination_id in ((1, 2), (2, 1))
+    }
+    snapshot = PublishedSolverData(
+        published.version,
+        published.city_id,
+        published.attractions,
+        published.weather_by_date,
+        InMemoryTravelTimeProvider(results),
+        basis.value,
+        published.weather_basis,
+    )
+    return ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((snapshot,)),
+        FixedClock(),
+    )
+
+
 def _balanced_gateway() -> ProductionSolverGateway:
     attractions = tuple(
         PublishedAttraction(
@@ -169,7 +210,7 @@ def _balanced_gateway() -> ProductionSolverGateway:
     )
 
 
-def test_gateway_runs_frozen_solver_and_maps_stable_result() -> None:
+def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     first = _gateway().solve(_request())
     second = _gateway().solve(_request())
 
@@ -189,9 +230,51 @@ def test_gateway_runs_frozen_solver_and_maps_stable_result() -> None:
     )
     assert connected_node["transport_mode"] == "walking_estimate"
     assert connected_node["travel_basis"] == "approximate"
+    assert connected_node["travel_distance_m"] > 0
+    assert connected_node["travel_fallback_reason"] is None
     assert first.result_snapshot["days"][0]["lunch"]["status"] == "full"
     assert first.audit_payload["solve_run_id"] == "solver_run_1"
     assert first.audit_payload["data_snapshot_version"] == VERSION
+
+
+def test_gateway_maps_gaode_mode_and_road_distance_into_v2_result() -> None:
+    outcome = _gateway_with_od(
+        basis=ODBasis.GAODE,
+        travel_mode=ODTravelMode.TRANSIT,
+        distance_m=8_200,
+    ).solve(_request())
+
+    connected_node = next(
+        node
+        for node in outcome.result_snapshot["days"][0]["nodes"]
+        if node["travel_from_previous_min"] > 0
+    )
+
+    assert outcome.result_schema_version == "trip-result-v2"
+    assert outcome.result_snapshot["schema_version"] == "trip-result-v2"
+    assert connected_node["transport_mode"] == "transit"
+    assert connected_node["travel_basis"] == "gaode"
+    assert connected_node["travel_distance_m"] == 8_200
+    assert connected_node["travel_fallback_reason"] is None
+
+
+def test_gateway_exposes_approximate_fallback_reason_without_claiming_gaode() -> None:
+    outcome = _gateway_with_od(
+        basis=ODBasis.APPROXIMATE,
+        travel_mode=None,
+        distance_m=3_400,
+        fallback_reason="gaode_timeout",
+    ).solve(_request())
+
+    connected_node = next(
+        node
+        for node in outcome.result_snapshot["days"][0]["nodes"]
+        if node["travel_from_previous_min"] > 0
+    )
+
+    assert connected_node["travel_basis"] == "approximate"
+    assert connected_node["travel_fallback_reason"] == "gaode_timeout"
+    assert connected_node["transport_mode"] == "taxi_estimate"
 
 
 def test_gateway_derives_stable_balanced_dates_when_user_has_no_date_preference() -> None:

@@ -56,6 +56,12 @@ class ODBasis(StrEnum):
     GAODE = "gaode"
 
 
+class ODTravelMode(StrEnum):
+    WALKING = "walking"
+    TRANSIT = "transit"
+    DRIVING = "driving"
+
+
 class TravelMode(StrEnum):
     SPEED = "speed"
     NORMAL = "normal"
@@ -138,6 +144,9 @@ class TravelTimeResult:
     basis: ODBasis
     data_version: str
     fetched_at: datetime
+    travel_mode: ODTravelMode | None = None
+    distance_m: int | None = None
+    fallback_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.travel_min < 0:
@@ -150,6 +159,13 @@ class TravelTimeResult:
             raise ValueError("data_version is required")
         if self.fetched_at.tzinfo is None:
             raise ValueError("fetched_at must be timezone-aware")
+        if self.distance_m is not None:
+            if self.origin_id == self.destination_id and self.distance_m != 0:
+                raise ValueError("same-node distance must be zero")
+            if self.origin_id != self.destination_id and self.distance_m <= 0:
+                raise ValueError("distance_m must be positive for different nodes")
+        if self.fallback_reason is not None and self.basis is not ODBasis.APPROXIMATE:
+            raise ValueError("fallback_reason is only valid for approximate OD")
 
 
 @dataclass(frozen=True, slots=True)

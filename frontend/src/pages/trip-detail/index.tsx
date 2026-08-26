@@ -45,10 +45,19 @@ function dayTransitLabel(value: number) {
 }
 
 function transportModeLabel(mode?: string | null) {
+  if (mode === 'walking') return '步行'
+  if (mode === 'transit') return '公交/地铁'
+  if (mode === 'driving') return '驾车/打车'
   if (mode === 'walking_estimate') return '步行'
   if (mode === 'taxi_estimate') return '打车'
   if (mode === 'transit_or_taxi_estimate') return '公交/地铁或打车'
   return '驾车/打车'
+}
+
+function distanceLabel(value?: number | null) {
+  if (!value || value <= 0) return ''
+  if (value < 1000) return ` · ${Math.round(value / 50) * 50} 米`
+  return ` · 约 ${(value / 1000).toFixed(value < 10000 ? 1 : 0)} 公里`
 }
 
 function mealLabel(name: string, meal?: MealBreak | null) {
@@ -174,7 +183,7 @@ export default function TripDetailPage() {
                         <View className='attraction-meta'>计划停留约 {durationLabel(node.planned_duration_min)}</View>
                         {index > 0 && (
                           <View className='transit-note'>
-                            从上一站建议 {transportModeLabel(node.transport_mode)} · 约 {transitDurationLabel(node.buffered_travel_from_previous_min ?? node.travel_from_previous_min ?? 0)}
+                            从上一站建议 {transportModeLabel(node.transport_mode)}{distanceLabel(node.travel_distance_m)} · 约 {transitDurationLabel(node.buffered_travel_from_previous_min ?? node.travel_from_previous_min ?? 0)}
                           </View>
                         )}
                       </View>
