@@ -33,6 +33,8 @@ python -m pytest tests/application/test_gaode_provider.py tests/application/test
 
 覆盖范围包括：环境变量读取与 Key 脱敏、缺 Key、步行/公交/驾车解析、进程内及跨进程 JSON TTL 缓存、请求节流、限流、超时、脱敏 `infocode`/pair/mode/time 失败明细、A→B/B→A 独立构建、稳定模式选择、近似降级、缺边、快照构建的显式联网开关和候选坐标门禁，以及 `trip-result-v2` 对真实交通模式、道路距离和降级原因的映射。JSON 发布 Provider 回归覆盖 SHA-256、防篡改、candidate/published、`human_verified`、坐标来源、ID 唯一性、OD basis/version 和完整有向边。Gateway 回归还覆盖 OD 感知默认分天、`3/3/1` 数量反例、建议时长负载均衡、强近邻保护、日间末节点前往晚间首节点的终端成本、景点守恒和结果哈希稳定。真实联网只允许按 [`gaode-od-snapshot.md`](../ops/gaode-od-snapshot.md) 显式启用，不进入常规测试或 Gate 6 离线回归。
 
+生产组合根回归使用 `tests/application/test_production_composition.py`，覆盖环境配置、显式版本要求、正式快照启动、candidate 拒绝和城市不一致 fail-fast。测试不会给生产组合根增加候选放行参数；真实候选 bundle 还需执行一次实物拒绝验证。
+
 ### 评审行程接近度（Gate 6）
 
 Golden Case 的硬约束和景点守恒门禁之外，使用 ADR-0007 定义的结构化接近度比较分天、时段、同日组合和相邻顺序。固定项必须全部命中，软接近度初始阈值为 `0.75`；软分不能补偿 C1/C2/C4/C5/C6 或景点守恒失败。

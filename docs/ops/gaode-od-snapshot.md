@@ -129,7 +129,7 @@ fallback_reason
 
 ## 5. 当前未完成
 
-- 已实现不可变 JSON `PublishedSolverDataProvider` 并完成候选快照离线回放；尚未接入正式发布数据表或生产组合根；
+- 已实现不可变 JSON `PublishedSolverDataProvider`、候选快照离线回放和生产 fail-fast 组合根；尚未接入正式发布数据表或正式快照；
 - 已实现本机跨进程 JSON 持久化缓存，默认位于 Git 忽略的 `var/cache/gaode-routes.json`；尚未建立跨机器共享缓存、配额看板和熔断状态；
 - 已在真实网络验证节流后完整构建不再触发限流；尚未完成高德控制台配额看板、生产 TLS/代理、跨机器缓存、熔断和故障恢复；
 - 尚未完成真实餐厅节点加入后的全量 OD 重建与新 Revision 重排。
@@ -187,3 +187,32 @@ mode_failures        = 4
 最终模式为 driving 23、transit 15、walking 4；耗时范围 5–61 分钟，道路距离 324–11,587 米。4 次模式失败均为公交 `no_route / infocode=10000`，分别是灵隐寺↔飞来峰、西湖湖滨↔音乐喷泉；对应 OD 的其他模式成功，因此没有最终缺边。36 条有向边在耗时、距离或模式上与反向不同。
 
 该快照及组合 bundle 位于 Git 忽略的 `var/audit/`，当前仅为 candidate。正式发布前仍需人工确认浙江省博物馆具体入口、灵隐寺/飞来峰联游入口和西湖湖滨开放区域代表点。
+
+## 9. 生产组合根配置与启动
+
+生产式 HTTP 应用不再由调用方手工注入内存 fixture，而是从环境显式选择唯一的 M1 城市发布快照：
+
+```dotenv
+TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT=./var/published
+TRAVEL_AGENT_PUBLISHED_CITY_ID=hangzhou
+TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION=hangzhou-published-YYYY-MM-DD-vN
+```
+
+启动命令：
+
+```powershell
+py -3.12 scripts/run_published_app.py --host 127.0.0.1 --port 8000
+```
+
+启动时 `build_production_http_app()` 会立即加载并校验指定快照，而不是等到用户提交生成请求后再发现数据问题。以下任一情况都会拒绝启动：
+
+- root、城市或版本未显式配置；
+- 文件不存在、版本名不安全或快照版本不一致；
+- 快照仍为 `candidate`；
+- 路线点未全部 `human_verified`；
+- SHA-256、ID、天气、OD 完整性、basis 或 data version 校验失败；
+- 快照内 `city_id` 与环境选择城市不一致。
+
+生产组合根没有 `allow_candidates` 配置开关，避免通过环境变量意外放宽发布门禁。candidate 只能由审计代码显式构造 `JsonPublishedSolverDataProvider(..., allow_candidates=True)` 离线读取。
+
+数据库迁移仍应在启动应用前通过 Alembic 独立执行；生产式启动脚本不会隐式修改数据库结构。日志继续写入模块级、按级别每日文件，不把 Key 或完整请求参数写到控制台。
