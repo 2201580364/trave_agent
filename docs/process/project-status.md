@@ -19,9 +19,9 @@
 - 更新时间：2026-08-27
 - 产品里程碑：`M1 — 行程骨架验证`
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 专家/用户验证尚未开始
-- 当前阶段：`A6-8.1 路线点浏览器证据、严格 OD、和风天气链路、JSON Provider 和生产 fail-fast 组合根已完成离线技术闭环；正式发布等待责任人签字与真实天气`
-- 当前任务：由发布责任人确认 7 个杭州路线点口径并写入 `human_verified`，配置和风凭证完成真实三日预报验证，生成正式杭州 Published Snapshot 并通过 FastAPI/Chrome 回放；随后处理配额治理并进入 A6-8.2 真实 MySQL 与部署恢复
-- 总体判断：后端 HTTP、SQLite 持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订和高德真实 Provider 已形成可操作技术纵向闭环；候选路线点 42/42 高德严格边、Chrome/高德逐点复核证据、请求节流、OD 分天负载均衡、和风三日天气 Provider、不可变 JSON Provider、正式合并器、离线回放和生产启动门禁均已验证，但路线点尚未由发布责任人签为 `human_verified`，本机尚无和风凭证和真实响应，正式快照/发布表、配额治理、真实 MySQL、餐厅节点和部署恢复尚未完成，因此仍不能宣称稳定生产可用或已完成 M1 MVP
+- 当前阶段：`A6-8.1 生产数据发布收口：7 个路线点已完成人工审核，新版本严格 OD 已重建；正在收口真实 OD 暴露的日内下午空白，并等待真实和风天气后生成正式 bundle`
+- 当前任务：修复“单日间景点 + 固定晚间节点”的下午大段空白并用新审核 OD 离线回归；随后配置和风凭证完成真实三日预报验证，生成正式杭州 Published Snapshot 并通过生产组合根、FastAPI/Chrome 回放；再处理配额治理并进入 A6-8.2 真实 MySQL 与部署恢复
+- 总体判断：后端 HTTP、SQLite 持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订和高德真实 Provider 已形成可操作技术纵向闭环；7 个杭州路线点已经发布责任人接受并生成独立 `human_verified` 坐标版本，新版本 42/42 有向 OD 均来自高德且 0 fallback/0 missing，历史候选数据未覆盖。新 OD 离线求解仍满足 7/7 景点、0 硬约束违反，但暴露第三天下午约 5 小时 22 分钟无安排的体验回归；本机尚无和风凭证和真实响应，正式快照/发布表、配额治理、真实 MySQL、餐厅节点和部署恢复也尚未完成，因此仍不能宣称稳定生产可用或已完成 M1 MVP
 
 ## 已完成
 
@@ -67,7 +67,7 @@
 - 已完成：A6-1 至 A6-5 应用、求解与数据库核心；A6-6 匿名身份、FastAPI HTTP v1、景点目录和 inline 组合根
 - 浏览器进展：375px 下真实走通 P00→P04，验证交通继承、搜索/室内筛选、7 景点选择、结果生成、三日切换、18:30 灯光秀、刷新恢复；新 Revision 的景点数量为 3/2/2，7 个景点全部守恒且 0 个未排入
 - 响应式与安全：375×812 完整页面通过；1280×800 下内容居中、无横向溢出、日期 Tab 三列等宽；健康路径控制台 0 error/warn；受控后端故障只展示稳定用户提示，不泄露 Token、request ID 或技术堆栈
-- 下一步：发布责任人确认路线点浏览器复核报告；配置和风凭证执行真实三日天气构建；生成正式 OD/天气 Published Snapshot 并通过生产组合根和 Chrome 验证，再进入配额治理与 A6-8.2
+- 下一步：先修复并回归“单日间景点 + 固定晚间节点”的下午空白；再配置和风凭证执行真实三日天气构建，生成正式 OD/天气 Published Snapshot 并通过生产组合根和 Chrome 验证；随后进入配额治理与 A6-8.2
 - 完成度：约 98%（仅指首个纵向切片及其本地浏览器、行程质量、高德 Provider、JSON 发布适配器和生产启动门禁技术验证，不代表 M1 MVP）
 
 ## 本轮完成（2026-08-25）
@@ -176,7 +176,7 @@
 ### A6-8.1 路线点浏览器复核与和风天气发布链路（2026-08-27）
 
 - Chrome 控制通道已恢复，已在高德地图 Web 逐项检索并复核 7 个候选路线点；页面证据确认省博候选为“浙江省博物馆孤山馆区(南门)”、灵隐寺候选为“灵隐寺(进口)”、飞来峰候选为“飞来峰(1号门)”、湖滨候选对应湖滨公园，雷峰塔售票处、清河坊步行街和西湖音乐喷泉表演点语义也分别获得页面支持；
-- 新增 `a6-8-1-gaode-browser-coordinate-review-2026-08-27.md`，记录查询、页面结果、点位语义和联游 OD 一致性；AI 辅助浏览器复核不冒充发布责任人的真人签字，因此候选坐标暂不写成 `human_verified`，生产组合根继续 fail-fast；
+- 新增 `a6-8-1-gaode-browser-coordinate-review-2026-08-27.md`，记录查询、页面结果、点位语义和联游 OD 一致性；发布责任人于 2026-08-27 接受报告中的 7 个点位口径并授权生成新的 `human_verified` 坐标版本；
 - 新增和风三日天气 Provider：配置 Key 脱敏、可配置 Location ID/HTTPS API Host/超时/数据版本，解析 `/v7/weather/3d`，要求三个唯一连续日期和带时区抓取时间，并分类 timeout/rate_limited/http_error/api_error/invalid_response；
 - 固化 `qweather-severity-v1`：晴/多云等为 normal，普通雨雪/雷/雾/霾/沙尘为 advisory，暴雨/大暴雨/特大暴雨、暴雪、台风、龙卷风、冰雹、雷暴大风和强沙尘暴为 extreme；只有 `basis=forecast AND severity=extreme` 可驱动 C5 硬排除，climate 只做提示；
 - 新增 `scripts/build_qweather_snapshot.py`，真实联网必须显式传入 `--execute-live`；快照保存 `condition_code/source_ref/fetched_at/provider_update_time/data_version/content_hash`，不保存或打印 Key；
@@ -184,7 +184,11 @@
 - 新增 `scripts/build_published_solver_snapshot.py`：只接受全量 `human_verified` 坐标、0 fallback/0 missing 的严格高德有向 OD、哈希有效且城市一致的和风三日 forecast；正式文件排他创建，禁止覆盖历史快照；
 - 新增 ADR-0014 和 `docs/ops/qweather-snapshot.md`，明确三日之外必须使用正式气候基线或拒绝覆盖，禁止复制第三天预报、循环天气或补造晴天；当前尚未实现气候基线 Provider；
 - 全量测试由 232 增至 255 项通过；Golden 7/7、降级 8/8、接近度 0.975、数据校验 7/7、性能门禁、本轮改动文件 Ruff、新增实现源文件隔离 strict mypy、前端 TypeScript 和 H5 production build 均通过；H5 仍有既有 304 KiB 警告，全仓 Ruff 仍有 46 个历史问题；
-- 当前 `.env` 尚未配置 `TRAVEL_AGENT_QWEATHER_API_KEY`，因此真实和风响应与正式杭州天气快照尚未验证。当前阶段结论：路线点“无法打开浏览器”的技术阻塞已消除，天气与正式合并代码路径已完成离线闭环；A6 维持约 98%，剩余发布阻塞为责任人路线点签字、和风真实凭证/响应、正式 bundle、配额治理和真实部署。
+- 新增不可变审核坐标版本 `var/published/hangzhou-attractions-reviewed-2026-08-27-v1.json`：7 个点位均为 `human_verified`、`data_verified=true`、`conflict=false`；浙江省博物馆（孤山馆区）点位语义由候选态 `south_gate_candidate` 收口为 `south_gate`，旧候选文件保持不变；
+- 使用新审核坐标真实重建 `gaode-hangzhou-reviewed-2026-08-27-v1`：42/42 有向 OD 均为高德结果，0 fallback、0 missing，模式分布为 walking 4、driving 27、transit 11；4 次 transit `no_route` 均由其他真实模式成功补齐，快照不含 Key 或带 Key 请求字段；
+- 新审核 OD 已生成仅供离线审计的 candidate bundle；其天气仍为 `audit_normal_fixture`，只能通过显式 `allow_candidates=True` 加载，不能进入生产；
+- 新审核 OD 离线求解保持 7/7 景点、0 未排入、0 硬约束违反和稳定结果哈希，但第三天形成“西湖湖滨 09:00–11:30、午餐 11:30–12:30、晚餐 17:52–19:22、表演 19:30”的时序，12:30–17:52 约 5 小时 22 分钟无安排；该体验回归必须在正式发布前收口，不能只因硬约束通过就判定路线质量通过；
+- 当前 `.env` 尚未配置 `TRAVEL_AGENT_QWEATHER_API_KEY`，因此真实和风响应与正式杭州天气快照尚未验证。当前阶段结论：路线点人工确认和新严格 OD 已完成，天气与正式合并代码路径已完成离线闭环；A6 维持约 98%，当前优先项为下午空白修复，剩余发布阻塞为和风真实凭证/响应、正式 bundle、配额治理和真实部署。
 
 ## 本轮完成（2026-08-24）
 
