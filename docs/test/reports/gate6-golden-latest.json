@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-27T06:54:49.402156+00:00",
+  "generated_at": "2026-08-27T12:52:29.922692+00:00",
   "suite": "hangzhou-realistic-golden-cases",
-  "passed": 7,
-  "total": 7,
+  "passed": 8,
+  "total": 8,
   "gate_passed": true,
   "cases": [
     {
@@ -176,6 +176,42 @@
         },
         "lunch_gap_min": 97,
         "dinner_status": "full",
+        "hard_constraint_violations": 0
+      }
+    },
+    {
+      "case_id": "HZ-GC-08",
+      "title": "单个日间景点覆盖下午，真实湖滨 OD、晚餐与固定表演保留",
+      "passed": true,
+      "constraints": [
+        "C2",
+        "C4",
+        "C6",
+        "S1",
+        "LUNCH_BLOCK",
+        "DINNER_BLOCK",
+        "DAY_SPREAD"
+      ],
+      "evidence": [
+        "SRC-WESTLAKE-GUIDE",
+        "SRC-FOUNTAIN-GUIDE"
+      ],
+      "details": {
+        "visit_times": {
+          "13": {
+            "arrival_min": 810,
+            "leave_min": 960,
+            "planned_duration_min": 150
+          },
+          "17": {
+            "arrival_min": 1170,
+            "leave_min": 1190,
+            "planned_duration_min": 20
+          }
+        },
+        "lunch_gap_min": 120,
+        "dinner_status": "full",
+        "od_version": "gaode-hangzhou-reviewed-2026-08-27-v1",
         "hard_constraint_violations": 0
       }
     }

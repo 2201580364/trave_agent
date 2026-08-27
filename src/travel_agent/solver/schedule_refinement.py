@@ -3,8 +3,8 @@
 The routing model first establishes a hard-feasible order using the minimum
 visit duration accepted by C2.  This module then uses genuine remaining slack
 to move planned durations towards the published suggestion, preserve a lunch
-gap, and keep multiple daytime visits from being compressed into one part of
-the day.  It never changes visit order or weakens C1/C2/C4/C5/C6.
+gap, and keep daytime visits from being compressed into one part of the day.
+It never changes visit order or weakens C1/C2/C4/C5/C6.
 
 Traceability: H3, S1, DAY_SPREAD, LUNCH_BLOCK, ADR-0010.
 """
@@ -36,7 +36,8 @@ def refine_daytime_schedule(
 
     The refinement is deliberately conservative:
 
-    * only two or more daytime visits are refined;
+    * a single daytime visit is only moved when a fixed evening segment exists;
+    * two or more daytime visits keep the conservative incremental spread;
     * the OR-Tools order and all OD edges remain unchanged;
     * a full dinner gap before an evening segment is preserved;
     * candidates that no longer fit an attraction window are discarded;
@@ -140,13 +141,22 @@ def _expand_single_daytime_duration(
     cross_buffered_min: int,
     dinner_duration_min: int,
 ) -> RoutedDay:
-    """Let a genuinely loose one-stop day use its published visit duration."""
+    """Expand one daytime visit and cover the afternoon before an evening event.
+
+    A single daytime node has no inter-visit order or OD to protect, so limiting
+    its move to the multi-node 60-minute adjustment can leave most of the
+    afternoon empty.  When an evening segment exists, this refinement therefore
+    targets a 16:00 departure while preserving a full lunch before the visit,
+    the real cross-segment OD, and a full dinner before the fixed event.
+    """
 
     visit = route.visits[0]
     resolution = resolve_effective_window(visit.attraction, route.visit_date)
     if resolution.window is None:
         return route
-    deadline = min(route.bounds.end_min, resolution.window.close_min)
+    window = resolution.window
+    deadline = min(route.bounds.end_min, window.close_min)
+    can_spread_before_evening = False
     if len(route.visits) > 1:
         dinner_safe_deadline = (
             route.visits[1].arrival_min
@@ -155,6 +165,7 @@ def _expand_single_daytime_duration(
         )
         if dinner_safe_deadline >= visit.leave_min:
             deadline = min(deadline, dinner_safe_deadline)
+            can_spread_before_evening = True
         else:
             deadline = min(
                 deadline,
@@ -164,16 +175,51 @@ def _expand_single_daytime_duration(
         visit.attraction.suggested_duration,
         deadline - visit.arrival_min,
     )
-    if expanded_duration <= visit.planned_duration_min:
+    if expanded_duration < visit.planned_duration_min:
         return route
     visits = list(route.visits)
-    visits[0] = _reschedule_visit(
-        visit,
+    if expanded_duration > visit.planned_duration_min:
+        visits[0] = _reschedule_visit(
+            visit,
+            visit.arrival_min,
+            expanded_duration,
+        )
+    expanded = replace(route, visits=tuple(visits))
+    if not _times_fit(expanded):
+        return route
+    if not can_spread_before_evening:
+        return expanded
+
+    lunch_start = max(route.bounds.start_min, DEFAULT_LUNCH_EARLIEST_MIN)
+    lunch_ready = lunch_start + DEFAULT_LUNCH_DURATION_MIN
+    if lunch_ready > DEFAULT_LUNCH_LATEST_END_MIN:
+        return expanded
+
+    target_leave = min(DEFAULT_DAY_SPREAD_TARGET_END_MIN, deadline)
+    desired_arrival = max(
         visit.arrival_min,
+        lunch_ready,
+        target_leave - expanded_duration,
+    )
+    latest_arrival = min(
+        window.last_entry_min
+        if window.last_entry_min is not None
+        else window.close_min,
+        window.close_min - expanded_duration,
+        route.bounds.end_min - expanded_duration,
+        deadline - expanded_duration,
+    )
+    if desired_arrival > latest_arrival:
+        return expanded
+
+    visits = list(expanded.visits)
+    visits[0] = _reschedule_visit(
+        visits[0],
+        desired_arrival,
         expanded_duration,
     )
-    candidate = replace(route, visits=tuple(visits))
-    return candidate if _times_fit(candidate) else route
+    candidate = replace(expanded, visits=tuple(visits))
+    return candidate if _times_fit(candidate) else expanded
 
 
 def _build_candidate(

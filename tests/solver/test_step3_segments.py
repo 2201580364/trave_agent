@@ -30,6 +30,7 @@ NOW = datetime(2026, 8, 23, tzinfo=UTC)
 DAY_RULE = (TimeRule.from_strings(("01-01", "12-31"), "09:00", "17:30"),)
 EVENING_RULE = (TimeRule.from_strings(("01-01", "12-31"), "19:00", "23:00"),)
 SHOW_RULE = (TimeRule.from_strings(("01-01", "12-31"), "18:30", "19:00"),)
+LATE_SHOW_RULE = (TimeRule.from_strings(("01-01", "12-31"), "19:30", "19:50"),)
 
 
 def _attraction(
@@ -142,6 +143,65 @@ def test_step3_spreads_two_daytime_visits_across_lunch_before_1830_show() -> Non
     )
     assert lunch_gap >= 60
     assert result.meal_plan.status is MealStatus.FULL
+    assert result.validation.valid
+
+
+def test_step3_spreads_single_daytime_visit_into_afternoon_before_fixed_show() -> None:
+    lake = _attraction(1, DAY_RULE, duration=150)
+    light_show = _attraction(2, LATE_SHOW_RULE, duration=20)
+    provider = InMemoryTravelTimeProvider(
+        {(1, 2): _travel(1, 2, 6), (2, 1): _travel(2, 1, 6)}
+    )
+
+    result = route_segmented_day(
+        _day(lake, light_show),
+        provider,
+        weather_by_date=_weather(),
+    )
+
+    daytime, show = result.routed_day.visits
+    assert daytime.arrival_min == 13 * 60 + 30
+    assert daytime.leave_min == 16 * 60
+    assert daytime.planned_duration_min == 150
+    assert (
+        min(daytime.arrival_min, 14 * 60) - max(9 * 60, 11 * 60 + 30)
+        >= 60
+    )
+    assert show.arrival_min == 19 * 60 + 30
+    assert show.planned_duration_min == 20
+    assert result.meal_plan.status is MealStatus.FULL
+    assert result.meal_plan.placement is MealPlacement.BETWEEN_SEGMENTS
+    assert result.meal_plan.end_min <= (
+        show.arrival_min - show.buffered_travel_from_previous_min
+    )
+    assert result.validation.valid
+
+
+def test_step3_single_daytime_spread_respects_last_entry_fallback() -> None:
+    early_last_entry = (
+        TimeRule.from_strings(
+            ("01-01", "12-31"),
+            "09:00",
+            "17:30",
+            "11:00",
+        ),
+    )
+    lake = _attraction(1, early_last_entry, duration=150)
+    light_show = _attraction(2, LATE_SHOW_RULE, duration=20)
+    provider = InMemoryTravelTimeProvider(
+        {(1, 2): _travel(1, 2, 6), (2, 1): _travel(2, 1, 6)}
+    )
+
+    result = route_segmented_day(
+        _day(lake, light_show),
+        provider,
+        weather_by_date=_weather(),
+    )
+
+    daytime, show = result.routed_day.visits
+    assert daytime.arrival_min == 9 * 60
+    assert daytime.planned_duration_min == 150
+    assert show.arrival_min == 19 * 60 + 30
     assert result.validation.valid
 
 

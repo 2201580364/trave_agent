@@ -547,7 +547,7 @@ M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约
 ```json
 {
   "solver_contract_version": "solver-p1-v2",
-    "constraint_version": "constraints-p1-v4",
+    "constraint_version": "constraints-p1-v5",
     "parameter_version": "parameters-p1-2026-08-26",
   "data_snapshot_version": "hangzhou-2026-08-24",
   "weather_basis": "forecast",

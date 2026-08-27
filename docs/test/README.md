@@ -21,7 +21,7 @@ python -m pytest tests/solver/test_solver_contract.py -q
 python scripts/run_solver_contract.py
 ```
 
-机器可读快照：`docs/test/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v4 / parameters-p1-2026-08-26`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013 升级版本。
+机器可读快照：`docs/test/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013/ADR-0015 升级版本。
 
 ### 高德 OD Provider 与 V2 结果映射
 
@@ -81,8 +81,9 @@ docs/test/reports/gate6-golden-latest.json
 | HZ-GC-05 | OD 缺失禁止零耗时串联并触发跨天回退 | C6 |
 | HZ-GC-06 | 七景点三日混合行程端到端守恒 | C1/C2/C4/C5/C6/S1/S2 |
 | HZ-GC-07 | 两个日间景点、午餐空档与 18:30 固定表演稳定展开 | C2/C4/C6/S1/S2 |
+| HZ-GC-08 | 单个日间景点覆盖下午，真实湖滨 OD、午晚餐与 19:30 固定表演保留 | C2/C4/C6/S1/S2 |
 
-当前结果：`7/7` 场景通过，硬约束最终违反数为 `0`，重复运行结果一致。HZ-GC-07 覆盖“两个日间景点 + 18:30 固定表演”的建议时长扩展、午餐空档和下午展开。
+当前结果：`8/8` 场景通过，硬约束最终违反数为 `0`，重复运行结果一致。HZ-GC-07 覆盖“两个日间景点 + 18:30 固定表演”的建议时长扩展、午餐空档和下午展开；HZ-GC-08 使用审核后湖滨真实 OD，覆盖“单个日间景点 + 19:30 固定表演”的下午展开、完整午餐和完整晚餐。
 这只是 Gate 6 的 Golden Case 子门禁，不代表数据校验、性能和降级子门禁已经完成。
 
 ## 九项数据校验
@@ -166,7 +167,7 @@ docs/test/reports/gate6-degradation-latest.json
 
 ```
 - 硬约束单测通过率：/ 
-- Golden Case 通过数：7/7（杭州首批，仍需扩展其他城市与反例）
+- Golden Case 通过数：8/8（杭州首批，仍需扩展其他城市与反例）
 - 数据校验覆盖率：杭州离线快照 7/7，生产数据待接入
 - 性能：N=12/D=3、N=20/D=7 本机 P95 均 `<100ms`（精确值见最新报告）
 - 降级反例：8/8，含有解超时和无解超时

@@ -213,7 +213,7 @@ DEFAULT_SOLVER_P1_CONTRACT
 
 ```text
 contract_version   = solver-p1-v2
-constraint_version = constraints-p1-v4
+constraint_version = constraints-p1-v5
 parameter_version  = parameters-p1-2026-08-26
 result_schema      = trip-result-v2
 
@@ -224,7 +224,7 @@ lunch preference      = 11:30–14:00
 lunch full duration   = 60min
 ```
 
-`DAY_SPREAD` 只在 OR-Tools 已选硬可行顺序之后进行软精修：优先把最低可玩时长扩展至建议时长、保留午餐空档并覆盖下午；它不能改变顺序、突破硬窗口或牺牲固定晚间场次。
+`DAY_SPREAD` 只在 OR-Tools 已选硬可行顺序之后进行软精修：优先把最低可玩时长扩展至建议时长、保留午餐空档并覆盖下午；它不能改变顺序、突破硬窗口或牺牲固定晚间场次。`day spread max delay = 60min` 继续约束多日间节点的局部移动；当只有一个日间节点且存在固定晚间段时，允许在保留完整午餐、90 分钟晚餐和真实跨段 OD 的前提下移动超过 60 分钟，以约 16:00 离开为稳定目标（ADR-0015）。
 
 `OD_DAY_ASSIGNMENT` 在默认分天聚类后先保证景点数量差不超过 1，再在数量仍保持 floor/ceil 平衡且双向对称 OD 平均代价增量不超过 10 分钟时降低每日建议游览时长极差。该阈值是版本化参数；最终日期仍受 C1/C2/C4/C5、容量和跨天恢复约束。
 

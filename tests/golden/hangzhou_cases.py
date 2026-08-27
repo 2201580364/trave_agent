@@ -7,9 +7,9 @@ Traceability: H2, H3, C1, C2, C4, C5, C6, S1, S2, Gate 6.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Callable
 
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -19,8 +19,11 @@ from travel_agent.solver import (
     DailyWeather,
     InMemoryTravelTimeProvider,
     MealStatus,
+    ODBasis,
+    ODTravelMode,
     RejectionCode,
     TimeRule,
+    TravelTimeResult,
     TripTimeAnchors,
     WeatherBasis,
     WeatherSeverity,
@@ -28,7 +31,6 @@ from travel_agent.solver import (
     evaluate_solver_quality,
     route_itinerary,
 )
-
 
 MONDAY = date(2026, 8, 24)
 TUESDAY = date(2026, 8, 25)
@@ -472,6 +474,94 @@ def daytime_visits_are_spread_before_fixed_evening_show() -> GoldenCaseResult:
     )
 
 
+def single_daytime_visit_covers_afternoon_before_fixed_show() -> GoldenCaseResult:
+    lakefront = _attraction(
+        13,
+        "西湖湖滨",
+        always_open=True,
+        duration=150,
+        energy=3,
+    )
+    show = _attraction(
+        17,
+        "西湖音乐喷泉表演",
+        rules=_rule("19:30", "19:50"),
+        duration=20,
+    )
+    attractions = (lakefront, show)
+    weather = _weather({MONDAY: WeatherSeverity.NORMAL})
+    step1 = assign_days(
+        tuple(AttractionPreference(item, MONDAY) for item in attractions),
+        trip_dates=(MONDAY,),
+        weather_by_date=weather,
+        anchors=TripTimeAnchors(9 * 60, 0, 22 * 60, 0, 0),
+    )
+    provider = InMemoryTravelTimeProvider(
+        {
+            (13, 17): TravelTimeResult(
+                13,
+                17,
+                6,
+                ODBasis.GAODE,
+                "gaode-hangzhou-reviewed-2026-08-27-v1",
+                SNAPSHOT_AT,
+                ODTravelMode.WALKING,
+                386,
+            ),
+            (17, 13): TravelTimeResult(
+                17,
+                13,
+                6,
+                ODBasis.GAODE,
+                "gaode-hangzhou-reviewed-2026-08-27-v1",
+                SNAPSHOT_AT,
+                ODTravelMode.WALKING,
+                386,
+            ),
+        }
+    )
+    itinerary = route_itinerary(step1, provider, weather_by_date=weather)
+    quality = evaluate_solver_quality(itinerary, attractions)
+    daytime, fixed_show = itinerary.days[0].visits
+    lunch_gap = min(daytime.arrival_min, 14 * 60) - max(
+        itinerary.days[0].bounds.start_min,
+        11 * 60 + 30,
+    )
+    meal = itinerary.segmented_days[0].meal_plan
+    passed = (
+        quality.gate_passed
+        and daytime.attraction.id == 13
+        and daytime.arrival_min == 13 * 60 + 30
+        and daytime.leave_min == 16 * 60
+        and daytime.planned_duration_min == 150
+        and lunch_gap >= 60
+        and fixed_show.attraction.id == 17
+        and fixed_show.arrival_min == 19 * 60 + 30
+        and meal.status is MealStatus.FULL
+    )
+    return GoldenCaseResult(
+        "HZ-GC-08",
+        "单个日间景点覆盖下午，真实湖滨 OD、晚餐与固定表演保留",
+        passed,
+        ("C2", "C4", "C6", "S1", "LUNCH_BLOCK", "DINNER_BLOCK", "DAY_SPREAD"),
+        ("SRC-WESTLAKE-GUIDE", "SRC-FOUNTAIN-GUIDE"),
+        {
+            "visit_times": {
+                str(visit.attraction.id): {
+                    "arrival_min": visit.arrival_min,
+                    "leave_min": visit.leave_min,
+                    "planned_duration_min": visit.planned_duration_min,
+                }
+                for visit in itinerary.days[0].visits
+            },
+            "lunch_gap_min": lunch_gap,
+            "dinner_status": meal.status.value,
+            "od_version": "gaode-hangzhou-reviewed-2026-08-27-v1",
+            "hard_constraint_violations": quality.hard_constraint_violations,
+        },
+    )
+
+
 CASES: tuple[Callable[[], GoldenCaseResult], ...] = (
     museum_closure_moves_to_tuesday,
     late_arrival_keeps_morning_site_unplaced,
@@ -480,6 +570,7 @@ CASES: tuple[Callable[[], GoldenCaseResult], ...] = (
     missing_od_enters_cross_day_recovery,
     three_day_realistic_mix_is_conserved,
     daytime_visits_are_spread_before_fixed_evening_show,
+    single_daytime_visit_covers_afternoon_before_fixed_show,
 )
 
 
