@@ -21,17 +21,17 @@ python -m pytest tests/solver/test_solver_contract.py -q
 python scripts/run_solver_contract.py
 ```
 
-机器可读快照：`docs/test/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v3`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012 升级版本。
+机器可读快照：`docs/test/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v4 / parameters-p1-2026-08-26`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013 升级版本。
 
 ### 高德 OD Provider 与 V2 结果映射
 
 自动化测试默认不访问网络，使用固定响应验证高德多模式有向 OD、缓存和失败分类：
 
 ```powershell
-python -m pytest tests/application/test_gaode_provider.py tests/application/test_gaode_snapshot_script.py tests/application/test_solver_gateway.py -q
+python -m pytest tests/application/test_gaode_provider.py tests/application/test_gaode_snapshot_script.py tests/application/test_published_json_provider.py tests/application/test_solver_gateway.py -q
 ```
 
-覆盖范围包括：环境变量读取与 Key 脱敏、缺 Key、步行/公交/驾车解析、进程内及跨进程 JSON TTL 缓存、限流、超时、脱敏 `infocode`/pair/mode/time 失败明细、A→B/B→A 独立构建、稳定模式选择、近似降级、缺边、快照构建的显式联网开关和发布数据门禁，以及 `trip-result-v2` 对真实交通模式、道路距离和降级原因的映射。Gateway 回归还覆盖 OD 感知默认分天、近邻同日、日间末节点前往晚间首节点的终端成本、景点守恒和结果哈希稳定。真实联网只允许按 [`gaode-od-snapshot.md`](../ops/gaode-od-snapshot.md) 显式启用，不进入常规测试或 Gate 6 离线回归。
+覆盖范围包括：环境变量读取与 Key 脱敏、缺 Key、步行/公交/驾车解析、进程内及跨进程 JSON TTL 缓存、请求节流、限流、超时、脱敏 `infocode`/pair/mode/time 失败明细、A→B/B→A 独立构建、稳定模式选择、近似降级、缺边、快照构建的显式联网开关和候选坐标门禁，以及 `trip-result-v2` 对真实交通模式、道路距离和降级原因的映射。JSON 发布 Provider 回归覆盖 SHA-256、防篡改、candidate/published、`human_verified`、坐标来源、ID 唯一性、OD basis/version 和完整有向边。Gateway 回归还覆盖 OD 感知默认分天、`3/3/1` 数量反例、建议时长负载均衡、强近邻保护、日间末节点前往晚间首节点的终端成本、景点守恒和结果哈希稳定。真实联网只允许按 [`gaode-od-snapshot.md`](../ops/gaode-od-snapshot.md) 显式启用，不进入常规测试或 Gate 6 离线回归。
 
 ### 评审行程接近度（Gate 6）
 

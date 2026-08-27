@@ -16,6 +16,7 @@ from .closeness import (
 )
 from .contract import (
     CONSTRAINT_VERSION,
+    DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN,
     DEFAULT_SOLVER_P1_CONTRACT,
     PARAMETER_VERSION,
     SOLVER_CONTRACT_VERSION,
@@ -145,6 +146,7 @@ __all__ = [
     "DataRuleResult",
     "DefaultRoutingSearchExecutor",
     "DEFAULT_SOLVER_P1_CONTRACT",
+    "DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN",
     "DegradationCode",
     "DegradationNotice",
     "DegradationReport",

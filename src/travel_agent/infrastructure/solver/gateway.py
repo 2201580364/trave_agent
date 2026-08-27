@@ -21,6 +21,7 @@ from travel_agent.domain.planning import CompletionKind
 from travel_agent.observability.solver_audit import build_solver_run_audit
 from travel_agent.solver import (
     CONSTRAINT_VERSION,
+    DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN,
     PARAMETER_VERSION,
     SOLVER_CONTRACT_VERSION,
     Attraction,
@@ -321,7 +322,9 @@ def _cluster_attractions_by_od(
         raise ValueError("cluster_count must be within 1..len(attractions)")
 
     max_cluster_size = (len(attractions) + cluster_count - 1) // cluster_count
-    clusters = [(item,) for item in sorted(attractions, key=lambda item: item.id)]
+    clusters: list[tuple[Attraction, ...]] = [
+        (item,) for item in sorted(attractions, key=lambda item: item.id)
+    ]
     while len(clusters) > cluster_count:
         candidates: list[
             tuple[Fraction, int, tuple[int, ...], int, int]
@@ -358,7 +361,160 @@ def _cluster_attractions_by_od(
         ]
         clusters.append(merged)
         clusters.sort(key=lambda cluster: tuple(item.id for item in cluster))
-    return tuple(clusters)
+    size_balanced = _rebalance_od_cluster_sizes(tuple(clusters), provider)
+    return _rebalance_od_cluster_durations(size_balanced, provider)
+
+
+def _rebalance_od_cluster_sizes(
+    clusters: tuple[tuple[Attraction, ...], ...],
+    provider: TravelTimeProvider,
+) -> tuple[tuple[Attraction, ...], ...]:
+    """Keep OD clusters useful while ensuring day counts differ by at most one."""
+
+    mutable = [list(cluster) for cluster in clusters]
+    while max(map(len, mutable)) - min(map(len, mutable)) > 1:
+        largest = max(map(len, mutable))
+        smallest = min(map(len, mutable))
+        candidates: list[
+            tuple[Fraction, Fraction, int, tuple[int, ...], tuple[int, ...], int, int]
+        ] = []
+        for donor_index, donor in enumerate(mutable):
+            if len(donor) != largest:
+                continue
+            for recipient_index, recipient in enumerate(mutable):
+                if len(recipient) != smallest:
+                    continue
+                for attraction in donor:
+                    donor_others = [item for item in donor if item.id != attraction.id]
+                    lost_affinity = _average_attraction_cluster_cost(
+                        attraction,
+                        donor_others,
+                        provider,
+                    )
+                    gained_affinity = _average_attraction_cluster_cost(
+                        attraction,
+                        recipient,
+                        provider,
+                    )
+                    candidates.append(
+                        (
+                            gained_affinity - lost_affinity,
+                            gained_affinity,
+                            attraction.id,
+                            tuple(item.id for item in donor),
+                            tuple(item.id for item in recipient),
+                            donor_index,
+                            recipient_index,
+                        )
+                    )
+        if not candidates:
+            raise RuntimeError("unable to rebalance OD clusters")
+        selected = min(candidates)
+        attraction_id = selected[2]
+        donor_index = selected[-2]
+        recipient_index = selected[-1]
+        attraction = next(
+            item for item in mutable[donor_index] if item.id == attraction_id
+        )
+        mutable[donor_index].remove(attraction)
+        mutable[recipient_index].append(attraction)
+        mutable[donor_index].sort(key=lambda item: item.id)
+        mutable[recipient_index].sort(key=lambda item: item.id)
+
+    return tuple(
+        tuple(cluster)
+        for cluster in sorted(mutable, key=lambda items: tuple(item.id for item in items))
+    )
+
+
+def _average_attraction_cluster_cost(
+    attraction: Attraction,
+    cluster: list[Attraction],
+    provider: TravelTimeProvider,
+) -> Fraction:
+    costs = [
+        _symmetric_od_cost(attraction.id, other.id, provider)
+        for other in cluster
+    ]
+    return Fraction(sum(costs), len(costs))
+
+
+def _rebalance_od_cluster_durations(
+    clusters: tuple[tuple[Attraction, ...], ...],
+    provider: TravelTimeProvider,
+) -> tuple[tuple[Attraction, ...], ...]:
+    """Reduce extreme day-load gaps when the added OD cost stays small."""
+
+    mutable = [list(cluster) for cluster in clusters]
+    total_count = sum(map(len, mutable))
+    minimum_size = total_count // len(mutable)
+    maximum_size = (total_count + len(mutable) - 1) // len(mutable)
+    while True:
+        durations = [
+            sum(item.suggested_duration for item in cluster)
+            for cluster in mutable
+        ]
+        current_spread = max(durations) - min(durations)
+        candidates: list[
+            tuple[int, Fraction, int, tuple[int, ...], tuple[int, ...], int, int]
+        ] = []
+        for donor_index, donor in enumerate(mutable):
+            if len(donor) <= minimum_size:
+                continue
+            for recipient_index, recipient in enumerate(mutable):
+                if donor_index == recipient_index or len(recipient) >= maximum_size:
+                    continue
+                for attraction in donor:
+                    proposed = durations.copy()
+                    proposed[donor_index] -= attraction.suggested_duration
+                    proposed[recipient_index] += attraction.suggested_duration
+                    improvement = current_spread - (max(proposed) - min(proposed))
+                    if improvement <= 0:
+                        continue
+                    donor_others = [item for item in donor if item.id != attraction.id]
+                    od_penalty = _average_attraction_cluster_cost(
+                        attraction,
+                        recipient,
+                        provider,
+                    ) - _average_attraction_cluster_cost(
+                        attraction,
+                        donor_others,
+                        provider,
+                    )
+                    if (
+                        od_penalty
+                        > DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN
+                    ):
+                        continue
+                    candidates.append(
+                        (
+                            -improvement,
+                            od_penalty,
+                            attraction.id,
+                            tuple(item.id for item in donor),
+                            tuple(item.id for item in recipient),
+                            donor_index,
+                            recipient_index,
+                        )
+                    )
+        if not candidates:
+            break
+        selected = min(candidates)
+        attraction_id = selected[2]
+        donor_index = selected[-2]
+        recipient_index = selected[-1]
+        attraction = next(
+            item for item in mutable[donor_index] if item.id == attraction_id
+        )
+        mutable[donor_index].remove(attraction)
+        mutable[recipient_index].append(attraction)
+        mutable[donor_index].sort(key=lambda item: item.id)
+        mutable[recipient_index].sort(key=lambda item: item.id)
+
+    return tuple(
+        tuple(cluster)
+        for cluster in sorted(mutable, key=lambda items: tuple(item.id for item in items))
+    )
 
 
 def _average_cluster_od_cost(

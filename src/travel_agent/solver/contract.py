@@ -34,8 +34,9 @@ from .transport import DEFAULT_TRANSIT_BUFFER_RATIO
 
 LEGACY_SOLVER_CONTRACT_VERSION = "solver-p1-v1"
 SOLVER_CONTRACT_VERSION = "solver-p1-v2"
-CONSTRAINT_VERSION = "constraints-p1-v3"
-PARAMETER_VERSION = "parameters-p1-2026-08-25"
+CONSTRAINT_VERSION = "constraints-p1-v4"
+PARAMETER_VERSION = "parameters-p1-2026-08-26"
+DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,7 @@ class SolverP1Contract:
     drop_penalty: int
     travel_cost_scale: int
     period_deviation_cost: int
+    od_duration_rebalance_max_symmetric_penalty_min: int
     day_spread_target_end_min: int
     day_spread_max_delay_min: int
     lunch_earliest_min: int
@@ -74,6 +76,8 @@ class SolverP1Contract:
             raise ValueError("solver contract transit buffer must be at least one")
         if self.route_time_limit_seconds <= 0 or self.drop_penalty <= 0:
             raise ValueError("solver contract routing parameters must be positive")
+        if self.od_duration_rebalance_max_symmetric_penalty_min < 0:
+            raise ValueError("OD duration rebalance penalty must be non-negative")
         if self.dinner_reduced_duration_min > self.dinner_full_duration_min:
             raise ValueError("reduced dinner duration cannot exceed full duration")
 
@@ -94,6 +98,9 @@ DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
     drop_penalty=DEFAULT_DROP_PENALTY,
     travel_cost_scale=DEFAULT_TRAVEL_COST_SCALE,
     period_deviation_cost=DEFAULT_PERIOD_DEVIATION_COST,
+    od_duration_rebalance_max_symmetric_penalty_min=(
+        DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN
+    ),
     day_spread_target_end_min=DEFAULT_DAY_SPREAD_TARGET_END_MIN,
     day_spread_max_delay_min=DEFAULT_DAY_SPREAD_MAX_DELAY_MIN,
     lunch_earliest_min=DEFAULT_LUNCH_EARLIEST_MIN,
@@ -115,6 +122,7 @@ DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
     soft_objectives=(
         "S1_DURATION_RATIO",
         "S2_ENERGY_BALANCE",
+        "OD_DAY_ASSIGNMENT",
         "VISIT_PERIOD",
         "DINNER_BLOCK",
         "LUNCH_BLOCK",

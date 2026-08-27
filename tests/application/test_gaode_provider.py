@@ -107,6 +107,7 @@ def test_gaode_settings_require_key(monkeypatch) -> None:
 
 def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     clock = FixedClock()
+    request_gates: list[str] = []
     transport = FakeTransport(
         {
             "/v3/direction/walking": _payload(
@@ -126,6 +127,7 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
         clock,
         transport=transport,
         cache=InMemoryGaodeRouteCache(),
+        before_request=lambda: request_gates.append("request"),
     )
 
     first = client.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
@@ -136,6 +138,7 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     assert first.distance_m == 1350
     assert first.mode is ODTravelMode.WALKING
     assert len(transport.calls) == 1
+    assert request_gates == ["request"]
     path, params, timeout = transport.calls[0]
     assert path == "/v3/direction/walking"
     assert params["origin"] == "120.165000,30.259000"
@@ -146,6 +149,7 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     clock.now += timedelta(seconds=61)
     client.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
     assert len(transport.calls) == 2
+    assert request_gates == ["request", "request"]
 
 
 def test_gaode_cache_does_not_mix_route_data_versions() -> None:

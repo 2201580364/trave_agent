@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-26T07:42:55.145950+00:00",
+  "generated_at": "2026-08-26T10:33:42.782938+00:00",
   "contract_version": "solver-p1-v2",
-  "constraint_version": "constraints-p1-v3",
-  "parameter_version": "parameters-p1-2026-08-25",
+  "constraint_version": "constraints-p1-v4",
+  "parameter_version": "parameters-p1-2026-08-26",
   "duration_ratios": [
     [
       "speed",
@@ -23,6 +23,7 @@
   "drop_penalty": 1000000,
   "travel_cost_scale": 30,
   "period_deviation_cost": 1,
+  "od_duration_rebalance_max_symmetric_penalty_min": 10,
   "day_spread_target_end_min": 960,
   "day_spread_max_delay_min": 60,
   "lunch_earliest_min": 690,
@@ -62,6 +63,7 @@
   "soft_objectives": [
     "S1_DURATION_RATIO",
     "S2_ENERGY_BALANCE",
+    "OD_DAY_ASSIGNMENT",
     "VISIT_PERIOD",
     "DINNER_BLOCK",
     "LUNCH_BLOCK",

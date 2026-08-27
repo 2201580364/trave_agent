@@ -1,8 +1,8 @@
 # 高德真实 OD 快照构建与安全联调
 
-- 状态：A6-8.1 真实联网严格快照已验证；当前停止联网请求，使用快照离线回归
+- 状态：A6-8.1 已完成真实坐标候选、请求节流、42/42 严格 OD 重建和 JSON 发布 Provider 技术验证；正式发布等待点位人工确认
 - 日期：2026-08-26
-- 依据：ADR-0010、ADR-0011
+- 依据：ADR-0010、ADR-0011、ADR-0012、ADR-0013
 
 ## 1. 边界
 
@@ -12,7 +12,7 @@
 
 1. 本地 `.env` 或部署环境已设置高德 Web 服务 Key；
 2. 操作者显式传入 `--execute-live`；
-3. 输入文件中的每个景点均通过发布数据门禁并具有实际入口坐标；
+3. 输入文件中的每个景点均通过发布数据门禁并具有带点位语义的路线坐标；候选坐标只可在审计构建时显式放行；
 4. 为本次快照提供新的、可追踪的 `--data-version`；
 5. 输出文件进入发布审核流程后才可供生产组合根使用。
 
@@ -57,6 +57,7 @@ py -3.12 scripts/build_gaode_od_snapshot.py `
   --input tests/data/hangzhou_attractions_snapshot.json `
   --output var/published/gaode-hangzhou-2026-08-26-v1.json `
   --data-version gaode-hangzhou-2026-08-26-v1 `
+  --request-interval-seconds 1.05 `
   --execute-live
 ```
 
@@ -67,11 +68,22 @@ py -3.12 scripts/build_gaode_od_snapshot.py `
   --input tests/data/hangzhou_attractions_snapshot.json `
   --output var/published/gaode-hangzhou-2026-08-26-v1.json `
   --data-version gaode-hangzhou-2026-08-26-v1 `
+  --request-interval-seconds 1.05 `
   --allow-approximate-fallback `
   --execute-live
 ```
 
 第二种方式只适合受控降级。每条降级边都会保存 `basis=approximate` 和 `fallback_reason`；不能把该文件描述为“全量真实高德 OD”。
+
+脚本默认在真正的缓存未命中请求之间至少等待 `1.05s`；命中持久化缓存不会等待。可以用 `--request-interval-seconds` 调整，但不能为了加快批量构建而绕过已确认的服务限流边界。
+
+若输入记录的 `coordinate_review_status` 不是 `human_verified`，脚本默认拒绝。只有候选坐标审计允许显式传入：
+
+```text
+--allow-coordinate-candidates
+```
+
+带该标志生成的文件仍是候选证据，不能进入正式 production published 状态。
 
 ## 4. 输出检查
 
@@ -117,9 +129,9 @@ fallback_reason
 
 ## 5. 当前未完成
 
-- 尚未将生成的 JSON 接入正式发布数据表或生产组合根；
+- 已实现不可变 JSON `PublishedSolverDataProvider` 并完成候选快照离线回放；尚未接入正式发布数据表或生产组合根；
 - 已实现本机跨进程 JSON 持久化缓存，默认位于 Git 忽略的 `var/cache/gaode-routes.json`；尚未建立跨机器共享缓存、配额看板和熔断状态；
-- 尚未验证高德服务配额、TLS/代理、生产网络和故障恢复；
+- 已在真实网络验证节流后完整构建不再触发限流；尚未完成高德控制台配额看板、生产 TLS/代理、跨机器缓存、熔断和故障恢复；
 - 尚未完成真实餐厅节点加入后的全量 OD 重建与新 Revision 重排。
 
 ## 6. 失败明细与持久化缓存
@@ -142,4 +154,36 @@ occurred_at
 var/cache/gaode-routes.json
 ```
 
-也可通过 `--cache` 显式指定。缓存只减少重复成功请求，不改变受控联网边界：没有 `--execute-live` 时脚本仍不得访问高德。当前配额已经触发 `rate_limited`，在高德控制台确认恢复前只允许使用既有快照和缓存做离线验证。
+也可通过 `--cache` 显式指定。缓存只减少重复成功请求，不改变受控联网边界：没有 `--execute-live` 时脚本仍不得访问高德。首轮无间隔诊断曾触发 `rate_limited`；按约 1.2 秒节流复查及使用默认 1.05 秒间隔完整重建后，所有有效请求均为 `infocode=10000`。这只证明当前受控构建可用，不替代配额监控和熔断。
+
+## 7. 路线点与发布快照门禁
+
+正式路线点不能只保存裸 `lat/lng`，至少需要：
+
+```text
+gaode_poi_id
+routing_point_kind
+coordinate_source
+coordinate_fetched_at
+coordinate_review_status
+```
+
+候选坐标文件与 OD 文件可通过 `scripts/build_candidate_published_solver_snapshot.py` 合并为审计 bundle。生成审计天气必须显式传入 `--acknowledge-audit-weather`；该天气固定标记为 `audit_normal_fixture`，不能宣称为实时天气。
+
+`JsonPublishedSolverDataProvider` 加载 `published-solver-data-v1` 时校验 SHA-256、版本、景点 ID、外部 ID、天气日期、路线点来源、完整有向 OD、OD basis 和 OD data version。默认只加载 `status=published`，且正式坐标必须 `human_verified`；`allow_candidates=True` 仅供审计离线回放。
+
+## 8. 2026-08-26 候选坐标严格重建结果
+
+使用 7 个高德候选路线点、默认 1.05 秒请求间隔和严格模式完成真实重建，耗时约 132.8 秒：
+
+```text
+requested_pair_count = 42
+gaode_pair_count     = 42
+fallback_pair_count  = 0
+missing_pair_count   = 0
+mode_failures        = 4
+```
+
+最终模式为 driving 23、transit 15、walking 4；耗时范围 5–61 分钟，道路距离 324–11,587 米。4 次模式失败均为公交 `no_route / infocode=10000`，分别是灵隐寺↔飞来峰、西湖湖滨↔音乐喷泉；对应 OD 的其他模式成功，因此没有最终缺边。36 条有向边在耗时、距离或模式上与反向不同。
+
+该快照及组合 bundle 位于 Git 忽略的 `var/audit/`，当前仅为 candidate。正式发布前仍需人工确认浙江省博物馆具体入口、灵隐寺/飞来峰联游入口和西湖湖滨开放区域代表点。

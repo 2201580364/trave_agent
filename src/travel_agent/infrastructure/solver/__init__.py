@@ -21,6 +21,10 @@ from .gateway import (
     PublishedSolverData,
     PublishedSolverDataProvider,
 )
+from .published_json import (
+    JsonPublishedSolverDataProvider,
+    published_snapshot_content_hash,
+)
 
 __all__ = [
     "InMemoryPublishedSolverDataProvider",
@@ -40,4 +44,6 @@ __all__ = [
     "HttpxGaodeTransport",
     "InMemoryGaodeRouteCache",
     "JsonFileGaodeRouteCache",
+    "JsonPublishedSolverDataProvider",
+    "published_snapshot_content_hash",
 ]

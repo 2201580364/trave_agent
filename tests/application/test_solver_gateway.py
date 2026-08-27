@@ -16,6 +16,10 @@ from travel_agent.infrastructure.solver import (
     PublishedAttraction,
     PublishedSolverData,
 )
+from travel_agent.infrastructure.solver.gateway import (
+    _cluster_attractions_by_od,
+    _rebalance_od_cluster_durations,
+)
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
     Attraction,
@@ -433,6 +437,114 @@ def test_gateway_keeps_nearby_attractions_together_with_published_od() -> None:
     assert sorted(day_counts) == [2, 2, 3]
     assert first.result_snapshot["accounting"]["conserved"] is True
     assert first.result_snapshot_hash == second.result_snapshot_hash
+
+
+def test_od_clusters_rebalance_two_triples_and_a_singleton_to_three_two_two() -> None:
+    attractions = tuple(
+        Attraction(
+            attraction_id,
+            f"attraction-{attraction_id}",
+            data_verified=True,
+        )
+        for attraction_id in range(1, 8)
+    )
+    results = {}
+    for origin in attractions:
+        for destination in attractions:
+            if origin.id == destination.id:
+                continue
+            pair = frozenset({origin.id, destination.id})
+            if pair in {frozenset({1, 2}), frozenset({4, 5})}:
+                travel_min = 1
+            elif pair in {
+                frozenset({1, 3}),
+                frozenset({2, 3}),
+                frozenset({4, 6}),
+                frozenset({5, 6}),
+            }:
+                travel_min = 2
+            elif pair in {frozenset({3, 7}), frozenset({6, 7})}:
+                travel_min = 30
+            else:
+                travel_min = 100
+            results[(origin.id, destination.id)] = TravelTimeResult(
+                origin.id,
+                destination.id,
+                travel_min,
+                ODBasis.GAODE,
+                "balanced-cluster-test-v1",
+                NOW,
+                ODTravelMode.DRIVING,
+                travel_min * 100,
+            )
+
+    clusters = _cluster_attractions_by_od(
+        attractions,
+        3,
+        InMemoryTravelTimeProvider(results),
+    )
+    cluster_ids = [set(item.id for item in cluster) for cluster in clusters]
+
+    assert sorted(map(len, clusters)) == [2, 2, 3]
+    assert any({1, 2}.issubset(cluster) for cluster in cluster_ids)
+    assert any({4, 5}.issubset(cluster) for cluster in cluster_ids)
+
+
+def test_od_clusters_move_one_visit_when_duration_balance_costs_little_od() -> None:
+    attractions = {
+        attraction_id: Attraction(
+            attraction_id,
+            f"attraction-{attraction_id}",
+            suggested_duration=duration,
+            data_verified=True,
+        )
+        for attraction_id, duration in {
+            1: 180,
+            2: 120,
+            3: 120,
+            4: 150,
+            5: 20,
+            6: 90,
+            7: 120,
+        }.items()
+    }
+    results = {}
+    for origin_id in attractions:
+        for destination_id in attractions:
+            if origin_id == destination_id:
+                continue
+            if 3 in {origin_id, destination_id}:
+                other_id = destination_id if origin_id == 3 else origin_id
+                travel_min = 35 if other_id in {1, 2} else 36
+            else:
+                travel_min = 50
+            results[(origin_id, destination_id)] = TravelTimeResult(
+                origin_id,
+                destination_id,
+                travel_min,
+                ODBasis.GAODE,
+                "duration-balance-test-v1",
+                NOW,
+                ODTravelMode.DRIVING,
+                travel_min * 100,
+            )
+
+    clusters = _rebalance_od_cluster_durations(
+        (
+            (attractions[1], attractions[2], attractions[3]),
+            (attractions[4], attractions[5]),
+            (attractions[6], attractions[7]),
+        ),
+        InMemoryTravelTimeProvider(results),
+    )
+    cluster_ids = [set(item.id for item in cluster) for cluster in clusters]
+    durations = sorted(
+        sum(item.suggested_duration for item in cluster) for cluster in clusters
+    )
+
+    assert sorted(map(len, clusters)) == [2, 2, 3]
+    assert {3, 4, 5} in cluster_ids
+    assert durations == [210, 290, 300]
 
 
 def test_missing_published_snapshot_is_retryable() -> None:

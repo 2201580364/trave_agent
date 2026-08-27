@@ -82,6 +82,47 @@ def test_load_coordinates_rejects_records_outside_publication_gate(
         _load_coordinates(source)
 
 
+def test_load_coordinates_requires_explicit_candidate_acknowledgement(
+    tmp_path,
+) -> None:
+    source = tmp_path / "candidate.json"
+    source.write_text(
+        json.dumps(
+            {
+                "records": [
+                    {
+                        "id": 1,
+                        "lat": 30.25,
+                        "lng": 120.16,
+                        "data_verified": True,
+                        "conflict": False,
+                        "coordinate_review_status": "gaode_matched_manual_review_pending",
+                    },
+                    {
+                        "id": 2,
+                        "lat": 30.26,
+                        "lng": 120.17,
+                        "data_verified": True,
+                        "conflict": False,
+                        "coordinate_review_status": "gaode_matched_manual_review_pending",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="coordinate candidates require"):
+        _load_coordinates(source)
+
+    coordinates = _load_coordinates(source, allow_coordinate_candidates=True)
+
+    assert coordinates == {
+        1: Coordinate(30.25, 120.16),
+        2: Coordinate(30.26, 120.17),
+    }
+
+
 def test_serialize_pairs_preserves_real_mode_distance_and_missing_edges() -> None:
     coordinates = {
         1: Coordinate(30.25, 120.16),

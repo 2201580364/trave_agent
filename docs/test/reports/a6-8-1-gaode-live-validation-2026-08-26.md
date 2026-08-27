@@ -2,9 +2,9 @@
 
 - 验证日期：2026-08-26
 - 城市：杭州（330100）
-- 快照版本：`gaode-hangzhou-2026-08-26-v1`
+- 快照版本：首轮 `gaode-hangzhou-2026-08-26-v1`；候选坐标严格重建 `gaode-hangzhou-coordinate-candidate-2026-08-26-v2`
 - 结果契约：`solver-p1-v2 / trip-result-v2`
-- 软目标版本：`constraints-p1-v3`（ADR-0012 修复后离线回放）
+- 当前软目标与参数：`constraints-p1-v4 / parameters-p1-2026-08-26`（ADR-0013）
 - 凭证：本地 `.env` 注入；报告、快照、日志和命令输出均不包含 Key
 
 ## 1. 结论
@@ -15,12 +15,13 @@
 | 严格有向 OD 快照 | 通过 | 42/42 最终有向边来自高德，0 approximate，0 missing |
 | Key 安全 | 通过 | `.env` 被 Git 忽略且未跟踪；快照中未发现 Key |
 | V2 Gateway 消费真实 OD | 通过 | 七景点三日求解成功，所有实际日内接驳均为 `basis=gaode` |
-| 配额与连续构建能力 | 部分处理 | 首轮成功后追加诊断触发 `rate_limited`；已增加跨进程 JSON 缓存和失败明细，但配额看板/熔断仍待实现 |
-| 入口坐标和旅游体验抽查 | 待处理 | 已做结构化合理性检查，但尚未逐点核对官方入口和高德客户端路线 |
-| OD 感知分天质量 | 修复并离线通过 | 近邻景点稳定同日，日间顺序计入晚间终端成本；总接驳降至 7,594m/50min |
-| 生产可用性 | 未通过 | 尚未接入正式发布 Provider、生产组合根、跨机器缓存、配额监控和入口坐标人工校准 |
+| 配额与连续构建能力 | 技术验证通过，生产治理待完成 | 默认 1.05 秒节流下完整重建无 rate limit；已有跨进程 JSON 缓存和失败明细，配额看板/熔断仍待实现 |
+| 入口坐标和旅游体验抽查 | 候选完成，人工发布待处理 | 7 点均取得可追溯高德 POI 候选；尚未逐点完成人工入口审核和官方页面/客户端核对 |
+| OD 感知分天质量 | V4 修复并离线通过 | 数量由 `3/3/1` 修正为 `2/3/2`，建议时长负载改善为 `300/290/210min`，强近邻保持同日 |
+| JSON 发布 Provider | 技术验证通过 | SHA-256、candidate/published、人工审核、坐标来源、完整有向 OD 和版本一致性门禁通过 |
+| 生产可用性 | 未通过 | 尚未接入正式发布表、生产组合根、真实天气、跨机器缓存、配额监控和入口坐标人工确认 |
 
-因此，A6-8.1 的“真实 Provider 可用”和“求解器可消费真实 OD”已经得到真实环境证据，但不能将整个高德生产接入标记为完成。
+因此，A6-8.1 的“真实 Provider 可用”“求解器可消费真实 OD”“候选路线点可重建完整快照”和“发布 JSON 可离线回放”均已有真实环境或离线技术证据，但不能将候选数据描述为正式生产发布。
 
 ## 2. 严格快照结果
 
@@ -180,11 +181,58 @@ Day 3：河坊街 → 雷峰塔
 
 与修复前约 23,195m/109min 相比，道路距离约减少 67%，接驳时间约减少 54%。该回放证明当前七景点样本的缺陷已被修复，但仍不等同于真实专家/用户已经认可路线。
 
-## 8. 后续顺序
+## 8. 候选坐标严格重建与 V4 回放
 
-1. 在高德控制台确认配额后，仅进行必要的最小增量验证，不重复全量请求；
-2. 校准 7 个景点的实际游客入口坐标，并人工比对客户端路线；
-3. 审核并发布正式 OD 快照；
-4. 接入正式 PublishedDataProvider、FastAPI 和 Chrome 页面；
-5. 建设配额看板、熔断和旧快照继续服务策略；
-6. 完成上述生产接入后标记 A6-8.1 完成并进入 A6-8.2。
+使用高德 POI V3 `place/text`、`place/around` 和 `assistant/inputtips` 对 7 个景点进行候选点位审计。首次连续无间隔查询中两次出现 `infocode=10021`；按约 1.2 秒节流后，所有有效请求均返回 `status=1 / infocode=10000`。候选坐标及偏移明细见 `a6-8-1-gaode-coordinate-audit-2026-08-26.md`。
+
+使用候选点位、1.05 秒请求间隔和严格模式重新构建 42 条有向 OD，耗时约 132.8 秒：
+
+```text
+requested_pair_count = 42
+gaode_pair_count     = 42
+fallback_pair_count  = 0
+missing_pair_count   = 0
+mode_failures        = 4
+
+driving = 23
+transit = 15
+walking = 4
+
+duration = 5–61min
+distance = 324–11,587m
+```
+
+4 次模式失败均为公交 `no_route / infocode=10000`，没有造成最终缺边；节流后没有再次出现 `rate_limited`。36 条有向边在耗时、距离或模式上与反向不同。
+
+首次用候选真实 OD 求解形成 `3/3/1`，雷峰塔单独占一天。只做数量均衡后虽然成为 `3/2/2`，但每日建议游览负载约为 `420/210/170min`。ADR-0013 增加数量与建议时长两级均衡后，离线稳定结果为：
+
+```text
+Day 1：飞来峰 → 灵隐寺
+Day 2：浙江省博物馆 → 西湖湖滨 → 湖滨晚间表演
+Day 3：雷峰塔 → 河坊街
+
+day_counts       = [2, 3, 2]
+day_durations    = [300, 290, 210]
+total_travel_min = 80
+total_distance_m = 7,135
+gaode            = 4/4
+scheduled        = 7
+unplaced         = 0
+conserved        = true
+```
+
+结果哈希：
+
+```text
+98705e1a8e3a92c62eb415126015faa367efa997b589b40ce26af2c4cff2b687
+```
+
+候选数据已组合为 `published-solver-data-v1` bundle，并通过 `JsonPublishedSolverDataProvider(..., allow_candidates=True)` 完全离线回放。bundle 天气明确为 `audit_normal_fixture`，不是实时天气；坐标仍为 `gaode_matched_manual_review_pending`，因此默认 Provider 会拒绝，不能切换到 `published`。
+
+## 9. 后续顺序
+
+1. 人工确认浙江省博物馆入口、灵隐寺/飞来峰联游入口、西湖湖滨代表点，并抽样比对客户端路线；
+2. 将审核通过的路线点标记为 `human_verified`，使用新版本重建并发布正式 OD/天气快照；
+3. 将正式 PublishedDataProvider 接入生产组合根、FastAPI 和 Chrome 页面；
+4. 建设配额看板、熔断、跨机器缓存和旧快照继续服务策略；
+5. 完成生产接入后进入 A6-8.2 真实 MySQL 与部署恢复验证。

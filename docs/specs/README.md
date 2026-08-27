@@ -5,7 +5,7 @@
 
 ## 文件约定
 
-已冻结的求解器公开边界见 [solver-p1-contract.md](solver-p1-contract.md)。应用、API、数据库和页面设计必须依赖该契约，而不是直接依赖求解器内部实现细节。
+已稳定并版本化的求解器公开边界见 [solver-p1-contract.md](solver-p1-contract.md)。应用、API、数据库和页面设计必须依赖该契约，而不是直接依赖求解器内部实现细节。
 
 M1 应用层规格已经完成 A5 同步：
 

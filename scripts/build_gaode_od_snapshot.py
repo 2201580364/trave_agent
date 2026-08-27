@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
+from collections.abc import Callable
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -43,9 +45,20 @@ def main() -> int:
         help="Persistent credential-free route cache used across snapshot builds.",
     )
     parser.add_argument(
+        "--request-interval-seconds",
+        type=float,
+        default=1.05,
+        help="Minimum interval between live cache-miss requests; defaults to 1.05s.",
+    )
+    parser.add_argument(
         "--allow-approximate-fallback",
         action="store_true",
         help="Fill failed Gaode pairs with explicitly labelled approximate OD.",
+    )
+    parser.add_argument(
+        "--allow-coordinate-candidates",
+        action="store_true",
+        help="Allow explicitly pending coordinate candidates for non-production audit builds.",
     )
     parser.add_argument(
         "--execute-live",
@@ -56,8 +69,13 @@ def main() -> int:
 
     if not args.execute_live:
         parser.error("live requests require the explicit --execute-live flag")
+    if args.request_interval_seconds < 0:
+        parser.error("--request-interval-seconds must be non-negative")
 
-    coordinates = _load_coordinates(args.input)
+    coordinates = _load_coordinates(
+        args.input,
+        allow_coordinate_candidates=args.allow_coordinate_candidates,
+    )
     settings = replace(
         GaodeSettings.from_env(dotenv_path=PROJECT_ROOT / ".env"),
         data_version=args.data_version,
@@ -70,6 +88,7 @@ def main() -> int:
         settings,
         clock,
         cache=JsonFileGaodeRouteCache(args.cache),
+        before_request=_request_pacer(args.request_interval_seconds),
     )
     fallback = None
     if args.allow_approximate_fallback:
@@ -108,11 +127,33 @@ def main() -> int:
     print(f"Missing: {built.report.missing_pair_count}")
     print(f"Mode failures: {len(built.report.failure_details)}")
     print(f"Cache: {args.cache}")
+    print(f"Request interval: {args.request_interval_seconds:.2f}s")
     print(f"Report: {args.output}")
     return 0 if built.report.complete else 2
 
 
-def _load_coordinates(path: Path) -> dict[int, Coordinate]:
+def _request_pacer(interval_seconds: float) -> Callable[[], None]:
+    """Return a cache-miss gate that keeps live requests below a fixed rate."""
+
+    last_request_at: float | None = None
+
+    def pace() -> None:
+        nonlocal last_request_at
+        now = time.monotonic()
+        if last_request_at is not None:
+            remaining = interval_seconds - (now - last_request_at)
+            if remaining > 0:
+                time.sleep(remaining)
+        last_request_at = time.monotonic()
+
+    return pace
+
+
+def _load_coordinates(
+    path: Path,
+    *,
+    allow_coordinate_candidates: bool = False,
+) -> dict[int, Coordinate]:
     payload = json.loads(path.read_text(encoding="utf-8-sig"))
     records = payload.get("records") if isinstance(payload, dict) else None
     if not isinstance(records, list):
@@ -128,6 +169,15 @@ def _load_coordinates(path: Path) -> dict[int, Coordinate]:
             or record.get("active", True) is not True
         ):
             raise ValueError("all snapshot records must pass the publication data gate")
+        coordinate_review_status = record.get("coordinate_review_status")
+        if (
+            coordinate_review_status is not None
+            and coordinate_review_status != "human_verified"
+            and not allow_coordinate_candidates
+        ):
+            raise ValueError(
+                "coordinate candidates require --allow-coordinate-candidates"
+            )
         try:
             attraction_id = int(record["id"])
             coordinate = Coordinate(float(record["lat"]), float(record["lng"]))

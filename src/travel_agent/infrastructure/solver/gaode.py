@@ -329,11 +329,13 @@ class GaodeRouteClient:
         *,
         transport: GaodeHttpTransport | None = None,
         cache: GaodeRouteCache | None = None,
+        before_request: Callable[[], None] | None = None,
     ) -> None:
         self._settings = settings
         self._clock = clock
         self._transport = transport or HttpxGaodeTransport(settings.base_url)
         self._cache = cache or InMemoryGaodeRouteCache()
+        self._before_request = before_request or (lambda: None)
 
     def fetch(
         self,
@@ -356,6 +358,7 @@ class GaodeRouteClient:
         cached = self._cache.get(key, now)
         if cached is not None:
             return cached
+        self._before_request()
         try:
             payload = self._transport.get_json(
                 _path_for(mode),

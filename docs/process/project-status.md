@@ -12,16 +12,16 @@
 | `P2` | 增强优先级；不阻塞当前里程碑，可在证据充分后实现 |
 | `G0–G7` | 假设驱动开发的证据 Gate，不等同于产品路线或实现优先级 |
 
-历史机器标识 `solver-p1-v1`、`parameters-p1-*` 和 `DEFAULT_SOLVER_P1_CONTRACT` 必须保留；其中的 `p1/P1` 不再表示产品阶段命名。当前公开契约已按 ADR-0011 升级为 `solver-p1-v2 / trip-result-v2`，历史 V1 仅用于不可变 Revision 回放。
+历史机器标识 `solver-p1-v1`、`parameters-p1-*` 和 `DEFAULT_SOLVER_P1_CONTRACT` 必须保留；其中的 `p1/P1` 不再表示产品阶段命名。当前结构契约已按 ADR-0011 升级为 `solver-p1-v2 / trip-result-v2`，约束和参数已按 ADR-0013 升级为 `constraints-p1-v4 / parameters-p1-2026-08-26`；历史版本仅用于不可变 Revision 回放。
 
 ## 当前总状态
 
 - 更新时间：2026-08-26
 - 产品里程碑：`M1 — 行程骨架验证`
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 专家/用户验证尚未开始
-- 当前阶段：`A6-8.1 真实 OD 行程质量修复已完成；进入入口校准、快照审核和正式发布 Provider 接入准备`
-- 当前任务：在不继续消耗高德配额的前提下，校准 7 个杭州景点游客入口，审核严格 OD 快照并设计正式 PublishedDataProvider/组合根接入；完成后进入 A6-8.2 真实 MySQL 与部署恢复
-- 总体判断：后端 HTTP、SQLite 持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订和高德真实 Provider 已形成可操作技术纵向闭环；严格快照 42/42 高德边、Gateway 真实 OD 消费、OD 感知分天和晚间终端成本均已验证，但入口校准、配额治理、正式发布、真实 MySQL、餐厅节点和部署恢复尚未完成，因此仍不能宣称稳定生产可用或已完成 M1 MVP
+- 当前阶段：`A6-8.1 真实坐标候选、严格 OD 重建和 JSON 发布 Provider 已完成技术验证；正式发布等待路线点人工确认和生产数据接入`
+- 当前任务：完成人工路线点审核后发布正式杭州 OD/天气快照，并将 PublishedDataProvider 接入生产组合根；随后进入 A6-8.2 真实 MySQL 与部署恢复
+- 总体判断：后端 HTTP、SQLite 持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订和高德真实 Provider 已形成可操作技术纵向闭环；候选路线点 42/42 高德严格边、请求节流、OD 分天负载均衡、不可变 JSON Provider 和离线回放均已验证，但路线点尚未 `human_verified`，正式天气/发布表/组合根、配额治理、真实 MySQL、餐厅节点和部署恢复尚未完成，因此仍不能宣称稳定生产可用或已完成 M1 MVP
 
 ## 已完成
 
@@ -32,14 +32,14 @@
 | G5 C1/C2/C4/C5/C6 与分层求解 | 阶段性完成 | 核心能力已通过 Gate 6；后续可根据应用集成、真实数据和用户验证继续修复或演进 |
 | 日志与审计 | 完成 | 模块级、按级别每日文件、月度压缩归档 |
 | Gate 6 Golden/降级/性能/接近度 | 通过 | `docs/test/reports/` |
-| M1 求解器对外契约 | 已稳定并版本化 | ADR-0009/0011/0012；当前 `solver-p1-v2 / constraints-p1-v3`，保留历史版本回放 |
+| M1 求解器对外契约 | 已稳定并版本化 | ADR-0009/0011/0012/0013；当前 `solver-p1-v2 / constraints-p1-v4 / parameters-p1-2026-08-26`，保留历史版本回放 |
 | A1 功能模块设计 | 完成（V3.0） | 14 个跨里程碑一级功能域；M1 详细功能树保持稳定，M2–M4 补齐可追踪功能骨架，见 `docs/product/功能模块设计.md` |
 | 产品功能完整性复审 | 完成（V1.0） | 产品全景→功能树追踪、遗漏项、用户新增细化和历史规格冲突，见 `docs/product/产品功能完整性审查.md` |
 | A2 信息架构与 UI 设计 | M1 详细设计完成；全路线同步完成（V1.1） | 保留 M1 页面和关键低保真；补充规划/行中/回顾三模式、M2–M4 页面族、入口与组件边界，见 `docs/product/信息架构与UI设计.md` |
 | A3 交互流程与状态机 | M1 详细设计完成；全路线同步完成（V1.1） | IF-01–IF-12 可进入实现；登记 IF-13–IF-24，并明确执行、Visit、小记、媒体、授权和回顾状态，见 `docs/product/交互流程与状态机设计.md` |
 | A4 应用代码架构设计 | 完成（V1.0） | 模块化单体、分层依赖、应用用例、求解器网关、事务幂等、前端目录、测试架构与纵向切片，见 `docs/product/应用代码架构设计.md` |
 
-最新稳定技术基线：全量 214 项测试通过；Golden 7/7；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 16.55ms、PERF-20-7 P95 20.22ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v3 / parameters-p1-2026-08-25`，结果结构为 `trip-result-v2`。前端 Node 22/npm 10 下 TypeScript 和 H5 production build 通过，且 production `dist/index.html` 已生成；入口约 304 KiB 的既有性能警告仍保留为 P1 优化项。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
+最新稳定技术基线：全量 226 项测试通过；Golden 7/7；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 15.77ms、PERF-20-7 P95 20.20ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v4 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。改动文件 Ruff、前端 TypeScript 和 H5 production build 通过，production `dist/index.html` 已生成；入口约 304 KiB 的既有性能警告仍保留为 P1 优化项。全项目 strict mypy 仍有 154 条分布在 27 个历史文件的既有类型债，尚未建立为绿色 Gate；本轮新增 JSON Provider 的直接类型问题已收紧。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -49,7 +49,7 @@
 
 - 状态：已完成
 - 核心产物：`docs/product/应用代码架构设计.md`
-- 关键结论：模块化单体；首切片 inline executor；通过 GenerationExecutor 可替换 Celery；Trip/Revision/Intent/SolverRun 分离；SolverGateway 隔离冻结求解器；M2–M4 只保留边界、不创建空模块
+- 关键结论：模块化单体；首切片 inline executor；通过 GenerationExecutor 可替换 Celery；Trip/Revision/Intent/SolverRun 分离；SolverGateway 隔离已稳定并版本化的求解器契约；M2–M4 只保留边界、不创建空模块
 - 完成度：100%
 
 ### A5：API 与持久化数据模型同步
@@ -67,8 +67,8 @@
 - 已完成：A6-1 至 A6-5 应用、求解与数据库核心；A6-6 匿名身份、FastAPI HTTP v1、景点目录和 inline 组合根
 - 浏览器进展：375px 下真实走通 P00→P04，验证交通继承、搜索/室内筛选、7 景点选择、结果生成、三日切换、18:30 灯光秀、刷新恢复；新 Revision 的景点数量为 3/2/2，7 个景点全部守恒且 0 个未排入
 - 响应式与安全：375×812 完整页面通过；1280×800 下内容居中、无横向溢出、日期 Tab 三列等宽；健康路径控制台 0 error/warn；受控后端故障只展示稳定用户提示，不泄露 Token、request ID 或技术堆栈
-- 下一步：当前已触发真实 rate limit，不再新增高德请求；先校准入口坐标、审核既有严格快照并接入正式 PublishedDataProvider/生产组合根，再进入 A6-8.2
-- 完成度：约 98%（仅指首个纵向切片及其本地浏览器、行程质量和高德 Provider 离线验证，不代表 M1 MVP）
+- 下一步：人工确认多门景区与开放街区路线点，发布正式 OD/天气快照并接入生产组合根，再进入 A6-8.2
+- 完成度：约 98%（仅指首个纵向切片及其本地浏览器、行程质量、高德 Provider 和 JSON 发布适配器技术验证，不代表 M1 MVP）
 
 ## 本轮完成（2026-08-25）
 
@@ -146,6 +146,20 @@
 - 软目标版本升级为 `constraints-p1-v3`；`solver-p1-v2 / trip-result-v2 / parameters-p1-2026-08-25` 不变。历史 Revision 和 V1/V2 标识不迁移、不覆盖、不原地重算；
 - 全量 214 项测试通过；Golden 7/7、降级 8/8、接近度 0.975、数据校验 7/7、性能门禁、改动文件 Ruff、TypeScript 和 H5 production build 全部通过；`git diff --check` 无空白错误；
 - 当前进度：A6 仍约 98%。真实 OD 算法质量缺陷已收口，A6-8.1 尚余入口坐标人工校准、正式快照审核/发布、生产 PublishedDataProvider、配额看板/熔断；完成后进入 A6-8.2 真实 MySQL 与部署恢复。
+
+### A6-8.1 路线点候选、分天负载与 JSON 发布适配器收口（2026-08-26）
+
+- 使用高德 Web 服务 V3 对 7 个杭州景点执行真实 POI 候选审计；有效节流请求均返回 `status=1 / infocode=10000`。浙江省博物馆、西湖湖滨和音乐喷泉原 fixture 分别偏移约 636m、652m、755m，证明裸坐标不能直接作为生产游客点位；
+- 新增路线点发布门禁：生产坐标至少保留高德 POI ID、点位类型、来源、抓取时间和审核状态；candidate 默认禁止进入正式构建，published 强制 `human_verified`；多门景区和开放街区仍需人工确认；
+- 快照构建脚本增加缓存未命中请求节流，默认间隔 1.05 秒；候选点位严格真实重建耗时约 132.8 秒，42/42 高德、0 approximate、0 missing，4 次 transit `no_route` 由其他模式补齐，节流后无 rate limit；
+- 真实候选 OD 首次形成 `3/3/1`；新增聚类后数量均衡，确保默认簇数量差不超过 1；继续新增建议游览时长均衡，只在数量保持 floor/ceil 且双向对称 OD 代价增量不超过 10 分钟时移动，避免拆散强近邻；
+- 最终稳定结果为“飞来峰→灵隐寺”“浙江省博物馆→西湖湖滨→湖滨晚间表演”“雷峰塔→河坊街”，日数量 `2/3/2`，建议时长负载 `300/290/210min`，交通 `80min / 7,135m`，7/7 守恒、0 未排入、4/4 高德连接；结果哈希为 `98705e1a8e3a92c62eb415126015faa367efa997b589b40ce26af2c4cff2b687`；
+- 新增 `JsonPublishedSolverDataProvider`：校验 SHA-256、版本、景点/外部 ID 唯一、路线点来源、candidate/published、人工审核、天气日期和完整有向 OD basis/version；加载后完全离线，不调用高德；
+- 新增候选 bundle 构建器；审计天气必须显式确认并标记为 `audit_normal_fixture`，禁止伪称实时天气。候选 bundle 已离线回放通过，但不会被默认正式 Provider 加载；
+- 新增 ADR-0013；结构契约和结果 schema 保持 `solver-p1-v2 / trip-result-v2`，软目标升级为 `constraints-p1-v4`，参数升级为 `parameters-p1-2026-08-26`，历史 V1/V2/V3 Revision 不迁移、不覆盖、不原地重算；
+- 全量 226 项测试通过；Golden 7/7、降级 8/8、接近度 0.975、数据校验 7/7、性能门禁、改动文件 Ruff、TypeScript 和 H5 production build 全部通过；H5 仍只有既有 304 KiB 入口体积警告；
+- 补跑全项目 strict mypy 后确认仍有 154 条既有类型债，涉及 27 个历史文件和 OR-Tools 无类型存根；该项尚非绿色 Gate，本轮未扩张为跨模块清债任务；
+- 当前阶段结论：A6-8.1 的坐标候选、真实严格 OD、算法负载修复和 JSON 发布适配器已完成技术验证；正式发布仍等待路线点人工确认、真实天气、生产发布表/组合根、配额看板/熔断与跨机器缓存。A6 维持约 98%。
 
 ## 本轮完成（2026-08-24）
 
