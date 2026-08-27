@@ -97,9 +97,20 @@ def _parse_snapshot(
         raise ValueError("published solver snapshot attraction ids must be unique")
     if len(set(external_ids)) != len(external_ids):
         raise ValueError("published solver snapshot external ids must be unique")
+    weather_basis = _text(snapshot["weather_basis"])
+    if require_human_review and (
+        "audit" in weather_basis.lower() or "fixture" in weather_basis.lower()
+    ):
+        raise ValueError("published solver snapshot cannot use audit weather")
     weather = tuple(
-        _parse_weather(_mapping(row)) for row in _list(snapshot["weather"])
+        _parse_weather(
+            _mapping(row),
+            require_provenance=require_human_review,
+        )
+        for row in _list(snapshot["weather"])
     )
+    if not weather:
+        raise ValueError("published solver snapshot requires weather data")
     weather_by_date = {item.day: item for item in weather}
     if len(weather_by_date) != len(weather):
         raise ValueError("published solver snapshot weather dates must be unique")
@@ -135,7 +146,7 @@ def _parse_snapshot(
             fetched_at=fetched_at,
         ),
         od_basis,
-        _text(snapshot["weather_basis"]),
+        weather_basis,
     )
 
 
@@ -190,12 +201,22 @@ def _parse_attraction(
     )
 
 
-def _parse_weather(row: dict[str, object]) -> DailyWeather:
+def _parse_weather(
+    row: dict[str, object],
+    *,
+    require_provenance: bool,
+) -> DailyWeather:
+    condition = _optional_text(row.get("condition"))
+    if require_provenance:
+        condition = _text(row.get("condition"))
+        _text(row.get("condition_code"))
+        _text(row.get("source_ref"))
+        _iso_aware_datetime(row.get("fetched_at"))
     return DailyWeather(
         date.fromisoformat(_text(row["date"])),
         WeatherBasis(_text(row["basis"])),
         WeatherSeverity(_text(row["severity"])),
-        _optional_text(row.get("condition")),
+        condition,
     )
 
 
@@ -270,4 +291,12 @@ def _iso_date_or_datetime(value: object) -> str:
         datetime.fromisoformat(parsed)
     except ValueError:
         date.fromisoformat(parsed)
+    return parsed
+
+
+def _iso_aware_datetime(value: object) -> str:
+    parsed = _text(value)
+    timestamp = datetime.fromisoformat(parsed)
+    if timestamp.tzinfo is None:
+        raise ValueError("expected timezone-aware datetime")
     return parsed

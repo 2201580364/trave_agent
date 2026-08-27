@@ -62,6 +62,9 @@ def _snapshot(
                 "basis": "forecast",
                 "severity": "normal",
                 "condition": "sunny",
+                "condition_code": "100",
+                "source_ref": "qweather:101210101:weather-test-v1:2026-09-01",
+                "fetched_at": "2026-08-31T08:00:00+00:00",
             }
         ],
         "od_pairs": [
@@ -204,3 +207,53 @@ def test_json_published_provider_rejects_string_boolean(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="invalid published solver snapshot"):
         JsonPublishedSolverDataProvider(tmp_path).load(VERSION)
+
+
+@pytest.mark.parametrize("missing_field", ["condition_code", "source_ref", "fetched_at"])
+def test_json_published_provider_requires_weather_provenance(
+    tmp_path: Path,
+    missing_field: str,
+) -> None:
+    snapshot = _snapshot()
+    del snapshot["weather"][0][missing_field]
+    _write(tmp_path, snapshot)
+
+    with pytest.raises(ValueError, match="invalid published solver snapshot"):
+        JsonPublishedSolverDataProvider(tmp_path).load(VERSION)
+
+
+def test_json_published_provider_rejects_audit_weather_for_published(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot()
+    snapshot["weather_basis"] = "audit_normal_fixture"
+    _write(tmp_path, snapshot)
+
+    with pytest.raises(ValueError, match="invalid published solver snapshot"):
+        JsonPublishedSolverDataProvider(tmp_path).load(VERSION)
+
+
+def test_json_candidate_provider_keeps_audit_weather_compatibility(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot(
+        status="candidate",
+        review_status="gaode_matched_manual_review_pending",
+    )
+    snapshot["weather_basis"] = "audit_normal_fixture"
+    snapshot["weather"] = [
+        {
+            "date": "2026-09-01",
+            "basis": "climate",
+            "severity": "normal",
+            "condition": "audit-normal-fixture-not-live-weather",
+        }
+    ]
+    _write(tmp_path, snapshot)
+
+    loaded = JsonPublishedSolverDataProvider(
+        tmp_path,
+        allow_candidates=True,
+    ).load(VERSION)
+
+    assert loaded.weather_basis == "audit_normal_fixture"

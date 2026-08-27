@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-27T06:08:24.323569+00:00",
+  "generated_at": "2026-08-27T06:54:49.776830+00:00",
   "input": "tests\\data\\hangzhou_attractions_snapshot.json",
   "target_date": "2026-08-25",
   "record_count": 7,

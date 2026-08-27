@@ -197,6 +197,9 @@ def _snapshot(
                 "basis": "forecast",
                 "severity": "normal",
                 "condition": "sunny",
+                "condition_code": "100",
+                "source_ref": "qweather:101210101:weather-composition-test-v1:2026-09-01",
+                "fetched_at": "2026-08-31T08:00:00+00:00",
             }
         ],
         "od_pairs": od_pairs,
