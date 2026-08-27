@@ -19,9 +19,9 @@
 - 更新时间：2026-08-27
 - 产品里程碑：`M1 — 行程骨架验证`
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 专家/用户验证尚未开始
-- 当前阶段：`A6-8.1 生产数据发布收口：7 个路线点已完成人工审核，新版本严格 OD 已重建，真实 OD 暴露的单日间节点下午空白已收口；等待真实和风天气后生成正式 bundle`
-- 当前任务：在 `.env` 配置和风凭证与项目 API Host，完成真实三日预报验证，生成正式杭州 Published Snapshot 并通过生产组合根、FastAPI/Chrome 回放；随后处理配额治理并进入 A6-8.2 真实 MySQL 与部署恢复
-- 总体判断：后端 HTTP、SQLite 持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订和高德真实 Provider 已形成可操作技术纵向闭环；7 个杭州路线点已经发布责任人接受并生成独立 `human_verified` 坐标版本，新版本 42/42 有向 OD 均来自高德且 0 fallback/0 missing，历史候选数据未覆盖。新 OD 暴露的 5 小时 22 分钟下午空白已经通过 ADR-0015 和 `constraints-p1-v5` 收口，真实 bundle 离线回放为 7/7 景点、0 未排入、0 硬约束违反且结果哈希稳定；但本机尚无和风凭证和真实响应，正式快照/发布表、配额治理、真实 MySQL、餐厅节点和部署恢复也尚未完成，因此仍不能宣称稳定生产可用或已完成 M1 MVP
+- 当前阶段：`A6-8.1 配额与快照持续服务收口：路线点、严格 OD、下午展开、真实和风天气、正式 Published Snapshot 和生产 FastAPI/Chrome 回放已完成`
+- 当前任务：补齐和风/高德配额看板、限流、熔断、跨机器缓存与旧快照继续服务策略；随后进入 A6-8.2 真实 MySQL 与部署恢复
+- 总体判断：后端 HTTP、配置数据库持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订、高德真实 Provider 和和风真实三日预报已形成可操作技术纵向闭环；7 个杭州路线点已经发布责任人接受并生成独立 `human_verified` 坐标版本，新版本 42/42 有向 OD 均来自高德且 0 fallback/0 missing，历史候选数据未覆盖。新 OD 暴露的 5 小时 22 分钟下午空白已经通过 ADR-0015 和 `constraints-p1-v5` 收口。和风认证按官方专属 Host + `X-QW-Api-Key` 请求头完成真实验证，已生成 2026-08-27 至 2026-08-29 的不可变天气快照和正式杭州 Published Solver Snapshot，并通过生产组合根、FastAPI 端到端生成、Revision 持久化和 Chrome P00→P04 回放。当前仍缺配额治理、跨机器缓存、旧快照持续服务、真实 MySQL 部署恢复、餐厅节点与 Gate 7，不能宣称稳定生产可用或已完成 M1 MVP
 
 ## 已完成
 
@@ -39,7 +39,7 @@
 | A3 交互流程与状态机 | M1 详细设计完成；全路线同步完成（V1.1） | IF-01–IF-12 可进入实现；登记 IF-13–IF-24，并明确执行、Visit、小记、媒体、授权和回顾状态，见 `docs/product/交互流程与状态机设计.md` |
 | A4 应用代码架构设计 | 完成（V1.0） | 模块化单体、分层依赖、应用用例、求解器网关、事务幂等、前端目录、测试架构与纵向切片，见 `docs/product/应用代码架构设计.md` |
 
-最新稳定技术基线：全量 258 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。本轮改动文件 Ruff 和两个实现文件的隔离 strict mypy 通过，前端 TypeScript 与 H5 production build 通过，production `dist/index.html` 已生成；入口约 304 KiB 的既有性能警告仍保留为 P1 优化项。全仓 Ruff 仍有 46 个历史问题；全项目 strict mypy 最近完整基线仍为 154 条/27 个历史文件，尚未建立为绿色 Gate。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
+最新稳定技术基线：全量 264 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。和风实现文件 Ruff 与隔离 strict mypy 通过；本轮前端 TypeScript 与 H5 production build 通过，production `dist/index.html` 已生成；正式 bundle 严格加载、生产组合根/FastAPI 三日七景点回放和 Chrome P00→P04 均通过，Chrome 控制台 0 warn/error，刷新后三日 Revision 节点顺序稳定。入口约 304 KiB 的既有性能警告仍保留为 P1 优化项。全仓 Ruff 仍有 46 个历史问题；全项目 strict mypy 最近完整基线仍为 154 条/27 个历史文件，尚未建立为绿色 Gate。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -65,9 +65,9 @@
 - 当前输入：A4 架构、A5 HTTP v1 契约与数据库模型、已稳定并版本化的求解器契约
 - 首个实现切片：匿名会话 → 草稿 → 杭州景点 → GenerationIntent → inline SolverGateway → TripRevision → 恢复结果
 - 已完成：A6-1 至 A6-5 应用、求解与数据库核心；A6-6 匿名身份、FastAPI HTTP v1、景点目录和 inline 组合根
-- 浏览器进展：375px 下真实走通 P00→P04，验证交通继承、搜索/室内筛选、7 景点选择、结果生成、三日切换、18:30 灯光秀、刷新恢复；新 Revision 的景点数量为 3/2/2，7 个景点全部守恒且 0 个未排入
+- 浏览器进展：首轮 375px 门禁和本轮正式数据桌面 Chrome 回放均走通 P00→P04；正式回放使用 2026-08-27 至 2026-08-29 的真实和风天气、审核坐标和 42/42 高德 OD，验证返回上一步、按钮真实禁用/启用、7 景点选择、午晚餐、交通方式/距离/耗时、三日切换、13:30–16:00 湖滨、19:30 固定表演、刷新恢复和“＋规划新行程”；3/2/2 景点全部守恒且 0 个未排入
 - 响应式与安全：375×812 完整页面通过；1280×800 下内容居中、无横向溢出、日期 Tab 三列等宽；健康路径控制台 0 error/warn；受控后端故障只展示稳定用户提示，不泄露 Token、request ID 或技术堆栈
-- 下一步：配置和风凭证执行真实三日天气构建，生成正式 OD/天气 Published Snapshot 并通过生产组合根、FastAPI 和 Chrome 验证；随后进入配额治理与 A6-8.2
+- 下一步：完成和风/高德配额看板、限流/熔断、跨机器缓存与旧快照继续服务策略；再进入 A6-8.2 真实 MySQL 与部署恢复
 - 完成度：约 98%（仅指首个纵向切片及其本地浏览器、行程质量、高德 Provider、JSON 发布适配器和生产启动门禁技术验证，不代表 M1 MVP）
 
 ## 本轮完成（2026-08-25）
@@ -199,6 +199,24 @@
 - 使用 `hangzhou-reviewed-od-audit-2026-08-27-v1` 完整离线回放：7/7 景点、0 未排入、0 数据拒绝、0 硬约束违反、结果哈希稳定；关键日为午餐 11:30–12:30、西湖湖滨 13:30–16:00、晚餐 17:52–19:22、表演 19:30–19:50，原 5 小时 22 分钟下午空白已消除；
 - 全量 258 项测试、Golden 8/8、降级 8/8、接近度 0.975、数据校验 7/7、性能 P95 14.94ms/19.32ms、改动文件 Ruff、隔离 strict mypy、前端 TypeScript 和 H5 production build 全部通过；H5 保留既有约 304 KiB 入口体积警告；
 - 回归证据见 `docs/test/reports/a6-8-1-reviewed-od-single-daytime-spread-2026-08-27.md`。当前 A6 仍约 98%，下一步是配置真实和风凭证、构建正式天气并发布不可变杭州 bundle。
+
+### A6-8.1 和风 API KEY 请求头认证修订（2026-08-27）
+
+- 根据和风当前官方文档，将 API KEY 从旧式 URL 查询参数 `?key=` 攻击面迁移为 `X-QW-Api-Key` 请求头；三日天气 URL 查询参数现在只包含杭州 `location=101210101`；
+- `TRAVEL_AGENT_QWEATHER_BASE_URL` 改为必填专属 HTTPS Host，不再隐式回退到逐步停用的 `devapi.qweather.com`；含路径、查询参数、fragment、用户名或密码的 Host 会被拒绝，避免把 Key 或完整接口路径误写入基础地址；
+- `.env.example` 改用无真实凭证的 `https://your-account-host.qweatherapi.com` 占位值；运维文档补充请求头认证与禁止 `?key=` 的安全口径；
+- 新增 6 项测试，覆盖专属 Host 必填、危险 URL 拒绝、API KEY 只进入请求头以及 URL/params 无 Key；和风相关离线测试 20 项通过，全量测试由 258 增至 264 项，改动文件 Ruff、隔离 strict mypy 和 `git diff --check` 通过；
+- 脱敏实物检查发现 `C:/Users/Administrator/CascadeProjects/trave_agent/.env` 当前仍只有数据库和高德变量，没有任何 `TRAVEL_AGENT_QWEATHER_*` 变量；因此未发起真实请求，也未生成天气或正式 published bundle。A6 维持约 98%，待用户将凭证保存到该文件后继续。
+
+### A6-8.1 真实和风天气、正式 Published Snapshot 与生产回放收口（2026-08-27）
+
+- 用户将和风 API Key、专属 API Host、杭州 Location ID、超时和数据版本实际保存到项目根目录 `.env`；脱敏加载确认 Key 非空且不进入 `repr`，Host 是无路径/query/fragment/用户信息的 HTTPS 主机；真实凭证和专属 Host 未进入回复、日志、测试报告或快照；
+- 使用 `X-QW-Api-Key` 请求头真实调用和风 `/v7/weather/3d` 成功，生成不可变 `var/audit/qweather-hangzhou-2026-08-27-v1.json`；日期为 2026-08-27 至 2026-08-29，三个日期唯一、升序、连续，来源字段和内容哈希完整，天气依次为晴转小雨、中雨转多云、小雨转晴，均为 advisory；
+- 以 7 个正式景点、7 个 `human_verified` 坐标、42/42 高德有向 OD 和真实天气合并 `var/published/hangzhou-published-2026-08-27-v1.json`；严格 `JsonPublishedSolverDataProvider` 加载通过，状态 `published`、哈希正确、0 fallback、0 missing；本地 `.env` 的正式版本选择器已切换到该不可变版本；
+- 生产组合根/FastAPI 以配置数据库完成三日七景点端到端回放：readiness、数据库和身份均 ready，GenerationIntent completed，`complete_success / trip-result-v2`，7 个已选景点全部排入、0 未排入，三天 forecast/午餐/晚餐完整，跨景点连接均使用 gaode，TripRevision 持久化成功；验证过程产生的历史 Revision 保留且未覆盖；
+- Chrome 使用 H5 production build 完成 P00→P04：P01/P02/P03 有返回入口，未选时 CTA 真实禁用、满足条件后真实启用，P04 有“＋规划新行程”；交通方式、距离和耗时范围可见；第三天为 13:30 西湖湖滨、约 2.5 小时，晚餐约 17:50–19:20，19:30 湖滨晚间表演；刷新后三日节点顺序稳定，控制台 0 warn/error；
+- 后端全量 pytest、前端 TypeScript、H5 production build 和 `git diff --check` 通过；H5 仍保留既有约 304 KiB 入口警告。详细证据见 `docs/test/reports/a6-8-1-qweather-published-production-replay-2026-08-27.md`；
+- 当前阶段结论：A6-8.1 的真实生产数据发布主链已经收口，A6 仍约 98%，接下来只处理配额看板、限流/熔断、跨机器缓存和旧快照继续服务，再进入 A6-8.2；Gate 7 与 M1 MVP 仍未完成。
 
 ## 本轮完成（2026-08-24）
 
@@ -445,7 +463,7 @@
 | 3.6 | A2.1/A3.1 | 全路线 UI/交互边界同步 | 已完成 |
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
-| 6 | A6 | 首个浏览器可操作纵向切片 | 进行中（约 98%；真实 OD 质量修复已通过，下一步入口校准、正式快照发布、MySQL 与部署恢复） |
+| 6 | A6 | 首个浏览器可操作纵向切片 | 进行中（约 98%；真实 OD、真实天气、正式快照和生产 Chrome 回放已通过，下一步配额/快照持续服务治理、MySQL 与部署恢复） |
 | 7 | G7 | 真实专家评审与用户验证 | 未开始 |
 
 ## 首个可用目标
@@ -465,11 +483,11 @@
 ## 明确未完成
 
 - FastAPI HTTP v1、匿名会话和组合根已完成首切片；尚未进行真实 MySQL 部署、外网服务启动和安全加固；
-- Planning SQLAlchemy 仓储与迁移已完成；发布数据 Provider 仍为内存测试适配器，正式数据发布表尚未接入数据库；
-- 天气、登录等真实外部 Provider 尚未接入；高德真实路网 Provider 已使用真实 Web 服务 Key 完成严格快照、Gateway 消费、OD 感知分天质量修复和生产组合根，但尚未完成入口坐标人工校准、配额看板/熔断和正式发布数据接入；
+- Planning SQLAlchemy 仓储与迁移已完成；正式不可变 JSON PublishedDataProvider 已接入生产组合根并完成回放，但正式发布数据尚未迁入数据库发布表；
+- 高德真实路网和和风真实三日天气均已完成严格快照、正式 bundle、Gateway 消费和生产回放；尚未完成配额看板/限流/熔断、跨机器缓存、旧快照持续服务和三日之外的正式气候基线；登录等其他真实外部 Provider 尚未接入；
 - 午晚餐当前仍是软留白；具体餐厅节点、餐厅加入后的真实 OD 完整重排和新 Revision 流程尚未实现；
 - Taro/React P00–P04、依赖锁定、TypeScript、H5 production build 和 Chrome 移动端/桌面端首轮交互门禁已完成；尚未完成多浏览器、弱网、长时会话和生产部署验证；
-- A6 已有领域/应用、求解器、数据库、HTTP API、前端页面和本地浏览器闭环；由于真实高德、真实 MySQL、生产发布数据和部署恢复仍未完成，仍不能宣称普通用户可稳定生产使用；
+- A6 已有领域/应用、求解器、配置数据库、HTTP API、前端页面、真实高德/和风、正式 JSON 发布数据和本地生产 Chrome 闭环；由于真实 MySQL 部署、配额与快照持续服务治理、外网安全加固和部署恢复仍未完成，仍不能宣称普通用户可稳定生产使用；
 - 全项目严格 Mypy 基线尚未清零；当前本轮新增文件在隔离导入检查下通过，但旧求解器、HTTP/数据库适配器与 Windows/POSIX 分支仍有 83 个既存类型错误，需另立技术债切片处理；
 - 分享卡片尚未实现；
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；

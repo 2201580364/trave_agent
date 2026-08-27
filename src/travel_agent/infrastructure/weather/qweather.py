@@ -17,6 +17,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from os import PathLike
 from typing import Protocol
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -71,10 +72,10 @@ class QWeatherForecastError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class QWeatherSettings:
     api_key: str = field(repr=False)
+    base_url: str = ""
     location_id: str = "101210101"
     timeout_seconds: float = 5.0
     data_version: str = "qweather-forecast-v1"
-    base_url: str = "https://devapi.qweather.com"
 
     def __post_init__(self) -> None:
         if not self.api_key.strip():
@@ -85,8 +86,17 @@ class QWeatherSettings:
             raise ValueError("QWeather timeout_seconds must be positive")
         if not self.data_version.strip():
             raise ValueError("QWeather data_version is required")
-        if not self.base_url.startswith("https://"):
-            raise ValueError("QWeather base_url must use HTTPS")
+        parsed_base_url = urlsplit(self.base_url)
+        if (
+            parsed_base_url.scheme != "https"
+            or not parsed_base_url.netloc
+            or parsed_base_url.path not in {"", "/"}
+            or parsed_base_url.query
+            or parsed_base_url.fragment
+            or parsed_base_url.username is not None
+            or parsed_base_url.password is not None
+        ):
+            raise ValueError("QWeather base_url must be a credential-free HTTPS host")
 
     @classmethod
     def from_env(
@@ -100,8 +110,12 @@ class QWeatherSettings:
         key = os.environ.get("TRAVEL_AGENT_QWEATHER_API_KEY", "").strip()
         if not key:
             raise ValueError("TRAVEL_AGENT_QWEATHER_API_KEY is required")
+        base_url = os.environ.get("TRAVEL_AGENT_QWEATHER_BASE_URL", "").strip()
+        if not base_url:
+            raise ValueError("TRAVEL_AGENT_QWEATHER_BASE_URL is required")
         return cls(
             api_key=key,
+            base_url=base_url,
             location_id=os.environ.get(
                 "TRAVEL_AGENT_QWEATHER_LOCATION_ID",
                 "101210101",
@@ -112,10 +126,6 @@ class QWeatherSettings:
             data_version=os.environ.get(
                 "TRAVEL_AGENT_QWEATHER_DATA_VERSION",
                 "qweather-forecast-v1",
-            ).strip(),
-            base_url=os.environ.get(
-                "TRAVEL_AGENT_QWEATHER_BASE_URL",
-                "https://devapi.qweather.com",
             ).strip(),
         )
 
@@ -197,6 +207,7 @@ class QWeatherHttpTransport(Protocol):
         path: str,
         *,
         params: Mapping[str, str],
+        headers: Mapping[str, str],
         timeout_seconds: float,
     ) -> Mapping[str, object]: ...
 
@@ -210,6 +221,7 @@ class HttpxQWeatherTransport:
         path: str,
         *,
         params: Mapping[str, str],
+        headers: Mapping[str, str],
         timeout_seconds: float,
     ) -> Mapping[str, object]:
         try:
@@ -217,7 +229,7 @@ class HttpxQWeatherTransport:
                 self._base_url + path,
                 params=params,
                 timeout=timeout_seconds,
-                headers={"Accept": "application/json"},
+                headers={"Accept": "application/json", **headers},
             )
         except httpx.TimeoutException as exc:
             raise QWeatherForecastError(
@@ -276,10 +288,8 @@ class QWeatherForecastClient:
             raise ValueError("QWeather clock must return timezone-aware datetimes")
         payload = self._transport.get_json(
             "/v7/weather/3d",
-            params={
-                "location": self._settings.location_id,
-                "key": self._settings.api_key,
-            },
+            params={"location": self._settings.location_id},
+            headers={"X-QW-Api-Key": self._settings.api_key},
             timeout_seconds=self._settings.timeout_seconds,
         )
         return _parse_forecast(

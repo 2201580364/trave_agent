@@ -6,9 +6,11 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 import pytest
 
 from travel_agent.infrastructure.weather import (
+    HttpxQWeatherTransport,
     QWeatherFailureCode,
     QWeatherForecastClient,
     QWeatherForecastError,
@@ -24,16 +26,19 @@ NOW = datetime(2026, 8, 27, 8, 0, tzinfo=UTC)
 class FakeTransport:
     def __init__(self, payload: Mapping[str, object]) -> None:
         self.payload = payload
-        self.calls: list[tuple[str, dict[str, str], float]] = []
+        self.calls: list[
+            tuple[str, dict[str, str], dict[str, str], float]
+        ] = []
 
     def get_json(
         self,
         path: str,
         *,
         params: Mapping[str, str],
+        headers: Mapping[str, str],
         timeout_seconds: float,
     ) -> Mapping[str, object]:
-        self.calls.append((path, dict(params), timeout_seconds))
+        self.calls.append((path, dict(params), dict(headers), timeout_seconds))
         return self.payload
 
 
@@ -97,6 +102,32 @@ def test_qweather_settings_require_key(monkeypatch: pytest.MonkeyPatch) -> None:
         QWeatherSettings.from_env(load_dotenv_file=False)
 
 
+def test_qweather_settings_require_dedicated_api_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRAVEL_AGENT_QWEATHER_API_KEY", "weather-secret")
+    monkeypatch.delenv("TRAVEL_AGENT_QWEATHER_BASE_URL", raising=False)
+
+    with pytest.raises(ValueError, match="QWEATHER_BASE_URL"):
+        QWeatherSettings.from_env(load_dotenv_file=False)
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://api.example.test",
+        "https://api.example.test/v7/weather/3d",
+        "https://api.example.test?key=weather-secret",
+        "https://user:password@api.example.test",
+    ],
+)
+def test_qweather_settings_reject_non_host_or_credential_bearing_url(
+    base_url: str,
+) -> None:
+    with pytest.raises(ValueError, match="credential-free HTTPS host"):
+        QWeatherSettings("weather-secret", base_url=base_url)
+
+
 @pytest.mark.parametrize(
     ("condition", "expected"),
     [
@@ -119,6 +150,7 @@ def test_qweather_client_parses_three_day_forecast_with_provenance() -> None:
     transport = FakeTransport(_payload())
     settings = QWeatherSettings(
         "weather-secret",
+        base_url="https://api.example.test",
         timeout_seconds=4,
         data_version="qweather-hangzhou-2026-08-27-v1",
     )
@@ -143,7 +175,8 @@ def test_qweather_client_parses_three_day_forecast_with_provenance() -> None:
     assert transport.calls == [
         (
             "/v7/weather/3d",
-            {"location": "101210101", "key": "weather-secret"},
+            {"location": "101210101"},
+            {"X-QW-Api-Key": "weather-secret"},
             4,
         )
     ]
@@ -153,9 +186,53 @@ def test_qweather_client_parses_three_day_forecast_with_provenance() -> None:
     assert len(qweather_snapshot_content_hash(serialized)) == 64
 
 
+def test_http_transport_sends_api_key_only_in_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get(
+        url: str,
+        *,
+        params: Mapping[str, str],
+        timeout: float,
+        headers: Mapping[str, str],
+    ) -> httpx.Response:
+        captured.update(
+            url=url,
+            params=dict(params),
+            timeout=timeout,
+            headers=dict(headers),
+        )
+        return httpx.Response(
+            200,
+            json=_payload(),
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    transport = HttpxQWeatherTransport("https://api.example.test")
+
+    transport.get_json(
+        "/v7/weather/3d",
+        params={"location": "101210101"},
+        headers={"X-QW-Api-Key": "weather-secret"},
+        timeout_seconds=5,
+    )
+
+    assert captured["url"] == "https://api.example.test/v7/weather/3d"
+    assert captured["params"] == {"location": "101210101"}
+    assert captured["headers"] == {
+        "Accept": "application/json",
+        "X-QW-Api-Key": "weather-secret",
+    }
+    assert "weather-secret" not in str(captured["url"])
+    assert "weather-secret" not in str(captured["params"])
+
+
 def test_qweather_client_classifies_api_rate_limit() -> None:
     client = QWeatherForecastClient(
-        QWeatherSettings("secret"),
+        QWeatherSettings("secret", base_url="https://api.example.test"),
         lambda: NOW,
         transport=FakeTransport(_payload(code="429")),
     )
@@ -171,7 +248,7 @@ def test_qweather_client_rejects_incomplete_forecast() -> None:
     payload = _payload()
     payload["daily"] = payload["daily"][:2]
     client = QWeatherForecastClient(
-        QWeatherSettings("secret"),
+        QWeatherSettings("secret", base_url="https://api.example.test"),
         lambda: NOW,
         transport=FakeTransport(payload),
     )
@@ -186,7 +263,7 @@ def test_qweather_client_rejects_non_consecutive_days() -> None:
     payload = _payload()
     payload["daily"][2]["fxDate"] = "2026-08-30"
     client = QWeatherForecastClient(
-        QWeatherSettings("secret"),
+        QWeatherSettings("secret", base_url="https://api.example.test"),
         lambda: NOW,
         transport=FakeTransport(payload),
     )
@@ -199,7 +276,7 @@ def test_qweather_client_rejects_non_consecutive_days() -> None:
 
 def test_qweather_client_requires_timezone_aware_clock() -> None:
     client = QWeatherForecastClient(
-        QWeatherSettings("secret"),
+        QWeatherSettings("secret", base_url="https://api.example.test"),
         lambda: datetime(2026, 8, 27, 8, 0),
         transport=FakeTransport(_payload()),
     )
