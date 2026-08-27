@@ -14,6 +14,7 @@ dependencies = [
     "ortools>=9.10,<10",
     "pymysql>=1.1,<2",
     "python-dotenv>=1.0,<2",
+    "redis>=4.6,<5",
     "sqlalchemy>=2.0,<3",
     "uvicorn>=0.30,<1",
 ]
@@ -24,8 +25,10 @@ travel-agent-archive-logs = "travel_agent.observability.archive:main"
 [project.optional-dependencies]
 dev = [
     "mypy>=1.11",
+    "fakeredis>=2.24,<3",
     "pytest>=8.3",
     "ruff>=0.6",
+    "types-redis>=4.6,<5",
 ]
 
 [tool.setuptools.packages.find]

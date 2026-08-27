@@ -16,12 +16,15 @@
 
 ## 当前总状态
 
-- 更新时间：2026-08-27
+- 更新时间：2026-08-28
 - 产品里程碑：`M1 — 行程骨架验证`
+- 里程碑判断：当前是 M1 中后段的核心规划技术纵向切片收口，不是 M1 MVP 已完成，也尚未进入 M2；A6 的“约 98%”只描述首个 P00–P04 技术纵向切片
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 专家/用户验证尚未开始
-- 当前阶段：`A6-8.1 配额与快照持续服务收口：路线点、严格 OD、下午展开、真实和风天气、正式 Published Snapshot 和生产 FastAPI/Chrome 回放已完成`
-- 当前任务：补齐和风/高德配额看板、限流、熔断、跨机器缓存与旧快照继续服务策略；随后进入 A6-8.2 真实 MySQL 与部署恢复
-- 总体判断：后端 HTTP、配置数据库持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订、高德真实 Provider 和和风真实三日预报已形成可操作技术纵向闭环；7 个杭州路线点已经发布责任人接受并生成独立 `human_verified` 坐标版本，新版本 42/42 有向 OD 均来自高德且 0 fallback/0 missing，历史候选数据未覆盖。新 OD 暴露的 5 小时 22 分钟下午空白已经通过 ADR-0015 和 `constraints-p1-v5` 收口。和风认证按官方专属 Host + `X-QW-Api-Key` 请求头完成真实验证，已生成 2026-08-27 至 2026-08-29 的不可变天气快照和正式杭州 Published Solver Snapshot，并通过生产组合根、FastAPI 端到端生成、Revision 持久化和 Chrome P00→P04 回放。当前仍缺配额治理、跨机器缓存、旧快照持续服务、真实 MySQL 部署恢复、餐厅节点与 Gate 7，不能宣称稳定生产可用或已完成 M1 MVP
+- 当前阶段：`A6-8.2 服务器 Redis/MySQL 部署与恢复验证已完成；准备转入 M1 产品闭环缺口收口与应用服务发布准备`
+- 当前任务：A6-8.2 文档与证据收口完成。下一实现优先处理 M1 的替换景点/生成新 Revision 用户入口和“我的行程”恢复入口，再补计划分享与结构化反馈；同时登记 FastAPI/Taro 生产服务、集中监控和异地备份发布门禁。本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：后端 HTTP、SQLAlchemy 持久化、前端五页面、H5 production build、Chrome 真实浏览器门禁、日内节奏修订、高德真实 Provider 和和风真实三日预报已形成可操作技术纵向闭环；7 个杭州路线点已经发布责任人接受并生成独立 `human_verified` 坐标版本，新版本 42/42 有向 OD 均来自高德且 0 fallback/0 missing。ADR-0016/0017 已补齐显式旧快照回退、按日安全预算、跨进程/跨机器请求节拍、熔断和 Redis 高德路线缓存。A6-8.2 又完成真实 MySQL 8.0.46、真实 Redis 7.4、最小权限、Alembic、InnoDB 并发、真实 Redis 并发、断连恢复、每日备份和隔离恢复。当前仍缺 M1 替换/新 Revision、我的行程、计划分享、结构化反馈、正式应用服务发布、集中监控、异地备份、真实多机网络分区验证、餐厅节点与 Gate 7，不能宣称稳定生产可用或已完成 M1 MVP
+
+M1 产品闭环核对：杭州单城入口和一键生成核心闭环已完成；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现；替换景点与新 Revision 用户入口、我的行程、计划分享和结构化反馈尚未实现。A6-8.2 完成后仍需补齐这些 M1 产品能力并进入 Gate 7，不能直接跳转到 M2。
 
 ## 已完成
 
@@ -39,7 +42,7 @@
 | A3 交互流程与状态机 | M1 详细设计完成；全路线同步完成（V1.1） | IF-01–IF-12 可进入实现；登记 IF-13–IF-24，并明确执行、Visit、小记、媒体、授权和回顾状态，见 `docs/product/交互流程与状态机设计.md` |
 | A4 应用代码架构设计 | 完成（V1.0） | 模块化单体、分层依赖、应用用例、求解器网关、事务幂等、前端目录、测试架构与纵向切片，见 `docs/product/应用代码架构设计.md` |
 
-最新稳定技术基线：全量 264 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。和风实现文件 Ruff 与隔离 strict mypy 通过；本轮前端 TypeScript 与 H5 production build 通过，production `dist/index.html` 已生成；正式 bundle 严格加载、生产组合根/FastAPI 三日七景点回放和 Chrome P00→P04 均通过，Chrome 控制台 0 warn/error，刷新后三日 Revision 节点顺序稳定。入口约 304 KiB 的既有性能警告仍保留为 P1 优化项。全仓 Ruff 仍有 46 个历史问题；全项目 strict mypy 最近完整基线仍为 154 条/27 个历史文件，尚未建立为绿色 Gate。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
+最新稳定技术基线：全量 275 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。本轮 Provider 治理、Redis 路线缓存、真实 Provider 回调和生产组合根改动文件 Ruff 与隔离 strict mypy 通过；前端最近一轮 TypeScript 与 H5 production build 通过，production `dist/index.html` 已生成；正式 bundle 严格加载、生产组合根/FastAPI 三日七景点回放和 Chrome P00→P04 均通过，Chrome 控制台 0 warn/error，刷新后三日 Revision 节点顺序稳定。入口约 304 KiB 的既有性能警告仍保留为 P1 优化项。全仓 Ruff 仍有 46 个历史问题；全项目 strict mypy 最近完整基线仍为 154 条/27 个历史文件，尚未建立为绿色 Gate。该证据只证明技术可行性，不证明 H3 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -55,7 +58,7 @@
 ### A5：API 与持久化数据模型同步
 
 - 状态：已完成
-- 核心产物：`docs/specs/api-contract.md` V2.0、`docs/specs/data-model.md` V2.0
+- 核心产物：`docs/specs/api-contract.md` V2.1、`docs/specs/data-model.md` V2.1
 - 关键结论：草稿/Intent/Trip/Revision 资源分离；无 `/regenerate`；到离交通事实分离；输入/结果 snapshot 版本化；草稿乐观锁、intent 原子领取、Revision/SolverRun 原子完成事务明确
 - 完成度：100%
 
@@ -67,8 +70,8 @@
 - 已完成：A6-1 至 A6-5 应用、求解与数据库核心；A6-6 匿名身份、FastAPI HTTP v1、景点目录和 inline 组合根
 - 浏览器进展：首轮 375px 门禁和本轮正式数据桌面 Chrome 回放均走通 P00→P04；正式回放使用 2026-08-27 至 2026-08-29 的真实和风天气、审核坐标和 42/42 高德 OD，验证返回上一步、按钮真实禁用/启用、7 景点选择、午晚餐、交通方式/距离/耗时、三日切换、13:30–16:00 湖滨、19:30 固定表演、刷新恢复和“＋规划新行程”；3/2/2 景点全部守恒且 0 个未排入
 - 响应式与安全：375×812 完整页面通过；1280×800 下内容居中、无横向溢出、日期 Tab 三列等宽；健康路径控制台 0 error/warn；受控后端故障只展示稳定用户提示，不泄露 Token、request ID 或技术堆栈
-- 下一步：完成和风/高德配额看板、限流/熔断、跨机器缓存与旧快照继续服务策略；再进入 A6-8.2 真实 MySQL 与部署恢复
-- 完成度：约 98%（仅指首个纵向切片及其本地浏览器、行程质量、高德 Provider、JSON 发布适配器和生产启动门禁技术验证，不代表 M1 MVP）
+- 下一步：优先实现 M1 替换景点/新 Revision 与“我的行程”入口；并行设计 FastAPI/Taro 生产服务发布、监控告警和异地备份门禁
+- 完成度：约 99%（仅指首个纵向切片的技术实现、真实数据、浏览器和服务器基础设施验证，不代表 M1 产品功能、正式公网发布或 Gate 7 已完成）
 
 ## 本轮完成（2026-08-25）
 
@@ -217,6 +220,65 @@
 - Chrome 使用 H5 production build 完成 P00→P04：P01/P02/P03 有返回入口，未选时 CTA 真实禁用、满足条件后真实启用，P04 有“＋规划新行程”；交通方式、距离和耗时范围可见；第三天为 13:30 西湖湖滨、约 2.5 小时，晚餐约 17:50–19:20，19:30 湖滨晚间表演；刷新后三日节点顺序稳定，控制台 0 warn/error；
 - 后端全量 pytest、前端 TypeScript、H5 production build 和 `git diff --check` 通过；H5 仍保留既有约 304 KiB 入口警告。详细证据见 `docs/test/reports/a6-8-1-qweather-published-production-replay-2026-08-27.md`；
 - 当前阶段结论：A6-8.1 的真实生产数据发布主链已经收口，A6 仍约 98%，接下来只处理配额看板、限流/熔断、跨机器缓存和旧快照继续服务，再进入 A6-8.2；Gate 7 与 M1 MVP 仍未完成。
+
+### A6-8.1 Provider 治理与旧快照持续服务（2026-08-27）
+
+- 修订 API、数据模型和功能模块文档的历史状态：HTTP v1、SQLAlchemy/Alembic、高德 Provider 和正式 Published Snapshot 均不再标记为“待实现”；明确 A6 约 98% 只表示首个技术纵向切片，不代表 M1 MVP；
+- 新增 ADR-0016。生产组合根继续优先加载显式当前版本；仅按 `TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS` 的声明顺序尝试已知良好旧版本，所有候选执行相同的 published、哈希、城市、坐标、天气和严格 OD 门禁；不扫描目录、不启用 candidate、不放宽验证；
+- 发生旧版本回退时记录模块级 error 日志，并在 FastAPI `app.state` 暴露请求版本、选中版本和 `fallback_used`；当前与全部回退均无效时仍 fail-fast；
+- 新增凭证无关的 `JsonProviderRequestGovernor`，使用进程间文件锁和原子 JSON 替换记录高德/和风按日安全预算、成功/失败计数、失败分类、跨进程最小请求间隔、连续失败和熔断截止时间；`rate_limited` 立即熔断，超时/HTTP/API/无效响应按阈值熔断；
+- 高德缓存未命中请求与和风三日预报请求已接入统一治理回调；缓存命中不消耗请求预算。新增 `scripts/show_provider_governance.py`，可输出人类可读或 JSON 状态，状态文件不保存 Key、专属 Host 或完整请求参数；
+- 新增环境配置 `TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET`、`TRAVEL_AGENT_QWEATHER_DAILY_REQUEST_BUDGET`、`TRAVEL_AGENT_PROVIDER_CIRCUIT_FAILURE_THRESHOLD`、`TRAVEL_AGENT_PROVIDER_CIRCUIT_OPEN_SECONDS` 和显式快照回退列表；
+- 针对性 49 项测试通过；全量 pytest 由 264 增至 272 项通过；改动文件 Ruff 和隔离 strict mypy 通过。求解器输入输出和版本组合未变化，Gate 6 结果保持有效；
+- 当前阶段结论：单机/共享文件系统上的配额、限流、熔断和旧快照继续服务代码闭环已完成；仍需跨机器共享后端、正式配额来源或集中看板以及多实例故障演练。A6 继续维持约 98%，完成上述工作后进入 A6-8.2。
+
+### A6-8.1 Redis 跨机器共享收口（2026-08-28）
+
+- 新增 ADR-0017，保留 JSON 作为本地开发默认后端；配置 `TRAVEL_AGENT_PROVIDER_REDIS_URL` 后，高德和和风发布脚本显式切换到 Redis 共享后端，不在 Redis 故障时静默退回本机 JSON；
+- 新增 `RedisProviderRequestGovernor`，通过 `WATCH/MULTI/EXEC` 乐观事务在多实例间共享按日安全预算、最小请求间隔、成功/失败计数、失败分类、连续失败和熔断状态；状态 TTL 为 90 天；
+- 新增 `RedisGaodeRouteCache`，规范化路由键执行 SHA-256，值只保存模式、耗时、距离、抓取/过期时间并使用 Redis TTL；不同机器可复用成功路线，缓存命中不消耗 Provider 预算；
+- `scripts/show_provider_governance.py` 自动识别 JSON 或 Redis，输出不包含 Redis URL、密码、API Key、专属 Host 或完整请求参数；
+- 新增生产依赖 `redis>=4.6,<5`，保持与当前环境既有任务依赖兼容；测试新增 `fakeredis` 和 `types-redis`；
+- fakeredis 双客户端共享治理/缓存单元测试通过；在用户明确“Redis/MySQL 服务不得在本机部署测试”边界前曾进行一次短生命周期本机 Redis 协议检查，随后验证键、临时进程和 `.local/redis-validation` 临时目录均已清理，系统既有认证 Redis 未读取密码、未写入数据；该本机检查不计入正式部署验收证据；
+- 全量 pytest 由 272 增至 275 项通过；改动文件 Ruff、隔离 strict mypy 和 `git diff --check` 通过；求解器契约与 Gate 6 结果不变；
+- 当前阶段结论：A6-8.1 持续服务治理代码闭环完成。正式环境仍需由用户提供服务器和授权 Redis URL，所有服务安装、TLS/ACL、集中配额看板、监控和多实例断连/恢复演练只在该服务器进行；本机仅保留不启动真实服务的纯单元/仿真测试。A6 仍维持约 98%，不代表 M1 MVP 完成。
+
+### A6-8.2 服务器部署包与 SSH 接入准备（2026-08-28）
+
+- 用户提供 `124.222.14.188`、`ubuntu`、sudo、新装 Redis/MySQL、同机 Docker Compose、允许恢复演练等部署边界；应用来源 IP/CIDR 尚未给出，因此 3306/6379 继续安全地只绑定服务器 `127.0.0.1`，不向公网开放；
+- 新增 `deploy/production/`：MySQL 8.0、Redis 7.4 Alpine、独立数据/备份目录、服务健康检查、Docker 日志轮转、MySQL InnoDB/utf8mb4/UTC/慢查询配置、Redis AOF everysec/RDB/noeviction 和最小 ACL；
+- 服务凭证只由服务器 `provision-secrets.sh` 使用 `openssl` 生成，不写入仓库或命令输出；MySQL 应用账号仅有 DML 权限，迁移账号与运行账号分离；Compose 不在 MySQL/Redis 容器之间交叉注入整套凭证；
+- `backup.sh` 生成 MySQL gzip、Redis RDB 与 SHA-256；Redis BGSAVE 必须在 60 秒内产生新的成功快照，否则明确失败，不再复制旧 RDB；失败时清理 `.partial` 文件；
+- 新增 `restore-drill.sh`，在一次性容器和一次性 Docker Volume 中校验哈希并隔离恢复 MySQL/Redis，检查 MySQL 表数量、Alembic revision 和 Redis 可读性，退出时删除演练资源，不覆盖生产数据目录；
+- 仓库根 `id_rsa`/`id_rsa.pub` 与 PEM/PPK 已显式加入 Git ignore，两个根密钥文件均未被 Git 追踪；私钥只在 `.local/ssh/` 创建权限收紧的临时副本用于认证诊断；
+- SSH 主机握手成功，服务器 ED25519 指纹已经通过 `accept-new` 写入本机 known_hosts；新私钥可以成功解析，其 RSA 公钥指纹为 `SHA256:OkMQtFzrvA8rCTOaZEO+jscyaPCikI+NtCmnJM9vTW4`，但服务器 `ubuntu` 返回 `Permission denied (publickey,password)`。工作区原 `id_rsa` 公钥属于另一密钥对，必须先把新私钥对应公钥加入 `/home/ubuntu/.ssh/authorized_keys`，不能从现有错误公钥推导；
+- 未在本机启动 Redis/MySQL；当前全量 275 项测试再次通过，`git diff --check` 通过。服务器 `bash -n`、`docker compose config`、容量参数校准、真实部署、Alembic、ACL、并发、断连、备份恢复和监控证据尚未执行；
+- 当前阶段结论：A6-8.2 已从“等待服务器信息”进入“部署包完成、等待 SSH 公钥授权”。该认证阻塞解除后，先执行只读资源/端口/防火墙盘点，再按实际内存与磁盘调整参数，之后才能部署，不能把本地静态准备标记为真实服务器验收完成。
+
+### A6-8.2 真实 MySQL/Redis 部署与恢复验收完成（2026-08-28）
+
+- 新私钥认证修复后完成 Ubuntu 24.04.4 服务器盘点：4 vCPU、约 3.6 GiB 内存、40 GiB 系统盘、Docker 29.1.3、Compose 2.40.3；发现同机已有两个 MySQL、一个 Redis 和一个 API 容器，因此不复用、不停止、不修改既有业务；
+- 既有非本项目 MySQL 占用并向 `0.0.0.0` 暴露 3306，UFW inactive；Travel Agent 改用独立 Compose project/network/data，MySQL/Redis 只绑定 `127.0.0.1:13306/16379`。既有公网 3306 作为高风险遗留记录，未获授权不修改；
+- 按同机资源将 MySQL 调整为 256 MiB buffer pool、50 最大连接、768 MiB 容器限制；Redis 调整为 128 MiB maxmemory、noeviction、192 MiB 容器限制；最终稳定观测约 371 MiB/3.3 MiB；
+- MySQL 8.0.46 与 Redis 7.4 容器均 running/healthy；凭证只在服务器生成，`infra.env`/`app.env` 为 root 0600；MySQL 应用 DML、迁移 DDL、只读备份账号，以及 Redis 应用/备份管理员账号均已分离；
+- MySQL 服务验证通过 InnoDB、utf8mb4、utf8mb4_0900_ai_ci、UTC、应用 DDL 拒绝和迁移 DDL 允许；Alembic 空库升级至 `0002_anonymous_identity (head)`；
+- 真实 MySQL 验证通过中文、emoji、JSON、跨午夜、时区、重启读取、两连接 Intent 原子领取恰好一胜、事务异常回滚无残余；受控断连显式失败，重启后 `pool_pre_ping` 恢复且已提交数据存在；
+- 真实 Redis 验证通过 10 连接并发计数、共享阈值熔断、`rate_limited` 立即熔断、跨客户端路线缓存、SHA-256 路线键、凭证/坐标不泄露；受控断连显式失败，重启后连接与 AOF/RDB 数据恢复；
+- Redis 主机 `vm.overcommit_memory=1` 已持久化，重启后 overcommit 警告消失；真实 BGSAVE/备份再次通过；
+- MySQL gzip 与 Redis RDB 备份、SHA-256、失败 partial 清理和 14 天保留已落地；隔离恢复得到 7 张 MySQL 表、Alembic 0002 和可加载 Redis RDB，演练临时容器/Volume 全部清理；
+- `travel-agent-infra-backup.timer` 已 enabled/active，每日北京时间 03:30、随机延迟最多 15 分钟、错过后补跑；当前仍是同系统盘备份，没有异地副本；
+- 服务器安装 `/opt/travel-agent/app` 与独立 Python venv，迁移和验收不把秘密复制回本机；`/etc/travel-agent/app.env` 只含应用账号连接，不含迁移账号；
+- 根目录私钥继续由 `.gitignore` 显式排除且未被 Git 追踪；部署结束后本轮创建的两个 `.local/ssh` 私钥副本已删除，服务器 `/tmp` 暂存目录和归档也已清理；
+- 全量本地 275 项测试、Ruff 和 `git diff --check` 保持通过；详细服务器证据见 `docs/test/reports/a6-8-2-server-mysql-redis-validation-2026-08-28.md`；
+- 当前阶段结论：A6-8.2 的真实数据库/Redis/恢复范围完成。FastAPI/Taro 尚未作为公网生产服务发布，集中监控、异地备份、镜像 digest、Python 生产 lock、两台物理节点网络分区和 Gate 7 尚未完成；不能将 A6-8.2 完成扩大解释为 M1 MVP 或稳定生产完成。
+
+### A6-8.2 提交边界整理（2026-08-28）
+
+- 复核全部未跟踪文件：ADR、Provider 治理代码、单元测试、无凭证 Compose、备份/恢复和真实验收脚本均为可复现工程资产，必须提交，未通过 `.gitignore` 隐藏必要实现；
+- 三个服务器专用 Python 验收脚本从根 `scripts/` 归并到 `deploy/production/validation/`，Shell wrapper 改为从自包含部署包调用；服务器新路径已重新执行 MySQL/Redis 验收，旧 `/opt/travel-agent/app/scripts/validate_*` 冗余副本已删除；
+- 根 `.gitignore` 显式补齐 pytest/mypy/Ruff、coverage、Python build/dist、IDE/OS 临时文件、部署 `infra.env/app.env`、ACL、data、backup、SQL/RDB/AOF 等规则，不再依赖用户全局 ignore；
+- `.env.example`、`deploy/production/infra.env.example` 和 `deploy/production/validation/*.py` 已确认仍可追踪；`.env`、`id_rsa`、`.local`、工具缓存和部署运行数据已确认命中 ignore；
+- 整理后全量 275 项测试和部署 validation Ruff 通过，服务器 `bash -n`、Python `py_compile`、Compose config、真实 MySQL/Redis 验收通过，两个容器保持 healthy。
 
 ## 本轮完成（2026-08-24）
 
@@ -431,7 +493,7 @@
 - 新增 3 项兼容测试：环境变量/密码隐藏、MySQL+PyMySQL Engine 与全表 DDL 编译、迁移 readiness 前后状态；
 - MySQL DDL 已验证包含 InnoDB、utf8mb4、utf8mb4_0900_ai_ci 和 JSON；全量测试由 183 增至 186 项；
 - 新增 docs/ops/mysql-deployment.md，记录版本、网络、最小权限、配置、迁移、并发、备份和恢复清单；
-- 本机未发现 MySQL/MariaDB 服务或 Docker，因此真实 InnoDB 双连接并发、服务器 TLS、备份和故障恢复仍未验证，不标记为生产 MySQL 已完成。
+- 根据用户 2026-08-28 的环境边界，本机禁止安装、启动或部署测试 MySQL/MariaDB/Redis；真实 InnoDB 双连接并发、服务器 TLS、备份和故障恢复必须在用户提供并授权的服务器上验证，当前不标记为生产 MySQL 已完成。
 
 ### A6-7 Taro/React 前端首轮实现
 
@@ -463,7 +525,7 @@
 | 3.6 | A2.1/A3.1 | 全路线 UI/交互边界同步 | 已完成 |
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
-| 6 | A6 | 首个浏览器可操作纵向切片 | 进行中（约 98%；真实 OD、真实天气、正式快照和生产 Chrome 回放已通过，下一步配额/快照持续服务治理、MySQL 与部署恢复） |
+| 6 | A6 | 首个浏览器可操作纵向切片 | 进行中（约 99%；真实 OD/天气/快照、生产 Chrome、真实 MySQL/Redis、断连与备份恢复已通过；下一步 M1 产品闭环缺口和应用服务发布准备） |
 | 7 | G7 | 真实专家评审与用户验证 | 未开始 |
 
 ## 首个可用目标
@@ -482,13 +544,13 @@
 
 ## 明确未完成
 
-- FastAPI HTTP v1、匿名会话和组合根已完成首切片；尚未进行真实 MySQL 部署、外网服务启动和安全加固；
+- FastAPI HTTP v1、匿名会话和组合根已完成首切片；真实 MySQL 已部署并通过持久化/恢复验收，但 FastAPI/Taro 尚未作为外网生产服务启动，域名/TLS、反向代理和应用进程安全加固仍未完成；
 - Planning SQLAlchemy 仓储与迁移已完成；正式不可变 JSON PublishedDataProvider 已接入生产组合根并完成回放，但正式发布数据尚未迁入数据库发布表；
-- 高德真实路网和和风真实三日天气均已完成严格快照、正式 bundle、Gateway 消费和生产回放；尚未完成配额看板/限流/熔断、跨机器缓存、旧快照持续服务和三日之外的正式气候基线；登录等其他真实外部 Provider 尚未接入；
+- 高德真实路网和和风真实三日天气均已完成严格快照、正式 bundle、Gateway 消费和生产回放；Redis 真实 ACL、并发治理、熔断、路线缓存、断连恢复和备份已通过，尚未完成正式配额来源/集中看板、两台物理节点网络分区、跨主机 TLS和三日之外的正式气候基线；登录等其他真实外部 Provider 尚未接入；
 - 午晚餐当前仍是软留白；具体餐厅节点、餐厅加入后的真实 OD 完整重排和新 Revision 流程尚未实现；
 - Taro/React P00–P04、依赖锁定、TypeScript、H5 production build 和 Chrome 移动端/桌面端首轮交互门禁已完成；尚未完成多浏览器、弱网、长时会话和生产部署验证；
-- A6 已有领域/应用、求解器、配置数据库、HTTP API、前端页面、真实高德/和风、正式 JSON 发布数据和本地生产 Chrome 闭环；由于真实 MySQL 部署、配额与快照持续服务治理、外网安全加固和部署恢复仍未完成，仍不能宣称普通用户可稳定生产使用；
-- 全项目严格 Mypy 基线尚未清零；当前本轮新增文件在隔离导入检查下通过，但旧求解器、HTTP/数据库适配器与 Windows/POSIX 分支仍有 83 个既存类型错误，需另立技术债切片处理；
+- A6 已有领域/应用、求解器、真实 MySQL/Redis、HTTP API、前端页面、真实高德/和风、正式 JSON 发布数据、本地生产 Chrome、断连和备份恢复闭环；由于 M1 产品缺口、外网应用服务、集中监控、异地备份和 Gate 7 仍未完成，仍不能宣称普通用户可稳定生产使用；
+- 全项目严格 Mypy 基线尚未清零；当前本轮新增文件在隔离导入检查下通过，最近完整基线仍为 154 条/27 个历史文件，需另立技术债切片处理；
 - 分享卡片尚未实现；
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；

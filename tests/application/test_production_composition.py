@@ -19,6 +19,7 @@ from travel_agent.interfaces.http import (
 )
 
 VERSION = "hangzhou-published-composition-v1"
+FALLBACK_VERSION = "hangzhou-published-composition-v0"
 
 
 def test_production_settings_load_database_and_snapshot_selection(
@@ -29,6 +30,10 @@ def test_production_settings_load_database_and_snapshot_selection(
     monkeypatch.setenv("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT", str(tmp_path))
     monkeypatch.setenv("TRAVEL_AGENT_PUBLISHED_CITY_ID", "hangzhou")
     monkeypatch.setenv("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION", VERSION)
+    monkeypatch.setenv(
+        "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
+        f"{FALLBACK_VERSION},hangzhou-published-composition-v0-older",
+    )
 
     settings = ProductionHttpSettings.from_env(dotenv_path=tmp_path / "missing.env")
 
@@ -36,6 +41,10 @@ def test_production_settings_load_database_and_snapshot_selection(
     assert settings.published_snapshot.root == tmp_path.resolve()
     assert settings.published_snapshot.city_id == "hangzhou"
     assert settings.published_snapshot.version == VERSION
+    assert settings.published_snapshot.fallback_versions == (
+        FALLBACK_VERSION,
+        "hangzhou-published-composition-v0-older",
+    )
 
 
 def test_production_settings_require_explicit_published_version(
@@ -67,6 +76,7 @@ def test_relative_snapshot_root_resolves_from_dotenv_directory(
         "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT",
         "TRAVEL_AGENT_PUBLISHED_CITY_ID",
         "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION",
+        "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -82,6 +92,7 @@ def test_relative_snapshot_root_resolves_from_dotenv_directory(
             "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT",
             "TRAVEL_AGENT_PUBLISHED_CITY_ID",
             "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION",
+            "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
         ):
             os.environ.pop(name, None)
 
@@ -110,10 +121,47 @@ def test_production_composition_rejects_snapshot_city_mismatch(tmp_path: Path) -
         build_production_http_app(_settings(tmp_path))
 
 
-def _settings(root: Path) -> ProductionHttpSettings:
+def test_production_composition_uses_explicit_known_good_fallback(
+    tmp_path: Path,
+) -> None:
+    _write_snapshot(tmp_path, _snapshot(status="candidate"))
+    _write_snapshot(
+        tmp_path,
+        _snapshot(version=FALLBACK_VERSION),
+    )
+
+    app = build_production_http_app(
+        _settings(tmp_path, fallback_versions=(FALLBACK_VERSION,))
+    )
+
+    assert app.state.published_snapshot_requested_version == VERSION
+    assert app.state.published_snapshot_selected_version == FALLBACK_VERSION
+    assert app.state.published_snapshot_fallback_used is True
+
+
+def test_production_composition_fails_when_current_and_fallback_are_invalid(
+    tmp_path: Path,
+) -> None:
+    _write_snapshot(tmp_path, _snapshot(status="candidate"))
+    _write_snapshot(
+        tmp_path,
+        _snapshot(version=FALLBACK_VERSION, status="candidate"),
+    )
+
+    with pytest.raises(ValueError, match="no valid published solver snapshot"):
+        build_production_http_app(
+            _settings(tmp_path, fallback_versions=(FALLBACK_VERSION,))
+        )
+
+
+def _settings(
+    root: Path,
+    *,
+    fallback_versions: tuple[str, ...] = (),
+) -> ProductionHttpSettings:
     return ProductionHttpSettings(
         DatabaseSettings(url="sqlite://"),
-        PublishedSnapshotSettings(root, "hangzhou", VERSION),
+        PublishedSnapshotSettings(root, "hangzhou", VERSION, fallback_versions),
     )
 
 
@@ -123,7 +171,7 @@ def _write_snapshot(root: Path, snapshot: dict[str, Any]) -> None:
         "content_hash": published_snapshot_content_hash(snapshot),
         "snapshot": snapshot,
     }
-    (root / f"{VERSION}.json").write_text(
+    (root / f"{snapshot['version']}.json").write_text(
         json.dumps(payload, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -131,6 +179,7 @@ def _write_snapshot(root: Path, snapshot: dict[str, Any]) -> None:
 
 def _snapshot(
     *,
+    version: str = VERSION,
     status: str = "published",
     city_id: str = "hangzhou",
 ) -> dict[str, Any]:
@@ -184,7 +233,7 @@ def _snapshot(
         )
     ]
     return {
-        "version": VERSION,
+        "version": version,
         "status": status,
         "city_id": city_id,
         "od_version": "gaode-composition-test-v1",

@@ -129,9 +129,9 @@ fallback_reason
 
 ## 5. 当前未完成
 
-- 已实现不可变 JSON `PublishedSolverDataProvider`、候选快照离线回放和生产 fail-fast 组合根；尚未接入正式发布数据表或正式快照；
-- 已实现本机跨进程 JSON 持久化缓存，默认位于 Git 忽略的 `var/cache/gaode-routes.json`；尚未建立跨机器共享缓存、配额看板和熔断状态；
-- 已在真实网络验证节流后完整构建不再触发限流；尚未完成高德控制台配额看板、生产 TLS/代理、跨机器缓存、熔断和故障恢复；
+- 已实现不可变 JSON `PublishedSolverDataProvider`、正式快照、生产组合根、显式已知良好旧版本回退和生产回放；尚未迁入正式数据库发布表；
+- 已实现本机跨进程 JSON 路由缓存和 Redis 跨机器路线缓存；Provider 治理同样支持 JSON/Redis 两种后端，包含按日安全预算、请求间隔、失败分类和熔断状态；
+- 已在真实高德网络验证节流后完整构建不再触发限流；Redis 共享后端通过 fakeredis 双客户端单元测试，正式 Redis 协议、TLS/ACL/监控和多实例故障恢复只允许在用户提供并授权的服务器上验证；
 - 尚未完成真实餐厅节点加入后的全量 OD 重建与新 Revision 重排。
 
 ## 6. 失败明细与持久化缓存
@@ -154,7 +154,35 @@ occurred_at
 var/cache/gaode-routes.json
 ```
 
-也可通过 `--cache` 显式指定。缓存只减少重复成功请求，不改变受控联网边界：没有 `--execute-live` 时脚本仍不得访问高德。首轮无间隔诊断曾触发 `rate_limited`；按约 1.2 秒节流复查及使用默认 1.05 秒间隔完整重建后，所有有效请求均为 `infocode=10000`。这只证明当前受控构建可用，不替代配额监控和熔断。
+也可通过 `--cache` 显式指定。缓存只减少重复成功请求，不改变受控联网边界：没有 `--execute-live` 时脚本仍不得访问高德。首轮无间隔诊断曾触发 `rate_limited`；按约 1.2 秒节流复查及使用默认 1.05 秒间隔完整重建后，所有有效请求均为 `infocode=10000`。
+
+当前构建脚本已把缓存未命中请求接入持久化治理状态：
+
+```dotenv
+TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET=1000
+TRAVEL_AGENT_PROVIDER_CIRCUIT_FAILURE_THRESHOLD=3
+TRAVEL_AGENT_PROVIDER_CIRCUIT_OPEN_SECONDS=300
+```
+
+默认状态路径为 `var/ops/provider-governance.json`，可通过 `--governance-state` 指定。每日预算是项目侧安全上限，不等于或替代高德控制台套餐配额；生产值必须基于实际套餐配置并保留余量。查看状态：
+
+```powershell
+py -3.12 scripts/show_provider_governance.py
+py -3.12 scripts/show_provider_governance.py --json
+```
+
+缓存命中不消耗请求预算；`rate_limited` 立即打开熔断，超时、HTTP、API 和无效响应按连续失败阈值打开熔断。短请求间隔只会等待到共享时间窗结束；每日预算耗尽和熔断打开会直接阻止继续联网，不会自动绕过治理或改用另一个 Key。
+
+多机器发布节点必须配置同一个经过授权的 Redis：
+
+```dotenv
+TRAVEL_AGENT_PROVIDER_REDIS_URL=redis://:<password>@<host>:<port>/<db>
+TRAVEL_AGENT_PROVIDER_REDIS_PREFIX=travel-agent
+```
+
+配置 Redis URL 后，治理状态和高德路线缓存同时切换到 Redis；连接或认证失败会终止构建，不会静默退回本地 JSON。Redis key 使用前缀隔离，路线 key 为 SHA-256，不包含明文坐标或凭证。正式环境应使用 TLS、最小权限 ACL、专用逻辑库/前缀、内存与淘汰监控，并验证断连和恢复流程。
+
+环境边界：不得在开发本机安装、启动或部署测试 Redis/MySQL 服务。本地自动化只允许使用不监听网络端口的纯单元/仿真后端；真实 Redis 验收必须连接用户明确提供并授权的服务器。
 
 ## 7. 路线点与发布快照门禁
 

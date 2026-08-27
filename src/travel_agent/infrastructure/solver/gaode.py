@@ -9,6 +9,7 @@ Traceability: C6, ADR-0010, A6-8.1.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Protocol
 
 import httpx
+from redis import Redis
 
 from travel_agent.runtime_config import load_runtime_environment
 from travel_agent.solver import (
@@ -321,6 +323,89 @@ class JsonFileGaodeRouteCache:
         temporary.replace(self.path)
 
 
+class RedisGaodeRouteCache:
+    """Cross-machine route cache with credential-free hashed keys."""
+
+    def __init__(
+        self,
+        client: Redis[str],
+        *,
+        key_prefix: str = "travel-agent",
+    ) -> None:
+        if not key_prefix.strip():
+            raise ValueError("Gaode Redis cache key prefix is required")
+        self._client = client
+        self._key_prefix = f"{key_prefix}:gaode-route:"
+
+    @classmethod
+    def from_url(
+        cls,
+        redis_url: str,
+        *,
+        key_prefix: str = "travel-agent",
+    ) -> RedisGaodeRouteCache:
+        if not redis_url.strip():
+            raise ValueError("Gaode Redis cache URL is required")
+        return cls(
+            Redis.from_url(redis_url, decode_responses=True),
+            key_prefix=key_prefix,
+        )
+
+    def get(self, key: tuple[object, ...], now: datetime) -> GaodeRoute | None:
+        cache_key = self._redis_key(key)
+        raw = self._client.get(cache_key)
+        if raw is None:
+            return None
+        try:
+            payload = json.loads(_redis_text(raw))
+            if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+                raise ValueError
+            route = GaodeRoute(
+                ODTravelMode(str(payload["mode"])),
+                int(payload["duration_min"]),
+                int(payload["distance_m"]),
+                datetime.fromisoformat(str(payload["fetched_at"])),
+            )
+            expires_at = datetime.fromisoformat(str(payload["expires_at"]))
+            if expires_at.tzinfo is None:
+                raise ValueError
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("Gaode Redis route cache is invalid") from exc
+        if expires_at <= now:
+            self._client.delete(cache_key)
+            return None
+        return route
+
+    def put(
+        self,
+        key: tuple[object, ...],
+        route: GaodeRoute,
+        *,
+        expires_at: datetime,
+    ) -> None:
+        ttl_seconds = max(
+            1,
+            math.ceil((expires_at - route.fetched_at).total_seconds()),
+        )
+        payload = {
+            "schema_version": 1,
+            "mode": route.mode.value,
+            "duration_min": route.duration_min,
+            "distance_m": route.distance_m,
+            "fetched_at": route.fetched_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
+        }
+        self._client.set(
+            self._redis_key(key),
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            ex=ttl_seconds,
+        )
+
+    def _redis_key(self, key: tuple[object, ...]) -> str:
+        digest = hashlib.sha256(_cache_key_text(key).encode("utf-8")).hexdigest()
+        return self._key_prefix + digest
+
+
 class GaodeRouteClient:
     def __init__(
         self,
@@ -330,12 +415,16 @@ class GaodeRouteClient:
         transport: GaodeHttpTransport | None = None,
         cache: GaodeRouteCache | None = None,
         before_request: Callable[[], None] | None = None,
+        on_success: Callable[[], None] | None = None,
+        on_failure: Callable[[str], None] | None = None,
     ) -> None:
         self._settings = settings
         self._clock = clock
         self._transport = transport or HttpxGaodeTransport(settings.base_url)
         self._cache = cache or InMemoryGaodeRouteCache()
         self._before_request = before_request or (lambda: None)
+        self._on_success = on_success or (lambda: None)
+        self._on_failure = on_failure or (lambda _failure_code: None)
 
     def fetch(
         self,
@@ -367,6 +456,7 @@ class GaodeRouteClient:
             )
             route = _parse_route(payload, mode, now)
         except GaodeRouteError as exc:
+            self._on_failure(exc.code.value)
             if exc.occurred_at is not None:
                 raise
             raise GaodeRouteError(
@@ -375,6 +465,7 @@ class GaodeRouteClient:
                 infocode=exc.infocode,
                 occurred_at=now,
             ) from exc
+        self._on_success()
         self._cache.put(
             key,
             route,
@@ -532,6 +623,14 @@ def _cache_key(
 
 def _cache_key_text(key: tuple[object, ...]) -> str:
     return json.dumps(key, ensure_ascii=False, separators=(",", ":"))
+
+
+def _redis_text(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, str):
+        return value
+    raise ValueError("Redis cache value must be text")
 
 
 def _path_for(mode: ODTravelMode) -> str:

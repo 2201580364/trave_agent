@@ -275,10 +275,16 @@ class QWeatherForecastClient:
         clock: Callable[[], datetime],
         *,
         transport: QWeatherHttpTransport | None = None,
+        before_request: Callable[[], None] | None = None,
+        on_success: Callable[[], None] | None = None,
+        on_failure: Callable[[str], None] | None = None,
     ) -> None:
         self._settings = settings
         self._clock = clock
         self._transport = transport or HttpxQWeatherTransport(settings.base_url)
+        self._before_request = before_request or (lambda: None)
+        self._on_success = on_success or (lambda: None)
+        self._on_failure = on_failure or (lambda _failure_code: None)
 
     def fetch_three_day(self, *, city_id: str) -> QWeatherForecastSnapshot:
         if not city_id:
@@ -286,18 +292,25 @@ class QWeatherForecastClient:
         now = self._clock()
         if now.tzinfo is None:
             raise ValueError("QWeather clock must return timezone-aware datetimes")
-        payload = self._transport.get_json(
-            "/v7/weather/3d",
-            params={"location": self._settings.location_id},
-            headers={"X-QW-Api-Key": self._settings.api_key},
-            timeout_seconds=self._settings.timeout_seconds,
-        )
-        return _parse_forecast(
-            payload,
-            settings=self._settings,
-            city_id=city_id,
-            fetched_at=now,
-        )
+        self._before_request()
+        try:
+            payload = self._transport.get_json(
+                "/v7/weather/3d",
+                params={"location": self._settings.location_id},
+                headers={"X-QW-Api-Key": self._settings.api_key},
+                timeout_seconds=self._settings.timeout_seconds,
+            )
+            snapshot = _parse_forecast(
+                payload,
+                settings=self._settings,
+                city_id=city_id,
+                fetched_at=now,
+            )
+        except QWeatherForecastError as exc:
+            self._on_failure(exc.code.value)
+            raise
+        self._on_success()
+        return snapshot
 
 
 def classify_qweather_severity(condition: str) -> WeatherSeverity:

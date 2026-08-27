@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 
+import fakeredis
 import pytest
 
 from travel_agent.infrastructure.solver import (
@@ -15,6 +16,7 @@ from travel_agent.infrastructure.solver import (
     GaodeSettings,
     InMemoryGaodeRouteCache,
     JsonFileGaodeRouteCache,
+    RedisGaodeRouteCache,
 )
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -108,6 +110,7 @@ def test_gaode_settings_require_key(monkeypatch) -> None:
 def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     clock = FixedClock()
     request_gates: list[str] = []
+    outcomes: list[str] = []
     transport = FakeTransport(
         {
             "/v3/direction/walking": _payload(
@@ -128,6 +131,8 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
         transport=transport,
         cache=InMemoryGaodeRouteCache(),
         before_request=lambda: request_gates.append("request"),
+        on_success=lambda: outcomes.append("success"),
+        on_failure=lambda code: outcomes.append(f"failure:{code}"),
     )
 
     first = client.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
@@ -139,6 +144,7 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     assert first.mode is ODTravelMode.WALKING
     assert len(transport.calls) == 1
     assert request_gates == ["request"]
+    assert outcomes == ["success"]
     path, params, timeout = transport.calls[0]
     assert path == "/v3/direction/walking"
     assert params["origin"] == "120.165000,30.259000"
@@ -150,6 +156,7 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     client.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
     assert len(transport.calls) == 2
     assert request_gates == ["request", "request"]
+    assert outcomes == ["success", "success"]
 
 
 def test_gaode_cache_does_not_mix_route_data_versions() -> None:
@@ -191,6 +198,7 @@ def test_gaode_cache_does_not_mix_route_data_versions() -> None:
 
 
 def test_gaode_client_classifies_api_rate_limit() -> None:
+    failures: list[str] = []
     transport = FakeTransport(
         {
             "/v3/direction/driving": {
@@ -204,6 +212,7 @@ def test_gaode_client_classifies_api_rate_limit() -> None:
         GaodeSettings("secret", enabled_modes=(ODTravelMode.DRIVING,)),
         FixedClock(),
         transport=transport,
+        on_failure=failures.append,
     )
 
     with pytest.raises(GaodeRouteError) as raised:
@@ -212,6 +221,7 @@ def test_gaode_client_classifies_api_rate_limit() -> None:
     assert raised.value.code is GaodeFailureCode.RATE_LIMITED
     assert raised.value.infocode == "10044"
     assert raised.value.occurred_at == NOW
+    assert failures == ["rate_limited"]
 
 
 def test_gaode_file_cache_reuses_routes_without_storing_key(tmp_path) -> None:
@@ -253,6 +263,57 @@ def test_gaode_file_cache_reuses_routes_without_storing_key(tmp_path) -> None:
     assert len(first_transport.calls) == 1
     assert second_transport.calls == []
     assert "secret-not-for-cache" not in cache_path.read_text(encoding="utf-8")
+
+
+def test_gaode_redis_cache_reuses_routes_across_clients_without_credentials() -> None:
+    server = fakeredis.FakeServer()
+    first_redis = fakeredis.FakeRedis(server=server, decode_responses=True)
+    second_redis = fakeredis.FakeRedis(server=server, decode_responses=True)
+    settings = GaodeSettings(
+        "secret-not-for-redis",
+        data_version="gaode-redis-test-v1",
+        enabled_modes=(ODTravelMode.WALKING,),
+    )
+    first_transport = FakeTransport(
+        {
+            "/v3/direction/walking": _payload(
+                duration_seconds=600,
+                distance_m=1_200,
+            )
+        }
+    )
+    first = GaodeRouteClient(
+        settings,
+        FixedClock(),
+        transport=first_transport,
+        cache=RedisGaodeRouteCache(
+            first_redis,  # type: ignore[arg-type]
+            key_prefix="test-travel-agent",
+        ),
+    )
+    fetched = first.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
+    second_transport = FakeTransport(
+        error=GaodeRouteError(GaodeFailureCode.TIMEOUT, "must not be called")
+    )
+    second = GaodeRouteClient(
+        settings,
+        FixedClock(),
+        transport=second_transport,
+        cache=RedisGaodeRouteCache(
+            second_redis,  # type: ignore[arg-type]
+            key_prefix="test-travel-agent",
+        ),
+    )
+
+    cached = second.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
+    keys = list(first_redis.scan_iter(match="test-travel-agent:gaode-route:*"))
+    values = [first_redis.get(key) for key in keys]
+
+    assert cached == fetched
+    assert second_transport.calls == []
+    assert len(keys) == 1
+    assert "secret-not-for-redis" not in f"{keys!r}{values!r}"
+    assert "120.165" not in str(keys)
 
 
 def test_gaode_builder_materializes_both_directions_and_selects_walking() -> None:

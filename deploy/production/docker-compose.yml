@@ -1,0 +1,87 @@
+name: travel-agent-infra
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: travel-agent-mysql
+    restart: unless-stopped
+    mem_limit: 768m
+    mem_reservation: 384m
+    cpus: 1.5
+    pids_limit: 256
+    stop_grace_period: 60s
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-travel_agent}"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      - --skip-name-resolve=ON
+    ports:
+      - "127.0.0.1:${MYSQL_BIND_PORT:-3306}:3306"
+    volumes:
+      - /srv/travel-agent/data/mysql:/var/lib/mysql
+      - /opt/travel-agent/infra/mysql/travel-agent.cnf:/etc/mysql/conf.d/travel-agent.cnf:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql --protocol=socket -uroot --batch --skip-column-names -e "SELECT 1" >/dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "10"
+    networks:
+      - backend
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: travel-agent-redis
+    restart: unless-stopped
+    mem_limit: 192m
+    mem_reservation: 64m
+    cpus: 0.5
+    pids_limit: 128
+    stop_grace_period: 30s
+    user: "999:999"
+    environment:
+      REDIS_APP_USER: "${REDIS_APP_USER:-travel_agent}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+    ports:
+      - "127.0.0.1:${REDIS_BIND_PORT:-6379}:6379"
+    volumes:
+      - /srv/travel-agent/data/redis:/data
+      - /opt/travel-agent/infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - /etc/travel-agent/redis/users.acl:/usr/local/etc/redis/users.acl:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli --user "$${REDIS_APP_USER}" --pass "$${REDIS_PASSWORD}" --no-auth-warning ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "10"
+    networks:
+      - backend
+
+networks:
+  backend:
+    name: travel-agent-backend
+    driver: bridge

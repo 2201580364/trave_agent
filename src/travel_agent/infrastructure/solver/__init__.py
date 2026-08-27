@@ -13,6 +13,7 @@ from .gaode import (
     HttpxGaodeTransport,
     InMemoryGaodeRouteCache,
     JsonFileGaodeRouteCache,
+    RedisGaodeRouteCache,
 )
 from .gateway import (
     InMemoryPublishedSolverDataProvider,
@@ -44,6 +45,7 @@ __all__ = [
     "HttpxGaodeTransport",
     "InMemoryGaodeRouteCache",
     "JsonFileGaodeRouteCache",
+    "RedisGaodeRouteCache",
     "JsonPublishedSolverDataProvider",
     "published_snapshot_content_hash",
 ]

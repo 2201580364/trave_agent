@@ -101,5 +101,28 @@ py -3.12 scripts/build_published_solver_snapshot.py `
 ## 6. 当前未完成
 
 - 三日之外的正式月度气候基线 Provider 尚未实现；
-- 和风/高德配额看板、限流、熔断、跨机器缓存和旧快照继续服务策略尚未完成生产实现与演练；
+- 和风与高德快照脚本已共用 Provider 治理接口；未配置 Redis 时使用 `var/ops/provider-governance.json`，配置 `TRAVEL_AGENT_PROVIDER_REDIS_URL` 时使用 Redis 跨机器共享状态；两种后端均实现按日安全预算、请求间隔、成功/失败分类、连续失败熔断和限流立即熔断；
+- 生产组合根已支持显式已知良好旧 Published Snapshot 回退，配置与门禁见 ADR-0016；当前仍缺跨机器共享治理后端、正式配额来源/集中看板和多实例故障演练；
 - A6-8.2 真实 MySQL 部署与恢复演练尚未完成。
+
+## 7. 配额、限流与熔断配置
+
+本地 `.env` 或部署 Secret/环境变量可配置：
+
+```dotenv
+TRAVEL_AGENT_QWEATHER_DAILY_REQUEST_BUDGET=100
+TRAVEL_AGENT_PROVIDER_CIRCUIT_FAILURE_THRESHOLD=3
+TRAVEL_AGENT_PROVIDER_CIRCUIT_OPEN_SECONDS=300
+TRAVEL_AGENT_PROVIDER_REDIS_URL=
+TRAVEL_AGENT_PROVIDER_REDIS_PREFIX=travel-agent
+```
+
+每日预算是项目侧的安全上限，不声称等于和风控制台套餐配额；生产值必须小于或等于实际可用配额并保留发布余量。状态文件不保存 API Key、专属 Host 或请求头。需要机器读取时执行：
+
+```powershell
+py -3.12 scripts/show_provider_governance.py --json
+```
+
+Redis URL 留空时使用本地 JSON。多机器发布节点必须连接同一授权 Redis；配置后连接/认证失败会终止快照构建，不会静默退回各自本地状态。正式环境还需完成 TLS、ACL、监控和断连恢复演练。
+
+环境边界：不得在开发本机安装、启动或部署测试 Redis/MySQL 服务。真实 Redis 认证、TLS、ACL 和故障演练只在用户提供并授权的服务器上执行。

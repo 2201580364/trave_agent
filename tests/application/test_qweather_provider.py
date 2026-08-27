@@ -148,13 +148,22 @@ def test_classify_qweather_severity(
 
 def test_qweather_client_parses_three_day_forecast_with_provenance() -> None:
     transport = FakeTransport(_payload())
+    request_gates: list[str] = []
+    outcomes: list[str] = []
     settings = QWeatherSettings(
         "weather-secret",
         base_url="https://api.example.test",
         timeout_seconds=4,
         data_version="qweather-hangzhou-2026-08-27-v1",
     )
-    client = QWeatherForecastClient(settings, lambda: NOW, transport=transport)
+    client = QWeatherForecastClient(
+        settings,
+        lambda: NOW,
+        transport=transport,
+        before_request=lambda: request_gates.append("request"),
+        on_success=lambda: outcomes.append("success"),
+        on_failure=lambda code: outcomes.append(f"failure:{code}"),
+    )
 
     snapshot = client.fetch_three_day(city_id="hangzhou")
 
@@ -184,6 +193,8 @@ def test_qweather_client_parses_three_day_forecast_with_provenance() -> None:
     assert serialized["provider"] == "qweather"
     assert "weather-secret" not in str(serialized)
     assert len(qweather_snapshot_content_hash(serialized)) == 64
+    assert request_gates == ["request"]
+    assert outcomes == ["success"]
 
 
 def test_http_transport_sends_api_key_only_in_header(
@@ -231,10 +242,12 @@ def test_http_transport_sends_api_key_only_in_header(
 
 
 def test_qweather_client_classifies_api_rate_limit() -> None:
+    failures: list[str] = []
     client = QWeatherForecastClient(
         QWeatherSettings("secret", base_url="https://api.example.test"),
         lambda: NOW,
         transport=FakeTransport(_payload(code="429")),
+        on_failure=failures.append,
     )
 
     with pytest.raises(QWeatherForecastError) as raised:
@@ -242,6 +255,7 @@ def test_qweather_client_classifies_api_rate_limit() -> None:
 
     assert raised.value.code is QWeatherFailureCode.RATE_LIMITED
     assert raised.value.provider_code == "429"
+    assert failures == ["rate_limited"]
 
 
 def test_qweather_client_rejects_incomplete_forecast() -> None:

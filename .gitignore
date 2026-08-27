@@ -3,14 +3,39 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+build/
+dist/
+*.egg-info/
+
+# Python tooling and coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+pytestdebug.log
 
 # IDE
 .idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
 
 # 环境与密钥
 .env
 .env.*
 !.env.example
+*.env
+/deploy/production/infra.env
+/deploy/production/app.env
 
 # 运行时产物
 *.log
@@ -25,3 +50,19 @@ frontend/.swc/
 # Local development runtime data
 .local/
 var/
+
+# Local deployment data, secrets and database artifacts
+/deploy/production/data/
+/deploy/production/backups/
+/deploy/production/redis/users.acl
+/deploy/production/mysql/*.sql
+/deploy/production/mysql/*.sql.gz
+/deploy/production/redis/dump.rdb
+/deploy/production/redis/appendonly.aof
+/deploy/production/redis/appendonlydir/
+
+# SSH deployment credentials (never commit deployment identity material)
+/id_rsa
+/id_rsa.pub
+*.pem
+*.ppk

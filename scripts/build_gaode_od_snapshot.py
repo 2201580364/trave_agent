@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
-from collections.abc import Callable
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,11 +18,19 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from travel_agent.infrastructure.provider_governance import (  # noqa: E402
+    ProviderBlockCode,
+    ProviderGovernancePolicy,
+    ProviderRequestBlocked,
+    ProviderRequestGovernor,
+    build_provider_request_governor,
+)
 from travel_agent.infrastructure.solver import (  # noqa: E402
     GaodeODSnapshotBuilder,
     GaodeRouteClient,
     GaodeSettings,
     JsonFileGaodeRouteCache,
+    RedisGaodeRouteCache,
 )
 from travel_agent.solver import (  # noqa: E402
     ApproximateTravelTimeProvider,
@@ -49,6 +57,12 @@ def main() -> int:
         type=float,
         default=1.05,
         help="Minimum interval between live cache-miss requests; defaults to 1.05s.",
+    )
+    parser.add_argument(
+        "--governance-state",
+        type=Path,
+        default=PROJECT_ROOT / "var" / "ops" / "provider-governance.json",
+        help="Credential-free shared quota and circuit-breaker state.",
     )
     parser.add_argument(
         "--allow-approximate-fallback",
@@ -84,11 +98,57 @@ def main() -> int:
     def clock() -> datetime:
         return datetime.now(UTC)
 
+    redis_url = os.environ.get("TRAVEL_AGENT_PROVIDER_REDIS_URL", "").strip()
+    redis_key_prefix = os.environ.get(
+        "TRAVEL_AGENT_PROVIDER_REDIS_PREFIX",
+        "travel-agent",
+    ).strip()
+    governor = build_provider_request_governor(
+        ProviderGovernancePolicy(
+            provider="gaode",
+            daily_request_budget=_positive_env_int(
+                "TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET",
+                1_000,
+            ),
+            minimum_interval_seconds=args.request_interval_seconds,
+            consecutive_failure_threshold=_positive_env_int(
+                "TRAVEL_AGENT_PROVIDER_CIRCUIT_FAILURE_THRESHOLD",
+                3,
+            ),
+            circuit_open_seconds=_positive_env_int(
+                "TRAVEL_AGENT_PROVIDER_CIRCUIT_OPEN_SECONDS",
+                300,
+            ),
+            circuit_failure_codes=frozenset(
+                {
+                    "timeout",
+                    "rate_limited",
+                    "http_error",
+                    "api_error",
+                    "invalid_response",
+                }
+            ),
+        ),
+        clock,
+        json_path=args.governance_state,
+        redis_url=redis_url,
+        redis_key_prefix=redis_key_prefix,
+    )
+    route_cache = (
+        RedisGaodeRouteCache.from_url(
+            redis_url,
+            key_prefix=redis_key_prefix,
+        )
+        if redis_url
+        else JsonFileGaodeRouteCache(args.cache)
+    )
     client = GaodeRouteClient(
         settings,
         clock,
-        cache=JsonFileGaodeRouteCache(args.cache),
-        before_request=_request_pacer(args.request_interval_seconds),
+        cache=route_cache,
+        before_request=lambda: _wait_for_request_slot(governor),
+        on_success=governor.record_success,
+        on_failure=governor.record_failure,
     )
     fallback = None
     if args.allow_approximate_fallback:
@@ -126,27 +186,43 @@ def main() -> int:
     print(f"Approximate fallback: {built.report.fallback_pair_count}")
     print(f"Missing: {built.report.missing_pair_count}")
     print(f"Mode failures: {len(built.report.failure_details)}")
-    print(f"Cache: {args.cache}")
+    print(f"Cache backend: {'redis' if redis_url else 'json'}")
+    if not redis_url:
+        print(f"Cache: {args.cache}")
     print(f"Request interval: {args.request_interval_seconds:.2f}s")
+    usage = governor.snapshot()
+    print(
+        "Provider budget: "
+        f"{usage.request_count}/{usage.daily_request_budget} "
+        f"({usage.remaining_request_budget} remaining)"
+    )
+    print(f"Provider governance backend: {'redis' if redis_url else 'json'}")
+    if not redis_url:
+        print(f"Provider governance: {args.governance_state}")
     print(f"Report: {args.output}")
     return 0 if built.report.complete else 2
 
 
-def _request_pacer(interval_seconds: float) -> Callable[[], None]:
-    """Return a cache-miss gate that keeps live requests below a fixed rate."""
+def _wait_for_request_slot(governor: ProviderRequestGovernor) -> None:
+    """Wait only for the shared short rate window; propagate hard governance blocks."""
 
-    last_request_at: float | None = None
-
-    def pace() -> None:
-        nonlocal last_request_at
-        now = time.monotonic()
-        if last_request_at is not None:
-            remaining = interval_seconds - (now - last_request_at)
+    while True:
+        try:
+            governor.before_request()
+            return
+        except ProviderRequestBlocked as exc:
+            if exc.code is not ProviderBlockCode.RATE_WINDOW or exc.retry_at is None:
+                raise
+            remaining = (exc.retry_at - datetime.now(UTC)).total_seconds()
             if remaining > 0:
                 time.sleep(remaining)
-        last_request_at = time.monotonic()
 
-    return pace
+
+def _positive_env_int(name: str, default: int) -> int:
+    value = int(os.environ.get(name, str(default)))
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
 
 
 def _load_coordinates(

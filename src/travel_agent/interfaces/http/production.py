@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from os import PathLike
@@ -17,6 +18,8 @@ from travel_agent.runtime_config import load_runtime_environment
 
 from .composition import HttpSettings, build_http_app
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class PublishedSnapshotSettings:
@@ -25,12 +28,18 @@ class PublishedSnapshotSettings:
     root: Path
     city_id: str
     version: str
+    fallback_versions: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.city_id:
             raise ValueError("published snapshot city id is required")
         if not self.version:
             raise ValueError("published snapshot version is required")
+        if any(not item.strip() for item in self.fallback_versions):
+            raise ValueError("published snapshot fallback versions must be non-empty")
+        versions = (self.version, *self.fallback_versions)
+        if len(set(versions)) != len(versions):
+            raise ValueError("published snapshot versions must be unique")
 
     @classmethod
     def from_env(
@@ -47,12 +56,20 @@ class PublishedSnapshotSettings:
         root = os.environ.get("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT", "").strip()
         city_id = os.environ.get("TRAVEL_AGENT_PUBLISHED_CITY_ID", "").strip()
         version = os.environ.get("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION", "").strip()
+        fallback_versions = tuple(
+            item.strip()
+            for item in os.environ.get(
+                "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
+                "",
+            ).split(",")
+            if item.strip()
+        )
         if not root:
             raise ValueError("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT is required")
         root_path = Path(root)
         if not root_path.is_absolute() and relative_to is not None:
             root_path = relative_to / root_path
-        return cls(root_path.resolve(), city_id, version)
+        return cls(root_path.resolve(), city_id, version, fallback_versions)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,22 +94,52 @@ class ProductionHttpSettings:
 
 
 def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
-    """Build the HTTP application and fail fast on unpublished solver data."""
+    """Build the HTTP application from a current or explicit fallback snapshot."""
 
     published_data = JsonPublishedSolverDataProvider(
         settings.published_snapshot.root,
     )
-    selected = published_data.load(settings.published_snapshot.version)
-    if selected.city_id != settings.published_snapshot.city_id:
-        raise ValueError("published solver snapshot city mismatch")
-    versions = FixedDataSnapshotVersionProvider(
-        {settings.published_snapshot.city_id: settings.published_snapshot.version}
+    selected = None
+    failures: list[str] = []
+    requested_versions = (
+        settings.published_snapshot.version,
+        *settings.published_snapshot.fallback_versions,
     )
-    return cast(
+    for version in requested_versions:
+        try:
+            candidate = published_data.load(version)
+            if candidate.city_id != settings.published_snapshot.city_id:
+                raise ValueError(f"published solver snapshot city mismatch: {version}")
+        except (LookupError, ValueError) as exc:
+            failures.append(str(exc))
+            continue
+        selected = candidate
+        break
+    if selected is None:
+        detail = "; ".join(failures)
+        raise ValueError(f"no valid published solver snapshot is available: {detail}")
+    fallback_used = selected.version != settings.published_snapshot.version
+    if fallback_used:
+        logger.error(
+            "published snapshot fallback activated",
+            extra={
+                "component": "http.production",
+                "requested_snapshot_version": settings.published_snapshot.version,
+                "selected_snapshot_version": selected.version,
+            },
+        )
+    snapshot_versions = FixedDataSnapshotVersionProvider(
+        {settings.published_snapshot.city_id: selected.version}
+    )
+    app = cast(
         FastAPI,
         build_http_app(
             HttpSettings(settings.database),
-            versions,
+            snapshot_versions,
             published_data,
         ),
     )
+    app.state.published_snapshot_requested_version = settings.published_snapshot.version
+    app.state.published_snapshot_selected_version = selected.version
+    app.state.published_snapshot_fallback_used = fallback_used
+    return app
