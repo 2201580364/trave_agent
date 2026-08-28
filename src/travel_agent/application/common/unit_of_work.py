@@ -8,10 +8,11 @@ from typing import Protocol, Self
 from travel_agent.domain.planning.repositories import (
     GenerationIntentRepository,
     SolverRunRepository,
-    TripRepository,
     TripDraftRepository,
+    TripRepository,
     TripRevisionRepository,
 )
+from travel_agent.domain.sharing import PlanShareRepository
 
 
 class UnitOfWork(Protocol):
@@ -20,6 +21,7 @@ class UnitOfWork(Protocol):
     trips: TripRepository
     trip_revisions: TripRevisionRepository
     solver_runs: SolverRunRepository
+    plan_shares: PlanShareRepository
 
     def __enter__(self) -> Self: ...
 

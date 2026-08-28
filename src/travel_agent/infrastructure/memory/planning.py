@@ -23,6 +23,7 @@ from travel_agent.domain.planning import (
     TripDraft,
     TripRevision,
 )
+from travel_agent.domain.sharing import PlanShare
 
 
 @dataclass(slots=True)
@@ -32,6 +33,7 @@ class InMemoryPlanningStore:
     trips: dict[str, Trip] = field(default_factory=dict)
     trip_revisions: dict[str, TripRevision] = field(default_factory=dict)
     solver_runs: dict[str, SolverRun] = field(default_factory=dict)
+    plan_shares: dict[str, PlanShare] = field(default_factory=dict)
 
 
 class InMemoryTripDraftRepository:
@@ -154,6 +156,32 @@ class InMemoryTripRevisionRepository(_InMemoryAddRepository):
         )
 
 
+class InMemoryPlanShareRepository(_InMemoryAddRepository):
+    def __init__(self, records: dict[str, PlanShare]) -> None:
+        super().__init__(records, "plan_share_id")
+        self._share_records = records
+
+    def get_by_intent(self, plan_share_intent_id: str) -> PlanShare | None:
+        return next(
+            (
+                share
+                for share in self._share_records.values()
+                if share.plan_share_intent_id == plan_share_intent_id
+            ),
+            None,
+        )
+
+    def get_by_public_token_hash(self, public_token_hash: str) -> PlanShare | None:
+        return next(
+            (
+                share
+                for share in self._share_records.values()
+                if share.public_token_hash == public_token_hash
+            ),
+            None,
+        )
+
+
 class InMemoryUnitOfWork:
     def __init__(self, store: InMemoryPlanningStore) -> None:
         self._store = store
@@ -164,6 +192,7 @@ class InMemoryUnitOfWork:
         self.trips = InMemoryTripRepository({})
         self.trip_revisions = InMemoryTripRevisionRepository({})
         self.solver_runs = _InMemoryAddRepository({}, "solver_run_id")
+        self.plan_shares = InMemoryPlanShareRepository({})
 
     def __enter__(self) -> Self:
         self._working = deepcopy(self._store)
@@ -178,6 +207,7 @@ class InMemoryUnitOfWork:
         self.solver_runs = _InMemoryAddRepository(
             self._working.solver_runs, "solver_run_id"
         )
+        self.plan_shares = InMemoryPlanShareRepository(self._working.plan_shares)
         self._committed = False
         return self
 
@@ -200,6 +230,7 @@ class InMemoryUnitOfWork:
         self._store.trips = deepcopy(self._working.trips)
         self._store.trip_revisions = deepcopy(self._working.trip_revisions)
         self._store.solver_runs = deepcopy(self._working.solver_runs)
+        self._store.plan_shares = deepcopy(self._working.plan_shares)
         self._committed = True
 
     def rollback(self) -> None:

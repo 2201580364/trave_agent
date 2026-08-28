@@ -26,6 +26,7 @@ from travel_agent.domain.planning import (
     TripDraft,
     TripRevision,
 )
+from travel_agent.domain.sharing import PlanShare
 from travel_agent.infrastructure.database import SqlAlchemyUnitOfWork, create_schema
 from travel_agent.infrastructure.memory import SequenceIdGenerator
 
@@ -260,4 +261,31 @@ def test_alembic_upgrade_builds_the_same_schema(tmp_path: Path) -> None:
     )
     with SqlAlchemyUnitOfWork(factory) as uow:
         uow.drafts.save(_draft())
+        uow.plan_shares.add(
+            PlanShare(
+                "plan_share_1",
+                "share_intent_1",
+                "principal_1",
+                "trip_1",
+                "revision_1",
+                "published",
+                "simple",
+                "c" * 64,
+                "plan-share-v1",
+                {"schema_version": "plan-share-v1", "days": []},
+                "d" * 64,
+                NOW,
+                NOW,
+            )
+        )
         uow.commit()
+
+    restarted_factory = sessionmaker(
+        create_engine(f"sqlite:///{database}"), expire_on_commit=False
+    )
+    with SqlAlchemyUnitOfWork(restarted_factory) as uow:
+        restored = uow.plan_shares.get_by_public_token_hash("c" * 64)
+
+    assert restored is not None
+    assert restored.plan_share_intent_id == "share_intent_1"
+    assert restored.share_snapshot["schema_version"] == "plan-share-v1"

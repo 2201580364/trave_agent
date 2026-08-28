@@ -7,7 +7,9 @@ export default defineAppConfig({
     'pages/trip-review/index',
     'pages/trip-detail/index',
     'pages/trip-list/index',
-    'pages/trip-revisions/index'
+    'pages/trip-revisions/index',
+    'pages/plan-share-create/index',
+    'pages/plan-share-view/index'
   ],
   window: {
     backgroundTextStyle: 'light',

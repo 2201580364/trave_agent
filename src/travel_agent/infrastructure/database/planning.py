@@ -303,6 +303,8 @@ class SqlAlchemyUnitOfWork:
         self._session: Session | None = None
 
     def __enter__(self) -> Self:
+        from .sharing import SqlAlchemyPlanShareRepository
+
         self._session = self._session_factory()
         self.drafts = SqlAlchemyTripDraftRepository(self._session)
         self.generation_intents = SqlAlchemyGenerationIntentRepository(self._session)
@@ -311,6 +313,7 @@ class SqlAlchemyUnitOfWork:
         self.solver_runs = _SqlAlchemyRepository(
             self._session, SolverRunRow, _run_from_row, _run_values
         )
+        self.plan_shares = SqlAlchemyPlanShareRepository(self._session)
         return self
 
     def __exit__(

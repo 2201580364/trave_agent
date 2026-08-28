@@ -1,11 +1,11 @@
 # M1 持久化数据模型
 
-- 文档版本：V2.2
+- 文档版本：V2.3
 - 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0003 已实现；0003 增加用户修订血缘和 Trip 内修订号唯一约束。A6-8.2 真实 MySQL 8.0.46 的 0002 基线、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过；0003 待下一次应用发布前在服务器执行，正式发布数据表仍待后续实现
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0004 已实现；0003 增加用户修订血缘和 Trip 内修订号唯一约束，0004 增加不可变脱敏计划分享快照。A6-8.2 真实 MySQL 8.0.46 的 0002 基线、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过；0003/0004 待下一次应用发布前按顺序在服务器执行，正式发布数据表仍待后续实现
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.0、应用代码架构 V1.0、ADR-0002、ADR-0005、ADR-0009
+- 上游：API 契约 V2.4、应用代码架构 V1.1、ADR-0002、ADR-0005、ADR-0009
 
 ## 1. 建模目标与原则
 
@@ -623,25 +623,28 @@ CREATE TABLE feedbacks (
 );
 
 CREATE TABLE plan_shares (
-    plan_share_id VARCHAR(32) PRIMARY KEY,
-    plan_share_intent_id VARCHAR(32) NOT NULL,
-    principal_id VARCHAR(32) NOT NULL,
-    trip_id VARCHAR(32) NOT NULL,
-    revision_id VARCHAR(32) NOT NULL,
+    plan_share_id VARCHAR(64) PRIMARY KEY,
+    plan_share_intent_id VARCHAR(64) NOT NULL,
+    principal_id VARCHAR(64) NOT NULL,
+    trip_id VARCHAR(64) NOT NULL,
+    revision_id VARCHAR(64) NOT NULL,
     status VARCHAR(20) NOT NULL,
     template VARCHAR(20) NOT NULL,
-    public_token_hash VARBINARY(64) NULL,
-    image_object_key VARCHAR(255) NULL,
-    created_at DATETIME(6) NOT NULL,
-    published_at DATETIME(6) NULL,
-    revoked_at DATETIME(6) NULL,
+    public_token_hash VARCHAR(64) NOT NULL,
+    share_schema_version VARCHAR(32) NOT NULL,
+    share_snapshot JSON NOT NULL,
+    share_snapshot_hash VARCHAR(64) NOT NULL,
+    created_at VARCHAR(40) NOT NULL,
+    published_at VARCHAR(40) NOT NULL,
+    revoked_at VARCHAR(40) NULL,
     CONSTRAINT uq_plan_share_intent UNIQUE (plan_share_intent_id),
-    CONSTRAINT fk_plan_share_revision FOREIGN KEY (revision_id)
-        REFERENCES trip_revisions(revision_id)
+    CONSTRAINT uq_plan_share_public_token_hash UNIQUE (public_token_hash)
 );
 ```
 
-节点反馈验证 node ID 存在于对应 revision snapshot；它不等于景点评分。计划分享与 M2 TripRetrospective 不复用表或 token。
+`plan_shares` 在创建事务中校验主体拥有 Trip、Revision 属于该 Trip，并保存创建时生成的 `plan-share-v1` 脱敏快照；公开读取不再动态联表重算。`public_token_hash` 是公开 token 的 SHA-256 摘要，数据库不保存 token 原值；`share_snapshot_hash` 用于检测快照意外变化。当前首版只创建 `published/simple` 对象；`revoked_at` 为后续撤回能力保留，尚未提供作者撤回 API/UI。图片对象键不进入 0004，PNG/JPEG 导出、二维码和原生平台分享属于 A6-9.3.1。
+
+节点反馈验证 node ID 存在于对应 revision snapshot；它不等于景点评分。计划分享与 M2 TripRetrospective 不复用表、快照 Schema、token 密钥或权限语义。
 
 ## 10. JSON Snapshot Schema
 
@@ -708,17 +711,19 @@ degradations
 ## 13. Alembic 迁移顺序
 
 ```text
-001 principals + anonymous_credentials
-002 cities + attractions
-003 time_rules + weekly_closures + date_exceptions + attraction_revisions
-004 published snapshots + weather + OD + visit-period preferences
-005 trip_drafts
-006 trips + generation_intents
-007 solver_runs + trip_revisions
-008 添加 trips.current_revision_id、intent.trip_id、intent.revision_id 环依赖外键
-009 feedbacks（M1 P1）
-010 plan_shares（M1 P1）
+0001_planning_core
+  → M1 草稿、Trip、GenerationIntent、SolverRun、TripRevision 基线
+0002_anonymous_identity
+  → 匿名主体凭证
+0003_trip_revision_lineage
+  → target_trip_id/base_revision_id、Trip 内 Revision 唯一约束
+0004_plan_shares
+  → 公开 token 摘要、plan-share-v1 不可变脱敏快照和查询索引
+下一迁移
+  → feedbacks（A6-9.4，编号以实际 revision 文件为准）
 ```
+
+以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；发布 A6-9.1/A6-9.3 应用前必须先备份，再依次执行 0003、0004，并确认 readiness 的 `expected_revision/current_revision` 都是 `0004_plan_shares`。
 
 每次迁移必须：
 

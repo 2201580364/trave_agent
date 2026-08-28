@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from travel_agent.runtime_config import load_runtime_environment
 
-EXPECTED_ALEMBIC_REVISION = "0003_trip_revision_lineage"
+EXPECTED_ALEMBIC_REVISION = "0004_plan_shares"
 
 
 @dataclass(frozen=True, slots=True)

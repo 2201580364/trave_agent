@@ -50,7 +50,10 @@ def build_local_dev_app(
     return cast(
         FastAPI,
         build_http_app(
-            HttpSettings(DatabaseSettings(url=resolved_url)),
+            HttpSettings(
+                DatabaseSettings(url=resolved_url),
+                "local-only-plan-share-secret-2026-08-28-do-not-use-production",
+            ),
             snapshots,
             catalog,
         ),

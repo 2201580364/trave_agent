@@ -1,10 +1,10 @@
 # M1 HTTP API 契约
 
-- 文档版本：V2.3
+- 文档版本：V2.4
 - 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P06 核心 HTTP v1、“替换景点→新 Revision”和匿名主体行程历史已实现；P08、D05/D06 对应的分享与反馈契约待后续 M1 切片实现
-- 上游：功能模块 V3.0、UI V1.1、交互 V1.1、应用代码架构 V1.0、ADR-0005、ADR-0009
+- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史和 `plan-share-v1` 安全计划分享已实现；D05/D06 对应的结构化反馈契约待 A6-9.4 实现
+- 上游：功能模块 V3.1、UI V1.2、交互 V1.2、应用代码架构 V1.1、ADR-0005、ADR-0009
 - API 前缀：`/api/v1`
 
 ## 1. 契约目标
@@ -171,7 +171,9 @@ od_basis: gaode | approximate
 | GET | `/trips` | 当前主体行程历史 | 是 |
 | POST | `/trips/{trip_id}/feedback` | 整体反馈 | P1 |
 | POST | `/trips/{trip_id}/revisions/{revision_id}/nodes/{node_id}/feedback` | 节点反馈 | P1 |
-| POST | `/trips/{trip_id}/plan-shares` | 创建计划分享 | P1 |
+| POST | `/trips/{trip_id}/plan-shares` | 创建不可变计划分享 | 是 |
+| GET | `/plan-shares/{public_token}` | 无认证读取受限公开计划摘要 | 是 |
+| POST | `/plan-shares/{public_token}/draft-copies` | 将公开计划复制为当前主体的新草稿 | 是 |
 | GET | `/trips/{trip_id}/revisions` | 当前 Trip 的只读修订历史 | 是 |
 
 M1 不提供 `/regenerate`。用户修改条件时更新或创建草稿，再提交新的 generation intent。
@@ -845,7 +847,48 @@ M1 P1。用户从当前行程景点卡发起替换时，服务端复制基准 Re
 }
 ```
 
-计划分享不能包含身份 token、完整私人交通信息或未来小记内容。
+创建接口需要原作者 Bearer token。当前 `template` 只接受 `simple`；成功返回 `201`：
+
+```json
+{
+  "plan_share_id": "plan_share_01K...",
+  "status": "published",
+  "template": "simple",
+  "revision_id": "revision_01K...",
+  "share_schema_version": "plan-share-v1",
+  "share_token": "ps1.plan_share_01K....signature",
+  "share_path": "/pages/plan-share-view/index?token=...",
+  "published_at": "2026-08-28T14:00:00+08:00",
+  "reused": false,
+  "content": {}
+}
+```
+
+同一个 `plan_share_intent_id + principal_id + trip_id + revision_id + template` 重试时，返回同一个分享对象和同一个公开 token，并令 `reused=true`；同一 intent 改用于其他 Trip、Revision 或模板时返回 `409 plan_share_intent_conflict`。分享内容在创建时清洗、固化并保存，后续原 Trip 产生新 Revision 不改变已经发布的分享快照。
+
+公开读取：
+
+```http
+GET /plan-shares/{public_token}
+```
+
+- 不要求登录；
+- 返回 `Cache-Control: no-store`；
+- 响应不回显 `share_token`，也不返回 `principal_id`、`trip_id`、`revision_id`、草稿 ID、内部 node/attraction ID、坐标或 OD 明细；
+- 无效、伪造或已失效 token 统一返回 `404 resource_not_found`；
+- `content.schema_version=plan-share-v1`、`content.content_kind=planned_itinerary`，只包含城市、日期范围、Revision 编号、每日景点名称、上午/下午/晚上、固定场次准确时间、粗粒度停留时长、天气参考、已安排/未排入计数和隐私提示；
+- 计划分享不能包含匿名访问 token、精确私人交通锚点、票号/班次/站点、私人备注、旅行小记或未来媒体内容。
+
+公开 token 使用独立 HMAC 密钥签发；服务端只保存 SHA-256 摘要，不保存 token 原值。生产环境必须配置至少 32 字节的 `TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET`，缺失或过短时应用启动失败。该密钥、匿名 access token 和未来旅程回顾 token 必须物理分离。
+
+访客复制：
+
+```http
+POST /plan-shares/{public_token}/draft-copies
+Authorization: Bearer <recipient_anonymous_access_token>
+```
+
+返回标准 Draft DTO。新草稿只复制城市和景点集合；`travel_facts=null`、时段偏好为空，不复制原用户日期、到达/离开交通、节奏、同行人群或其他私人事实。访客必须在自己的三步流程中重新确认日期和交通；复制行为不能修改原 Trip、原 Revision 或分享快照。
 
 ## 11. HTTP 状态码与错误码
 
@@ -856,6 +899,7 @@ M1 P1。用户从当前行程景点卡发起替换时，服务端复制基准 Re
 | 404 | `resource_not_found` | 不存在或无权访问 | 否 |
 | 409 | `draft_version_conflict` | 草稿版本过期 | 否 |
 | 409 | `generation_intent_conflict` | 同 intent 对应不同输入 | 否 |
+| 409 | `plan_share_intent_conflict` | 同一分享 intent 被用于不同 Trip、Revision 或模板 | 否 |
 | 409 | `draft_needs_review` | 发布数据变化影响选择 | 否 |
 | 409 | `invalid_state_transition` | 当前状态不允许操作 | 否 |
 | 422 | `field_validation_failed` | 字段/跨字段校验失败 | 否 |
@@ -978,6 +1022,22 @@ When 用户读取 Revision 1
 Then Revision 1 仍可读取
 And Trip.current_revision_id 仍指向 Revision 2
 And 主体 B 的列表不包含主体 A 的 Trip
+```
+
+### A5-API-10 计划分享脱敏、幂等与回流
+
+```gherkin
+Given 主体 A 为当前 Revision 2 创建 plan-share-v1 分享
+When 同一 plan_share_intent_id 重试两次
+Then 两次响应指向同一 plan_share_id 和同一 share_token
+And 数据库只保存公开 token 摘要和不可变脱敏快照
+When 未认证访客读取公开分享
+Then 响应使用 Cache-Control no-store
+And 不包含 access token、主体、Trip/Revision、交通锚点、内部节点、坐标或 OD 明细
+When 主体 B 选择“以此为参考新建行程”
+Then 新草稿只保留城市和景点集合
+And travel_facts 为 null 且时段偏好为空
+And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 ```
 
 ## 14. A5 API 退出条件

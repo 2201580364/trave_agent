@@ -1,0 +1,10 @@
+.plan-share-create-page { padding-bottom: 54px; }
+.share-safety-card { background: #fbfcfa; box-shadow: none; }
+.share-safety-list { display: grid; gap: 12px; margin-top: 16px; color: #405048; font-size: 13px; line-height: 1.55; }
+.share-create-button { margin-top: 20px; }
+.share-actions { display: grid; gap: 10px; margin-top: 18px; }
+.share-actions .secondary { width: 100%; }
+
+@media (min-width: 760px) {
+  .share-actions { grid-template-columns: 1fr 1fr; }
+}

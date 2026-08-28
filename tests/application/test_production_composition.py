@@ -34,6 +34,10 @@ def test_production_settings_load_database_and_snapshot_selection(
         "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
         f"{FALLBACK_VERSION},hangzhou-published-composition-v0-older",
     )
+    monkeypatch.setenv(
+        "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET",
+        "test-plan-share-secret-2026-08-28-at-least-32-bytes",
+    )
 
     settings = ProductionHttpSettings.from_env(dotenv_path=tmp_path / "missing.env")
 
@@ -45,6 +49,19 @@ def test_production_settings_load_database_and_snapshot_selection(
         FALLBACK_VERSION,
         "hangzhou-published-composition-v0-older",
     )
+    assert settings.plan_share_token_secret == (
+        "test-plan-share-secret-2026-08-28-at-least-32-bytes"
+    )
+
+
+def test_production_settings_reject_short_plan_share_secret(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET", "too-short")
+
+    with pytest.raises(ValueError, match="must contain at least 32 bytes"):
+        ProductionHttpSettings.from_env(dotenv_path=tmp_path / "missing.env")
 
 
 def test_production_settings_require_explicit_published_version(
@@ -68,7 +85,9 @@ def test_relative_snapshot_root_resolves_from_dotenv_directory(
         "TRAVEL_AGENT_DATABASE_URL=sqlite:///./relative.db\n"
         "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT=published\n"
         "TRAVEL_AGENT_PUBLISHED_CITY_ID=hangzhou\n"
-        f"TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION={VERSION}\n",
+        f"TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION={VERSION}\n"
+        "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET="
+        "test-plan-share-secret-2026-08-28-at-least-32-bytes\n",
         encoding="utf-8",
     )
     for name in (
@@ -77,6 +96,7 @@ def test_relative_snapshot_root_resolves_from_dotenv_directory(
         "TRAVEL_AGENT_PUBLISHED_CITY_ID",
         "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION",
         "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
+        "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -93,6 +113,7 @@ def test_relative_snapshot_root_resolves_from_dotenv_directory(
             "TRAVEL_AGENT_PUBLISHED_CITY_ID",
             "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION",
             "TRAVEL_AGENT_PUBLISHED_SNAPSHOT_FALLBACK_VERSIONS",
+            "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET",
         ):
             os.environ.pop(name, None)
 
@@ -162,6 +183,7 @@ def _settings(
     return ProductionHttpSettings(
         DatabaseSettings(url="sqlite://"),
         PublishedSnapshotSettings(root, "hangzhou", VERSION, fallback_versions),
+        "test-plan-share-secret-2026-08-28-at-least-32-bytes",
     )
 
 

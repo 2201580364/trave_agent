@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from enum import Enum
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
@@ -33,6 +34,14 @@ from travel_agent.application.planning.ports import (
     GenerationExecutor,
     IdGenerator,
 )
+from travel_agent.application.sharing import (
+    CopyPlanShareToDraft,
+    CopyPlanShareToDraftHandler,
+    CreatePlanShare,
+    CreatePlanShareHandler,
+    GetPublishedPlanShareHandler,
+)
+from travel_agent.application.sharing.ports import PlanShareTokenCodec
 from travel_agent.domain.planning import (
     ConfirmationStatus,
     CrowdType,
@@ -55,6 +64,7 @@ class HttpContainer:
     identity: AnonymousIdentityService
     catalog: PublishedSolverDataProvider | None = None
     readiness: Callable[[], dict[str, object]] | None = None
+    share_tokens: PlanShareTokenCodec | None = None
 
 
 class AnonymousSessionInput(BaseModel):
@@ -124,6 +134,13 @@ class ReplaceTripAttractionInput(BaseModel):
     generation_intent_id: str = Field(min_length=1, max_length=64)
     old_attraction_id: str = Field(min_length=1, max_length=64)
     new_attraction_id: str = Field(min_length=1, max_length=64)
+
+
+class CreatePlanShareInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    plan_share_intent_id: str = Field(min_length=1, max_length=64)
+    revision_id: str = Field(min_length=1, max_length=64)
+    template: Literal["simple"] = "simple"
 
 
 def create_app(container: HttpContainer) -> FastAPI:
@@ -505,6 +522,78 @@ def create_app(container: HttpContainer) -> FastAPI:
         response["replacement_draft_version"] = result.draft.draft_version
         return response
 
+    @app.post(
+        "/api/v1/trips/{trip_id}/plan-shares",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def create_plan_share(
+        trip_id: str,
+        payload: CreatePlanShareInput,
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        share_tokens = _share_tokens(container)
+        result = CreatePlanShareHandler(
+            container.uow_factory(),
+            container.clock,
+            container.ids,
+            share_tokens,
+        ).handle(
+            CreatePlanShare(
+                principal,
+                payload.plan_share_intent_id,
+                trip_id,
+                payload.revision_id,
+                payload.template,
+            )
+        )
+        return {
+            "plan_share_id": result.share.plan_share_id,
+            "status": result.share.status,
+            "template": result.share.template,
+            "revision_id": result.share.revision_id,
+            "share_schema_version": result.share.share_schema_version,
+            "share_token": result.public_token,
+            "share_path": (
+                "/pages/plan-share-view/index?token=" f"{result.public_token}"
+            ),
+            "published_at": result.share.published_at.isoformat(),
+            "reused": result.reused,
+            "content": result.share.share_snapshot,
+        }
+
+    @app.get("/api/v1/plan-shares/{public_token}")
+    def get_plan_share(public_token: str) -> JSONResponse:
+        published = GetPublishedPlanShareHandler(
+            container.uow_factory(),
+            _share_tokens(container),
+        ).handle(public_token)
+        return JSONResponse(
+            content={
+                "plan_share_id": published.plan_share_id,
+                "status": "published",
+                "template": published.template,
+                "published_at": published.published_at.isoformat(),
+                "content": published.share_snapshot,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post(
+        "/api/v1/plan-shares/{public_token}/draft-copies",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def copy_plan_share_to_draft(
+        public_token: str,
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        result = CopyPlanShareToDraftHandler(
+            container.uow_factory(),
+            container.clock,
+            container.ids,
+            _share_tokens(container),
+        ).handle(CopyPlanShareToDraft(principal, public_token))
+        return _draft_response(result.draft)
+
     return app
 
 
@@ -665,7 +754,17 @@ def _status_for(exc: ApplicationError) -> int:
         "invalid_state_transition": status.HTTP_409_CONFLICT,
         "trip_revision_conflict": status.HTTP_409_CONFLICT,
         "invalid_attraction_replacement": status.HTTP_422_UNPROCESSABLE_ENTITY,
+        "plan_share_intent_conflict": status.HTTP_409_CONFLICT,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
+
+
+def _share_tokens(container: HttpContainer) -> PlanShareTokenCodec:
+    if container.share_tokens is None:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "plan sharing unavailable",
+        )
+    return container.share_tokens
 
 
 def _valid_request_id(value: str) -> bool:

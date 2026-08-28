@@ -160,6 +160,11 @@ export default function TripDetailPage() {
           <Button className='secondary trip-link-button' onClick={() => Taro.navigateTo({ url: '/pages/trip-revisions/index' })}>
             历史版本
           </Button>
+          {!isHistorical && (
+            <Button className='secondary trip-link-button trip-share-button' onClick={() => Taro.navigateTo({ url: '/pages/plan-share-create/index' })}>
+              分享计划
+            </Button>
+          )}
         </View>
         <Button className='secondary trip-new-button' loading={startingNew} onClick={startNewPlan}>
           ＋ 规划新行程

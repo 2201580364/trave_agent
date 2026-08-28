@@ -23,6 +23,7 @@ from travel_agent.infrastructure.memory import (
     FixedDataSnapshotVersionProvider,
     SequenceIdGenerator,
 )
+from travel_agent.infrastructure.sharing import HmacPlanShareTokenCodec
 from travel_agent.infrastructure.solver import (
     InMemoryPublishedSolverDataProvider,
     PublishedAttraction,
@@ -134,6 +135,10 @@ def _client(tmp_path: Path) -> TestClient:
         InlineGenerationExecutor(execute),
         identity,
         catalog,
+        None,
+        HmacPlanShareTokenCodec(
+            "test-plan-share-secret-2026-08-28-at-least-32-bytes"
+        ),
     )
     return TestClient(create_app(container))
 
@@ -335,6 +340,58 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         True,
         False,
     ]
+
+    share = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/plan-shares",
+        headers=headers,
+        json={
+            "plan_share_intent_id": "share_intent_browser_1",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "template": "simple",
+        },
+    )
+    assert share.status_code == 201
+    share_body = share.json()
+    assert share_body["status"] == "published"
+    assert share_body["reused"] is False
+    assert share_body["share_path"].endswith(share_body["share_token"])
+    assert "principal_id" not in share.text
+    assert "source_draft_id" not in share.text
+
+    public = client.get(f"/api/v1/plan-shares/{share_body['share_token']}")
+    assert public.status_code == 200
+    assert public.headers["Cache-Control"] == "no-store"
+    assert public.json()["content"]["content_kind"] == "planned_itinerary"
+    assert "share_token" not in public.text
+    assert "principal_id" not in public.text
+
+    repeated_share = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/plan-shares",
+        headers=headers,
+        json={
+            "plan_share_intent_id": "share_intent_browser_1",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "template": "simple",
+        },
+    )
+    assert repeated_share.status_code == 201
+    assert repeated_share.json()["reused"] is True
+    assert repeated_share.json()["share_token"] == share_body["share_token"]
+
+    _, visitor_token = _session(client)
+    visitor_headers = _auth(visitor_token)
+    copied = client.post(
+        f"/api/v1/plan-shares/{share_body['share_token']}/draft-copies",
+        headers=visitor_headers,
+    )
+    assert copied.status_code == 201
+    assert copied.json()["selected_attraction_ids"] == ["attr_museum"]
+    assert copied.json()["travel_facts"] is None
+    assert client.get(
+        f"/api/v1/trip-drafts/{copied.json()['draft_id']}",
+        headers=headers,
+    ).status_code == 404
+    assert client.get("/api/v1/plan-shares/not-a-valid-token").status_code == 404
 
 
 def test_anonymous_ownership_is_hidden_as_not_found(tmp_path: Path) -> None:

@@ -1,0 +1,29 @@
+.plan-share-card { margin-top: 18px; overflow: hidden; border: 1px solid #d6e1da; border-radius: 24px; background: #fff; box-shadow: 0 18px 42px rgba(23, 60, 44, .12); }
+.plan-share-card__hero { padding: 24px 22px; background: linear-gradient(145deg, #0f513d, #1d8061); color: #fff; }
+.plan-share-card__eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; opacity: .78; }
+.plan-share-card__title { margin-top: 9px; font-size: 28px; font-weight: 800; }
+.plan-share-card__date { margin-top: 7px; font-size: 13px; opacity: .86; }
+.plan-share-card__metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.22); }
+.plan-share-card__metrics > view { display: flex; flex-direction: column; gap: 3px; font-size: 11px; opacity: .86; }
+.plan-share-card__metrics > view > text:first-child { font-size: 21px; font-weight: 800; opacity: 1; }
+.plan-share-card__days { padding: 4px 20px 20px; }
+.plan-share-day { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.plan-share-day:last-child { border-bottom: 0; }
+.plan-share-day__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.plan-share-day__index { color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .8px; }
+.plan-share-day__date { color: var(--muted); font-size: 12px; }
+.plan-share-day__weather { margin-top: 7px; color: var(--muted); font-size: 11px; }
+.plan-share-day__items { display: grid; gap: 14px; margin-top: 16px; }
+.plan-share-item { display: grid; grid-template-columns: 62px 1fr; gap: 12px; }
+.plan-share-item__period { padding-top: 2px; color: var(--brand-dark); font-size: 12px; font-weight: 750; }
+.plan-share-item__body { min-width: 0; }
+.plan-share-item__name { font-size: 15px; font-weight: 700; }
+.plan-share-item__meta { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.plan-share-empty { color: var(--muted); font-size: 12px; }
+.plan-share-card__footer { padding: 17px 20px; background: #f1f5f2; color: var(--brand-dark); font-size: 12px; line-height: 1.65; }
+.plan-share-card__privacy { margin-top: 7px; color: var(--muted); font-size: 11px; }
+
+@media (min-width: 760px) {
+  .plan-share-card__hero { padding: 30px 32px; }
+  .plan-share-card__days { padding-left: 30px; padding-right: 30px; }
+}

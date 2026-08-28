@@ -8,6 +8,7 @@ from .runtime import (
     build_engine,
     build_session_factory,
 )
+from .sharing import SqlAlchemyPlanShareRepository
 
 __all__ = [
     "AnonymousIdentityService",
@@ -15,6 +16,7 @@ __all__ = [
     "DatabaseReadiness",
     "DatabaseSettings",
     "SqlAlchemyUnitOfWork",
+    "SqlAlchemyPlanShareRepository",
     "create_schema",
     "build_engine",
     "build_session_factory",

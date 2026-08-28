@@ -107,6 +107,55 @@ export interface TripRevisionListResponse {
   items: TripRevisionSummary[]
 }
 
+export interface PlanShareContent {
+  schema_version: 'plan-share-v1'
+  content_kind: 'planned_itinerary'
+  title: string
+  city_id: string
+  city_name: string
+  start_date: string | null
+  end_date: string | null
+  revision_number: number
+  completion_kind: 'complete_success' | 'partial_success'
+  has_soft_degradation: boolean
+  scheduled_count: number
+  unplaced_count: number
+  days: Array<{
+    date: string
+    weather: { condition: string | null; basis: string | null }
+    items: Array<{
+      name: string
+      period: 'morning' | 'afternoon' | 'evening'
+      duration_min: number | null
+      timing_kind: 'flexible' | 'fixed_event'
+      fixed_time?: string
+    }>
+  }>
+  data_notice: string
+  privacy_notice: string
+}
+
+export interface CreatedPlanShare {
+  plan_share_id: string
+  status: 'published'
+  template: 'simple'
+  revision_id: string
+  share_schema_version: 'plan-share-v1'
+  share_token: string
+  share_path: string
+  published_at: string
+  reused: boolean
+  content: PlanShareContent
+}
+
+export interface PublicPlanShare {
+  plan_share_id: string
+  status: 'published'
+  template: 'simple'
+  published_at: string
+  content: PlanShareContent
+}
+
 export interface TripResult {
   schema_version: string
   summary?: Record<string, number>

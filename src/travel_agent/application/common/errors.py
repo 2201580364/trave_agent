@@ -66,3 +66,11 @@ class TripRevisionConflictError(ApplicationError):
 class InvalidAttractionReplacementError(ApplicationError):
     def __init__(self, message: str) -> None:
         super().__init__("invalid_attraction_replacement", message)
+
+
+class PlanShareIntentConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "plan_share_intent_conflict",
+            "该分享标识已经用于其他行程版本或模板。",
+        )

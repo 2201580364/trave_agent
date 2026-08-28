@@ -76,6 +76,7 @@ class PublishedSnapshotSettings:
 class ProductionHttpSettings:
     database: DatabaseSettings
     published_snapshot: PublishedSnapshotSettings
+    plan_share_token_secret: str
 
     @classmethod
     def from_env(
@@ -84,12 +85,18 @@ class ProductionHttpSettings:
         dotenv_path: str | PathLike[str] | None = None,
     ) -> ProductionHttpSettings:
         loaded = load_runtime_environment(dotenv_path)
+        secret = os.environ.get("TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET", "")
+        if len(secret.encode("utf-8")) < 32:
+            raise ValueError(
+                "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET must contain at least 32 bytes"
+            )
         return cls(
             DatabaseSettings.from_env(load_dotenv_file=False),
             PublishedSnapshotSettings.from_env(
                 load_dotenv_file=False,
                 relative_to=loaded.resolve().parent if loaded is not None else None,
             ),
+            secret,
         )
 
 
@@ -134,7 +141,10 @@ def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
     app = cast(
         FastAPI,
         build_http_app(
-            HttpSettings(settings.database),
+            HttpSettings(
+                settings.database,
+                settings.plan_share_token_secret,
+            ),
             snapshot_versions,
             published_data,
         ),
