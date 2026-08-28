@@ -37,7 +37,6 @@ from travel_agent.solver import (
     WeatherSeverity,
 )
 
-
 NOW = datetime(2026, 8, 25, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
 
 
@@ -71,7 +70,7 @@ class FakeGateway:
             "solver-p1-v1",
             "constraints-p1-v1",
             "parameters-p1-2026-08-24",
-            {"solve_run_id": getattr(request, "solver_run_id")},
+            {"solve_run_id": request.solver_run_id},
         )
 
 
@@ -81,7 +80,9 @@ def _client(tmp_path: Path) -> TestClient:
     sessions = sessionmaker(engine, expire_on_commit=False)
     ids = SequenceIdGenerator()
     clock = FixedClock()
-    uow_factory = lambda: SqlAlchemyUnitOfWork(sessions)
+    def uow_factory() -> SqlAlchemyUnitOfWork:
+        return SqlAlchemyUnitOfWork(sessions)
+
     execute = ExecuteGenerationHandler(
         uow_factory(), clock, ids, FakeGateway()
     )
@@ -98,6 +99,17 @@ def _client(tmp_path: Path) -> TestClient:
                     1,
                     "西湖湖滨",
                     suggested_duration=90,
+                    is_always_open=True,
+                    energy_level=2,
+                    data_verified=True,
+                ),
+            ),
+            PublishedAttraction(
+                "attr_museum",
+                Attraction(
+                    2,
+                    "浙江省博物馆",
+                    suggested_duration=120,
                     is_always_open=True,
                     energy_level=2,
                     data_verified=True,
@@ -222,6 +234,66 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     assert revision.status_code == 200
     assert revision.json()["result_snapshot"]["schema_version"] == "trip-result-v1"
     assert revision.headers["X-Request-ID"].startswith("req_")
+
+    replacement = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}"
+        "/attraction-replacements",
+        headers=headers,
+        json={
+            "generation_intent_id": "intent_browser_2",
+            "old_attraction_id": "attr_west_lake",
+            "new_attraction_id": "attr_museum",
+        },
+    )
+    assert replacement.status_code == 202
+    replacement_intent = replacement.json()
+    assert replacement_intent["status"] == "completed"
+    assert replacement_intent["trip_id"] == intent["trip_id"]
+    assert replacement_intent["trip_revision_id"] != intent["trip_revision_id"]
+
+    replacement_draft = client.get(
+        f"/api/v1/trip-drafts/{replacement_intent['replacement_draft_id']}",
+        headers=headers,
+    )
+    assert replacement_draft.json()["selected_attraction_ids"] == ["attr_museum"]
+    latest_revision = client.get(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/"
+        f"{replacement_intent['trip_revision_id']}",
+        headers=headers,
+    )
+    assert latest_revision.json()["revision_number"] == 2
+    assert client.get(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}",
+        headers=headers,
+    ).status_code == 200
+
+    repeated = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}"
+        "/attraction-replacements",
+        headers=headers,
+        json={
+            "generation_intent_id": "intent_browser_2",
+            "old_attraction_id": "attr_west_lake",
+            "new_attraction_id": "attr_museum",
+        },
+    )
+    assert repeated.status_code == 202
+    assert repeated.json()["trip_revision_id"] == replacement_intent[
+        "trip_revision_id"
+    ]
+
+    stale = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}"
+        "/attraction-replacements",
+        headers=headers,
+        json={
+            "generation_intent_id": "intent_browser_stale",
+            "old_attraction_id": "attr_west_lake",
+            "new_attraction_id": "attr_museum",
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "trip_revision_conflict"
 
 
 def test_anonymous_ownership_is_hidden_as_not_found(tmp_path: Path) -> None:

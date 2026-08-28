@@ -21,6 +21,8 @@ from travel_agent.application.planning import (
     CreateDraftHandler,
     ReplaceAttractionSelection,
     ReplaceAttractionSelectionHandler,
+    ReplaceTripAttraction,
+    ReplaceTripAttractionHandler,
     SubmitGeneration,
     SubmitGenerationHandler,
     UpdateTravelFacts,
@@ -115,6 +117,13 @@ class SubmitGenerationInput(BaseModel):
     generation_intent_id: str = Field(min_length=1, max_length=64)
     draft_id: str = Field(min_length=1, max_length=64)
     draft_version: int = Field(gt=0)
+
+
+class ReplaceTripAttractionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    generation_intent_id: str = Field(min_length=1, max_length=64)
+    old_attraction_id: str = Field(min_length=1, max_length=64)
+    new_attraction_id: str = Field(min_length=1, max_length=64)
 
 
 def create_app(container: HttpContainer) -> FastAPI:
@@ -396,6 +405,48 @@ def create_app(container: HttpContainer) -> FastAPI:
                 raise ResourceNotFoundError
             return _jsonable(revision)
 
+    @app.post(
+        "/api/v1/trips/{trip_id}/revisions/{revision_id}/attraction-replacements",
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    def replace_trip_attraction(
+        trip_id: str,
+        revision_id: str,
+        payload: ReplaceTripAttractionInput,
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        if payload.old_attraction_id == payload.new_attraction_id:
+            raise ValueError("replacement attraction must be different")
+        with container.uow_factory() as uow:
+            trip = uow.trips.get(trip_id)
+            if trip is None or trip.principal_id != principal:
+                raise ResourceNotFoundError
+            snapshot = _published_snapshot(container, trip.city_id)
+        published_ids = {item.external_id for item in snapshot.attractions}
+        if payload.new_attraction_id not in published_ids:
+            raise ResourceNotFoundError
+
+        result = ReplaceTripAttractionHandler(
+            container.uow_factory(),
+            container.clock,
+            container.ids,
+            container.snapshots,
+            container.executor,
+        ).handle(
+            ReplaceTripAttraction(
+                principal,
+                payload.generation_intent_id,
+                trip_id,
+                revision_id,
+                payload.old_attraction_id,
+                payload.new_attraction_id,
+            )
+        )
+        response = _owned_intent(container, payload.generation_intent_id, principal)
+        response["replacement_draft_id"] = result.draft.draft_id
+        response["replacement_draft_version"] = result.draft.draft_version
+        return response
+
     return app
 
 
@@ -481,6 +532,8 @@ def _status_for(exc: ApplicationError) -> int:
         "generation_intent_conflict": status.HTTP_409_CONFLICT,
         "draft_not_ready": status.HTTP_422_UNPROCESSABLE_ENTITY,
         "invalid_state_transition": status.HTTP_409_CONFLICT,
+        "trip_revision_conflict": status.HTTP_409_CONFLICT,
+        "invalid_attraction_replacement": status.HTTP_422_UNPROCESSABLE_ENTITY,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
 
 

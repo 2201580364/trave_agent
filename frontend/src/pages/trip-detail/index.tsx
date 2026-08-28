@@ -110,12 +110,21 @@ export default function TripDetailPage() {
     }
   }
 
+  const replaceAttraction = (attractionId: string, name: string) => {
+    Taro.navigateTo({
+      url: `/pages/attraction-replace/index?oldAttractionId=${encodeURIComponent(attractionId)}&oldAttractionName=${encodeURIComponent(name)}`
+    })
+  }
+
   return (
     <View className='page-shell trip-page'>
       <View className='content'>
         <Text className='eyebrow'>杭州 · 规划模式</Text>
         <View className='title'>你的可执行行程</View>
         <View className='subtitle'>先看每天怎么走，再查看未排入和数据说明。</View>
+        {revision && (
+          <View className='revision-label'>当前为第 {revision.revision_number} 版 · 历史版本不会被覆盖</View>
+        )}
         <Button className='secondary trip-new-button' loading={startingNew} onClick={startNewPlan}>
           ＋ 规划新行程
         </Button>
@@ -181,6 +190,12 @@ export default function TripDetailPage() {
                       <View className='visit-card'>
                         <View className='section-title'>{node.name}</View>
                         <View className='attraction-meta'>计划停留约 {durationLabel(node.planned_duration_min)}</View>
+                        <Button
+                          className='replace-attraction-button'
+                          onClick={() => replaceAttraction(node.attraction_id, node.name)}
+                        >
+                          替换景点
+                        </Button>
                         {index > 0 && (
                           <View className='transit-note'>
                             从上一站建议 {transportModeLabel(node.transport_mode)}{distanceLabel(node.travel_distance_m)} · 约 {transitDurationLabel(node.buffered_travel_from_previous_min ?? node.travel_from_previous_min ?? 0)}

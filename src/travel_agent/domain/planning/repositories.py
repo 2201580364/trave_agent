@@ -24,7 +24,12 @@ class GenerationIntentRepository(Protocol):
 class TripRepository(Protocol):
     def get(self, trip_id: str) -> Trip | None: ...
     def add(self, trip: Trip) -> None: ...
-    def save(self, trip: Trip) -> None: ...
+    def save(
+        self,
+        trip: Trip,
+        *,
+        expected_revision_id: str | None = None,
+    ) -> None: ...
 
 
 class TripRevisionRepository(Protocol):

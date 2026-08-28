@@ -25,7 +25,6 @@ from travel_agent.infrastructure.memory import (
     SequenceIdGenerator,
 )
 
-
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
 
 
@@ -107,6 +106,57 @@ def test_completed_intent_is_idempotent_and_does_not_call_gateway_again() -> Non
     assert second.reused is True
     assert second.trip_revision_id == first.trip_revision_id
     assert len(store.trip_revisions) == 1
+
+
+def test_revision_intent_appends_to_existing_trip_without_mutating_history() -> None:
+    store = _store()
+    gateway = FakeGateway(_outcome())
+    ids = SequenceIdGenerator()
+    handler = ExecuteGenerationHandler(
+        InMemoryUnitOfWork(store), FixedClock(), ids, gateway
+    )
+    first = handler.handle("intent_1")
+    old_revision = store.trip_revisions[first.trip_revision_id]
+    source = store.drafts["draft_1"]
+    replacement_draft = TripDraft(
+        "draft_2",
+        source.principal_id,
+        source.city_id,
+        1,
+        "editing",
+        source.travel_facts,
+        ("attr_2",),
+        (),
+        NOW,
+        NOW,
+    )
+    store.drafts[replacement_draft.draft_id] = replacement_draft
+    store.generation_intents["intent_2"] = GenerationIntent(
+        "intent_2",
+        "principal_1",
+        "draft_2",
+        1,
+        GenerationStatus.QUEUED,
+        "generation-input-v1",
+        {"city_id": "hangzhou"},
+        "c" * 64,
+        "hangzhou-2026-08-24-v1",
+        9,
+        NOW,
+        NOW,
+        target_trip_id=first.trip_id,
+        base_revision_id=first.trip_revision_id,
+    )
+
+    second = handler.handle("intent_2")
+
+    assert second.trip_id == first.trip_id
+    assert second.trip_revision_id != first.trip_revision_id
+    assert len(store.trips) == 1
+    assert len(store.trip_revisions) == 2
+    assert store.trip_revisions[first.trip_revision_id] == old_revision
+    assert store.trip_revisions[second.trip_revision_id].revision_number == 2
+    assert store.trips[first.trip_id].current_revision_id == second.trip_revision_id
 
 
 def test_running_intent_cannot_be_claimed_by_a_second_worker() -> None:

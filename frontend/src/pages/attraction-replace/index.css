@@ -1,0 +1,10 @@
+.replacement-page { padding-bottom: 112px; }
+.back-button { width: auto; min-height: 34px; margin: 0 0 18px; padding: 0; background: transparent; color: var(--brand-dark); font-size: 13px; line-height: 34px; text-align: left; }
+.back-button::after { border: 0; }
+.search-card { padding: 12px; }
+.input { width: 100%; min-height: 42px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 14px; }
+.candidate-list { display: grid; gap: 12px; margin-top: 16px; }
+.candidate-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(35, 65, 48, 0.06); }
+.candidate-card--selected { border-color: var(--brand); background: #f1faf5; }
+.select-mark { display: flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; border: 1px solid #b8c8bf; border-radius: 50%; color: var(--muted); }
+.select-mark--active { border-color: var(--brand); background: var(--brand); color: #fff; }

@@ -1,9 +1,9 @@
 # M1 HTTP API 契约
 
-- 文档版本：V2.1
-- 日期：2026-08-27
+- 文档版本：V2.2
+- 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P04 核心 HTTP v1 已实现并通过正式数据回放；P05/P06/P08、D05/D06 对应的修改、历史、分享与反馈契约待后续 M1 切片实现
+- 状态：P00–P04 核心 HTTP v1 与“替换景点→新 Revision”已实现；P06/P08、D05/D06 对应的历史、分享与反馈契约待后续 M1 切片实现
 - 上游：功能模块 V3.0、UI V1.1、交互 V1.1、应用代码架构 V1.0、ADR-0005、ADR-0009
 - API 前缀：`/api/v1`
 
@@ -684,6 +684,41 @@ walking_estimate | taxi_estimate | transit_or_taxi_estimate
 ```
 
 软降级不能使用未排入或失败状态表达。
+
+### 9.3 POST `/trips/{trip_id}/revisions/{revision_id}/attraction-replacements`
+
+M1 P1。用户从当前行程景点卡发起替换时，服务端复制基准 Revision 对应的输入草稿，仅替换一个景点，然后按当前已发布数据快照执行完整求解。旧 Revision 不修改；只有质量门通过后才把新 Revision 设置为 Trip 的当前版本。
+
+请求：
+
+```json
+{
+  "generation_intent_id": "intent_01K...",
+  "old_attraction_id": "hz_west_lake",
+  "new_attraction_id": "hz_museum"
+}
+```
+
+成功返回 `202 Accepted`，主体结构与 GenerationIntent 查询一致，并补充本次替换草稿引用：
+
+```json
+{
+  "generation_intent_id": "intent_01K...",
+  "status": "completed",
+  "trip_id": "trip_01K...",
+  "trip_revision_id": "revision_01K...",
+  "replacement_draft_id": "draft_01K...",
+  "replacement_draft_version": 1
+}
+```
+
+约束：
+
+- `revision_id` 必须属于该 Trip，且必须仍是 `current_revision_id`；否则返回 `409 trip_revision_conflict`，防止并发修改覆盖新版本；
+- 被替换景点必须存在于基准草稿，新景点不能已经被选择，且必须属于当前发布景点目录；
+- 同一个 `generation_intent_id`、同一 Trip、同一基准 Revision 和同一替换动作重复提交时返回原状态，不重复创建草稿、求解或 Revision；
+- 同一幂等 ID 被用于不同替换动作时返回 `409 generation_intent_conflict`；
+- 完整求解失败时旧 Revision 继续作为当前版本，前端不得局部插卡片或伪造成功。
 
 ## 10. 反馈与计划分享（M1 P1）
 

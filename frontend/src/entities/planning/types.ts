@@ -52,11 +52,14 @@ export interface GenerationIntent {
   trip_id: string | null
   trip_revision_id: string | null
   failure_code: string | null
+  replacement_draft_id?: string
+  replacement_draft_version?: number
 }
 
 export interface TripRevision {
   trip_revision_id: string
   trip_id: string
+  revision_number: number
   completion_kind: 'complete_success' | 'partial_success'
   has_soft_degradation: boolean
   result_snapshot: TripResult

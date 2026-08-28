@@ -12,7 +12,10 @@ from alembic.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from travel_agent.application.common.errors import DraftVersionConflictError
+from travel_agent.application.common.errors import (
+    DraftVersionConflictError,
+    TripRevisionConflictError,
+)
 from travel_agent.application.planning import ExecuteGenerationHandler
 from travel_agent.application.planning.ports import SolverOutcome, SolverRequest
 from travel_agent.domain.planning import (
@@ -117,6 +120,44 @@ def test_intent_status_compare_and_swap_allows_only_one_claim(tmp_path: Path) ->
         ValueError, match="status conflict"
     ):
         uow.generation_intents.save(claimed, expected_status="queued")
+
+
+def test_trip_revision_compare_and_swap_rejects_stale_publisher(
+    tmp_path: Path,
+) -> None:
+    factory = _factory(tmp_path / "planning.db")
+    original = Trip(
+        "trip_1", "principal_1", "hangzhou", "draft_1", "revision_1", NOW, NOW
+    )
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        uow.trips.add(original)
+        uow.commit()
+
+    first = SqlAlchemyUnitOfWork(factory)
+    second = SqlAlchemyUnitOfWork(factory)
+    with first as first_uow, second as second_uow:
+        first_trip = first_uow.trips.get("trip_1")
+        second_trip = second_uow.trips.get("trip_1")
+        assert first_trip is not None and second_trip is not None
+        first_uow.trips.save(
+            first_trip.advance_revision(
+                expected_revision_id="revision_1",
+                new_revision_id="revision_2",
+                now=NOW,
+            ),
+            expected_revision_id="revision_1",
+        )
+        first_uow.commit()
+
+        with pytest.raises(TripRevisionConflictError):
+            second_uow.trips.save(
+                second_trip.advance_revision(
+                    expected_revision_id="revision_1",
+                    new_revision_id="revision_3",
+                    now=NOW,
+                ),
+                expected_revision_id="revision_1",
+            )
 
 
 def test_uncommitted_completion_products_are_rolled_back(tmp_path: Path) -> None:

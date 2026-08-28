@@ -16,23 +16,41 @@ from travel_agent.application.common.errors import (
     DraftNotReadyError,
     DraftVersionConflictError,
     GenerationIntentConflictError,
-    InvalidStateTransitionError, ResourceNotFoundError,
+    InvalidAttractionReplacementError,
+    InvalidStateTransitionError,
+    ResourceNotFoundError,
+    TripRevisionConflictError,
 )
 from travel_agent.application.common.unit_of_work import UnitOfWork
 from travel_agent.domain.planning import (
-    GenerationIntent, GenerationStatus, SolverRun, Trip, TripDraft, TripRevision,
+    GenerationIntent,
+    GenerationStatus,
+    SolverRun,
+    Trip,
+    TripDraft,
+    TripRevision,
 )
 
 from .commands import (
     CreateDraft,
     ReplaceAttractionSelection,
+    ReplaceTripAttraction,
     SubmitGeneration,
     UpdateTravelFacts,
 )
-from .dto import DraftResult, GenerationExecutionResult, GenerationIntentResult
+from .dto import (
+    AttractionReplacementResult,
+    DraftResult,
+    GenerationExecutionResult,
+    GenerationIntentResult,
+)
 from .ports import (
-    DataSnapshotVersionProvider, GenerationExecutor, IdGenerator, SolverExecutionError,
-    SolverGateway, SolverRequest,
+    DataSnapshotVersionProvider,
+    GenerationExecutor,
+    IdGenerator,
+    SolverExecutionError,
+    SolverGateway,
+    SolverRequest,
 )
 
 
@@ -141,6 +159,124 @@ class SubmitGenerationHandler:
         return _intent_result(intent, reused=False)
 
 
+class ReplaceTripAttractionHandler:
+    """Clone the source draft and submit a revision intent without mutating history."""
+
+    def __init__(
+        self,
+        uow: UnitOfWork,
+        clock: Clock,
+        ids: IdGenerator,
+        snapshots: DataSnapshotVersionProvider,
+        executor: GenerationExecutor,
+    ) -> None:
+        self._uow = uow
+        self._clock = clock
+        self._ids = ids
+        self._snapshots = snapshots
+        self._executor = executor
+
+    def handle(self, command: ReplaceTripAttraction) -> AttractionReplacementResult:
+        with self._uow:
+            existing = self._uow.generation_intents.get(command.generation_intent_id)
+            if existing is not None:
+                if existing.principal_id != command.principal_id:
+                    raise ResourceNotFoundError
+                if (
+                    existing.target_trip_id != command.trip_id
+                    or existing.base_revision_id != command.base_revision_id
+                ):
+                    raise GenerationIntentConflictError
+                draft = _owned_draft(
+                    self._uow, existing.draft_id, command.principal_id
+                )
+                base_revision = self._uow.trip_revisions.get(command.base_revision_id)
+                source_intent = (
+                    self._uow.generation_intents.get(
+                        base_revision.generation_intent_id
+                    )
+                    if base_revision is not None
+                    else None
+                )
+                source_draft = (
+                    self._uow.drafts.get(source_intent.draft_id)
+                    if source_intent is not None
+                    else None
+                )
+                if (
+                    source_draft is None
+                    or set(source_draft.selected_attraction_ids)
+                    - set(draft.selected_attraction_ids)
+                    != {command.old_attraction_id}
+                    or set(draft.selected_attraction_ids)
+                    - set(source_draft.selected_attraction_ids)
+                    != {command.new_attraction_id}
+                ):
+                    raise GenerationIntentConflictError
+                return AttractionReplacementResult(
+                    _intent_result(existing, reused=True), draft
+                )
+
+            trip = self._uow.trips.get(command.trip_id)
+            base_revision = self._uow.trip_revisions.get(command.base_revision_id)
+            if (
+                trip is None
+                or trip.principal_id != command.principal_id
+                or base_revision is None
+                or base_revision.trip_id != trip.trip_id
+            ):
+                raise ResourceNotFoundError
+            if trip.current_revision_id != base_revision.trip_revision_id:
+                raise TripRevisionConflictError
+
+            source_intent = self._uow.generation_intents.get(
+                base_revision.generation_intent_id
+            )
+            if source_intent is None:
+                raise ResourceNotFoundError
+            source_draft = _owned_draft(
+                self._uow, source_intent.draft_id, command.principal_id
+            )
+            now = self._clock.now()
+            try:
+                draft = source_draft.clone_with_replacement(
+                    draft_id=self._ids.new_id("draft"),
+                    old_attraction_id=command.old_attraction_id,
+                    new_attraction_id=command.new_attraction_id,
+                    now=now,
+                )
+            except ValueError as exc:
+                raise InvalidAttractionReplacementError(str(exc)) from exc
+
+            data_version = self._snapshots.current_version(draft.city_id)
+            snapshot = _canonical_input_snapshot(draft, data_version)
+            snapshot_hash = _snapshot_hash(snapshot)
+            intent = GenerationIntent(
+                generation_intent_id=command.generation_intent_id,
+                principal_id=command.principal_id,
+                draft_id=draft.draft_id,
+                draft_version=draft.draft_version,
+                status=GenerationStatus.QUEUED,
+                input_schema_version="generation-input-v1",
+                input_snapshot=snapshot,
+                input_snapshot_hash=snapshot_hash,
+                data_snapshot_version=data_version,
+                random_seed=int(snapshot_hash[:15], 16),
+                submitted_at=now,
+                updated_at=now,
+                target_trip_id=trip.trip_id,
+                base_revision_id=base_revision.trip_revision_id,
+            )
+            self._uow.drafts.save(draft)
+            self._uow.generation_intents.add(intent)
+            self._uow.commit()
+
+        self._executor.submit(intent.generation_intent_id)
+        return AttractionReplacementResult(
+            _intent_result(intent, reused=False), draft
+        )
+
+
 class ExecuteGenerationHandler:
     """Claim and execute one intent, keeping solver work outside transactions."""
 
@@ -208,22 +344,83 @@ class ExecuteGenerationHandler:
                     generation_intent_id, failed.status, solver_run_id, None, None, False
                 )
 
-            trip_id = self._ids.new_id("trip")
             revision_id = self._ids.new_id("revision")
             draft = self._uow.drafts.get(current.draft_id)
             if draft is None:
                 raise ResourceNotFoundError
+            if current.target_trip_id is not None:
+                trip = self._uow.trips.get(current.target_trip_id)
+                base_revision = self._uow.trip_revisions.get(
+                    current.base_revision_id or ""
+                )
+                if (
+                    trip is None
+                    or trip.principal_id != current.principal_id
+                    or base_revision is None
+                    or base_revision.trip_id != trip.trip_id
+                ):
+                    raise ResourceNotFoundError
+                if trip.current_revision_id != base_revision.trip_revision_id:
+                    failed = current.fail(
+                        code="trip_revision_conflict", retryable=False, now=now
+                    )
+                    self._uow.generation_intents.save(
+                        failed, expected_status="running"
+                    )
+                    self._uow.commit()
+                    return GenerationExecutionResult(
+                        generation_intent_id,
+                        failed.status,
+                        solver_run_id,
+                        None,
+                        None,
+                        False,
+                    )
+                trip_id = trip.trip_id
+                revision_number = base_revision.revision_number + 1
+                updated_trip = trip.advance_revision(
+                    expected_revision_id=base_revision.trip_revision_id,
+                    new_revision_id=revision_id,
+                    now=now,
+                )
+            else:
+                trip_id = self._ids.new_id("trip")
+                revision_number = 1
+                updated_trip = None
             revision = TripRevision(
-                revision_id, trip_id, 1, generation_intent_id,
+                revision_id, trip_id, revision_number, generation_intent_id,
                 outcome.completion_kind, outcome.has_soft_degradation,
                 outcome.result_schema_version, outcome.result_snapshot,
                 outcome.result_snapshot_hash, now,
             )
-            trip = Trip(
-                trip_id, current.principal_id, draft.city_id, current.draft_id,
-                revision_id, now, now,
-            )
-            self._uow.trips.add(trip)
+            if updated_trip is None:
+                trip = Trip(
+                    trip_id, current.principal_id, draft.city_id, current.draft_id,
+                    revision_id, now, now,
+                )
+                self._uow.trips.add(trip)
+            else:
+                try:
+                    self._uow.trips.save(
+                        updated_trip,
+                        expected_revision_id=current.base_revision_id,
+                    )
+                except TripRevisionConflictError:
+                    failed = current.fail(
+                        code="trip_revision_conflict", retryable=False, now=now
+                    )
+                    self._uow.generation_intents.save(
+                        failed, expected_status="running"
+                    )
+                    self._uow.commit()
+                    return GenerationExecutionResult(
+                        generation_intent_id,
+                        failed.status,
+                        solver_run_id,
+                        None,
+                        None,
+                        False,
+                    )
             self._uow.trip_revisions.add(revision)
             completed = current.complete(
                 trip_id=trip_id, trip_revision_id=revision_id, now=now

@@ -14,6 +14,7 @@ from typing import Self
 from travel_agent.application.common.errors import (
     DraftVersionConflictError,
     GenerationIntentConflictError,
+    TripRevisionConflictError,
 )
 from travel_agent.domain.planning import (
     GenerationIntent,
@@ -93,6 +94,28 @@ class _InMemoryAddRepository:
         self._records[record_id] = record
 
 
+class InMemoryTripRepository(_InMemoryAddRepository):
+    def __init__(self, records: dict[str, Trip]) -> None:
+        super().__init__(records, "trip_id")
+        self._trip_records = records
+
+    def save(
+        self,
+        record: Trip,
+        *,
+        expected_revision_id: str | None = None,
+    ) -> None:
+        current = self._trip_records.get(record.trip_id)
+        if current is None:
+            raise ValueError("trip_id does not exist")
+        if (
+            expected_revision_id is not None
+            and current.current_revision_id != expected_revision_id
+        ):
+            raise TripRevisionConflictError
+        self._trip_records[record.trip_id] = record
+
+
 class InMemoryUnitOfWork:
     def __init__(self, store: InMemoryPlanningStore) -> None:
         self._store = store
@@ -100,7 +123,7 @@ class InMemoryUnitOfWork:
         self._committed = False
         self.drafts = InMemoryTripDraftRepository({})
         self.generation_intents = InMemoryGenerationIntentRepository({})
-        self.trips = _InMemoryAddRepository({}, "trip_id")
+        self.trips = InMemoryTripRepository({})
         self.trip_revisions = _InMemoryAddRepository({}, "trip_revision_id")
         self.solver_runs = _InMemoryAddRepository({}, "solver_run_id")
 
@@ -110,7 +133,7 @@ class InMemoryUnitOfWork:
         self.generation_intents = InMemoryGenerationIntentRepository(
             self._working.generation_intents
         )
-        self.trips = _InMemoryAddRepository(self._working.trips, "trip_id")
+        self.trips = InMemoryTripRepository(self._working.trips)
         self.trip_revisions = _InMemoryAddRepository(
             self._working.trip_revisions, "trip_revision_id"
         )

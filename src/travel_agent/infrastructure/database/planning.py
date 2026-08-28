@@ -6,7 +6,7 @@ from datetime import date, datetime
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import Boolean, Integer, JSON, String, select, update
+from sqlalchemy import JSON, Boolean, Integer, String, UniqueConstraint, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import (
@@ -21,6 +21,7 @@ from sqlalchemy.orm import (
 from travel_agent.application.common.errors import (
     DraftVersionConflictError,
     GenerationIntentConflictError,
+    TripRevisionConflictError,
 )
 from travel_agent.domain.planning import (
     CompletionKind,
@@ -82,6 +83,10 @@ class GenerationIntentRow(Base):
     trip_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     trip_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    target_trip_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    base_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class TripRow(Base):
@@ -98,6 +103,16 @@ class TripRow(Base):
 
 class TripRevisionRow(Base):
     __tablename__ = "trip_revisions"
+    __table_args__ = (
+        UniqueConstraint(
+            "trip_id", "revision_number", name="uq_trip_revisions_trip_number"
+        ),
+        {
+            "mysql_engine": "InnoDB",
+            "mysql_charset": "utf8mb4",
+            "mysql_collate": "utf8mb4_0900_ai_ci",
+        },
+    )
 
     trip_revision_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     trip_id: Mapped[str] = mapped_column(String(64), index=True)
@@ -195,6 +210,35 @@ class SqlAlchemyGenerationIntentRepository:
             raise ValueError("generation intent status conflict")
 
 
+class SqlAlchemyTripRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, trip_id: str) -> Trip | None:
+        row = self._session.get(TripRow, trip_id)
+        return _trip_from_row(row) if row is not None else None
+
+    def add(self, trip: Trip) -> None:
+        self._session.add(TripRow(**_trip_values(trip)))
+        self._session.flush()
+
+    def save(
+        self,
+        trip: Trip,
+        *,
+        expected_revision_id: str | None = None,
+    ) -> None:
+        statement = update(TripRow).where(TripRow.trip_id == trip.trip_id)
+        if expected_revision_id is not None:
+            statement = statement.where(
+                TripRow.current_revision_id == expected_revision_id
+            )
+        if self._session.execute(statement.values(**_trip_values(trip))).rowcount != 1:
+            if expected_revision_id is not None:
+                raise TripRevisionConflictError
+            raise ValueError("trip_id does not exist")
+
+
 class _SqlAlchemyRepository:
     def __init__(self, session: Session, row_type, entity_from_row, values) -> None:
         self._session = session
@@ -230,9 +274,7 @@ class SqlAlchemyUnitOfWork:
         self._session = self._session_factory()
         self.drafts = SqlAlchemyTripDraftRepository(self._session)
         self.generation_intents = SqlAlchemyGenerationIntentRepository(self._session)
-        self.trips = _SqlAlchemyRepository(
-            self._session, TripRow, _trip_from_row, _trip_values
-        )
+        self.trips = SqlAlchemyTripRepository(self._session)
         self.trip_revisions = _SqlAlchemyRepository(
             self._session, TripRevisionRow, _revision_from_row, _revision_values
         )
@@ -325,6 +367,8 @@ def _intent_values(intent: GenerationIntent) -> dict[str, Any]:
         "trip_id": intent.trip_id,
         "trip_revision_id": intent.trip_revision_id,
         "failure_code": intent.failure_code,
+        "target_trip_id": intent.target_trip_id,
+        "base_revision_id": intent.base_revision_id,
     }
 
 
@@ -345,6 +389,8 @@ def _intent_from_row(row: GenerationIntentRow) -> GenerationIntent:
         row.trip_id,
         row.trip_revision_id,
         row.failure_code,
+        row.target_trip_id,
+        row.base_revision_id,
     )
 
 

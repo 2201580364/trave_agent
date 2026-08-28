@@ -36,3 +36,13 @@ class SubmitGeneration:
     generation_intent_id: str
     draft_id: str
     draft_version: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReplaceTripAttraction:
+    principal_id: str
+    generation_intent_id: str
+    trip_id: str
+    base_revision_id: str
+    old_attraction_id: str
+    new_attraction_id: str

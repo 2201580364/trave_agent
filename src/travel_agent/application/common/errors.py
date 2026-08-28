@@ -53,3 +53,16 @@ class DraftNotReadyError(ApplicationError):
 class InvalidStateTransitionError(ApplicationError):
     def __init__(self, message: str) -> None:
         super().__init__("invalid_state_transition", message)
+
+
+class TripRevisionConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "trip_revision_conflict",
+            "行程已生成更新版本，请先恢复最新版本后再调整。",
+        )
+
+
+class InvalidAttractionReplacementError(ApplicationError):
+    def __init__(self, message: str) -> None:
+        super().__init__("invalid_attraction_replacement", message)

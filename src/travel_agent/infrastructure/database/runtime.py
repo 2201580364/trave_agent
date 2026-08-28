@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from travel_agent.runtime_config import load_runtime_environment
 
-EXPECTED_ALEMBIC_REVISION = "0002_anonymous_identity"
+EXPECTED_ALEMBIC_REVISION = "0003_trip_revision_lineage"
 
 
 @dataclass(frozen=True, slots=True)

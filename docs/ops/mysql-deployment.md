@@ -66,7 +66,7 @@ alembic upgrade head
 预期 revision：
 
 ```text
-0002_anonymous_identity
+0003_trip_revision_lineage
 ```
 
 迁移后 `/health/ready` 必须同时满足：

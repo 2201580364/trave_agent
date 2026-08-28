@@ -1,9 +1,9 @@
 # M1 持久化数据模型
 
-- 文档版本：V2.1
-- 日期：2026-08-27
+- 文档版本：V2.2
+- 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001/0002 已实现，配置数据库持久化和 Revision 回放已通过；A6-8.2 真实 MySQL 8.0.46、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过，正式发布数据表仍待后续实现
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0003 已实现；0003 增加用户修订血缘和 Trip 内修订号唯一约束。A6-8.2 真实 MySQL 8.0.46 的 0002 基线、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过；0003 待下一次应用发布前在服务器执行，正式发布数据表仍待后续实现
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
 - 上游：API 契约 V2.0、应用代码架构 V1.0、ADR-0002、ADR-0005、ADR-0009
 
@@ -461,6 +461,8 @@ CREATE TABLE generation_intents (
     failure_details JSON NULL,
     trip_id VARCHAR(32) NULL,
     revision_id VARCHAR(32) NULL,
+    target_trip_id VARCHAR(32) NULL,
+    base_revision_id VARCHAR(32) NULL,
     submitted_at DATETIME(6) NOT NULL,
     started_at DATETIME(6) NULL,
     completed_at DATETIME(6) NULL,
@@ -480,6 +482,8 @@ ON generation_intents(status, submitted_at);
 ```
 
 主键保证业务幂等。收到相同 ID 时应用先读取已有记录，比较主体、draft ID 和 draft version；一致则直接返回原状态，不重新选择当前数据快照。首次创建后 `input_snapshot_hash` 用于回放和防篡改。不能仅因两个不同 intent 哈希相同就强制合并用户动作。
+
+首次生成时 `target_trip_id/base_revision_id` 均为空；用户从现有行程发起景点替换等修订时两者必须同时存在。完成事务通过 `UPDATE trips ... WHERE trip_id=:id AND current_revision_id=:base_revision_id` 条件更新当前指针；只有影响一行的发布者可以继续创建 `base.revision_no + 1`，不相等时以 `trip_revision_conflict` 终止，旧版本继续可用。
 
 原子领取：
 
@@ -594,6 +598,8 @@ Revision 只保存质量门通过的 complete 或 partial 结果；软降级通�
 ```
 
 求解器执行在事务外；完成保存使用短事务。唯一约束是最终并发保护。事务失败不能留下半个 Revision，也不能让 intent 显示 completed。
+
+当前物理迁移 `0003_trip_revision_lineage` 已为 `generation_intents` 增加 `target_trip_id/base_revision_id`，并落实 `(trip_id, revision_number)` 唯一约束。该迁移不重写任何历史 Revision；现有首次生成 Intent 的两个新字段保持 `NULL`。
 
 ## 9. 反馈和计划分享（M1 P1）
 

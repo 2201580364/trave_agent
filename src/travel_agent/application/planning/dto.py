@@ -30,3 +30,9 @@ class GenerationExecutionResult:
     trip_id: str | None
     trip_revision_id: str | None
     reused: bool
+
+
+@dataclass(frozen=True, slots=True)
+class AttractionReplacementResult:
+    generation_intent: GenerationIntentResult
+    draft: TripDraft
