@@ -36,6 +36,7 @@ M1 工程纵向切片完成后的真实专家/用户验证不在本目录虚构�
 - `docs/test/gate7-validation-plan.md`；
 - `docs/test/gate7-expert-review-form.md`；
 - `docs/test/gate7-user-test-script.md`；
-- `docs/test/gate7-protocol-v1.json`。
+- `docs/test/gate7-protocol-v1.json`；
+- `docs/test/gate7-research-environment.md`。
 
-原始联系方式、录音、屏幕录像和精确私人行程保存于受控研究空间，不进入 Git；仓库只接受去标识聚合报告、protocol hash、样本区间、限制、反例和对 `docs/assumptions.md` 的结论回写。
+真实证据收集前必须生成状态为 `locked` 的研究环境 manifest；evidence 通过环境 ID 和 manifest SHA-256 绑定准确代码、数据、求解契约、数据库迁移和前端构建。原始联系方式、录音、屏幕录像和精确私人行程保存于受控研究空间，不进入 Git；仓库只接受去标识聚合报告、protocol/environment hash、样本区间、限制、反例和对 `docs/assumptions.md` 的结论回写。

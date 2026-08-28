@@ -10,8 +10,12 @@ from typing import Any
 import pytest
 
 from travel_agent.evaluation import (
+    CURRENT_DATABASE_REVISION,
     Gate7EvidenceError,
+    GitState,
+    build_gate7_environment_manifest,
     build_gate7_report,
+    environment_manifest_sha256,
     protocol_sha256,
     validate_gate7_evidence,
 )
@@ -25,7 +29,34 @@ def _protocol() -> dict[str, Any]:
     return load_json(PROTOCOL_PATH)
 
 
+def _environment_manifest() -> dict[str, Any]:
+    return build_gate7_environment_manifest(
+        protocol=_protocol(),
+        protocol_hash=protocol_sha256(PROTOCOL_PATH),
+        generated_at=datetime(2026, 8, 28, tzinfo=UTC),
+        study_environment_id="gate7-confirmatory-test-environment",
+        study_phase="confirmatory",
+        git_state=GitState("a" * 40, True),
+        app_version="0.1.0-test",
+        result_schema_version="trip-result-v2",
+        solver_version="solver-p1-v2",
+        constraint_version="constraints-p1-v5",
+        parameter_version="parameters-p1-2026-08-26",
+        data_snapshot_version="hangzhou-test-v1",
+        data_snapshot_kind="published",
+        data_snapshot_sha256="b" * 64,
+        city_id="hangzhou",
+        database_revision=CURRENT_DATABASE_REVISION,
+        required_database_revision=CURRENT_DATABASE_REVISION,
+        frontend_build_kind="h5-production",
+        frontend_build_sha256="c" * 64,
+        evidence_storage_kind="controlled_local",
+        limitations=["Test-only environment metadata."],
+    )
+
+
 def _evidence(*, sample_size: int = 21, accepted: int = 15) -> dict[str, Any]:
+    manifest = _environment_manifest()
     participants = [
         {
             "participant_id": f"participant_{index:02d}",
@@ -59,6 +90,8 @@ def _evidence(*, sample_size: int = 21, accepted: int = 15) -> dict[str, Any]:
         "collection_started_at": "2026-09-01T09:00:00+08:00",
         "collection_ended_at": "2026-09-20T18:00:00+08:00",
         "environment": {
+            "study_environment_id": manifest["study_environment_id"],
+            "environment_manifest_sha256": environment_manifest_sha256(manifest),
             "app_version": "0.1.0-test",
             "result_schema_version": "trip-result-v2",
             "solver_version": "solver-p1-v2",
@@ -84,6 +117,7 @@ def _report(evidence: dict[str, Any]) -> dict[str, Any]:
         evidence,
         expected_protocol_hash=protocol_sha256(PROTOCOL_PATH),
         generated_at=datetime(2026, 9, 21, tzinfo=UTC),
+        environment_manifest=_environment_manifest(),
     )
 
 

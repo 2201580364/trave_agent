@@ -266,8 +266,11 @@ docs/test/gate7-protocol-v1.json
 ```powershell
 python scripts/run_gate7_report.py `
   --protocol docs/test/gate7-protocol-v1.json `
+  --environment-manifest .local/gate7/<study_environment_id>/environment.json `
   --evidence .local/gate7/<study_id>/evidence.json `
   --output docs/test/reports/gate7-<study_id>-aggregate.json
 ```
+
+真实证据收集前必须先按 [`gate7-research-environment.md`](gate7-research-environment.md) 生成状态为 `locked` 的 manifest。Evidence 必须引用同一环境 ID 和 manifest canonical SHA-256；真实 evidence 引用 `candidate/invalid` 环境、环境版本漂移或 manifest 晚于收集开始时间时，汇总器必须拒绝。
 
 没有真实外部参与者证据时不得生成或提交名为 `gate7-latest-passed.json` 的报告。测试 fixture 必须显式标记 `synthetic_fixture=true`，汇总器不得把它判为正式 Gate 7 通过。

@@ -23,6 +23,7 @@ def main() -> int:
         default=Path("docs/test/gate7-protocol-v1.json"),
     )
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--environment-manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--require-h3-supported",
@@ -34,11 +35,13 @@ def main() -> int:
     locked_hash = protocol_sha256(args.protocol)
     protocol = load_json(args.protocol)
     evidence = load_json(args.evidence)
+    environment_manifest = load_json(args.environment_manifest)
     report = build_gate7_report(
         protocol,
         evidence,
         expected_protocol_hash=locked_hash,
         generated_at=datetime.now(UTC),
+        environment_manifest=environment_manifest,
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

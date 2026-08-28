@@ -33,6 +33,7 @@ def validate_gate7_evidence(
     evidence: dict[str, Any],
     *,
     expected_protocol_hash: str,
+    environment_manifest: dict[str, Any] | None = None,
 ) -> None:
     _require_equal(protocol.get("schema_version"), "gate7-protocol-v1", "protocol schema")
     _require_equal(evidence.get("schema_version"), "gate7-evidence-v1", "evidence schema")
@@ -70,6 +71,8 @@ def validate_gate7_evidence(
     if not isinstance(environment, dict):
         raise Gate7EvidenceError("environment must be an object")
     for key in (
+        "study_environment_id",
+        "environment_manifest_sha256",
         "app_version",
         "result_schema_version",
         "solver_version",
@@ -78,6 +81,18 @@ def validate_gate7_evidence(
         "data_snapshot_version",
     ):
         _required_string(environment, key)
+    manifest_hash = environment["environment_manifest_sha256"]
+    if len(manifest_hash) != 64 or any(
+        character not in "0123456789abcdef" for character in manifest_hash
+    ):
+        raise Gate7EvidenceError("environment manifest sha256 must be lowercase SHA-256")
+    if environment_manifest is None:
+        if evidence["synthetic_fixture"] is not True:
+            raise Gate7EvidenceError("real Gate 7 evidence requires an environment manifest")
+    else:
+        from .gate7_environment import validate_evidence_environment_reference
+
+        validate_evidence_environment_reference(evidence, environment_manifest)
 
     participants = _required_list(evidence, "participants")
     participant_ids: set[str] = set()
@@ -190,11 +205,13 @@ def build_gate7_report(
     *,
     expected_protocol_hash: str,
     generated_at: datetime,
+    environment_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     validate_gate7_evidence(
         protocol,
         evidence,
         expected_protocol_hash=expected_protocol_hash,
+        environment_manifest=environment_manifest,
     )
     if generated_at.tzinfo is None:
         raise Gate7EvidenceError("report timestamp must be timezone-aware")

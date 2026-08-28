@@ -20,9 +20,9 @@
 - 产品里程碑：`M1 — 行程骨架验证`
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
-- 当前阶段：`Gate 7 — G7-R0 验证准备 V1 已形成；下一步补齐外部稳定环境、受控原始证据空间和招募后进入 G7-R1`
-- 当前任务：锁定实际测试应用/数据版本，建立受控研究材料目录，招募 3 名独立领域专家和首批 8–12 名形成性目标用户；不直接跳转 M2。A6-9.3.1 分享增强、FastAPI/Taro 正式发布、服务器 0003→0004→0005 迁移、集中监控和异地备份仍是独立工作流。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4 已完成替换、我的行程、计划分享和结构化反馈，Gate 7 V1 已具备分段方案、专家表、用户脚本、锁定 protocol、匿名证据 Schema、隐私门禁和机器聚合工具。当前仍缺真实参与者、外部稳定研究环境、H3/H6/H7 确认性证据、H2 实际出行证据和 H11 分享转化前置能力；因此不能宣称 Gate 7、M1 MVP 或稳定生产已完成
+- 当前阶段：`Gate 7 — G7-R0.1 研究环境锁定机制已完成；首个真实 locked 环境尚未生成`
+- 当前任务：提交本轮锁定工具后生成正式 H5 构建，并在授权服务器完成/验证 0003→0004→0005 迁移，随后生成首个 `locked` 形成性环境；再建立受控研究材料空间、招募 3 名独立领域专家和首批 8–12 名形成性目标用户。A6-9.3.1 分享增强、FastAPI/Taro 正式发布、集中监控和异地备份仍是独立工作流。本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4 已完成替换、我的行程、计划分享和结构化反馈；Gate 7 已具备分段方案、专家表、用户脚本、锁定 protocol、匿名 evidence、研究环境 manifest、安全门禁和机器聚合工具。当前 candidate 检查准确识别工作树未提交、服务器数据库仍为 0002 和前端构建产物缺失，未冒充正式锁；仍缺真实参与者、可用的 `locked` 环境、H3/H6/H7 确认性证据、H2 实际出行证据和 H11 分享转化前置能力，因此不能宣称 Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -45,9 +45,9 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | A6-9.2 我的行程与历史 Revision | 完成并通过 Chrome 验收 | 匿名主体隔离列表、更新时间排序与分页、最新 Revision 恢复、历史只读回看、返回当前版本 |
 | A6-9.3 计划分享首版 | 完成并通过 Chrome 验收 | 不可变 `plan-share-v1` 脱敏快照、HMAC 公开 token、幂等创建、公开只读链接、访客参考复制、375×812/1280×800 与 console 门禁 |
 | A6-9.4 结构化反馈首版 | 完成并通过 Chrome 验收 | Revision/节点反馈、稳定 reason codes、intent 幂等与目标去重、节点归属校验、Alembic 0005、375×812/1280×800 与 console 门禁 |
-| Gate 7 R0 验证准备 V1 | 设计与机器工具完成；外部执行待开始 | R0–R3 分段、H3/H11 边界、专家表、用户脚本、protocol hash、匿名证据校验、synthetic 防伪和问题严重度/归因 |
+| Gate 7 R0 验证准备 | R0.1 环境锁定机制完成；首个真实锁待生成 | R0–R3 分段、H3/H11 边界、专家表、用户脚本、protocol hash、匿名证据校验、环境 manifest/哈希绑定、synthetic 防伪和问题严重度/归因 |
 
-最新稳定技术基线：全量 296 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。A6-9.4 反馈/HTTP/SQLAlchemy/readiness 定向 22 项、前端 TypeScript、H5 production build、SQLite Alembic 0005 升级均通过；Gate 7 evidence validator 新增 9 项测试，覆盖 H3 阈值中间态、最小样本、blocker、synthetic 防伪、排除样本、protocol hash、隐私字段、重复主指标和知情同意；全部改动 Python Ruff、Gate 7 新增 4 个 Python 源/测试文件隔离 strict mypy 和 `git diff --check` 通过。真实 Google Chrome 已完成 A6-9.1 替换、A6-9.2 行程历史、A6-9.3 分享和 A6-9.4 反馈闭环：当前 Revision 节点/整体反馈提交成功，刷新后新 intent 命中目标去重，历史 Revision 不显示反馈/替换入口，SQLite 只保存 1 条 trip + 1 条 node 反馈；375×812 与 1280×800 无横向溢出，完整刷新后新增 console warning/error 为 0。H5 入口约 306 KiB 的既有性能警告仍保留为 P1；全仓 Ruff 与 strict mypy 历史债仍未清零。以上仍只是技术和验证准备证据，不证明 H3/H11 已被专家或用户证实。
+最新稳定技术基线：全量 306 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。A6-9.4 反馈/HTTP/SQLAlchemy/readiness 定向 22 项、前端 TypeScript、H5 production build、SQLite Alembic 0005 升级均通过；Gate 7 evidence validator 9 项和研究环境锁定 10 项定向测试通过，覆盖 H3 判定、synthetic 防伪、隐私、Git/迁移/构建门禁、关键版本缺失、protocol 漂移、manifest hash 与 evidence 精确绑定；本轮 Python Ruff、4 个改动源/脚本文件隔离 strict mypy、synthetic 端到端汇总和 `git diff --check` 均通过。真实 Google Chrome 已完成 A6-9.1 替换、A6-9.2 行程历史、A6-9.3 分享和 A6-9.4 反馈闭环：当前 Revision 节点/整体反馈提交成功，刷新后新 intent 命中目标去重，历史 Revision 不显示反馈/替换入口，SQLite 只保存 1 条 trip + 1 条 node 反馈；375×812 与 1280×800 无横向溢出，完整刷新后新增 console warning/error 为 0。H5 入口约 306 KiB 的既有性能警告仍保留为 P1；全仓 strict mypy 历史债仍未清零。以上仍只是技术和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -55,10 +55,10 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 
 ### Gate 7：专家/用户验证准备
 
-- 状态：G7-R0 V1 设计和机器工具已完成；尚未开始招募或收集真实用户数据；
+- 状态：G7-R0.1 研究环境 manifest、状态推导和 evidence 精确绑定已完成；首个真实 `locked` 环境尚未生成，尚未开始招募或收集真实用户数据；
 - 当前输入：已通过 Gate 6 的求解器证据、A6 完整浏览器纵向切片、结构化 Revision/节点反馈能力；
-- 已完成产物：`gate7-validation-plan.md`、专家评审表、用户主持脚本、`gate7-protocol-v1.json`、匿名 evidence validator/aggregate report 和 9 项定向测试；
-- 下一产物：实际测试环境版本锁、受控原始证据空间、招募记录和首批 G7-R1 形成性报告；
+- 已完成产物：`gate7-validation-plan.md`、专家评审表、用户主持脚本、`gate7-protocol-v1.json`、匿名 evidence validator/aggregate report、`gate7-research-environment-v1` manifest、锁定 CLI 和环境/evidence 绑定测试；
+- 下一产物：基于已提交 commit、正式 H5 构建和数据库 0005 的首个 locked manifest，随后是受控原始证据空间、招募记录和首批 G7-R1 形成性报告；
 - 门禁原则：不得用自动化测试、Chrome 验收或团队内部主观判断冒充 H3/H11 的真实证据；Gate 7 结果决定 M1 补修、受控试运行或进入 M2，而不是预设一定晋级。
 
 ### A4：应用代码架构设计
@@ -146,6 +146,19 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 合成示例明确标记 `synthetic_fixture=true`，实际汇总结果为 `H3=synthetic_only / H11=not_evaluable / gate7_overall=not_decided_by_single_study`，不会制造虚假 Gate 7 通过报告；
 - Gate 7 定向 9 项和全量 296 项测试通过；改动 Python Ruff、Gate 7 新增 4 个 Python 源/测试文件隔离 strict mypy、protocol/example SHA-256 一致性和 `git diff --check` 均通过；pytest 结束时仅出现沙箱无权清理宿主临时目录符号链接的非测试失败提示，不影响 296 项通过结论；
 - 当前只完成 R0 设计和机器工具，尚未锁定外部测试部署版本、建立受控原始材料空间或招募真实参与者；H1/H2/H3/H6/H7/H11 状态均未因本轮准备工作改为已验证。
+
+### Gate 7 R0.1 研究环境锁定（2026-08-28）
+
+- 新增 `gate7-research-environment-v1`：固定 study phase、Git commit/clean 状态、reviewed protocol hash、应用/结果/solver/constraint/parameter 版本、published 数据及 canonical hash、数据库实际/要求 revision、前端构建类型/目录 hash、证据存储类型和限制；manifest 只保存非敏感版本事实；
+- 新增 `travel_agent.evaluation.gate7_environment` 和 `scripts/lock_gate7_environment.py`。状态由事实自动推导：脏工作树、数据库 revision 不一致或缺前端产物为 `candidate`；正式形成性/确认性/field pilot 使用 candidate/synthetic 数据为 `invalid`；只有门禁全部满足才是 `locked`；
+- 将 reviewed protocol canonical SHA-256 固化为 `b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89`，协议漂移会阻止锁定；当前要求数据库 revision 为 `0005_feedbacks`；
+- 锁定 manifest 若输出到仓库内部，必须写入 Git 忽略路径，避免“检查时 clean、写入后立即 dirty”的自相矛盾。推荐路径为 `.local/gate7/<study_environment_id>/environment.json`；
+- Gate 7 evidence 新增 `study_environment_id + environment_manifest_sha256` 精确引用。真实 evidence 必须绑定 `locked` manifest，且 study phase、六项版本、manifest 生成时间必须一致；synthetic dry run 仍不能形成 H3 支持结论；
+- 隐私门禁使用严格字段白名单并拒绝 `.env`、API Key、密码、secret/token、私钥和带凭证 URL 等敏感文本；原始 evidence、录音、联系方式和精确私人行程继续禁止进入 Git；
+- 新增 synthetic candidate manifest 示例并完成端到端聚合 dry run，结果保持 `H3=synthetic_only / H11=not_evaluable`；新增环境定向测试覆盖 clean lock、dirty tree、数据库漂移、缺前端产物、protocol 漂移、synthetic 冒充正式数据、敏感字段、构建 hash 和 evidence 精确绑定；
+- 实际 candidate 命令识别 `dirty_git_tree + database_revision_mismatch + frontend_artifact_missing`。这是正确门禁：本轮尚未提交，服务器仍为已验收的 0002，`frontend/dist` 当前为空；因此本轮没有伪造首个正式 locked 环境，也没有连接服务器或读取 `.env`；
+- 验证结果：Gate 7 定向 19 项、全量 306 项、改动范围 Ruff、4 个改动源/脚本文件隔离 strict mypy、synthetic manifest→evidence→aggregate 端到端命令均通过；全仓 Ruff/strict mypy 的既有历史债仍保持独立登记；
+- 当前下一门禁：本轮代码提交后，从 clean commit 生成正式 H5 artifact；经用户既有授权在服务器执行并验证 0003→0004→0005 后，才生成首个 G7-R1 formative `locked` manifest。此后方可开始外部专家/用户证据收集。
 
 ## 本轮完成（2026-08-25）
 
@@ -600,7 +613,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
 | 6 | A6 | 首个浏览器可操作纵向切片 | 已完成（100% 仅指技术纵向切片；替换、我的行程、计划分享、结构化反馈均通过 Chrome 验收） |
-| 7 | G7 | 真实专家评审与用户验证 | R0 准备中（V1 方案和机器工具完成；外部环境、招募和真实证据未开始） |
+| 7 | G7 | 真实专家评审与用户验证 | R0.1 环境锁机制完成；正式 locked 环境、招募和真实证据未开始 |
 
 ## 首个可用目标
 
@@ -634,7 +647,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；
 - M4 自动游记、旅行档案和长期偏好仅完成产品功能骨架，尚未进入详细 PRD 或实现；
-- Gate 7 R0 设计和机器准备已完成第一版，但外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
+- Gate 7 R0.1 研究环境锁定机制已完成，但服务器数据库仍为 0002、首个正式 H5 artifact/locked manifest 尚未生成；外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
 
 ## 每轮结束更新模板
 

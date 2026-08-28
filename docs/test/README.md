@@ -2,6 +2,8 @@
 
 > G6 产物。测试不是实现后的阶段，而是与实现交替进行（约束 TDD）。
 
+Gate 7 人类证据在收集前必须按 [`gate7-research-environment.md`](gate7-research-environment.md) 锁定研究环境。`scripts/lock_gate7_environment.py` 固定 Git commit、protocol hash、应用/求解器版本、published 数据快照、数据库 revision 和前端构建哈希；真实 evidence 必须引用 `locked` manifest，原始材料只进入 `.local/gate7/` 或外部受控空间。
+
 ## 测试分层
 
 | 层 | 内容 | 对应目标 |
@@ -182,6 +184,7 @@ Gate 7 不复用 Gate 6 的自动化通过口径。当前验证方案、表单�
 - [`gate7-expert-review-form.md`](gate7-expert-review-form.md)：领域专家独立评分与 blocker 登记；
 - [`gate7-user-test-script.md`](gate7-user-test-script.md)：形成性/确认性主持脚本和标准 assistance；
 - [`gate7-protocol-v1.json`](gate7-protocol-v1.json)：预注册 H3/H11 阈值、角色、严重度、归因和隐私字段；
+- [`gate7-research-environment.md`](gate7-research-environment.md)：Git、数据、求解版本、数据库迁移和前端构建的收集前锁定；
 - [`gate7-evidence-example.synthetic.json`](gate7-evidence-example.synthetic.json)：只用于演示数据格式，永远不能作为真实证据。
 
 校验和匿名聚合命令：
@@ -189,8 +192,9 @@ Gate 7 不复用 Gate 6 的自动化通过口径。当前验证方案、表单�
 ```powershell
 python scripts/run_gate7_report.py `
   --protocol docs/test/gate7-protocol-v1.json `
+  --environment-manifest .local/gate7/<study_environment_id>/environment.json `
   --evidence .local/gate7/<study_id>/evidence.json `
   --output docs/test/reports/gate7-<study_id>-aggregate.json
 ```
 
-汇总器会拒绝 protocol hash 漂移、缺失知情同意、重复 H3 主指标、未知参与者、非法严重度/归因和敏感字段名。内部/排除样本不进入 H3 分母；`synthetic_fixture=true` 的数据只能得到 `synthetic_only`。单个 study 报告不会直接输出“Gate 7 全部通过”，因为 H2、H3、H11 需要不同证据阶段。
+汇总器会拒绝 protocol hash 漂移、非 locked/不匹配的真实研究环境、缺失知情同意、重复 H3 主指标、未知参与者、非法严重度/归因和敏感字段名。内部/排除样本不进入 H3 分母；`synthetic_fixture=true` 的数据只能得到 `synthetic_only`。单个 study 报告不会直接输出“Gate 7 全部通过”，因为 H2、H3、H11 需要不同证据阶段。

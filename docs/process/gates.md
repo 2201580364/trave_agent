@@ -88,13 +88,14 @@ G7-R0 protocol/隐私/样本/环境准备
 附加门禁：
 
 - protocol 必须在首个有效样本前锁定并保存 canonical JSON SHA-256，避免换行格式改变证据身份；
+- 真实 evidence 必须引用收集前生成的 `locked` 研究环境 manifest，精确绑定 Git commit、数据快照、求解版本、数据库 revision 和前端 artifact hash；
 - 团队成员、开发者、AI 和 synthetic fixture 不进入目标用户分母；
 - H3 沿用登记册：`n>=21`，认可率 `>=70%` 支持、`<50%` 推翻、其余需调整；
 - 未关闭 blocker 时，平均分和认可率不得补偿；
 - H2 必须使用真实出行后证据，H11 必须使用独立接收者和真实转化事件；
 - 没有公开试运行环境、事件能力或可观察 UI 时，相应假设标记 `not_evaluable`；
 - 仓库只保存去标识聚合证据；联系方式、录音、精确票号和私人行程不得进入 Git；
-- 机器校验入口、样本和判定规则见 `docs/test/gate7-validation-plan.md` 与 `docs/test/gate7-protocol-v1.json`。
+- 机器校验入口、样本和判定规则见 `docs/test/gate7-validation-plan.md`、`docs/test/gate7-research-environment.md` 与 `docs/test/gate7-protocol-v1.json`。
 
 ## 决策变更传播检查
 

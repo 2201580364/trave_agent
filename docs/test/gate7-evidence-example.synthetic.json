@@ -4,10 +4,12 @@
   "protocol_id": "m1-hangzhou-gate7-v1",
   "protocol_sha256": "b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89",
   "synthetic_fixture": true,
-  "study_phase": "confirmatory",
+  "study_phase": "dry_run",
   "collection_started_at": "2026-09-01T09:00:00+08:00",
   "collection_ended_at": "2026-09-01T12:00:00+08:00",
   "environment": {
+    "study_environment_id": "synthetic-gate7-example-environment",
+    "environment_manifest_sha256": "3f83c6bcad8ecd11a79942b7fcb68dd9a7db811a3640b509cc939165dfe224fe",
     "app_version": "0.1.0-synthetic",
     "result_schema_version": "trip-result-v2",
     "solver_version": "solver-p1-v2",
