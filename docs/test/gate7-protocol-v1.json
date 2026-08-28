@@ -1,0 +1,71 @@
+{
+  "schema_version": "gate7-protocol-v1",
+  "protocol_id": "m1-hangzhou-gate7-v1",
+  "protocol_version": "1.0.0",
+  "created_at": "2026-08-28T00:00:00+08:00",
+  "scope": {
+    "milestone": "M1",
+    "city_ids": [
+      "hangzhou"
+    ],
+    "supported_study_phases": [
+      "dry_run",
+      "formative",
+      "confirmatory",
+      "field_pilot"
+    ]
+  },
+  "h3_decision_rule": {
+    "metric": "plan_preferred_over_manual",
+    "participant_role": "target_user",
+    "study_phase": "confirmatory",
+    "minimum_sample_size": 21,
+    "supported_rate_gte": 0.7,
+    "refuted_rate_lt": 0.5,
+    "open_blocker_prevents_support": true
+  },
+  "h11_guardrails": {
+    "share_rate_target_gte": 0.3,
+    "recipient_conversion_adjust_if_lt": 0.05,
+    "requires_public_share_environment": true,
+    "requires_independent_recipients": true,
+    "requires_conversion_events": true
+  },
+  "allowed_participant_roles": [
+    "target_user",
+    "domain_expert",
+    "share_recipient",
+    "internal"
+  ],
+  "allowed_issue_severities": [
+    "blocker",
+    "major",
+    "minor",
+    "observation"
+  ],
+  "allowed_attributions": [
+    "data",
+    "algorithm",
+    "interaction",
+    "expectation_management",
+    "infrastructure",
+    "research_protocol",
+    "out_of_scope"
+  ],
+  "repository_privacy": {
+    "forbidden_field_names": [
+      "name",
+      "full_name",
+      "email",
+      "phone",
+      "mobile",
+      "wechat",
+      "address",
+      "access_token",
+      "share_token",
+      "ticket_number",
+      "train_number",
+      "flight_number"
+    ]
+  }
+}

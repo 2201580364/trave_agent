@@ -173,3 +173,24 @@ docs/test/reports/gate6-degradation-latest.json
 - 降级反例：8/8，含有解超时和无解超时
 - 用户测试：认可率 %（n=）
 ```
+
+## Gate 7 人类证据准备
+
+Gate 7 不复用 Gate 6 的自动化通过口径。当前验证方案、表单和机器协议：
+
+- [`gate7-validation-plan.md`](gate7-validation-plan.md)：R0–R3 分段、样本、任务、指标、严重度和决策规则；
+- [`gate7-expert-review-form.md`](gate7-expert-review-form.md)：领域专家独立评分与 blocker 登记；
+- [`gate7-user-test-script.md`](gate7-user-test-script.md)：形成性/确认性主持脚本和标准 assistance；
+- [`gate7-protocol-v1.json`](gate7-protocol-v1.json)：预注册 H3/H11 阈值、角色、严重度、归因和隐私字段；
+- [`gate7-evidence-example.synthetic.json`](gate7-evidence-example.synthetic.json)：只用于演示数据格式，永远不能作为真实证据。
+
+校验和匿名聚合命令：
+
+```powershell
+python scripts/run_gate7_report.py `
+  --protocol docs/test/gate7-protocol-v1.json `
+  --evidence .local/gate7/<study_id>/evidence.json `
+  --output docs/test/reports/gate7-<study_id>-aggregate.json
+```
+
+汇总器会拒绝 protocol hash 漂移、缺失知情同意、重复 H3 主指标、未知参与者、非法严重度/归因和敏感字段名。内部/排除样本不进入 H3 分母；`synthetic_fixture=true` 的数据只能得到 `synthetic_only`。单个 study 报告不会直接输出“Gate 7 全部通过”，因为 H2、H3、H11 需要不同证据阶段。

@@ -1,0 +1,95 @@
+{
+  "schema_version": "gate7-evidence-v1",
+  "study_id": "synthetic-gate7-example",
+  "protocol_id": "m1-hangzhou-gate7-v1",
+  "protocol_sha256": "b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89",
+  "synthetic_fixture": true,
+  "study_phase": "confirmatory",
+  "collection_started_at": "2026-09-01T09:00:00+08:00",
+  "collection_ended_at": "2026-09-01T12:00:00+08:00",
+  "environment": {
+    "app_version": "0.1.0-synthetic",
+    "result_schema_version": "trip-result-v2",
+    "solver_version": "solver-p1-v2",
+    "constraint_version": "constraints-p1-v5",
+    "parameter_version": "parameters-p1-2026-08-26",
+    "data_snapshot_version": "synthetic-do-not-publish"
+  },
+  "participants": [
+    {
+      "participant_id": "synthetic_user_01",
+      "role": "target_user",
+      "cohort": "example",
+      "eligible": true,
+      "consent_recorded": true
+    },
+    {
+      "participant_id": "synthetic_user_02",
+      "role": "target_user",
+      "cohort": "example",
+      "eligible": true,
+      "consent_recorded": true
+    },
+    {
+      "participant_id": "synthetic_user_03",
+      "role": "target_user",
+      "cohort": "example",
+      "eligible": false,
+      "consent_recorded": true,
+      "exclusion_reason": "duplicate household"
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "synthetic_observation_01",
+      "participant_id": "synthetic_user_01",
+      "hypothesis_id": "H3",
+      "metric": "plan_preferred_over_manual",
+      "value": true,
+      "scenario_id": "hangzhou_personal_trip",
+      "recorded_at": "2026-09-01T10:00:00+08:00",
+      "source_ref": "SYNTHETIC-SOURCE-01"
+    },
+    {
+      "observation_id": "synthetic_observation_02",
+      "participant_id": "synthetic_user_02",
+      "hypothesis_id": "H3",
+      "metric": "plan_preferred_over_manual",
+      "value": false,
+      "scenario_id": "hangzhou_personal_trip",
+      "recorded_at": "2026-09-01T11:00:00+08:00",
+      "source_ref": "SYNTHETIC-SOURCE-02"
+    },
+    {
+      "observation_id": "synthetic_observation_03",
+      "participant_id": "synthetic_user_03",
+      "hypothesis_id": "H3",
+      "metric": "plan_preferred_over_manual",
+      "value": true,
+      "scenario_id": "hangzhou_personal_trip",
+      "recorded_at": "2026-09-01T11:30:00+08:00",
+      "source_ref": "SYNTHETIC-SOURCE-03"
+    }
+  ],
+  "issues": [
+    {
+      "issue_id": "synthetic_issue_01",
+      "severity": "minor",
+      "status": "open",
+      "primary_attribution": "interaction",
+      "secondary_attribution": null,
+      "participant_id": "synthetic_user_02",
+      "scenario_id": "hangzhou_personal_trip",
+      "source_ref": "SYNTHETIC-SOURCE-02"
+    }
+  ],
+  "h11_readiness": {
+    "public_share_environment": false,
+    "independent_recipients": false,
+    "conversion_events": false
+  },
+  "limitations": [
+    "This file is synthetic and exists only to demonstrate schema validation.",
+    "It must never be used as Gate 7 human evidence."
+  ]
+}

@@ -13,7 +13,7 @@
 | 产品 / 投资人 | [process/project-status.md](process/project-status.md) → [product/产品功能完整性审查.md](product/产品功能完整性审查.md) → [product/功能模块设计.md](product/功能模块设计.md) → [product/信息架构与UI设计.md](product/信息架构与UI设计.md) → [product/交互流程与状态机设计.md](product/交互流程与状态机设计.md) → [product/应用代码架构设计.md](product/应用代码架构设计.md) → [assumptions.md](assumptions.md) → [product/旅行助手产品文档.md](product/旅行助手产品文档.md) |
 | 工程师（后端/求解器） | [process/project-status.md](process/project-status.md) → [product/应用代码架构设计.md](product/应用代码架构设计.md) → [assumptions.md](assumptions.md) → [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/](domain/) |
 | 工程师（数据） | [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/开放时间数据规范.md](domain/开放时间数据规范.md) → [test/](test/) |
-| 测试 / 验证 | [assumptions.md](assumptions.md) → [specs/](specs/) → [test/](test/) |
+| 测试 / 验证 | [assumptions.md](assumptions.md) → [process/gates.md](process/gates.md) → [specs/](specs/) → [test/README.md](test/README.md) → [test/gate7-validation-plan.md](test/gate7-validation-plan.md) |
 
 ## 目录结构
 
