@@ -303,6 +303,7 @@ class SqlAlchemyUnitOfWork:
         self._session: Session | None = None
 
     def __enter__(self) -> Self:
+        from .feedback import SqlAlchemyFeedbackRepository
         from .sharing import SqlAlchemyPlanShareRepository
 
         self._session = self._session_factory()
@@ -314,6 +315,7 @@ class SqlAlchemyUnitOfWork:
             self._session, SolverRunRow, _run_from_row, _run_values
         )
         self.plan_shares = SqlAlchemyPlanShareRepository(self._session)
+        self.feedbacks = SqlAlchemyFeedbackRepository(self._session)
         return self
 
     def __exit__(

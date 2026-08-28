@@ -1,0 +1,91 @@
+.feedback-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.feedback-choice-row,
+.feedback-reason-grid,
+.node-feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feedback-choice,
+.feedback-reason,
+.node-feedback-choice {
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid #d7dfd8;
+  border-radius: 999px;
+  background: #fff;
+  color: #405149;
+  font-size: 14px;
+  line-height: 34px;
+}
+
+.feedback-choice--active,
+.feedback-reason--active,
+.node-feedback-choice--active {
+  border-color: #147456;
+  background: #eaf5ef;
+  color: #0d5d44;
+  font-weight: 600;
+}
+
+.feedback-comment {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid #d7dfd8;
+  border-radius: 14px;
+  background: #fff;
+  color: #17211d;
+  font-size: 14px;
+}
+
+.feedback-submit {
+  margin: 0;
+}
+
+.node-feedback {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0ed;
+}
+
+.node-feedback-title {
+  margin-bottom: 8px;
+  color: #607068;
+  font-size: 13px;
+}
+
+.node-feedback-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.node-feedback .feedback-comment {
+  min-height: 72px;
+}
+
+.feedback-success {
+  color: #0d6549;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 360px) {
+  .feedback-choice,
+  .feedback-reason,
+  .node-feedback-choice {
+    padding: 0 11px;
+    font-size: 13px;
+  }
+}

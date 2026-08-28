@@ -17,6 +17,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ApplicationError, ResourceNotFoundError
 from travel_agent.application.common.unit_of_work import UnitOfWork
+from travel_agent.application.feedback import (
+    SubmitNodeFeedback,
+    SubmitNodeFeedbackHandler,
+    SubmitTripFeedback,
+    SubmitTripFeedbackHandler,
+)
 from travel_agent.application.planning import (
     CreateDraft,
     CreateDraftHandler,
@@ -141,6 +147,40 @@ class CreatePlanShareInput(BaseModel):
     plan_share_intent_id: str = Field(min_length=1, max_length=64)
     revision_id: str = Field(min_length=1, max_length=64)
     template: Literal["simple"] = "simple"
+
+
+class SubmitTripFeedbackInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    feedback_intent_id: str = Field(min_length=1, max_length=64)
+    revision_id: str = Field(min_length=1, max_length=64)
+    rating: Literal["reasonable", "neutral", "unreasonable"]
+    problem_types: tuple[
+        Literal[
+            "route_too_long",
+            "time_unreasonable",
+            "pace_mismatch",
+            "missing_attraction",
+            "attraction_data_error",
+            "explanation_unclear",
+        ],
+        ...,
+    ] = ()
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class SubmitNodeFeedbackInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    feedback_intent_id: str = Field(min_length=1, max_length=64)
+    rating: Literal["like", "dislike"]
+    reason_code: Literal[
+        "arrangement_good",
+        "time_too_tight",
+        "travel_too_far",
+        "time_period_wrong",
+        "duration_wrong",
+        "attraction_data_error",
+    ] | None = None
+    comment: str | None = Field(default=None, max_length=500)
 
 
 def create_app(container: HttpContainer) -> FastAPI:
@@ -523,6 +563,61 @@ def create_app(container: HttpContainer) -> FastAPI:
         return response
 
     @app.post(
+        "/api/v1/trips/{trip_id}/feedback",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def submit_trip_feedback(
+        trip_id: str,
+        payload: SubmitTripFeedbackInput,
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        result = SubmitTripFeedbackHandler(
+            container.uow_factory(),
+            container.clock,
+            container.ids,
+        ).handle(
+            SubmitTripFeedback(
+                principal,
+                payload.feedback_intent_id,
+                trip_id,
+                payload.revision_id,
+                payload.rating,
+                payload.problem_types,
+                payload.comment,
+            )
+        )
+        return _feedback_response(result)
+
+    @app.post(
+        "/api/v1/trips/{trip_id}/revisions/{revision_id}/nodes/{node_id}/feedback",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def submit_node_feedback(
+        trip_id: str,
+        revision_id: str,
+        node_id: str,
+        payload: SubmitNodeFeedbackInput,
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        result = SubmitNodeFeedbackHandler(
+            container.uow_factory(),
+            container.clock,
+            container.ids,
+        ).handle(
+            SubmitNodeFeedback(
+                principal,
+                payload.feedback_intent_id,
+                trip_id,
+                revision_id,
+                node_id,
+                payload.rating,
+                payload.reason_code,
+                payload.comment,
+            )
+        )
+        return _feedback_response(result)
+
+    @app.post(
         "/api/v1/trips/{trip_id}/plan-shares",
         status_code=status.HTTP_201_CREATED,
     )
@@ -647,6 +742,24 @@ def _draft_response(draft) -> dict[str, object]:
     }
 
 
+def _feedback_response(result) -> dict[str, object]:
+    feedback = result.feedback
+    return {
+        "feedback_id": feedback.feedback_id,
+        "feedback_intent_id": feedback.feedback_intent_id,
+        "trip_id": feedback.trip_id,
+        "revision_id": feedback.revision_id,
+        "feedback_scope": feedback.feedback_scope,
+        "node_id": feedback.node_id,
+        "rating": feedback.rating,
+        "reason_codes": list(feedback.reason_codes),
+        "comment": feedback.comment,
+        "created_at": feedback.created_at.isoformat(),
+        "reused": result.reused,
+        "deduplicated": result.deduplicated,
+    }
+
+
 def _trip_summary_response(trip, revision, revision_count: int) -> dict[str, object]:
     snapshot = _snapshot_overview(revision.result_snapshot)
     return {
@@ -755,6 +868,7 @@ def _status_for(exc: ApplicationError) -> int:
         "trip_revision_conflict": status.HTTP_409_CONFLICT,
         "invalid_attraction_replacement": status.HTTP_422_UNPROCESSABLE_ENTITY,
         "plan_share_intent_conflict": status.HTTP_409_CONFLICT,
+        "feedback_intent_conflict": status.HTTP_409_CONFLICT,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
 
 

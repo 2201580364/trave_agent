@@ -65,7 +65,21 @@ class FakeGateway:
             "trip-result-v1",
             {
                 "schema_version": "trip-result-v1",
-                "days": [{"date": "2026-09-01", "nodes": []}],
+                "days": [
+                    {
+                        "date": "2026-09-01",
+                        "nodes": [
+                            {
+                                "node_id": "node_http_1",
+                                "attraction_id": "attr_west_lake",
+                                "name": "西湖湖滨",
+                                "arrival_min": 540,
+                                "leave_min": 630,
+                                "planned_duration_min": 90,
+                            }
+                        ],
+                    }
+                ],
             },
             "b" * 64,
             "solver-p1-v1",
@@ -317,7 +331,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
             "has_soft_degradation": False,
             "start_date": "2026-09-01",
             "end_date": "2026-09-01",
-            "scheduled_count": 0,
+            "scheduled_count": 1,
             "unplaced_count": 0,
             "updated_at": NOW.isoformat(),
             "revision_count": 2,
@@ -378,6 +392,102 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     assert repeated_share.json()["reused"] is True
     assert repeated_share.json()["share_token"] == share_body["share_token"]
 
+    trip_feedback = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/feedback",
+        headers=headers,
+        json={
+            "feedback_intent_id": "feedback_trip_http_1",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "rating": "unreasonable",
+            "problem_types": ["route_too_long", "pace_mismatch"],
+            "comment": "第二天路线有点绕。",
+        },
+    )
+    assert trip_feedback.status_code == 201
+    assert trip_feedback.json()["feedback_scope"] == "trip"
+    assert trip_feedback.json()["reason_codes"] == [
+        "pace_mismatch",
+        "route_too_long",
+    ]
+    assert trip_feedback.json()["reused"] is False
+
+    repeated_feedback = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/feedback",
+        headers=headers,
+        json={
+            "feedback_intent_id": "feedback_trip_http_1",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "rating": "unreasonable",
+            "problem_types": ["route_too_long", "pace_mismatch"],
+            "comment": "第二天路线有点绕。",
+        },
+    )
+    assert repeated_feedback.status_code == 201
+    assert repeated_feedback.json()["feedback_id"] == trip_feedback.json()[
+        "feedback_id"
+    ]
+    assert repeated_feedback.json()["reused"] is True
+    assert repeated_feedback.json()["deduplicated"] is False
+
+    deduplicated_feedback = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/feedback",
+        headers=headers,
+        json={
+            "feedback_intent_id": "feedback_trip_http_2",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "rating": "neutral",
+            "problem_types": [],
+            "comment": None,
+        },
+    )
+    assert deduplicated_feedback.status_code == 201
+    assert deduplicated_feedback.json()["feedback_id"] == trip_feedback.json()[
+        "feedback_id"
+    ]
+    assert deduplicated_feedback.json()["deduplicated"] is True
+
+    node_feedback = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/"
+        f"{replacement_intent['trip_revision_id']}/nodes/node_http_1/feedback",
+        headers=headers,
+        json={
+            "feedback_intent_id": "feedback_node_http_1",
+            "rating": "dislike",
+            "reason_code": "time_too_tight",
+            "comment": "希望多留一点时间。",
+        },
+    )
+    assert node_feedback.status_code == 201
+    assert node_feedback.json()["feedback_scope"] == "node"
+    assert node_feedback.json()["node_id"] == "node_http_1"
+
+    missing_node_feedback = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/revisions/"
+        f"{replacement_intent['trip_revision_id']}/nodes/node_missing/feedback",
+        headers=headers,
+        json={
+            "feedback_intent_id": "feedback_node_http_missing",
+            "rating": "like",
+            "reason_code": "arrangement_good",
+        },
+    )
+    assert missing_node_feedback.status_code == 404
+
+    conflicting_feedback = client.post(
+        f"/api/v1/trips/{intent['trip_id']}/feedback",
+        headers=headers,
+        json={
+            "feedback_intent_id": "feedback_trip_http_1",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "rating": "reasonable",
+            "problem_types": [],
+        },
+    )
+    assert conflicting_feedback.status_code == 409
+    assert conflicting_feedback.json()["error"]["code"] == (
+        "feedback_intent_conflict"
+    )
+
     _, visitor_token = _session(client)
     visitor_headers = _auth(visitor_token)
     copied = client.post(
@@ -390,6 +500,16 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     assert client.get(
         f"/api/v1/trip-drafts/{copied.json()['draft_id']}",
         headers=headers,
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/trips/{intent['trip_id']}/feedback",
+        headers=visitor_headers,
+        json={
+            "feedback_intent_id": "feedback_visitor_forbidden",
+            "revision_id": replacement_intent["trip_revision_id"],
+            "rating": "reasonable",
+            "problem_types": [],
+        },
     ).status_code == 404
     assert client.get("/api/v1/plan-shares/not-a-valid-token").status_code == 404
 

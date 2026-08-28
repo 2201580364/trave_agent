@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import TracebackType
 from typing import Protocol, Self
 
+from travel_agent.domain.feedback import FeedbackRepository
 from travel_agent.domain.planning.repositories import (
     GenerationIntentRepository,
     SolverRunRepository,
@@ -22,6 +23,7 @@ class UnitOfWork(Protocol):
     trip_revisions: TripRevisionRepository
     solver_runs: SolverRunRepository
     plan_shares: PlanShareRepository
+    feedbacks: FeedbackRepository
 
     def __enter__(self) -> Self: ...
 

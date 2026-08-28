@@ -1,10 +1,10 @@
 # M1 HTTP API 契约
 
-- 文档版本：V2.4
+- 文档版本：V2.5
 - 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史和 `plan-share-v1` 安全计划分享已实现；D05/D06 对应的结构化反馈契约待 A6-9.4 实现
-- 上游：功能模块 V3.1、UI V1.2、交互 V1.2、应用代码架构 V1.1、ADR-0005、ADR-0009
+- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现
+- 上游：功能模块 V3.2、UI V1.3、交互 V1.3、应用代码架构 V1.2、ADR-0005、ADR-0009
 - API 前缀：`/api/v1`
 
 ## 1. 契约目标
@@ -169,8 +169,8 @@ od_basis: gaode | approximate
 | GET | `/trips/{trip_id}` | 获取 Trip 摘要及当前 revision | 是 |
 | GET | `/trips/{trip_id}/revisions/{revision_id}` | 获取不可变行程结果 | 是 |
 | GET | `/trips` | 当前主体行程历史 | 是 |
-| POST | `/trips/{trip_id}/feedback` | 整体反馈 | P1 |
-| POST | `/trips/{trip_id}/revisions/{revision_id}/nodes/{node_id}/feedback` | 节点反馈 | P1 |
+| POST | `/trips/{trip_id}/feedback` | Revision 级整体反馈 | 是 |
+| POST | `/trips/{trip_id}/revisions/{revision_id}/nodes/{node_id}/feedback` | Revision 节点安排反馈 | 是 |
 | POST | `/trips/{trip_id}/plan-shares` | 创建不可变计划分享 | 是 |
 | GET | `/plan-shares/{public_token}` | 无认证读取受限公开计划摘要 | 是 |
 | POST | `/plan-shares/{public_token}/draft-copies` | 将公开计划复制为当前主体的新草稿 | 是 |
@@ -814,11 +814,24 @@ M1 P1。用户从当前行程景点卡发起替换时，服务端复制基准 Re
 {
   "revision_id": "rev_01K...",
   "feedback_intent_id": "feedback_01K...",
-  "rating": "reasonable",
-  "problem_types": ["route_too_long"],
+  "rating": "unreasonable",
+  "problem_types": ["route_too_long", "pace_mismatch"],
   "comment": "第二天来回有点远"
 }
 ```
+
+`rating` 只接受 `reasonable | neutral | unreasonable`。`problem_types` 会去重并按稳定顺序保存，只接受：
+
+```text
+route_too_long
+time_unreasonable
+pace_mismatch
+missing_attraction
+attraction_data_error
+explanation_unclear
+```
+
+`reasonable` 不能携带问题类型；`comment` 可空，去除首尾空格后最长 500 字。
 
 ### 10.2 节点反馈
 
@@ -833,7 +846,35 @@ M1 P1。用户从当前行程景点卡发起替换时，服务端复制基准 Re
 }
 ```
 
-节点反馈评价安排质量，不等于 M3 景点评分。
+`rating` 只接受 `like | dislike`；原因只接受 `arrangement_good | time_too_tight | travel_too_far | time_period_wrong | duration_wrong | attraction_data_error`。`like` 使用 `arrangement_good`，不能携带负面原因；`dislike` 可选择一个负面原因。节点反馈评价的是该 Revision 中的安排质量，不等于 M3 景点评分或评论区内容。
+
+两个接口成功均返回 `201`：
+
+```json
+{
+  "feedback_id": "feedback_01K...",
+  "feedback_intent_id": "feedback_intent_01K...",
+  "trip_id": "trip_01K...",
+  "revision_id": "revision_01K...",
+  "feedback_scope": "trip",
+  "node_id": null,
+  "rating": "unreasonable",
+  "reason_codes": ["pace_mismatch", "route_too_long"],
+  "comment": "第二天来回有点远",
+  "created_at": "2026-08-28T16:00:00+08:00",
+  "reused": false,
+  "deduplicated": false
+}
+```
+
+权限、幂等和去重规则：
+
+- Trip 必须属于当前主体，Revision 必须属于该 Trip；节点必须真实存在于该 Revision 的不可变结果快照，失败统一为 `404 resource_not_found`；
+- API 可评价当前主体拥有的任意历史 Revision；首版 UI 只在当前 Revision 展示控件，历史 Revision 保持只读；
+- 同一 `feedback_intent_id` 与完整规范化载荷重试返回原反馈，`reused=true, deduplicated=false`；
+- 同一 intent 被用于不同载荷时返回 `409 feedback_intent_conflict`；
+- 同一主体对同一 Revision 的整体反馈只保留首份；对同一 Revision/node 的节点反馈也只保留首份。新 intent 再次提交相同目标时返回首份反馈，`reused=true, deduplicated=true`；
+- A6-9.4 首版没有编辑、覆盖或追加反馈流程；去重响应不能解释为新内容已更新旧反馈。
 
 ### 10.3 计划分享
 
@@ -900,6 +941,7 @@ Authorization: Bearer <recipient_anonymous_access_token>
 | 409 | `draft_version_conflict` | 草稿版本过期 | 否 |
 | 409 | `generation_intent_conflict` | 同 intent 对应不同输入 | 否 |
 | 409 | `plan_share_intent_conflict` | 同一分享 intent 被用于不同 Trip、Revision 或模板 | 否 |
+| 409 | `feedback_intent_conflict` | 同一反馈 intent 被用于不同规范化载荷 | 否 |
 | 409 | `draft_needs_review` | 发布数据变化影响选择 | 否 |
 | 409 | `invalid_state_transition` | 当前状态不允许操作 | 否 |
 | 422 | `field_validation_failed` | 字段/跨字段校验失败 | 否 |

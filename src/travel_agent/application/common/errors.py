@@ -74,3 +74,11 @@ class PlanShareIntentConflictError(ApplicationError):
             "plan_share_intent_conflict",
             "该分享标识已经用于其他行程版本或模板。",
         )
+
+
+class FeedbackIntentConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "feedback_intent_conflict",
+            "该反馈标识已经用于其他评价内容。",
+        )

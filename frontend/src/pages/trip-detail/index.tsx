@@ -5,6 +5,8 @@ import { useState } from 'react'
 import './index.css'
 
 import type { Draft, MealBreak, TripRevision } from '@/entities/planning/types'
+import { NodeFeedbackControl } from '@/features/feedback/NodeFeedbackControl'
+import { TripFeedbackPanel } from '@/features/feedback/TripFeedbackPanel'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
 
@@ -232,12 +234,21 @@ export default function TripDetailPage() {
                         <View className='section-title'>{node.name}</View>
                         <View className='attraction-meta'>计划停留约 {durationLabel(node.planned_duration_min)}</View>
                         {!isHistorical && (
-                          <Button
-                            className='replace-attraction-button'
-                            onClick={() => replaceAttraction(node.attraction_id, node.name)}
-                          >
-                            替换景点
-                          </Button>
+                          <>
+                            <Button
+                              className='replace-attraction-button'
+                              onClick={() => replaceAttraction(node.attraction_id, node.name)}
+                            >
+                              替换景点
+                            </Button>
+                            <NodeFeedbackControl
+                              token={store.token}
+                              tripId={store.tripId}
+                              revisionId={revision.trip_revision_id}
+                              nodeId={node.node_id}
+                              nodeName={node.name}
+                            />
+                          </>
                         )}
                         {index > 0 && (
                           <View className='transit-note'>
@@ -275,6 +286,15 @@ export default function TripDetailPage() {
               <View className='section-title'>这份行程依据什么生成</View>
               <View className='field-help'>使用已发布的景点、天气和交通数据快照；刷新页面不会重新随机排列节点。</View>
             </View>
+
+            {!isHistorical && (
+              <TripFeedbackPanel
+                token={store.token}
+                tripId={store.tripId}
+                revisionId={revision.trip_revision_id}
+                revisionNumber={revision.revision_number}
+              />
+            )}
           </>
         )}
       </View>

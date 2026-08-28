@@ -1,11 +1,11 @@
 # M1 持久化数据模型
 
-- 文档版本：V2.3
+- 文档版本：V2.4
 - 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0004 已实现；0003 增加用户修订血缘和 Trip 内修订号唯一约束，0004 增加不可变脱敏计划分享快照。A6-8.2 真实 MySQL 8.0.46 的 0002 基线、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过；0003/0004 待下一次应用发布前按顺序在服务器执行，正式发布数据表仍待后续实现
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0005 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈及双重唯一约束。A6-8.2 真实 MySQL 8.0.46 的 0002 基线、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过；0003–0005 待下一次应用发布前按顺序在服务器执行，正式发布数据表仍待后续实现
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.4、应用代码架构 V1.1、ADR-0002、ADR-0005、ADR-0009
+- 上游：API 契约 V2.5、应用代码架构 V1.2、ADR-0002、ADR-0005、ADR-0009
 
 ## 1. 建模目标与原则
 
@@ -605,21 +605,22 @@ Revision 只保存质量门通过的 complete 或 partial 结果；软降级通�
 
 ```sql
 CREATE TABLE feedbacks (
-    feedback_id VARCHAR(32) PRIMARY KEY,
-    feedback_intent_id VARCHAR(32) NOT NULL,
-    principal_id VARCHAR(32) NOT NULL,
-    trip_id VARCHAR(32) NOT NULL,
-    revision_id VARCHAR(32) NOT NULL,
-    node_id VARCHAR(32) NULL,
-    feedback_scope VARCHAR(20) NOT NULL,          -- trip | node | visit_period
+    feedback_id VARCHAR(64) PRIMARY KEY,
+    feedback_intent_id VARCHAR(64) NOT NULL,
+    principal_id VARCHAR(64) NOT NULL,
+    trip_id VARCHAR(64) NOT NULL,
+    revision_id VARCHAR(64) NOT NULL,
+    feedback_scope VARCHAR(20) NOT NULL,          -- trip | node
+    target_key VARCHAR(96) NOT NULL,              -- trip | node:<node_id>
+    node_id VARCHAR(64) NULL,
     rating VARCHAR(20) NOT NULL,
     reason_codes JSON NOT NULL,
     comment VARCHAR(500) NULL,
-    created_at DATETIME(6) NOT NULL,
-    updated_at DATETIME(6) NOT NULL,
-    CONSTRAINT uq_feedback_intent UNIQUE (feedback_intent_id),
-    CONSTRAINT fk_feedback_revision FOREIGN KEY (revision_id)
-        REFERENCES trip_revisions(revision_id)
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    CONSTRAINT uq_feedbacks_intent UNIQUE (feedback_intent_id),
+    CONSTRAINT uq_feedbacks_principal_revision_target
+        UNIQUE (principal_id, revision_id, target_key)
 );
 
 CREATE TABLE plan_shares (
@@ -644,7 +645,9 @@ CREATE TABLE plan_shares (
 
 `plan_shares` 在创建事务中校验主体拥有 Trip、Revision 属于该 Trip，并保存创建时生成的 `plan-share-v1` 脱敏快照；公开读取不再动态联表重算。`public_token_hash` 是公开 token 的 SHA-256 摘要，数据库不保存 token 原值；`share_snapshot_hash` 用于检测快照意外变化。当前首版只创建 `published/simple` 对象；`revoked_at` 为后续撤回能力保留，尚未提供作者撤回 API/UI。图片对象键不进入 0004，PNG/JPEG 导出、二维码和原生平台分享属于 A6-9.3.1。
 
-节点反馈验证 node ID 存在于对应 revision snapshot；它不等于景点评分。计划分享与 M2 TripRetrospective 不复用表、快照 Schema、token 密钥或权限语义。
+`feedbacks` 保存规范化后的首份反馈。`feedback_intent_id` 负责同一网络意图的幂等与冲突检测；`(principal_id, revision_id, target_key)` 保证同一主体对同一 Revision 整体或节点目标只存在一份样本。`target_key` 的整体值为 `trip`，节点值为 `node:<node_id>`。节点提交前必须验证 node ID 存在于对应 Revision 的不可变结果快照；越权、Revision 不属于 Trip、node 不属于 Revision 均在应用层统一为 404。当前首版没有 UPDATE/编辑反馈流程，重复目标只返回首份记录。
+
+反馈评价行程安排质量，不等于景点评分。计划分享与 M2 TripRetrospective 不复用表、快照 Schema、token 密钥或权限语义。
 
 ## 10. JSON Snapshot Schema
 
@@ -704,6 +707,7 @@ degradations
 | 领取执行 | 单条件 UPDATE |
 | 求解 | 无数据库事务 |
 | 保存完成结果 | SolverRun + Trip + Revision + Intent 单短事务 |
+| 提交反馈 | 归属/节点校验 + intent/目标去重 + Feedback 单短事务；数据库唯一约束处理并发终态 |
 | 数据发布 | building 校验后原子切换城市当前快照指针 |
 
 恢复任务扫描 running 且租约超时的 intent，根据执行器状态转 `failed_retryable`。重试不换输入、数据版本或 seed，并创建新 SolverRun `run_no`。
@@ -719,11 +723,11 @@ degradations
   → target_trip_id/base_revision_id、Trip 内 Revision 唯一约束
 0004_plan_shares
   → 公开 token 摘要、plan-share-v1 不可变脱敏快照和查询索引
-下一迁移
-  → feedbacks（A6-9.4，编号以实际 revision 文件为准）
+0005_feedbacks
+  → Revision/节点反馈、intent 幂等和主体/Revision/目标去重约束
 ```
 
-以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；发布 A6-9.1/A6-9.3 应用前必须先备份，再依次执行 0003、0004，并确认 readiness 的 `expected_revision/current_revision` 都是 `0004_plan_shares`。
+以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；发布当前应用前必须先备份，再依次执行 0003、0004、0005，并确认 readiness 的 `expected_revision/current_revision` 都是 `0005_feedbacks`。
 
 每次迁移必须：
 

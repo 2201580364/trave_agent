@@ -9,8 +9,8 @@
 
 M1 应用层规格已经完成 A5 同步：
 
-- [api-contract.md](api-contract.md) V2.4：匿名会话、草稿、GenerationIntent、Trip/Revision、计划分享、错误码和接口验收；
-- [data-model.md](data-model.md) V2.3：持久化实体、唯一约束、事务、发布快照、计划分享和 Alembic 顺序。
+- [api-contract.md](api-contract.md) V2.5：匿名会话、草稿、GenerationIntent、Trip/Revision、计划分享、结构化反馈、错误码和接口验收；
+- [data-model.md](data-model.md) V2.4：持久化实体、唯一约束、事务、发布快照、计划分享、反馈和 Alembic 顺序。
 
 旧 `/regenerate`、单一 `transport_type` 和单表 `trips.itinerary JSON` 不再是当前实现依据。
 

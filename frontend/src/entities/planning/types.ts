@@ -156,6 +156,21 @@ export interface PublicPlanShare {
   content: PlanShareContent
 }
 
+export interface FeedbackResponse {
+  feedback_id: string
+  feedback_intent_id: string
+  trip_id: string
+  revision_id: string
+  feedback_scope: 'trip' | 'node'
+  node_id: string | null
+  rating: 'reasonable' | 'neutral' | 'unreasonable' | 'like' | 'dislike'
+  reason_codes: string[]
+  comment: string | null
+  created_at: string
+  reused: boolean
+  deduplicated: boolean
+}
+
 export interface TripResult {
   schema_version: string
   summary?: Record<string, number>

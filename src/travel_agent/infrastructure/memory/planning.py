@@ -13,9 +13,11 @@ from typing import Self
 
 from travel_agent.application.common.errors import (
     DraftVersionConflictError,
+    FeedbackIntentConflictError,
     GenerationIntentConflictError,
     TripRevisionConflictError,
 )
+from travel_agent.domain.feedback import Feedback
 from travel_agent.domain.planning import (
     GenerationIntent,
     SolverRun,
@@ -34,6 +36,7 @@ class InMemoryPlanningStore:
     trip_revisions: dict[str, TripRevision] = field(default_factory=dict)
     solver_runs: dict[str, SolverRun] = field(default_factory=dict)
     plan_shares: dict[str, PlanShare] = field(default_factory=dict)
+    feedbacks: dict[str, Feedback] = field(default_factory=dict)
 
 
 class InMemoryTripDraftRepository:
@@ -182,6 +185,56 @@ class InMemoryPlanShareRepository(_InMemoryAddRepository):
         )
 
 
+class InMemoryFeedbackRepository:
+    def __init__(self, records: dict[str, Feedback]) -> None:
+        self._records = records
+
+    def get(self, feedback_id: str) -> Feedback | None:
+        return self._records.get(feedback_id)
+
+    def get_by_intent(self, feedback_intent_id: str) -> Feedback | None:
+        return next(
+            (
+                feedback
+                for feedback in self._records.values()
+                if feedback.feedback_intent_id == feedback_intent_id
+            ),
+            None,
+        )
+
+    def get_by_target(
+        self,
+        principal_id: str,
+        revision_id: str,
+        target_key: str,
+    ) -> Feedback | None:
+        return next(
+            (
+                feedback
+                for feedback in self._records.values()
+                if feedback.principal_id == principal_id
+                and feedback.revision_id == revision_id
+                and feedback.target_key == target_key
+            ),
+            None,
+        )
+
+    def add(self, feedback: Feedback) -> None:
+        if feedback.feedback_id in self._records:
+            raise FeedbackIntentConflictError
+        if self.get_by_intent(feedback.feedback_intent_id) is not None:
+            raise FeedbackIntentConflictError
+        if (
+            self.get_by_target(
+                feedback.principal_id,
+                feedback.revision_id,
+                feedback.target_key,
+            )
+            is not None
+        ):
+            raise FeedbackIntentConflictError
+        self._records[feedback.feedback_id] = feedback
+
 class InMemoryUnitOfWork:
     def __init__(self, store: InMemoryPlanningStore) -> None:
         self._store = store
@@ -193,6 +246,7 @@ class InMemoryUnitOfWork:
         self.trip_revisions = InMemoryTripRevisionRepository({})
         self.solver_runs = _InMemoryAddRepository({}, "solver_run_id")
         self.plan_shares = InMemoryPlanShareRepository({})
+        self.feedbacks = InMemoryFeedbackRepository({})
 
     def __enter__(self) -> Self:
         self._working = deepcopy(self._store)
@@ -208,6 +262,7 @@ class InMemoryUnitOfWork:
             self._working.solver_runs, "solver_run_id"
         )
         self.plan_shares = InMemoryPlanShareRepository(self._working.plan_shares)
+        self.feedbacks = InMemoryFeedbackRepository(self._working.feedbacks)
         self._committed = False
         return self
 
@@ -231,6 +286,7 @@ class InMemoryUnitOfWork:
         self._store.trip_revisions = deepcopy(self._working.trip_revisions)
         self._store.solver_runs = deepcopy(self._working.solver_runs)
         self._store.plan_shares = deepcopy(self._working.plan_shares)
+        self._store.feedbacks = deepcopy(self._working.feedbacks)
         self._committed = True
 
     def rollback(self) -> None:

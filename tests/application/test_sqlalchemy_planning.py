@@ -18,6 +18,7 @@ from travel_agent.application.common.errors import (
 )
 from travel_agent.application.planning import ExecuteGenerationHandler
 from travel_agent.application.planning.ports import SolverOutcome, SolverRequest
+from travel_agent.domain.feedback import Feedback
 from travel_agent.domain.planning import (
     CompletionKind,
     GenerationIntent,
@@ -278,6 +279,22 @@ def test_alembic_upgrade_builds_the_same_schema(tmp_path: Path) -> None:
                 NOW,
             )
         )
+        uow.feedbacks.add(
+            Feedback(
+                "feedback_1",
+                "feedback_intent_1",
+                "principal_1",
+                "trip_1",
+                "revision_1",
+                "node",
+                "node_1",
+                "dislike",
+                ("time_too_tight",),
+                "希望多留一点时间。",
+                NOW,
+                NOW,
+            )
+        )
         uow.commit()
 
     restarted_factory = sessionmaker(
@@ -285,7 +302,14 @@ def test_alembic_upgrade_builds_the_same_schema(tmp_path: Path) -> None:
     )
     with SqlAlchemyUnitOfWork(restarted_factory) as uow:
         restored = uow.plan_shares.get_by_public_token_hash("c" * 64)
+        restored_feedback = uow.feedbacks.get_by_target(
+            "principal_1",
+            "revision_1",
+            "node:node_1",
+        )
 
     assert restored is not None
     assert restored.plan_share_intent_id == "share_intent_1"
     assert restored.share_snapshot["schema_version"] == "plan-share-v1"
+    assert restored_feedback is not None
+    assert restored_feedback.reason_codes == ("time_too_tight",)

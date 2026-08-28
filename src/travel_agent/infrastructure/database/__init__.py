@@ -1,5 +1,6 @@
 """SQLAlchemy persistence adapters."""
 
+from .feedback import SqlAlchemyFeedbackRepository
 from .identity import AnonymousIdentityService
 from .planning import Base, SqlAlchemyUnitOfWork, create_schema
 from .runtime import (
@@ -15,6 +16,7 @@ __all__ = [
     "Base",
     "DatabaseReadiness",
     "DatabaseSettings",
+    "SqlAlchemyFeedbackRepository",
     "SqlAlchemyUnitOfWork",
     "SqlAlchemyPlanShareRepository",
     "create_schema",
