@@ -1,9 +1,9 @@
 # M1 HTTP API 契约
 
-- 文档版本：V2.2
+- 文档版本：V2.3
 - 日期：2026-08-28
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P04 核心 HTTP v1 与“替换景点→新 Revision”已实现；P06/P08、D05/D06 对应的历史、分享与反馈契约待后续 M1 切片实现
+- 状态：P00–P06 核心 HTTP v1、“替换景点→新 Revision”和匿名主体行程历史已实现；P08、D05/D06 对应的分享与反馈契约待后续 M1 切片实现
 - 上游：功能模块 V3.0、UI V1.1、交互 V1.1、应用代码架构 V1.0、ADR-0005、ADR-0009
 - API 前缀：`/api/v1`
 
@@ -168,10 +168,11 @@ od_basis: gaode | approximate
 | POST | `/generation-intents/{intent_id}/retry` | 稳定重试暂时失败的同一意图 | P1 |
 | GET | `/trips/{trip_id}` | 获取 Trip 摘要及当前 revision | 是 |
 | GET | `/trips/{trip_id}/revisions/{revision_id}` | 获取不可变行程结果 | 是 |
-| GET | `/trips` | 当前主体行程历史 | P1 |
+| GET | `/trips` | 当前主体行程历史 | 是 |
 | POST | `/trips/{trip_id}/feedback` | 整体反馈 | P1 |
 | POST | `/trips/{trip_id}/revisions/{revision_id}/nodes/{node_id}/feedback` | 节点反馈 | P1 |
 | POST | `/trips/{trip_id}/plan-shares` | 创建计划分享 | P1 |
+| GET | `/trips/{trip_id}/revisions` | 当前 Trip 的只读修订历史 | 是 |
 
 M1 不提供 `/regenerate`。用户修改条件时更新或创建草稿，再提交新的 generation intent。
 
@@ -500,26 +501,107 @@ M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约
 
 ## 9. Trip 与不可变 Revision
 
-### 9.1 GET `/trips/{trip_id}`
+### 9.1 GET `/trips`
+
+返回当前认证主体可访问的正式 Trip，匿名主体天然等价于“当前设备会话可访问的行程”。列表只包含已成功创建 TripRevision 的行程；尚未生成、生成失败的 Draft/GenerationIntent 不伪装成正常 Trip 卡片。
+
+查询参数：
+
+```text
+limit  1–50，默认 20
+offset >= 0，默认 0
+```
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "trip_id": "trip_01K...",
+      "city_id": "hangzhou",
+      "city_name": "杭州",
+      "current_revision_id": "rev_02K...",
+      "current_revision_number": 2,
+      "completion_kind": "complete_success",
+      "has_soft_degradation": false,
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-03",
+      "scheduled_count": 7,
+      "unplaced_count": 0,
+      "updated_at": "2026-08-28T11:05:00+08:00",
+      "revision_count": 2
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+排序固定为 `updated_at DESC, trip_id ASC`；相同更新时间使用 trip ID 稳定次排序。服务端先按 `principal_id` 过滤再分页，禁止客户端拉取全量后自行过滤。
+
+### 9.2 GET `/trips/{trip_id}`
 
 ```json
 {
   "trip_id": "trip_01K...",
-  "city": {"city_id": "hangzhou", "name": "杭州"},
+  "city_id": "hangzhou",
+  "city_name": "杭州",
   "start_date": "2026-09-01",
   "end_date": "2026-09-03",
-  "current_revision": {
-    "revision_id": "rev_01K...",
-    "revision_no": 1,
-    "completion_kind": "partial_success",
-    "has_soft_degradation": true
-  },
+  "current_revision_id": "rev_01K...",
+  "current_revision_number": 1,
+  "completion_kind": "partial_success",
+  "has_soft_degradation": true,
+  "scheduled_count": 6,
+  "unplaced_count": 1,
+  "revision_count": 1,
   "created_at": "2026-08-24T10:40:02+08:00",
   "updated_at": "2026-08-24T10:40:02+08:00"
 }
 ```
 
-### 9.2 GET `/trips/{trip_id}/revisions/{revision_id}`
+响应不返回 `principal_id`、匿名 token 或内部 `source_draft_id`。不存在与越权访问统一返回 `404 resource_not_found`。
+
+### 9.3 GET `/trips/{trip_id}/revisions`
+
+返回该 Trip 的不可变修订摘要，固定按 `revision_number DESC, trip_revision_id ASC` 排序。查看历史只改变客户端当前查看指针，不得修改服务端 Trip 的 `current_revision_id`。
+
+```json
+{
+  "trip_id": "trip_01K...",
+  "current_revision_id": "rev_02K...",
+  "items": [
+    {
+      "trip_revision_id": "rev_02K...",
+      "revision_number": 2,
+      "is_current": true,
+      "completion_kind": "complete_success",
+      "has_soft_degradation": false,
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-03",
+      "scheduled_count": 7,
+      "unplaced_count": 0,
+      "created_at": "2026-08-28T11:05:00+08:00"
+    },
+    {
+      "trip_revision_id": "rev_01K...",
+      "revision_number": 1,
+      "is_current": false,
+      "completion_kind": "complete_success",
+      "has_soft_degradation": false,
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-03",
+      "scheduled_count": 7,
+      "unplaced_count": 0,
+      "created_at": "2026-08-27T10:30:00+08:00"
+    }
+  ]
+}
+```
+
+### 9.4 GET `/trips/{trip_id}/revisions/{revision_id}`
 
 响应顶层：
 
@@ -685,7 +767,7 @@ walking_estimate | taxi_estimate | transit_or_taxi_estimate
 
 软降级不能使用未排入或失败状态表达。
 
-### 9.3 POST `/trips/{trip_id}/revisions/{revision_id}/attraction-replacements`
+### 9.5 POST `/trips/{trip_id}/revisions/{revision_id}/attraction-replacements`
 
 M1 P1。用户从当前行程景点卡发起替换时，服务端复制基准 Revision 对应的输入草稿，仅替换一个景点，然后按当前已发布数据快照执行完整求解。旧 Revision 不修改；只有质量门通过后才把新 Revision 设置为 Trip 的当前版本。
 
@@ -882,6 +964,20 @@ When 服务端检查资源归属
 Then 返回 404 resource_not_found
 And 日志不包含访问 token
 And 响应不泄露资源是否存在
+```
+
+### A5-API-09 行程历史与 Revision 只读回看
+
+```gherkin
+Given 主体 A 有两个 Trip 且其中一个 Trip 有 Revision 1 和 Revision 2
+When 主体 A 查询行程列表和该 Trip 的修订历史
+Then Trip 按 updated_at 倒序并使用 trip_id 稳定次排序
+And Revision 按 revision_number 从 2 到 1 返回
+And Revision 2 标记 is_current=true
+When 用户读取 Revision 1
+Then Revision 1 仍可读取
+And Trip.current_revision_id 仍指向 Revision 2
+And 主体 B 的列表不包含主体 A 的 Trip
 ```
 
 ## 14. A5 API 退出条件

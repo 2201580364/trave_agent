@@ -99,6 +99,23 @@ class InMemoryTripRepository(_InMemoryAddRepository):
         super().__init__(records, "trip_id")
         self._trip_records = records
 
+    def list_by_principal(
+        self,
+        principal_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[Trip, ...]:
+        matching = sorted(
+            (
+                trip
+                for trip in self._trip_records.values()
+                if trip.principal_id == principal_id
+            ),
+            key=lambda trip: (-trip.updated_at.timestamp(), trip.trip_id),
+        )
+        return tuple(matching[offset : offset + limit])
+
     def save(
         self,
         record: Trip,
@@ -116,6 +133,27 @@ class InMemoryTripRepository(_InMemoryAddRepository):
         self._trip_records[record.trip_id] = record
 
 
+class InMemoryTripRevisionRepository(_InMemoryAddRepository):
+    def __init__(self, records: dict[str, TripRevision]) -> None:
+        super().__init__(records, "trip_revision_id")
+        self._revision_records = records
+
+    def list_by_trip(self, trip_id: str) -> tuple[TripRevision, ...]:
+        return tuple(
+            sorted(
+                (
+                    revision
+                    for revision in self._revision_records.values()
+                    if revision.trip_id == trip_id
+                ),
+                key=lambda revision: (
+                    -revision.revision_number,
+                    revision.trip_revision_id,
+                ),
+            )
+        )
+
+
 class InMemoryUnitOfWork:
     def __init__(self, store: InMemoryPlanningStore) -> None:
         self._store = store
@@ -124,7 +162,7 @@ class InMemoryUnitOfWork:
         self.drafts = InMemoryTripDraftRepository({})
         self.generation_intents = InMemoryGenerationIntentRepository({})
         self.trips = InMemoryTripRepository({})
-        self.trip_revisions = _InMemoryAddRepository({}, "trip_revision_id")
+        self.trip_revisions = InMemoryTripRevisionRepository({})
         self.solver_runs = _InMemoryAddRepository({}, "solver_run_id")
 
     def __enter__(self) -> Self:
@@ -134,8 +172,8 @@ class InMemoryUnitOfWork:
             self._working.generation_intents
         )
         self.trips = InMemoryTripRepository(self._working.trips)
-        self.trip_revisions = _InMemoryAddRepository(
-            self._working.trip_revisions, "trip_revision_id"
+        self.trip_revisions = InMemoryTripRevisionRepository(
+            self._working.trip_revisions
         )
         self.solver_runs = _InMemoryAddRepository(
             self._working.solver_runs, "solver_run_id"

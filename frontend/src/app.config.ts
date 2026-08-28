@@ -5,7 +5,9 @@ export default defineAppConfig({
     'pages/attraction-select/index',
     'pages/attraction-replace/index',
     'pages/trip-review/index',
-    'pages/trip-detail/index'
+    'pages/trip-detail/index',
+    'pages/trip-list/index',
+    'pages/trip-revisions/index'
   ],
   window: {
     backgroundTextStyle: 'light',

@@ -1,5 +1,7 @@
 .trip-page { padding-bottom: 44px; }
 .trip-new-button { width: 100%; margin-top: 16px; }
+.trip-header-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+.trip-link-button { width: 100%; margin: 0; }
 .result-summary { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
 .result-summary > view { display: flex; flex-direction: column; gap: 5px; }
 .summary-number { font-size: 25px; font-weight: 800; color: var(--brand-dark); }
@@ -27,5 +29,7 @@
 .reason-code { color: var(--amber); font-size: 11px; }
 .provenance-card { background: #f1f4f1; box-shadow: none; }
 .revision-label { margin: 10px 0 14px; color: var(--muted); font-size: 12px; }
+.history-notice { margin-bottom: 14px; }
+.history-return-button { width: auto; min-height: 32px; margin: 10px 0 0; padding: 0 13px; border-radius: 999px; background: var(--amber); color: #fff; font-size: 12px; line-height: 32px; }
 .replace-attraction-button { width: auto; min-height: 32px; margin: 10px 0 0; padding: 0 13px; border: 1px solid #bad2c5; border-radius: 999px; background: #f5fbf7; color: var(--brand-dark); font-size: 12px; line-height: 30px; }
 .replace-attraction-button::after { border: 0; }

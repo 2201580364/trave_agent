@@ -65,6 +65,48 @@ export interface TripRevision {
   result_snapshot: TripResult
 }
 
+export interface TripSummary {
+  trip_id: string
+  city_id: string
+  city_name: string
+  current_revision_id: string
+  current_revision_number: number
+  completion_kind: 'complete_success' | 'partial_success'
+  has_soft_degradation: boolean
+  start_date: string | null
+  end_date: string | null
+  scheduled_count: number
+  unplaced_count: number
+  updated_at: string
+  revision_count: number
+}
+
+export interface TripListResponse {
+  items: TripSummary[]
+  limit: number
+  offset: number
+  has_more: boolean
+}
+
+export interface TripRevisionSummary {
+  trip_revision_id: string
+  revision_number: number
+  is_current: boolean
+  completion_kind: 'complete_success' | 'partial_success'
+  has_soft_degradation: boolean
+  start_date: string | null
+  end_date: string | null
+  scheduled_count: number
+  unplaced_count: number
+  created_at: string
+}
+
+export interface TripRevisionListResponse {
+  trip_id: string
+  current_revision_id: string
+  items: TripRevisionSummary[]
+}
+
 export interface TripResult {
   schema_version: string
   summary?: Record<string, number>

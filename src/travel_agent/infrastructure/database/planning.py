@@ -218,6 +218,22 @@ class SqlAlchemyTripRepository:
         row = self._session.get(TripRow, trip_id)
         return _trip_from_row(row) if row is not None else None
 
+    def list_by_principal(
+        self,
+        principal_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[Trip, ...]:
+        rows = self._session.scalars(
+            select(TripRow)
+            .where(TripRow.principal_id == principal_id)
+            .order_by(TripRow.updated_at.desc(), TripRow.trip_id.asc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return tuple(_trip_from_row(row) for row in rows)
+
     def add(self, trip: Trip) -> None:
         self._session.add(TripRow(**_trip_values(trip)))
         self._session.flush()
@@ -265,6 +281,22 @@ class _SqlAlchemyRepository:
         self._session.flush()
 
 
+class SqlAlchemyTripRevisionRepository(_SqlAlchemyRepository):
+    def __init__(self, session: Session) -> None:
+        super().__init__(session, TripRevisionRow, _revision_from_row, _revision_values)
+
+    def list_by_trip(self, trip_id: str) -> tuple[TripRevision, ...]:
+        rows = self._session.scalars(
+            select(TripRevisionRow)
+            .where(TripRevisionRow.trip_id == trip_id)
+            .order_by(
+                TripRevisionRow.revision_number.desc(),
+                TripRevisionRow.trip_revision_id.asc(),
+            )
+        )
+        return tuple(_revision_from_row(row) for row in rows)
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -275,9 +307,7 @@ class SqlAlchemyUnitOfWork:
         self.drafts = SqlAlchemyTripDraftRepository(self._session)
         self.generation_intents = SqlAlchemyGenerationIntentRepository(self._session)
         self.trips = SqlAlchemyTripRepository(self._session)
-        self.trip_revisions = _SqlAlchemyRepository(
-            self._session, TripRevisionRow, _revision_from_row, _revision_values
-        )
+        self.trip_revisions = SqlAlchemyTripRevisionRepository(self._session)
         self.solver_runs = _SqlAlchemyRepository(
             self._session, SolverRunRow, _run_from_row, _run_values
         )

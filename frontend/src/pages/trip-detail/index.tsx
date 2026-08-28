@@ -75,14 +75,25 @@ export default function TripDetailPage() {
   const [error, setError] = useState('')
   const [startingNew, setStartingNew] = useState(false)
 
-  useDidShow(() => {
-    if (!store.token || !store.tripId || !store.revisionId) return
+  const loadRevision = (revisionId: string) => {
+    if (!store.token || !store.tripId || !revisionId) return
+    setError('')
+    setRevision(null)
     apiRequest<TripRevision>(
-      `/api/v1/trips/${store.tripId}/revisions/${store.revisionId}`,
+      `/api/v1/trips/${store.tripId}/revisions/${revisionId}`,
       { token: store.token }
     )
-      .then(setRevision)
+      .then((item) => {
+        setRevision(item)
+        if (!store.currentRevisionId || item.trip_revision_id === store.currentRevisionId) {
+          store.setCurrentRevision(item.trip_revision_id, item.revision_number)
+        }
+      })
       .catch((cause) => setError(cause instanceof Error ? cause.message : '行程恢复失败。'))
+  }
+
+  useDidShow(() => {
+    loadRevision(store.revisionId)
   })
 
   const result = revision?.result_snapshot
@@ -91,6 +102,10 @@ export default function TripDetailPage() {
     (total, node) => total + (node.buffered_travel_from_previous_min ?? 0),
     0
   ) ?? 0
+  const currentRevisionId = store.currentRevisionId || store.revisionId
+  const isHistorical = Boolean(
+    revision && currentRevisionId && revision.trip_revision_id !== currentRevisionId
+  )
   const startNewPlan = async () => {
     if (!store.token) return
     setStartingNew(true)
@@ -116,15 +131,36 @@ export default function TripDetailPage() {
     })
   }
 
+  const viewCurrentRevision = () => {
+    if (!currentRevisionId) return
+    store.viewRevision(currentRevisionId)
+    loadRevision(currentRevisionId)
+  }
+
   return (
     <View className='page-shell trip-page'>
       <View className='content'>
         <Text className='eyebrow'>杭州 · 规划模式</Text>
         <View className='title'>你的可执行行程</View>
         <View className='subtitle'>先看每天怎么走，再查看未排入和数据说明。</View>
-        {revision && (
+        {revision && !isHistorical && (
           <View className='revision-label'>当前为第 {revision.revision_number} 版 · 历史版本不会被覆盖</View>
         )}
+        {revision && isHistorical && (
+          <View className='notice notice--warning history-notice'>
+            正在查看历史第 {revision.revision_number} 版
+            {store.currentRevisionNumber ? ` · 当前版本是第 ${store.currentRevisionNumber} 版` : ''}
+            <Button className='history-return-button' onClick={viewCurrentRevision}>返回当前版本</Button>
+          </View>
+        )}
+        <View className='trip-header-actions'>
+          <Button className='secondary trip-link-button' onClick={() => Taro.navigateTo({ url: '/pages/trip-list/index' })}>
+            我的行程
+          </Button>
+          <Button className='secondary trip-link-button' onClick={() => Taro.navigateTo({ url: '/pages/trip-revisions/index' })}>
+            历史版本
+          </Button>
+        </View>
         <Button className='secondary trip-new-button' loading={startingNew} onClick={startNewPlan}>
           ＋ 规划新行程
         </Button>
@@ -190,12 +226,14 @@ export default function TripDetailPage() {
                       <View className='visit-card'>
                         <View className='section-title'>{node.name}</View>
                         <View className='attraction-meta'>计划停留约 {durationLabel(node.planned_duration_min)}</View>
-                        <Button
-                          className='replace-attraction-button'
-                          onClick={() => replaceAttraction(node.attraction_id, node.name)}
-                        >
-                          替换景点
-                        </Button>
+                        {!isHistorical && (
+                          <Button
+                            className='replace-attraction-button'
+                            onClick={() => replaceAttraction(node.attraction_id, node.name)}
+                          >
+                            替换景点
+                          </Button>
+                        )}
                         {index > 0 && (
                           <View className='transit-note'>
                             从上一站建议 {transportModeLabel(node.transport_mode)}{distanceLabel(node.travel_distance_m)} · 约 {transitDurationLabel(node.buffered_travel_from_previous_min ?? node.travel_from_previous_min ?? 0)}

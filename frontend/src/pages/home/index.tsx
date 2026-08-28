@@ -13,21 +13,21 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const ensureSession = async () => {
+    if (store.token) return { token: store.token, principalId: store.principalId }
+    const session = await apiRequest<AnonymousSession>('/api/v1/anonymous-sessions', {
+      method: 'POST',
+      data: { device_installation_id: `h5_${Date.now()}` }
+    })
+    store.setSession(session.access_token, session.principal_id)
+    return { token: session.access_token, principalId: session.principal_id }
+  }
+
   const start = async (newPlan = false) => {
     setLoading(true)
     setError('')
     try {
-      let token = store.token
-      let principalId = store.principalId
-      if (!token) {
-        const session = await apiRequest<AnonymousSession>('/api/v1/anonymous-sessions', {
-          method: 'POST',
-          data: { device_installation_id: `h5_${Date.now()}` }
-        })
-        token = session.access_token
-        principalId = session.principal_id
-        store.setSession(token, principalId)
-      }
+      const { token } = await ensureSession()
       if (newPlan || !store.draftId) {
         const draft = await apiRequest<Draft>('/api/v1/trip-drafts', {
           method: 'POST',
@@ -43,6 +43,19 @@ export default function HomePage() {
       Taro.navigateTo({ url: '/pages/trip-time/index' })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '暂时无法开始规划。')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const openTrips = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      await ensureSession()
+      Taro.navigateTo({ url: '/pages/trip-list/index' })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '暂时无法打开我的行程。')
     } finally {
       setLoading(false)
     }
@@ -82,6 +95,9 @@ export default function HomePage() {
             新建行程
           </Button>
         )}
+        <Button className='secondary home-secondary' disabled={loading} onClick={openTrips}>
+          我的行程
+        </Button>
       </View>
     </View>
   )

@@ -10,11 +10,15 @@ interface PlanningState {
   selectedAttractionIds: string[]
   tripId: string
   revisionId: string
+  currentRevisionId: string
+  currentRevisionNumber: number
   setSession: (token: string, principalId: string) => void
   setDraft: (draftId: string, draftVersion: number) => void
   setDraftVersion: (version: number) => void
   setSelectedAttractions: (ids: string[]) => void
-  setTrip: (tripId: string, revisionId: string) => void
+  setTrip: (tripId: string, revisionId: string, revisionNumber?: number) => void
+  setCurrentRevision: (revisionId: string, revisionNumber: number) => void
+  viewRevision: (revisionId: string) => void
   replacePlan: (draftId: string, draftVersion: number) => void
   reset: () => void
 }
@@ -32,7 +36,9 @@ const empty = {
   draftVersion: 0,
   selectedAttractionIds: [] as string[],
   tripId: '',
-  revisionId: ''
+  revisionId: '',
+  currentRevisionId: '',
+  currentRevisionNumber: 0
 }
 
 export const usePlanningStore = create<PlanningState>()(
@@ -43,13 +49,25 @@ export const usePlanningStore = create<PlanningState>()(
       setDraft: (draftId, draftVersion) => set({ draftId, draftVersion }),
       setDraftVersion: (draftVersion) => set({ draftVersion }),
       setSelectedAttractions: (selectedAttractionIds) => set({ selectedAttractionIds }),
-      setTrip: (tripId, revisionId) => set({ tripId, revisionId }),
+      setTrip: (tripId, revisionId, currentRevisionNumber = 0) => set({
+        tripId,
+        revisionId,
+        currentRevisionId: revisionId,
+        currentRevisionNumber
+      }),
+      setCurrentRevision: (currentRevisionId, currentRevisionNumber) => set({
+        currentRevisionId,
+        currentRevisionNumber
+      }),
+      viewRevision: (revisionId) => set({ revisionId }),
       replacePlan: (draftId, draftVersion) => set({
         draftId,
         draftVersion,
         selectedAttractionIds: [],
         tripId: '',
-        revisionId: ''
+        revisionId: '',
+        currentRevisionId: '',
+        currentRevisionNumber: 0
       }),
       reset: () => set(empty)
     }),

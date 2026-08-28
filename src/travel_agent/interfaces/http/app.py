@@ -8,7 +8,7 @@ from datetime import date, datetime
 from enum import Enum
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -377,6 +377,33 @@ def create_app(container: HttpContainer) -> FastAPI:
     ) -> dict[str, object]:
         return _owned_intent(container, intent_id, principal)
 
+    @app.get("/api/v1/trips")
+    def list_trips(
+        limit: int = Query(default=20, ge=1, le=50),
+        offset: int = Query(default=0, ge=0),
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        with container.uow_factory() as uow:
+            trips = uow.trips.list_by_principal(
+                principal,
+                limit=limit + 1,
+                offset=offset,
+            )
+            visible = trips[:limit]
+            items = []
+            for trip in visible:
+                revision = uow.trip_revisions.get(trip.current_revision_id)
+                if revision is None or revision.trip_id != trip.trip_id:
+                    raise RuntimeError("trip current revision invariant is broken")
+                revision_count = len(uow.trip_revisions.list_by_trip(trip.trip_id))
+                items.append(_trip_summary_response(trip, revision, revision_count))
+        return {
+            "items": items,
+            "limit": limit,
+            "offset": offset,
+            "has_more": len(trips) > limit,
+        }
+
     @app.get("/api/v1/trips/{trip_id}")
     def get_trip(
         trip_id: str, principal: str = Depends(principal_id)
@@ -385,7 +412,38 @@ def create_app(container: HttpContainer) -> FastAPI:
             trip = uow.trips.get(trip_id)
             if trip is None or trip.principal_id != principal:
                 raise ResourceNotFoundError
-            return _jsonable(trip)
+            revision = uow.trip_revisions.get(trip.current_revision_id)
+            if revision is None or revision.trip_id != trip.trip_id:
+                raise RuntimeError("trip current revision invariant is broken")
+            response = _trip_summary_response(
+                trip,
+                revision,
+                len(uow.trip_revisions.list_by_trip(trip.trip_id)),
+            )
+            response["created_at"] = trip.created_at.isoformat()
+            return response
+
+    @app.get("/api/v1/trips/{trip_id}/revisions")
+    def list_revisions(
+        trip_id: str,
+        principal: str = Depends(principal_id),
+    ) -> dict[str, object]:
+        with container.uow_factory() as uow:
+            trip = uow.trips.get(trip_id)
+            if trip is None or trip.principal_id != principal:
+                raise ResourceNotFoundError
+            revisions = uow.trip_revisions.list_by_trip(trip_id)
+            return {
+                "trip_id": trip.trip_id,
+                "current_revision_id": trip.current_revision_id,
+                "items": [
+                    _revision_summary_response(
+                        revision,
+                        current_revision_id=trip.current_revision_id,
+                    )
+                    for revision in revisions
+                ],
+            }
 
     @app.get("/api/v1/trips/{trip_id}/revisions/{revision_id}")
     def get_revision(
@@ -497,6 +555,79 @@ def _draft_response(draft) -> dict[str, object]:
         "selected_attraction_ids": list(draft.selected_attraction_ids),
         "visit_period_preferences": _jsonable(draft.visit_period_preferences),
         "last_saved_at": draft.updated_at.isoformat(),
+    }
+
+
+def _trip_summary_response(trip, revision, revision_count: int) -> dict[str, object]:
+    snapshot = _snapshot_overview(revision.result_snapshot)
+    return {
+        "trip_id": trip.trip_id,
+        "city_id": trip.city_id,
+        "city_name": "杭州" if trip.city_id == "hangzhou" else trip.city_id,
+        "current_revision_id": trip.current_revision_id,
+        "current_revision_number": revision.revision_number,
+        "completion_kind": revision.completion_kind.value,
+        "has_soft_degradation": revision.has_soft_degradation,
+        "start_date": snapshot["start_date"],
+        "end_date": snapshot["end_date"],
+        "scheduled_count": snapshot["scheduled_count"],
+        "unplaced_count": snapshot["unplaced_count"],
+        "updated_at": trip.updated_at.isoformat(),
+        "revision_count": revision_count,
+    }
+
+
+def _revision_summary_response(
+    revision,
+    *,
+    current_revision_id: str,
+) -> dict[str, object]:
+    snapshot = _snapshot_overview(revision.result_snapshot)
+    return {
+        "trip_revision_id": revision.trip_revision_id,
+        "revision_number": revision.revision_number,
+        "is_current": revision.trip_revision_id == current_revision_id,
+        "completion_kind": revision.completion_kind.value,
+        "has_soft_degradation": revision.has_soft_degradation,
+        "start_date": snapshot["start_date"],
+        "end_date": snapshot["end_date"],
+        "scheduled_count": snapshot["scheduled_count"],
+        "unplaced_count": snapshot["unplaced_count"],
+        "created_at": revision.created_at.isoformat(),
+    }
+
+
+def _snapshot_overview(snapshot: dict[str, object]) -> dict[str, object]:
+    raw_days = snapshot.get("days")
+    days = (
+        [item for item in raw_days if isinstance(item, dict)]
+        if isinstance(raw_days, list)
+        else []
+    )
+    dates = [
+        item["date"]
+        for item in days
+        if isinstance(item.get("date"), str)
+    ]
+    raw_summary = snapshot.get("summary")
+    summary = raw_summary if isinstance(raw_summary, dict) else {}
+    raw_scheduled = summary.get("scheduled_count")
+    scheduled_count = (
+        raw_scheduled
+        if isinstance(raw_scheduled, int) and not isinstance(raw_scheduled, bool)
+        else sum(
+            len(nodes)
+            for day in days
+            if isinstance((nodes := day.get("nodes")), list)
+        )
+    )
+    raw_unplaced = snapshot.get("unplaced")
+    unplaced_count = len(raw_unplaced) if isinstance(raw_unplaced, list) else 0
+    return {
+        "start_date": min(dates) if dates else None,
+        "end_date": max(dates) if dates else None,
+        "scheduled_count": scheduled_count,
+        "unplaced_count": unplaced_count,
     }
 
 

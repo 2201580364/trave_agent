@@ -23,6 +23,13 @@ class GenerationIntentRepository(Protocol):
 
 class TripRepository(Protocol):
     def get(self, trip_id: str) -> Trip | None: ...
+    def list_by_principal(
+        self,
+        principal_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[Trip, ...]: ...
     def add(self, trip: Trip) -> None: ...
     def save(
         self,
@@ -34,6 +41,7 @@ class TripRepository(Protocol):
 
 class TripRevisionRepository(Protocol):
     def get(self, trip_revision_id: str) -> TripRevision | None: ...
+    def list_by_trip(self, trip_id: str) -> tuple[TripRevision, ...]: ...
     def add(self, revision: TripRevision) -> None: ...
 
 

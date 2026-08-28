@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -24,6 +24,7 @@ from travel_agent.domain.planning import (
     GenerationStatus,
     Trip,
     TripDraft,
+    TripRevision,
 )
 from travel_agent.infrastructure.database import SqlAlchemyUnitOfWork, create_schema
 from travel_agent.infrastructure.memory import SequenceIdGenerator
@@ -158,6 +159,50 @@ def test_trip_revision_compare_and_swap_rejects_stale_publisher(
                 ),
                 expected_revision_id="revision_1",
             )
+
+
+def test_trip_and_revision_queries_are_owned_ordered_and_paginated(
+    tmp_path: Path,
+) -> None:
+    factory = _factory(tmp_path / "planning.db")
+    older = NOW - timedelta(days=1)
+    trips = (
+        Trip("trip_b", "principal_1", "hangzhou", "draft_b", "revision_b2", older, NOW),
+        Trip("trip_a", "principal_1", "hangzhou", "draft_a", "revision_a1", older, NOW),
+        Trip("trip_old", "principal_1", "hangzhou", "draft_old", "revision_old", older, older),
+        Trip("trip_hidden", "principal_2", "hangzhou", "draft_x", "revision_x", NOW, NOW),
+    )
+    revisions = (
+        TripRevision(
+            "revision_b1", "trip_b", 1, "intent_b1",
+            CompletionKind.COMPLETE_SUCCESS, False, "trip-result-v1",
+            {"days": []}, "a" * 64, older,
+        ),
+        TripRevision(
+            "revision_b2", "trip_b", 2, "intent_b2",
+            CompletionKind.COMPLETE_SUCCESS, False, "trip-result-v1",
+            {"days": []}, "b" * 64, NOW,
+        ),
+    )
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        for trip in trips:
+            uow.trips.add(trip)
+        for revision in revisions:
+            uow.trip_revisions.add(revision)
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        first_page = uow.trips.list_by_principal(
+            "principal_1", limit=2, offset=0
+        )
+        second_page = uow.trips.list_by_principal(
+            "principal_1", limit=2, offset=2
+        )
+        trip_revisions = uow.trip_revisions.list_by_trip("trip_b")
+
+    assert [trip.trip_id for trip in first_page] == ["trip_a", "trip_b"]
+    assert [trip.trip_id for trip in second_page] == ["trip_old"]
+    assert [revision.revision_number for revision in trip_revisions] == [2, 1]
 
 
 def test_uncommitted_completion_products_are_rolled_back(tmp_path: Path) -> None:

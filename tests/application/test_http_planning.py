@@ -227,6 +227,9 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
 
     trip = client.get(f"/api/v1/trips/{intent['trip_id']}", headers=headers)
     assert trip.status_code == 200
+    assert trip.json()["current_revision_number"] == 1
+    assert "principal_id" not in trip.json()
+    assert "source_draft_id" not in trip.json()
     revision = client.get(
         f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}",
         headers=headers,
@@ -295,6 +298,44 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "trip_revision_conflict"
 
+    trips = client.get("/api/v1/trips?limit=20&offset=0", headers=headers)
+    assert trips.status_code == 200
+    assert trips.json()["has_more"] is False
+    assert trips.json()["items"] == [
+        {
+            "trip_id": intent["trip_id"],
+            "city_id": "hangzhou",
+            "city_name": "杭州",
+            "current_revision_id": replacement_intent["trip_revision_id"],
+            "current_revision_number": 2,
+            "completion_kind": "complete_success",
+            "has_soft_degradation": False,
+            "start_date": "2026-09-01",
+            "end_date": "2026-09-01",
+            "scheduled_count": 0,
+            "unplaced_count": 0,
+            "updated_at": NOW.isoformat(),
+            "revision_count": 2,
+        }
+    ]
+
+    revisions = client.get(
+        f"/api/v1/trips/{intent['trip_id']}/revisions",
+        headers=headers,
+    )
+    assert revisions.status_code == 200
+    assert revisions.json()["current_revision_id"] == replacement_intent[
+        "trip_revision_id"
+    ]
+    assert [item["revision_number"] for item in revisions.json()["items"]] == [
+        2,
+        1,
+    ]
+    assert [item["is_current"] for item in revisions.json()["items"]] == [
+        True,
+        False,
+    ]
+
 
 def test_anonymous_ownership_is_hidden_as_not_found(tmp_path: Path) -> None:
     client = _client(tmp_path)
@@ -313,6 +354,9 @@ def test_anonymous_ownership_is_hidden_as_not_found(tmp_path: Path) -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "resource_not_found"
+    assert client.get("/api/v1/trips", headers=_auth(second_token)).json()[
+        "items"
+    ] == []
 
 
 def test_draft_conflict_uses_stable_error_and_request_id(tmp_path: Path) -> None:
