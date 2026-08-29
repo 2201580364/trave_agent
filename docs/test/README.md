@@ -4,6 +4,15 @@
 
 Gate 7 人类证据在收集前必须按 [`gate7-research-environment.md`](gate7-research-environment.md) 锁定研究环境。`scripts/lock_gate7_environment.py` 固定 Git commit、protocol hash、应用/求解器版本、published 数据快照、数据库 revision 和前端构建哈希；真实 evidence 必须引用 `locked` manifest，原始材料只进入 `.local/gate7/` 或外部受控空间。
 
+R0.2-04 杭州候选目录与覆盖矩阵使用独立门禁：
+
+```powershell
+py -3.12 -m pytest tests/data_governance/test_candidate_catalog.py -q
+py -3.12 scripts/validate_candidate_catalog.py --json
+```
+
+该门禁只证明 candidate 数量、来源绑定、覆盖和关系线索结构有效，不把候选 POI、代表点或覆盖标签升级为 human_verified/published。执行证据见 [`reports/g7-r0.2-04-hangzhou-candidate-coverage-2026-08-29.md`](reports/g7-r0.2-04-hangzhou-candidate-coverage-2026-08-29.md)。
+
 ## 测试分层
 
 | 层 | 内容 | 对应目标 |

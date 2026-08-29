@@ -8,11 +8,14 @@
 |---|---|
 | `hangzhou-source-registry-v1.json` | 杭州 M1 首批来源、工程合规结论、字段级许可、条件和排除清单 |
 | `place-collection-field-dictionary-v1.json` | 允许采集的 58 个地点、访问点、时间、体验、关系、OD、天气和来源字段 |
+| `hangzhou-candidate-catalog-v1.json` | R0.2-04 的 72 个杭州候选、Provider 候选字段、覆盖标签和未裁决关系线索；全部为 candidate |
+| `hangzhou-candidate-coverage-v1.json` | 从候选目录确定性派生的区域、类别、夜间、雨天、地点形态和退出门槛矩阵 |
 
 校验：
 
 ```powershell
 py -3.12 scripts/validate_source_registry.py --json
+py -3.12 scripts/validate_candidate_catalog.py --json
 ```
 
 ## 版本规则

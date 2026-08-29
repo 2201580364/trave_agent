@@ -1,0 +1,3218 @@
+{
+  "candidates": [
+    {
+      "candidate_id": "hz-cand-001",
+      "canonical_name_candidate": "西湖",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "西湖区",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.246255,
+          "lng": 120.144302
+        },
+        "name": "西湖",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0FFFEDKS3",
+        "source_id": "gaode-web-service",
+        "typecode": "190205"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-002",
+      "canonical_name_candidate": "湖滨公园",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "龙井路1号杭州西湖风景名胜区内(东北角)",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.256583,
+          "lng": 120.158818
+        },
+        "name": "杭州西湖风景名胜区-湖滨公园",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B05MLT",
+        "source_id": "gaode-web-service",
+        "typecode": "110101"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-003",
+      "canonical_name_candidate": "断桥残雪",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "龙井路1号杭州西湖风景名胜区内(东北角)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.258151,
+          "lng": 120.151347
+        },
+        "name": "杭州西湖风景名胜区-断桥残雪",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B01EE6",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-004",
+      "canonical_name_candidate": "平湖秋月",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "北山街道西湖景区孤山路1号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.252244,
+          "lng": 120.146142
+        },
+        "name": "平湖秋月碑亭",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B0HU44IKRD",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-005",
+      "canonical_name_candidate": "曲院风荷",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "杭州西湖风景名胜区杨公堤38号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.249287,
+          "lng": 120.133333
+        },
+        "name": "杭州西湖风景名胜区-曲院风荷",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B0253E",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-006",
+      "canonical_name_candidate": "苏堤春晓",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "route",
+      "place_kind_candidate": "walking_route",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "杭州西湖风景名胜区内(东北角)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.24388,
+          "lng": 120.13796
+        },
+        "name": "杭州西湖风景名胜区-苏堤春晓",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B02070",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-007",
+      "canonical_name_candidate": "浙江省博物馆孤山馆区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "亲子",
+          "长辈"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "孤山路25号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.251243,
+          "lng": 120.143778
+        },
+        "name": "浙江省博物馆(孤山馆区)",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B06XVX",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-008",
+      "canonical_name_candidate": "西湖音乐喷泉表演",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "show",
+      "primary_category": "演出演艺",
+      "provider_candidate": {
+        "address": "湖滨路与平海路交汇处",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "evidence_ref": "docs/test/reports/a6-8-1-gaode-browser-coordinate-review-2026-08-27.md",
+        "location": {
+          "lat": 30.253778,
+          "lng": 120.16097
+        },
+        "name": "西湖音乐喷泉表演",
+        "observed_at": "2026-08-29T20:01:28+08:00",
+        "poi_id": "B023B08WZ7",
+        "source_id": "gaode-web-service",
+        "typecode": ""
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-009",
+      "canonical_name_candidate": "保俶塔",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "北山路宝石前山路宝石山上(近宝石流霞)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.260999,
+          "lng": 120.148084
+        },
+        "name": "杭州西湖风景名胜区-保俶塔",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B14B8Q",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-010",
+      "canonical_name_candidate": "雷峰塔",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "南山路15号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.230934,
+          "lng": 120.148849
+        },
+        "name": "雷峰塔景区",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B09LKR",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-011",
+      "canonical_name_candidate": "花港观鱼",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "西湖街道西山路5-1号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.230233,
+          "lng": 120.139095
+        },
+        "name": "杭州西湖风景名胜区-花港观鱼",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B023B2",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-012",
+      "canonical_name_candidate": "三潭印月",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "龙井路1号杭州西湖风景名胜区内(东北角)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.238845,
+          "lng": 120.145369
+        },
+        "name": "杭州西湖风景名胜区-三潭印月",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B0283D",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "west_lake_lakeside_north_hill"
+    },
+    {
+      "candidate_id": "hz-cand-013",
+      "canonical_name_candidate": "灵隐寺",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "法云弄1号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.240826,
+          "lng": 120.101406
+        },
+        "name": "灵隐寺",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B02842",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-014",
+      "canonical_name_candidate": "飞来峰景区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "灵隐街道灵隐路法云弄1号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.239119,
+          "lng": 120.101101
+        },
+        "name": "飞来峰",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B05MJE",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-015",
+      "canonical_name_candidate": "永福寺",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.238978,
+          "lng": 120.097524
+        },
+        "name": "永福寺",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B1H638",
+        "source_id": "gaode-web-service",
+        "typecode": "110205"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-016",
+      "canonical_name_candidate": "韬光寺",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "西湖街道飞来峰景区法云弄9号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.242688,
+          "lng": 120.096327
+        },
+        "name": "杭州西湖风景名胜区-韬光寺",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B0ACPS",
+        "source_id": "gaode-web-service",
+        "typecode": "110205"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-017",
+      "canonical_name_candidate": "上天竺法喜讲寺",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "西湖街道西湖街道天竺路338号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.227208,
+          "lng": 120.095362
+        },
+        "name": "上天竺法喜讲寺",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B02054",
+        "source_id": "gaode-web-service",
+        "typecode": "110205"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-018",
+      "canonical_name_candidate": "中天竺法净禅寺",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "西湖街道龙井路1号杭州西湖风景名胜区(西北角)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.233682,
+          "lng": 120.101849
+        },
+        "name": "中天竺法净禅寺",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B08SQE",
+        "source_id": "gaode-web-service",
+        "typecode": "110205"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-019",
+      "canonical_name_candidate": "三天竺法镜讲寺",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "寺庙祈福",
+      "provider_candidate": {
+        "address": "西湖街道灵隐街道天竺路66号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.23718,
+          "lng": 120.10483
+        },
+        "name": "杭州西湖风景名胜区-法镜寺",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B05MJ7",
+        "source_id": "gaode-web-service",
+        "typecode": "110205"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "lingyin_tianzhu"
+    },
+    {
+      "candidate_id": "hz-cand-020",
+      "canonical_name_candidate": "西溪国家湿地公园",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "天目山路518号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.255079,
+          "lng": 120.061159
+        },
+        "name": "西溪国家湿地公园",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B06P06",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xixi_wetland"
+    },
+    {
+      "candidate_id": "hz-cand-021",
+      "canonical_name_candidate": "西溪国家湿地公园洪园",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "五常大道龙舌嘴入口(西溪湿地西区)",
+        "admin_area": "余杭区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.261234,
+          "lng": 120.050588
+        },
+        "name": "西溪国家湿地公园洪园",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B1DNZH",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xixi_wetland"
+    },
+    {
+      "candidate_id": "hz-cand-022",
+      "canonical_name_candidate": "高庄",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "天目山路518号西溪湿地公园南门",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.263607,
+          "lng": 120.077341
+        },
+        "name": "西溪湿地高庄",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B1EOWK",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xixi_wetland"
+    },
+    {
+      "candidate_id": "hz-cand-023",
+      "canonical_name_candidate": "西溪天堂",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "网红打卡",
+      "provider_candidate": {
+        "address": "紫金港路21号(东岳地铁站A口步行280米)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.266381,
+          "lng": 120.088309
+        },
+        "name": "西溪天堂",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0FFLJ5UIY",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xixi_wetland"
+    },
+    {
+      "candidate_id": "hz-cand-024",
+      "canonical_name_candidate": "清河坊历史文化特色街区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "河坊街180号",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.239827,
+          "lng": 120.169899
+        },
+        "name": "清河坊历史文化特色街区",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B07SJZ",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-025",
+      "canonical_name_candidate": "南宋御街",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "上城区",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.242479,
+          "lng": 120.170779
+        },
+        "name": "南宋御街",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0IA368WAJ",
+        "source_id": "gaode-web-service",
+        "typecode": "190301"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-026",
+      "canonical_name_candidate": "胡雪岩旧居",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "元宝街18号",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.237273,
+          "lng": 120.172906
+        },
+        "name": "胡雪岩旧居",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B0284D",
+        "source_id": "gaode-web-service",
+        "typecode": "110204"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-027",
+      "canonical_name_candidate": "杭州博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "亲子",
+          "长辈"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "粮道山18号",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.239091,
+          "lng": 120.166525
+        },
+        "name": "杭州博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0FFFWQGI8",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-028",
+      "canonical_name_candidate": "城隍阁",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "吴山3号(吴山广场山顶)",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.236413,
+          "lng": 120.164726
+        },
+        "name": "吴山景区-城隍阁景区",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0FFG49JKW",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-029",
+      "canonical_name_candidate": "南宋德寿宫遗址博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "望江路228-264号(江城路地铁站E口步行460米)",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.238678,
+          "lng": 120.173273
+        },
+        "name": "南宋德寿宫遗址博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0HGNGK3FG",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-030",
+      "canonical_name_candidate": "南宋官窑博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "南复路60号",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.209606,
+          "lng": 120.155048
+        },
+        "name": "南宋官窑博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B09JLI",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-031",
+      "canonical_name_candidate": "十五奎巷",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "上城区",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.23765,
+          "lng": 120.171421
+        },
+        "name": "十五奎巷",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "BZA3QQ01S5",
+        "source_id": "gaode-web-service",
+        "typecode": "190301"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-032",
+      "canonical_name_candidate": "鼓楼",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "中山南路501号(近十五奎巷)",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.237994,
+          "lng": 120.171386
+        },
+        "name": "鼓楼",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B015D8",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-033",
+      "canonical_name_candidate": "吴山广场",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "延安南路1号附近",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.239183,
+          "lng": 120.163686
+        },
+        "name": "吴山广场",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B0A5KT",
+        "source_id": "gaode-web-service",
+        "typecode": "110105"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "southern_song_wushan"
+    },
+    {
+      "candidate_id": "hz-cand-034",
+      "canonical_name_candidate": "京杭大运河杭州景区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "环城北路226号武林门码头",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.302955,
+          "lng": 120.141908
+        },
+        "name": "京杭大运河杭州景区",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0FFG97H9P",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-035",
+      "canonical_name_candidate": "拱宸桥",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "桥弄街1号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.318101,
+          "lng": 120.139844
+        },
+        "name": "拱宸桥",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B1BGM6",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-036",
+      "canonical_name_candidate": "中国京杭大运河博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "金华路34号运河文化广场1号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.317404,
+          "lng": 120.14133
+        },
+        "name": "中国京杭大运河博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B07XI3",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-037",
+      "canonical_name_candidate": "中国刀剪剑博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "小河路336号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.316137,
+          "lng": 120.137682
+        },
+        "name": "中国刀剪剑博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B09XH9",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-038",
+      "canonical_name_candidate": "中国伞博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "小河路336号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.315991,
+          "lng": 120.137712
+        },
+        "name": "中国伞博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B09XH8",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-039",
+      "canonical_name_candidate": "中国扇博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "小河路450号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.318968,
+          "lng": 120.138026
+        },
+        "name": "中国扇博物馆",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B023B0BDU2",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-040",
+      "canonical_name_candidate": "桥西历史文化街区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "桥西直街1号(拱宸桥西)",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.316781,
+          "lng": 120.137752
+        },
+        "name": "拱宸桥西历史文化街区",
+        "observed_at": "2026-08-29T18:42:53+08:00",
+        "poi_id": "B0FFFFZRBD",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-041",
+      "canonical_name_candidate": "小河历史文化街区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "小河直街51号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.308302,
+          "lng": 120.135337
+        },
+        "name": "小河历史文化街区",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0FFFWQ8DS",
+        "source_id": "gaode-web-service",
+        "typecode": "110200|061000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-042",
+      "canonical_name_candidate": "杭州运河游船",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "experience",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "环城北路226号(武林广场地铁站B口步行480米)",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.274196,
+          "lng": 120.164806
+        },
+        "name": "杭州运河游船",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B0JB7MMKKG",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "grand_canal_gongchen_bridge"
+    },
+    {
+      "candidate_id": "hz-cand-043",
+      "canonical_name_candidate": "浙江自然博物院杭州馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "亲子"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "西湖文化广场6号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.276814,
+          "lng": 120.164581
+        },
+        "name": "浙江自然博物院",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B15DKJ",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "wulin_lakeside_commercial"
+    },
+    {
+      "candidate_id": "hz-cand-044",
+      "canonical_name_candidate": "浙江省科技馆",
+      "coverage": {
+        "audiences": [
+          "亲子",
+          "雨天"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "亲子乐园",
+      "provider_candidate": {
+        "address": "西湖文化广场A座1号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.276404,
+          "lng": 120.164936
+        },
+        "name": "浙江省科技馆",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B0A1BX",
+        "source_id": "gaode-web-service",
+        "typecode": "140600"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "wulin_lakeside_commercial"
+    },
+    {
+      "candidate_id": "hz-cand-045",
+      "canonical_name_candidate": "武林夜市",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "market",
+      "primary_category": "美食街区",
+      "provider_candidate": {
+        "address": "武林街道武林路143号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.261664,
+          "lng": 120.159572
+        },
+        "name": "杭州武林夜市",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B1DS0H",
+        "source_id": "gaode-web-service",
+        "typecode": "061000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "wulin_lakeside_commercial"
+    },
+    {
+      "candidate_id": "hz-cand-046",
+      "canonical_name_candidate": "武林广场",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "天水街道天水街道体育场路208号",
+        "admin_area": "拱墅区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.271001,
+          "lng": 120.163325
+        },
+        "name": "武林广场",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B02841",
+        "source_id": "gaode-web-service",
+        "typecode": "110105"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "wulin_lakeside_commercial"
+    },
+    {
+      "candidate_id": "hz-cand-047",
+      "canonical_name_candidate": "城市阳台",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "四季青街道之江路1078号",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.241827,
+          "lng": 120.216803
+        },
+        "name": "城市阳台",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B1FB36",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "qianjiang_new_city"
+    },
+    {
+      "candidate_id": "hz-cand-048",
+      "canonical_name_candidate": "钱江新城灯光秀",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "show",
+      "primary_category": "演出演艺",
+      "provider_candidate": {
+        "address": "新业路39号(市民中心地铁站M1口或N2口)",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.244481,
+          "lng": 120.215428
+        },
+        "name": "钱江新城灯光秀",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B0FFHKQ7F5",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "qianjiang_new_city"
+    },
+    {
+      "candidate_id": "hz-cand-049",
+      "canonical_name_candidate": "杭州大剧院",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "演出演艺",
+      "provider_candidate": {
+        "address": "新业路39号(市民中心地铁站L口步行240米)",
+        "admin_area": "上城区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.24404,
+          "lng": 120.215108
+        },
+        "name": "杭州大剧院",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B03DMD",
+        "source_id": "gaode-web-service",
+        "typecode": "080603"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "qianjiang_new_city"
+    },
+    {
+      "candidate_id": "hz-cand-050",
+      "canonical_name_candidate": "中国杭州低碳科技馆",
+      "coverage": {
+        "audiences": [
+          "亲子",
+          "雨天"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "亲子乐园",
+      "provider_candidate": {
+        "address": "江汉路1888号",
+        "admin_area": "滨江区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.209358,
+          "lng": 120.201967
+        },
+        "name": "中国杭州低碳科技馆",
+        "observed_at": "2026-08-29T19:58:06+08:00",
+        "poi_id": "B023B1944R",
+        "source_id": "gaode-web-service",
+        "typecode": "140600"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "qianjiang_new_city"
+    },
+    {
+      "candidate_id": "hz-cand-051",
+      "canonical_name_candidate": "杭州奥林匹克体育中心体育场",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "网红打卡",
+      "provider_candidate": {
+        "address": "飞虹路3号奥体中心",
+        "admin_area": "滨江区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.229155,
+          "lng": 120.228893
+        },
+        "name": "杭州奥林匹克体育中心体育场",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B1C842",
+        "source_id": "gaode-web-service",
+        "typecode": "080101"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "qianjiang_new_city"
+    },
+    {
+      "candidate_id": "hz-cand-052",
+      "canonical_name_candidate": "良渚博物院",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "亲子",
+          "长辈"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "良渚街道美丽洲路1号",
+        "admin_area": "余杭区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.377474,
+          "lng": 120.028083
+        },
+        "name": "良渚博物院",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B0A45Y",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "liangzhu"
+    },
+    {
+      "candidate_id": "hz-cand-053",
+      "canonical_name_candidate": "良渚古城遗址公园",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "瓶窑镇凤都路与104国道辅路交叉口西北200米",
+        "admin_area": "余杭区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.389549,
+          "lng": 119.991005
+        },
+        "name": "良渚古城遗址公园",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B14O96",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "liangzhu"
+    },
+    {
+      "candidate_id": "hz-cand-054",
+      "canonical_name_candidate": "良渚文化艺术中心",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "网红打卡",
+      "provider_candidate": {
+        "address": "玉鸟路12号良渚文化村内(东侧)",
+        "admin_area": "余杭区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.365111,
+          "lng": 120.032341
+        },
+        "name": "良渚文化艺术中心",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0FFF0DY8D",
+        "source_id": "gaode-web-service",
+        "typecode": "140000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "liangzhu"
+    },
+    {
+      "candidate_id": "hz-cand-055",
+      "canonical_name_candidate": "玉鸟集",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "market",
+      "primary_category": "美食街区",
+      "provider_candidate": {
+        "address": "良渚文化村良渚街道玉鸟街与荀甫路交叉口向西300米",
+        "admin_area": "余杭区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.3655,
+          "lng": 120.029146
+        },
+        "name": "BIRLAND玉鸟集",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0I0HRRTKG",
+        "source_id": "gaode-web-service",
+        "typecode": "060100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "liangzhu"
+    },
+    {
+      "candidate_id": "hz-cand-056",
+      "canonical_name_candidate": "良渚文化村",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "玉鸟路12号",
+        "admin_area": "余杭区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.361263,
+          "lng": 120.013803
+        },
+        "name": "良渚文化村",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0FFF8B93M",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "liangzhu"
+    },
+    {
+      "candidate_id": "hz-cand-057",
+      "canonical_name_candidate": "湘湖国家旅游度假区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "湘湖路132号",
+        "admin_area": "萧山区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.13226,
+          "lng": 120.217125
+        },
+        "name": "湘湖国家旅游度假区",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B07SNT",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xianghu"
+    },
+    {
+      "candidate_id": "hz-cand-058",
+      "canonical_name_candidate": "跨湖桥遗址博物馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "湘湖旅游度假区内湘湖路978号",
+        "admin_area": "萧山区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.14159,
+          "lng": 120.222341
+        },
+        "name": "跨湖桥遗址博物馆",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B17X6U",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xianghu"
+    },
+    {
+      "candidate_id": "hz-cand-059",
+      "canonical_name_candidate": "杭州乐园",
+      "coverage": {
+        "audiences": [
+          "亲子",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "亲子乐园",
+      "provider_candidate": {
+        "address": "风情大道2555号",
+        "admin_area": "萧山区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.16085,
+          "lng": 120.244865
+        },
+        "name": "杭州乐园",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B07SF4",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xianghu"
+    },
+    {
+      "candidate_id": "hz-cand-060",
+      "canonical_name_candidate": "杭州长乔极地海洋公园",
+      "coverage": {
+        "audiences": [
+          "亲子",
+          "雨天"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "亲子乐园",
+      "provider_candidate": {
+        "address": "城厢街道湘湖景区湘湖路777号",
+        "admin_area": "萧山区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.140851,
+          "lng": 120.225664
+        },
+        "name": "杭州长乔极地海洋公园",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B0ACZG",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xianghu"
+    },
+    {
+      "candidate_id": "hz-cand-061",
+      "canonical_name_candidate": "湘湖游船",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "experience",
+      "primary_category": "城市观景",
+      "provider_candidate": {
+        "address": "闻堰街道闻堰街道湘湖路132号",
+        "admin_area": "萧山区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.158605,
+          "lng": 120.235392
+        },
+        "name": "湘湖游船",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0G2XRN5OF",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "xianghu"
+    },
+    {
+      "candidate_id": "hz-cand-062",
+      "canonical_name_candidate": "杭州宋城",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "scenic_area",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "之江路148号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.169795,
+          "lng": 120.098741
+        },
+        "name": "杭州宋城",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B023B025FB",
+        "source_id": "gaode-web-service",
+        "typecode": "110202"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "zhijiang_songcheng"
+    },
+    {
+      "candidate_id": "hz-cand-063",
+      "canonical_name_candidate": "宋城千古情",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": true,
+        "suitable_periods": [
+          "daytime",
+          "evening"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "show",
+      "primary_category": "演出演艺",
+      "provider_candidate": {
+        "address": "转塘街道之江路148号宋城3号剧院",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.169685,
+          "lng": 120.097153
+        },
+        "name": "宋城-千古情(暂停开放)",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0I1310PMW",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "FIXED_TIME_OR_OPERATING_RULE_REQUIRED",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE",
+        "PROVIDER_NAME_SIGNALS_STATUS_RISK"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "zhijiang_songcheng"
+    },
+    {
+      "candidate_id": "hz-cand-064",
+      "canonical_name_candidate": "浙江省博物馆之江馆区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "之江文化中心",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.159662,
+          "lng": 120.101745
+        },
+        "name": "浙江省博物馆(之江馆区)",
+        "observed_at": "2026-08-29T19:59:09+08:00",
+        "poi_id": "B0I15SU50Z",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "zhijiang_songcheng"
+    },
+    {
+      "candidate_id": "hz-cand-065",
+      "canonical_name_candidate": "浙江省非遗馆",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "江涵路300号(之江文化中心地铁站出入口步行260米)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.159928,
+          "lng": 120.104021
+        },
+        "name": "浙江省非遗馆",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B0J6PH0V4H",
+        "source_id": "gaode-web-service",
+        "typecode": "140200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "zhijiang_songcheng"
+    },
+    {
+      "candidate_id": "hz-cand-066",
+      "canonical_name_candidate": "龙井村",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友",
+          "长辈"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "龙井西路与满觉陇路交叉口西南40米",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.219939,
+          "lng": 120.109967
+        },
+        "name": "龙井村牌坊",
+        "observed_at": "2026-08-29T20:01:28+08:00",
+        "poi_id": "B0MG95PP15",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        "PROVIDER_NAME_DIFFERS_FROM_CANDIDATE"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    },
+    {
+      "candidate_id": "hz-cand-067",
+      "canonical_name_candidate": "梅家坞茶文化村",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友",
+          "长辈"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "area",
+      "place_kind_candidate": "neighborhood",
+      "primary_category": "古镇人文",
+      "provider_candidate": {
+        "address": "梅灵南路205号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.203525,
+          "lng": 120.087925
+        },
+        "name": "梅家坞茶文化村",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B0FFHRUTTW",
+        "source_id": "gaode-web-service",
+        "typecode": "110000"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    },
+    {
+      "candidate_id": "hz-cand-068",
+      "canonical_name_candidate": "九溪烟树",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "龙井村杭州西湖风景名胜区内(近九溪路)",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.202395,
+          "lng": 120.11335
+        },
+        "name": "九溪烟树",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B0FFHMH4J8",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    },
+    {
+      "candidate_id": "hz-cand-069",
+      "canonical_name_candidate": "九溪十八涧",
+      "coverage": {
+        "audiences": [
+          "情侣/朋友",
+          "徒步"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "route",
+      "place_kind_candidate": "walking_route",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "杭州西湖风景名胜区九溪烟树南侧",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.202349,
+          "lng": 120.113356
+        },
+        "name": "九溪十八涧",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B0LR1ZRRQE",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED",
+        "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    },
+    {
+      "candidate_id": "hz-cand-070",
+      "canonical_name_candidate": "中国茶叶博物馆双峰馆区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "龙井路88号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.232381,
+          "lng": 120.120532
+        },
+        "name": "中国茶叶博物馆(双峰馆区)",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B023B13PFT",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    },
+    {
+      "candidate_id": "hz-cand-071",
+      "canonical_name_candidate": "中国茶叶博物馆龙井馆区",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": true,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "博物馆",
+      "provider_candidate": {
+        "address": "满觉陇路翁家山268号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.219662,
+          "lng": 120.113539
+        },
+        "name": "中国茶叶博物馆(龙井馆区)",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B023B09JN4",
+        "source_id": "gaode-web-service",
+        "typecode": "140100"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    },
+    {
+      "candidate_id": "hz-cand-072",
+      "canonical_name_candidate": "云栖竹径",
+      "coverage": {
+        "audiences": [
+          "首次来杭",
+          "情侣/朋友"
+        ],
+        "indoor_or_rain": false,
+        "night_or_fixed_time": false,
+        "suitable_periods": [
+          "daytime"
+        ]
+      },
+      "geometry_kind_candidate": "point",
+      "place_kind_candidate": "attraction",
+      "primary_category": "自然山水",
+      "provider_candidate": {
+        "address": "梅灵南路8号",
+        "admin_area": "西湖区",
+        "collection_mode": "api",
+        "location": {
+          "lat": 30.191297,
+          "lng": 120.091816
+        },
+        "name": "云栖竹径",
+        "observed_at": "2026-08-29T20:00:19+08:00",
+        "poi_id": "B023B02796",
+        "source_id": "gaode-web-service",
+        "typecode": "110200"
+      },
+      "review_flags": [
+        "NAME_REQUIRES_HUMAN_VERIFICATION",
+        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+        "GEOMETRY_UNVERIFIED",
+        "ACCESS_POINT_UNVERIFIED",
+        "TIME_RULES_NOT_COLLECTED",
+        "DURATION_NOT_COLLECTED"
+      ],
+      "review_state": "candidate",
+      "travel_region_id": "longjing_meijiawu_jiuxi"
+    }
+  ],
+  "catalog_id": "hangzhou-m1-candidate-catalog-v1",
+  "city_id": "hangzhou",
+  "collection_policy": {
+    "city_adcode": "330100",
+    "collection_mode": "api",
+    "provider_endpoint": "gaode-place-text-v3",
+    "raw_retention": "selected_candidate_fields_only",
+    "source_id": "gaode-web-service",
+    "target_stage": "staging"
+  },
+  "field_dictionary": {
+    "dictionary_id": "m1-place-collection-fields-v1",
+    "dictionary_sha256": "773a7db58357b0cda5a7f9fa1fbd6a1e3d7351288e7601bbd0196d084ee7ed3a"
+  },
+  "generated_at": "2026-08-29T20:01:28+08:00",
+  "limitations": [
+    "本目录只用于R0.2-04候选发现，不是正式地点事实或用户可选目录。",
+    "canonical_name、类型、几何和分类均为待人工审核候选。",
+    "高德location仅用于重复和覆盖初筛，不是到达或离开访问点。",
+    "开放时间、最晚入园、例外日期、建议时长和真实入口尚未采集。",
+    "relation_clues均未裁决，进入求解器前必须在OM1工作台形成决定。"
+  ],
+  "relation_clues": [
+    {
+      "clue_id": "hz-rel-001",
+      "left_candidate_id": "hz-cand-001",
+      "reason_code": "WEST_LAKE_LAKESIDE_BOUNDARY_OVERLAP",
+      "relation_candidate": "overlaps",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-002"
+    },
+    {
+      "clue_id": "hz-rel-002",
+      "left_candidate_id": "hz-cand-001",
+      "reason_code": "WEST_LAKE_CONTAINS_CAUSEWAY_EXPERIENCE",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-006"
+    },
+    {
+      "clue_id": "hz-rel-003",
+      "left_candidate_id": "hz-cand-013",
+      "reason_code": "LINGYIN_FEILAI_EXPERIENCE_OVERLAP",
+      "relation_candidate": "overlaps",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-014"
+    },
+    {
+      "clue_id": "hz-rel-004",
+      "left_candidate_id": "hz-cand-020",
+      "reason_code": "XIXI_HONGYUAN_PARENT_CHILD",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-021"
+    },
+    {
+      "clue_id": "hz-rel-005",
+      "left_candidate_id": "hz-cand-024",
+      "reason_code": "QINGHEFANG_SOUTHERN_SONG_STREET_OVERLAP",
+      "relation_candidate": "overlaps",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-025"
+    },
+    {
+      "clue_id": "hz-rel-006",
+      "left_candidate_id": "hz-cand-034",
+      "reason_code": "GRAND_CANAL_QIAOXI_PARENT_CHILD",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-040"
+    },
+    {
+      "clue_id": "hz-rel-007",
+      "left_candidate_id": "hz-cand-047",
+      "reason_code": "CITY_BALCONY_LIGHT_SHOW_SHARED_VISIT",
+      "relation_candidate": "same_experience",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-048"
+    },
+    {
+      "clue_id": "hz-rel-008",
+      "left_candidate_id": "hz-cand-055",
+      "reason_code": "YUNNIAO_LIANGZHU_VILLAGE_OVERLAP",
+      "relation_candidate": "overlaps",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-056"
+    },
+    {
+      "clue_id": "hz-rel-009",
+      "left_candidate_id": "hz-cand-057",
+      "reason_code": "XIANGHU_DAY_AND_NIGHT_SHARED_AREA",
+      "relation_candidate": "same_experience",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-061"
+    },
+    {
+      "clue_id": "hz-rel-010",
+      "left_candidate_id": "hz-cand-062",
+      "reason_code": "SONGCHENG_SHOW_INSIDE_SCENIC_AREA",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-063"
+    },
+    {
+      "clue_id": "hz-rel-011",
+      "left_candidate_id": "hz-cand-068",
+      "reason_code": "JIUXI_SPOT_AND_ROUTE_OVERLAP",
+      "relation_candidate": "overlaps",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-069"
+    }
+  ],
+  "schema_version": "hangzhou-candidate-catalog-v1",
+  "source_registry": {
+    "registry_id": "hangzhou-m1-source-registry-v1",
+    "registry_sha256": "c0085129bbca7a38c963985a8c29ef7b857275d8ff833b53cca9b6207470d21a"
+  },
+  "status": "candidate"
+}

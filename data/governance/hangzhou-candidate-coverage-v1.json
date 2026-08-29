@@ -1,0 +1,277 @@
+{
+  "actuals": {
+    "candidate_count": 72,
+    "indoor_or_rain_count": 28,
+    "night_or_fixed_time_count": 18,
+    "non_point_candidate_count": 24,
+    "primary_category_count": 9,
+    "relation_clue_count": 11,
+    "travel_region_count": 11
+  },
+  "catalog_id": "hangzhou-m1-candidate-catalog-v1",
+  "catalog_sha256": "48a16f6756706b3e0f1fee7dbf9bfaf9cbfeb5715c08dafbc11391982cadb368",
+  "coverage_id": "hangzhou-m1-candidate-coverage-v1",
+  "dimensions": {
+    "geometry_kinds": [
+      {
+        "candidate_count": 22,
+        "geometry_kind": "area"
+      },
+      {
+        "candidate_count": 48,
+        "geometry_kind": "point"
+      },
+      {
+        "candidate_count": 2,
+        "geometry_kind": "route"
+      }
+    ],
+    "indoor_or_rain_candidate_ids": [
+      "hz-cand-007",
+      "hz-cand-013",
+      "hz-cand-015",
+      "hz-cand-016",
+      "hz-cand-017",
+      "hz-cand-018",
+      "hz-cand-019",
+      "hz-cand-026",
+      "hz-cand-027",
+      "hz-cand-029",
+      "hz-cand-030",
+      "hz-cand-036",
+      "hz-cand-037",
+      "hz-cand-038",
+      "hz-cand-039",
+      "hz-cand-043",
+      "hz-cand-044",
+      "hz-cand-049",
+      "hz-cand-050",
+      "hz-cand-052",
+      "hz-cand-054",
+      "hz-cand-058",
+      "hz-cand-060",
+      "hz-cand-063",
+      "hz-cand-064",
+      "hz-cand-065",
+      "hz-cand-070",
+      "hz-cand-071"
+    ],
+    "night_or_fixed_time_candidate_ids": [
+      "hz-cand-002",
+      "hz-cand-008",
+      "hz-cand-023",
+      "hz-cand-024",
+      "hz-cand-025",
+      "hz-cand-031",
+      "hz-cand-033",
+      "hz-cand-040",
+      "hz-cand-041",
+      "hz-cand-042",
+      "hz-cand-045",
+      "hz-cand-046",
+      "hz-cand-047",
+      "hz-cand-048",
+      "hz-cand-051",
+      "hz-cand-055",
+      "hz-cand-062",
+      "hz-cand-063"
+    ],
+    "non_point_candidate_ids": [
+      "hz-cand-001",
+      "hz-cand-002",
+      "hz-cand-006",
+      "hz-cand-011",
+      "hz-cand-014",
+      "hz-cand-020",
+      "hz-cand-021",
+      "hz-cand-023",
+      "hz-cand-024",
+      "hz-cand-025",
+      "hz-cand-031",
+      "hz-cand-034",
+      "hz-cand-040",
+      "hz-cand-041",
+      "hz-cand-045",
+      "hz-cand-047",
+      "hz-cand-053",
+      "hz-cand-055",
+      "hz-cand-056",
+      "hz-cand-057",
+      "hz-cand-062",
+      "hz-cand-066",
+      "hz-cand-067",
+      "hz-cand-069"
+    ],
+    "place_kinds": [
+      {
+        "candidate_count": 43,
+        "place_kind": "attraction"
+      },
+      {
+        "candidate_count": 2,
+        "place_kind": "experience"
+      },
+      {
+        "candidate_count": 2,
+        "place_kind": "market"
+      },
+      {
+        "candidate_count": 10,
+        "place_kind": "neighborhood"
+      },
+      {
+        "candidate_count": 10,
+        "place_kind": "scenic_area"
+      },
+      {
+        "candidate_count": 3,
+        "place_kind": "show"
+      },
+      {
+        "candidate_count": 2,
+        "place_kind": "walking_route"
+      }
+    ],
+    "primary_categories": [
+      {
+        "candidate_count": 4,
+        "primary_category": "亲子乐园"
+      },
+      {
+        "candidate_count": 15,
+        "primary_category": "博物馆"
+      },
+      {
+        "candidate_count": 15,
+        "primary_category": "古镇人文"
+      },
+      {
+        "candidate_count": 9,
+        "primary_category": "城市观景"
+      },
+      {
+        "candidate_count": 7,
+        "primary_category": "寺庙祈福"
+      },
+      {
+        "candidate_count": 4,
+        "primary_category": "演出演艺"
+      },
+      {
+        "candidate_count": 3,
+        "primary_category": "网红打卡"
+      },
+      {
+        "candidate_count": 2,
+        "primary_category": "美食街区"
+      },
+      {
+        "candidate_count": 13,
+        "primary_category": "自然山水"
+      }
+    ],
+    "travel_regions": [
+      {
+        "candidate_count": 9,
+        "travel_region_id": "grand_canal_gongchen_bridge"
+      },
+      {
+        "candidate_count": 5,
+        "travel_region_id": "liangzhu"
+      },
+      {
+        "candidate_count": 7,
+        "travel_region_id": "lingyin_tianzhu"
+      },
+      {
+        "candidate_count": 7,
+        "travel_region_id": "longjing_meijiawu_jiuxi"
+      },
+      {
+        "candidate_count": 5,
+        "travel_region_id": "qianjiang_new_city"
+      },
+      {
+        "candidate_count": 10,
+        "travel_region_id": "southern_song_wushan"
+      },
+      {
+        "candidate_count": 12,
+        "travel_region_id": "west_lake_lakeside_north_hill"
+      },
+      {
+        "candidate_count": 4,
+        "travel_region_id": "wulin_lakeside_commercial"
+      },
+      {
+        "candidate_count": 5,
+        "travel_region_id": "xianghu"
+      },
+      {
+        "candidate_count": 4,
+        "travel_region_id": "xixi_wetland"
+      },
+      {
+        "candidate_count": 4,
+        "travel_region_id": "zhijiang_songcheng"
+      }
+    ]
+  },
+  "exit_evaluation": {
+    "checks": [
+      {
+        "actual": 72,
+        "check_id": "candidate_count",
+        "passed": true,
+        "required_min": 50
+      },
+      {
+        "actual": 11,
+        "check_id": "travel_region_count",
+        "passed": true,
+        "required_min": 8
+      },
+      {
+        "actual": 9,
+        "check_id": "primary_category_count",
+        "passed": true,
+        "required_min": 8
+      },
+      {
+        "actual": 18,
+        "check_id": "night_or_fixed_time_count",
+        "passed": true,
+        "required_min": 8
+      },
+      {
+        "actual": 28,
+        "check_id": "indoor_or_rain_count",
+        "passed": true,
+        "required_min": 5
+      },
+      {
+        "actual": 11,
+        "check_id": "relation_clue_count",
+        "passed": true,
+        "required_min": 1
+      }
+    ],
+    "status": "passed"
+  },
+  "generated_at": "2026-08-29T20:01:28+08:00",
+  "limitations": [
+    "覆盖通过只表示候选发现达到R0.2-04工程门槛，不表示地点事实已人工审核。",
+    "高德POI坐标是候选定位，不是human_verified到达或离开访问点。",
+    "未裁决关系线索必须在R0.2-05审核工作台中形成明确裁决。"
+  ],
+  "schema_version": "hangzhou-candidate-coverage-v1",
+  "status": "candidate",
+  "thresholds": {
+    "candidate_count_min": 50,
+    "indoor_or_rain_count_min": 5,
+    "night_or_fixed_time_count_min": 8,
+    "primary_category_count_min": 8,
+    "relation_clue_count_min": 1,
+    "travel_region_count_min": 8
+  }
+}
