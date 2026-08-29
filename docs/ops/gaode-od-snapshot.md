@@ -1,6 +1,6 @@
 # 高德真实 OD 快照构建与安全联调
 
-- 状态：A6-8.1 已完成真实坐标候选、请求节流、42/42 严格 OD 重建和 JSON 发布 Provider 技术验证；正式发布等待点位人工确认
+- 状态：A6-8.1 已完成 7 个路线点的浏览器复核与 `human_verified` 坐标版本、42/42 严格高德有向 OD、真实和风天气、正式不可变 bundle、生产组合根与 Chrome 回放；该 7 点快照仅是 A6/Gate 6 技术基线，扩大目录的按需 OD 子图属于 G7-R0.2-06
 - 日期：2026-08-26
 - 依据：ADR-0010、ADR-0011、ADR-0012、ADR-0013
 
@@ -200,7 +200,7 @@ coordinate_review_status
 
 `JsonPublishedSolverDataProvider` 加载 `published-solver-data-v1` 时校验 SHA-256、版本、景点 ID、外部 ID、天气日期、路线点来源、完整有向 OD、OD basis 和 OD data version。默认只加载 `status=published`，且正式坐标必须 `human_verified`；`allow_candidates=True` 仅供审计离线回放。
 
-## 8. 2026-08-26 候选坐标严格重建结果
+## 8. 候选重建与 2026-08-27 正式发布结果
 
 使用 7 个高德候选路线点、默认 1.05 秒请求间隔和严格模式完成真实重建，耗时约 132.8 秒：
 
@@ -214,7 +214,9 @@ mode_failures        = 4
 
 最终模式为 driving 23、transit 15、walking 4；耗时范围 5–61 分钟，道路距离 324–11,587 米。4 次模式失败均为公交 `no_route / infocode=10000`，分别是灵隐寺↔飞来峰、西湖湖滨↔音乐喷泉；对应 OD 的其他模式成功，因此没有最终缺边。36 条有向边在耗时、距离或模式上与反向不同。
 
-该快照及组合 bundle 位于 Git 忽略的 `var/audit/`，当前仅为 candidate。正式发布前仍需人工确认浙江省博物馆具体入口、灵隐寺/飞来峰联游入口和西湖湖滨开放区域代表点。
+上述 2026-08-26 快照及组合 bundle 位于 Git 忽略的 `var/audit/`，保持 candidate 历史证据，不升级、不覆盖。2026-08-27 已完成 7 个路线点的 Chrome/高德复核并由发布责任人接受点位口径，生成新的 `human_verified` 坐标版本；随后重建 42/42 严格有向 OD（0 fallback、0 missing），合并真实和风三日天气并发布 `hangzhou-published-2026-08-27-v1`。正式生产组合根、FastAPI 持久化和 Chrome P00→P04 回放均已通过，证据见 [发布回放报告](../test/reports/a6-8-1-qweather-published-production-replay-2026-08-27.md)。
+
+该正式版本只有 7 个路线点，只证明发布链路、真实 Provider 和求解消费可用；它不是 G7-R1 的充分研究目录，也不应扩成全城 N² 完整矩阵。G7-R0.2-06 应在 50–75 个研究 Place 上按候选选择集构建版本化有向 OD 子图，使用 `origin.departure_access_point → destination.arrival_access_point`，缺边不得填 0，近似降级必须显式标注。
 
 ## 9. 生产组合根配置与启动
 

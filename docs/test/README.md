@@ -8,7 +8,7 @@ Gate 7 人类证据在收集前必须按 [`gate7-research-environment.md`](gate7
 
 | 层 | 内容 | 对应目标 |
 |---|---|---|
-| 单元测试 | 每个硬约束一条：开放时间、闭馆日、体力预算、时间窗、到达/离开锚点 | 「硬约束 100% 通过」变成机器可证 |
+| 单元测试 | C1 闭馆日、C2 入园/开放时间窗、C4 到达/离开锚点、C5 极端天气、C6 真实路网衔接；另测 S1 时长利用、S2 体力均衡与节奏提示 | 「硬约束 100% 通过」与软偏好回归分别机器可证 |
 | Golden Case 回归 | 人工构建 3–5 条「专家行程」基准，求解器输出与基准对比 | 防止算法改动「改好局部、改坏全局」 |
 | 数据校验测试 | `data_verified` 覆盖率、开放时间格式/范围一致性 | 数据质量门禁 |
 | LLM eval | 结构化抽取人工抽检比例 + 解释生成样例评测 | LLM 输出质量 |
@@ -111,7 +111,7 @@ docs/test/reports/gate6-data-validation-latest.json
 ```
 
 当前杭州快照结果：`7/7` 条记录结构合法且可进入求解器，规则 1–9 各自通过 `7/7`。
-该结果只证明固定测试快照通过，不代表生产数据库已完成 80–120 个杭州景点的人工校准。
+该结果只证明 7 点 A6/Gate 6 固定技术快照通过，不代表 Gate 7 数据准备完成。G7-R1 的研究最低目录为约 50–75 个 `human_verified` Place；M1 受控上线目录原则上为 80–120 个，二者都要求进入求解投影的发布字段和时间规则 100% 审核。
 
 ## 性能与规模基准
 
@@ -184,6 +184,8 @@ Gate 7 不复用 Gate 6 的自动化通过口径。当前验证方案、表单�
 - [`gate7-expert-review-form.md`](gate7-expert-review-form.md)：领域专家独立评分与 blocker 登记；
 - [`gate7-user-test-script.md`](gate7-user-test-script.md)：形成性/确认性主持脚本和标准 assistance；
 - [`gate7-protocol-v1.json`](gate7-protocol-v1.json)：预注册 H3/H11 阈值、角色、严重度、归因和隐私字段；
+- [`gate7-data-deployment-readiness-plan.md`](gate7-data-deployment-readiness-plan.md)：R0.2 杭州研究数据、R0.3 服务器 H5 和 R0.4 内部 dry run 门禁；
+- [`../ops/gate7-controlled-h5-docker-deployment.md`](../ops/gate7-controlled-h5-docker-deployment.md)：受控 H5 的 edge/API/迁移/MySQL/Redis 全容器拓扑、Compose 生命周期和发布/恢复门禁；
 - [`gate7-research-environment.md`](gate7-research-environment.md)：Git、数据、求解版本、数据库迁移和前端构建的收集前锁定；
 - [`gate7-evidence-example.synthetic.json`](gate7-evidence-example.synthetic.json)：只用于演示数据格式，永远不能作为真实证据。
 

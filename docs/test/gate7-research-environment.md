@@ -1,10 +1,10 @@
 # Gate 7 研究环境锁定规范
 
-- 文档版本：V1.0
-- 日期：2026-08-28
+- 文档版本：V1.1
+- 日期：2026-08-29
 - 产品里程碑：M1 — 行程骨架验证
 - Gate：G7-R0.1
-- 当前结论：锁定机制已实现；实际形成性研究环境尚未锁定
+- 当前结论：锁定机制已实现；R0.2 杭州研究数据、R0.3 服务器 H5 和 R0.4 dry run 未完成，实际形成性研究环境尚未锁定
 
 ## 1. 为什么必须锁定
 
@@ -62,11 +62,11 @@ Set-Location ..
 ```
 
 3. 在实际研究数据库执行并核对当前代码要求的 Alembic revision。当前要求为 `0005_feedbacks`；
-4. 使用不可变 published 数据快照。当前杭州候选为 `hangzhou-published-2026-08-27-v1`；
+4. 使用通过 R0.2 覆盖、来源、人工审核和 OD 扩容门禁的不可变 published research snapshot；现有 `hangzhou-published-2026-08-27-v1` 只有 7 个路线点，只用于技术回归，不作为 G7-R1 充分数据集；
 5. 在 `.local/gate7/<study_environment_id>/` 或外部受控研究空间准备原始证据目录。`.local/` 已被 Git 忽略；
 6. 不读取或复制 `.env` 内容到 manifest。数据库 revision 只传版本标识，不传数据库 URL。
 
-服务器验证报告仍记录为 `0002_anonymous_identity`，而当前应用要求 `0005_feedbacks`。因此在经授权执行 0003→0004→0005、验证应用和备份恢复之前，现有服务器不能标记为正式 Gate 7 环境。本规范和工具不会自行连接服务器或执行迁移。
+数据和部署详细前置见 [`gate7-data-deployment-readiness-plan.md`](gate7-data-deployment-readiness-plan.md)。服务器验证报告仍记录为 `0002_anonymous_identity`，而当前应用要求至少 `0005_feedbacks`，未来地点目录还会产生经 ADR 确认的新迁移。因此必须先完成 R0.2 数据模型，再在 R0.3 一次性按迁移链部署和验证；本规范和工具不会自行连接服务器或执行迁移。
 
 ### 4.2 生成 manifest
 
@@ -74,7 +74,7 @@ Set-Location ..
 py -3.12 scripts/lock_gate7_environment.py `
   --study-environment-id m1-hangzhou-formative-01 `
   --study-phase formative `
-  --data-snapshot var/published/hangzhou-published-2026-08-27-v1.json `
+  --data-snapshot var/published/hangzhou-g7-formative-v1.json `
   --database-revision 0005_feedbacks `
   --frontend-build frontend/dist `
   --frontend-build-kind h5-production `
@@ -99,7 +99,7 @@ py -3.12 scripts/lock_gate7_environment.py `
   "solver_version": "solver-p1-v2",
   "constraint_version": "constraints-p1-v5",
   "parameter_version": "parameters-p1-2026-08-26",
-  "data_snapshot_version": "hangzhou-published-2026-08-27-v1"
+  "data_snapshot_version": "hangzhou-g7-formative-v1"
 }
 ```
 
@@ -145,4 +145,4 @@ database_revision_mismatch
 frontend_artifact_missing
 ```
 
-这是预期结果：本轮实现尚未提交；服务器报告仍是 0002；前端 `dist` 当前为空。待本轮提交、正式构建及经授权完成服务器 0005 迁移后，才可生成首个 `locked` 形成性研究环境。
+这是预期结果：锁定工具已由提交 `8bbca5b` 固化，但服务器报告仍是 0002，且前端正式 artifact 和充分研究数据均未形成。2026-08-29 进一步确认当前 7 点数据不足，因此先执行 R0.2 地点数据和 OD 扩容，再执行 R0.3 正式构建/服务器迁移和 R0.4 dry run；三段全部通过后才生成首个 `locked` 形成性研究环境。

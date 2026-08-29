@@ -1,6 +1,8 @@
-# Travel Agent Redis/MySQL Docker Compose 部署包
+# Travel Agent Docker Compose 部署包
 
-本目录只保存无凭证的 Compose、服务配置和服务器脚本。真实凭证由服务器上的 `provision-secrets.sh` 生成，写入 `/etc/travel-agent/infra.env`，不会回显或提交到 Git。
+本目录当前实现 Redis/MySQL 基础设施 Compose，G7-R0.3 将按 [`../../docs/ops/gate7-controlled-h5-docker-deployment.md`](../../docs/ops/gate7-controlled-h5-docker-deployment.md) 扩展为 edge/H5、FastAPI、迁移任务、MySQL、Redis 统一 Docker 镜像部署和 Docker Compose 管理。真实凭证由服务器脚本生成并保存在 `/etc/travel-agent/`，不会回显或提交到 Git。
+
+统一部署原则：服务器宿主机不直接运行 FastAPI、Node、Nginx/Caddy、MySQL 或 Redis；除 Docker Engine、Docker Compose、必要安全参数和备份调度外，所有常驻应用组件均由一个逻辑 Compose 项目管理。当前 `name: travel-agent-infra` 是已验收的过渡基线，应用层实施时再评审迁移为 `name: travel-agent`，本轮不修改正在运行的服务器栈。
 
 ## Git 提交边界
 

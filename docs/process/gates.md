@@ -30,6 +30,8 @@
 - 结论能回溯原始记录；
 - 明确样本、局限与对 H-x 的影响。
 
+当前项目审计（2026-08-29）：仓库尚无满足以上要求的真实访谈记录和 H4 回写，Gate 1 存在显式补证债务。后续技术 Gate 的证据仍然有效，但不得据此宣称用户问题已被证明；补证路线见 `docs/process/project-roadmap.md`。
+
 ### Gate 2：需求可验收
 
 - Given/When/Then 可执行；
@@ -77,7 +79,10 @@
 Gate 7 按以下顺序执行，不能把准备完成写成验证通过：
 
 ```text
-G7-R0 protocol/隐私/样本/环境准备
+G7-R0.1 protocol/证据/环境锁机制
+→ G7-R0.2 杭州研究数据与地点类型
+→ G7-R0.3 受控服务器 H5 环境
+→ G7-R0.4 内部 dry run
 → G7-R1 领域专家 + 8–12 人形成性测试
 → 关闭 blocker/major 并完成技术回归
 → G7-R2 n>=21 确认性用户测试
@@ -89,13 +94,18 @@ G7-R0 protocol/隐私/样本/环境准备
 
 - protocol 必须在首个有效样本前锁定并保存 canonical JSON SHA-256，避免换行格式改变证据身份；
 - 真实 evidence 必须引用收集前生成的 `locked` 研究环境 manifest，精确绑定 Git commit、数据快照、求解版本、数据库 revision 和前端 artifact hash；
+- 当前 7 个杭州路线点只证明技术纵向切片；G7-R1 前必须通过研究数据覆盖、来源、人工审核、地点类型和 OD 扩容门禁；
+- 研究地点和网红区域的候选来源由 AI 协作开发方自主检索、获取和登记；只有来源需要付费、账号登录、签署授权或扩大到受限制数据时，才请求用户追加授权，未经条款/版权/隐私评审的数据不得进入 published 快照；
+- G7-R1 推荐使用受控服务器移动端 H5 + HTTPS；微信小程序正式上线不是形成性测试前置条件，体验版/正式版不能替代真实参与者证据；
+- 受控服务器上的 edge/H5、FastAPI、迁移任务、MySQL 和 Redis 必须全部使用 Docker 镜像并由一个逻辑 Docker Compose 项目管理；公网只暴露 80/443，应用和数据端口不得直接暴露；
+- 内部 dry run 只验证环境、数据和研究流程，团队成员结果不得进入目标用户分母；
 - 团队成员、开发者、AI 和 synthetic fixture 不进入目标用户分母；
 - H3 沿用登记册：`n>=21`，认可率 `>=70%` 支持、`<50%` 推翻、其余需调整；
 - 未关闭 blocker 时，平均分和认可率不得补偿；
 - H2 必须使用真实出行后证据，H11 必须使用独立接收者和真实转化事件；
 - 没有公开试运行环境、事件能力或可观察 UI 时，相应假设标记 `not_evaluable`；
 - 仓库只保存去标识聚合证据；联系方式、录音、精确票号和私人行程不得进入 Git；
-- 机器校验入口、样本和判定规则见 `docs/test/gate7-validation-plan.md`、`docs/test/gate7-research-environment.md` 与 `docs/test/gate7-protocol-v1.json`。
+- 机器校验入口、样本和判定规则见 `docs/test/gate7-validation-plan.md`、`docs/test/gate7-data-deployment-readiness-plan.md`、`docs/test/gate7-research-environment.md` 与 `docs/test/gate7-protocol-v1.json`。
 
 ## 决策变更传播检查
 

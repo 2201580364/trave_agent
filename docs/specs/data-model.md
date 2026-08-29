@@ -1,11 +1,11 @@
 # M1 持久化数据模型
 
-- 文档版本：V2.4
-- 日期：2026-08-28
+- 文档版本：V2.6
+- 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0005 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈及双重唯一约束。A6-8.2 真实 MySQL 8.0.46 的 0002 基线、InnoDB 并发、最小权限、断连恢复、备份与隔离恢复已通过；0003–0005 待下一次应用发布前按顺序在服务器执行，正式发布数据表仍待后续实现
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0005 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈及双重唯一约束。A6-8.2 真实 MySQL 8.0.46 的 0002 基线已通过；0003–0005 待服务器执行。ADR-0018 已确定通用地点目录、访问点、关系和版本化求解投影的逻辑边界，但尚未形成物理表或迁移，当前 SQL 不能冒充已实现的数据运营库
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.5、应用代码架构 V1.2、ADR-0002、ADR-0005、ADR-0009
+- 上游：API 契约 V2.5、应用代码架构 V1.2、ADR-0002、ADR-0005、ADR-0009、ADR-0018
 
 ## 1. 建模目标与原则
 
@@ -165,6 +165,42 @@ CREATE TABLE attractions (
 ```
 
 `data_verified=true AND conflict=false AND status=active` 是发布必要条件，但还需通过时间规则、天气和 OD 一致性门禁。
+
+#### G7-R0.2 已接受逻辑边界：通用地点目录（物理模型尚未实现）
+
+当前 `attractions` 适用于点状景点和 7 点技术基线，不足以可靠表达街区、多入口景区、步行路线、市集和固定表演。ADR-0018 已接受以下逻辑边界；具体 SQLAlchemy 表、约束、索引和 Alembic revision 在 R0.2-03 确定：
+
+```text
+places
+├── place_access_points
+├── place_geometries / route definition
+├── place_source_records
+├── place_revisions
+├── place_time_rules / closures / exceptions
+├── place_relations / selection exclusion groups
+└── solver_place_projections
+```
+
+建议字段至少覆盖：
+
+- `place_kind`：attraction/scenic_area/neighborhood/walking_route/market/show/experience；
+- `geometry_kind`：point/area/route；
+- 默认到达点、可选离开点和 access point 审核状态；
+- 建议时长下限/推荐值/上限及来源；
+- 内部步行预算、适合时段、室内外和人群标签；
+- source registry、采集时间、许可/条款检查和 review status；
+- candidate/human_verified/published 生命周期；
+- 投影到当前 solver `Attraction` 的版本和规则。
+
+投影的有向路网端点固定为 `origin.departure_access_point → destination.arrival_access_point`。M1 中一个用户可选 Place 最多投影为一个 solver 节点；路线内部步行计入游览时长，不重复计入节点间 OD。现有 API `attraction_id` 在 M1 暂时承载稳定 `place_id` 作为兼容别名，不能用其字段名反推事实类型。
+
+在物理模型和迁移完成前：
+
+- 不修改 0001–0005 的历史迁移；
+- 不为未来表预占虚假的 Alembic revision 编号；
+- 不把区域中心点当作 human_verified 游客入口；
+- 不把 raw/candidate 爬取记录直接写入 published snapshot；
+- 现有 `attractions` 和 JSON published snapshot 继续只承担历史回放和小规模技术基线。
 
 ### 5.3 `attraction_time_rules`
 
@@ -329,6 +365,21 @@ CREATE TABLE od_snapshot_entries (
 ```
 
 历史生成依赖发布快照而不是 attractions 当前工作行。A→B 与 B→A 独立，缺失边不能用 0 补齐。
+
+#### G7-R0.2 计划演进：按需 OD 子图（尚未实现）
+
+`od_snapshot_entries` 当前完整矩阵模型适用于 7 点 42/42 技术快照。扩大到 40–75 个研究地点后，不能默认要求全城、多模式 N² 预计算。计划新增或扩展以下概念：
+
+```text
+od_route_cache
+od_subgraph_snapshots
+od_subgraph_entries
+solver_run_od_binding
+```
+
+每次求解只为实际选择、到离锚点和必要替换候选加载/获取有向 OD，并将实际使用的子图、来源、版本和 hash 绑定到 SolverRun/TripRevision。缓存不是历史事实来源；历史回放必须读取不可变子图快照。近似降级继续显式保存 basis/reason，缺失边不得写成 0。
+
+该模型演进完成前，大规模地点目录不能直接接入当前要求完整有向矩阵的 `JsonPublishedSolverDataProvider`。
 
 ### 6.3 `visit_period_preferences`
 

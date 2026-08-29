@@ -2,10 +2,10 @@
 
 **版本**：V1.1  
 **文档类型**：技术选型（已确认）  
-**关联文档**：旅行助手产品文档.md（V2.2）  
+**关联文档**：旅行助手产品文档.md（当前 V2.4）
 **状态**：历史技术选型基线；具体应用架构、API、数据模型和首切片范围以 A4/A5 当前文档为准
 
-> 同步说明（2026-08-24）：技术栈方向仍有效，但本文早期的单 `trips.itinerary JSON`、`POST /api/trips/generate`、`regenerate`、单一 `transport_type` 和默认 Celery/WebSocket 流程已被 [应用代码架构设计.md](应用代码架构设计.md)、[../specs/api-contract.md](../specs/api-contract.md) V2.0、[../specs/data-model.md](../specs/data-model.md) V2.0 替代。约束语义以 ADR-0004/0009 为准。
+> 同步说明（2026-08-29）：技术栈方向仍有效，但本文早期的单 `trips.itinerary JSON`、`POST /api/trips/generate`、`regenerate`、单一 `transport_type` 和默认 Celery/WebSocket 流程已被 [应用代码架构设计.md](应用代码架构设计.md)、[../specs/api-contract.md](../specs/api-contract.md)、[../specs/data-model.md](../specs/data-model.md) 替代。正文中 K-Means 固定分天、3/5/8 星日硬预算、普通天气硬约束、80–120 条“爬虫入库”和旧 Phase/P1/P2 阶段描述均只保留为历史选型背景，不是当前实现要求；现行约束以 ADR-0004，地点与 OD 以 ADR-0018，阶段与路线以 [项目完整路线图](../process/project-roadmap.md) 为准。
 
 ---
 
