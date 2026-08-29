@@ -32,7 +32,7 @@ export function AdminLayout() {
         ? [{ key: '/review', icon: <CheckSquareOutlined />, label: '地点审核' }]
         : []),
       ...(hasPermission('place:candidate:read')
-        ? [{ key: '/candidates', icon: <DatabaseOutlined />, label: '鍊欓€夊湴鐐' }]
+        ? [{ key: '/candidates', icon: <DatabaseOutlined />, label: '候选地点' }]
         : []),
     ],
     [hasPermission],
