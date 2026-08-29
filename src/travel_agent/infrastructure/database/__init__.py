@@ -4,6 +4,7 @@ from .admin_identity import SqlAlchemyAdminUnitOfWork
 from .feedback import SqlAlchemyFeedbackRepository
 from .identity import AnonymousIdentityService
 from .place_catalog import SqlAlchemyPlaceCatalogRepository
+from .place_review import SqlAlchemyPlaceReviewRepository
 from .planning import Base, SqlAlchemyUnitOfWork, create_schema
 from .runtime import (
     DatabaseReadiness,
@@ -21,6 +22,7 @@ __all__ = [
     "SqlAlchemyFeedbackRepository",
     "SqlAlchemyAdminUnitOfWork",
     "SqlAlchemyPlaceCatalogRepository",
+    "SqlAlchemyPlaceReviewRepository",
     "SqlAlchemyUnitOfWork",
     "SqlAlchemyPlanShareRepository",
     "create_schema",

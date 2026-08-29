@@ -8,6 +8,9 @@ import type {
   CreateAdminActorInput,
   PageResponse,
   ReplaceAdminRolesInput,
+  ReviewDecision,
+  ReviewTask,
+  ReviewTaskStatus,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -72,6 +75,34 @@ export class AdminApi {
       if (value !== undefined && value !== '') query.set(key, String(value))
     })
     return this.request(`/audit-events?${query}`)
+  }
+
+  listReviewTasks(status?: ReviewTaskStatus, limit = 50, offset = 0): Promise<PageResponse<ReviewTask>> {
+    const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    if (status !== undefined) query.set('review_status', status)
+    return this.request(`/review-tasks?${query}`)
+  }
+
+  decidePlaceReview(
+    taskId: string,
+    input: {
+      expected_version: number
+      decision_kind: ReviewDecision['decision_kind']
+      reason_code: string
+      reason_text?: string
+    },
+  ): Promise<ReviewTask> {
+    return this.request(`/review-tasks/${encodeURIComponent(taskId)}/decisions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ...input,
+        operation_intent_id: createOperationIntent('review-decide'),
+      }),
+    })
+  }
+
+  listReviewDecisions(taskId: string): Promise<{ items: ReviewDecision[] }> {
+    return this.request(`/review-tasks/${encodeURIComponent(taskId)}/decisions`)
   }
 
   private async request<T>(

@@ -1122,9 +1122,10 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/places/{place_id}` | editor/reviewer/publisher/viewer | 查询 Place、当前 Revision 和依赖摘要 |
 | `POST /api/v1/admin/places/{place_id}/revisions` | data_editor | 基于指定 Revision 创建 candidate Revision |
 | `PATCH /api/v1/admin/place-revisions/{revision_id}` | data_editor | 以 expected version 编辑 candidate |
-| `POST /api/v1/admin/place-revisions/{revision_id}/review-requests` | data_editor | 创建/重提审核任务 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/review-tasks` | data_editor | 创建/重提审核任务；需 operation intent 和 reason code |
 | `GET /api/v1/admin/review-tasks` | data_reviewer | 查询待审核队列 |
-| `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve 或 request_changes；写 ReviewDecision |
+| `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve、request_changes 或 cancel；写 ReviewDecision 并使用 expected version |
+| `GET /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | 查询追加式决定历史 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/publications` | data_publisher | 通过 publication intent 调用发布用例 |
 | `POST /api/v1/admin/publication-batches` | data_publisher | 创建批次预览/执行，不隐藏逐项失败 |
@@ -1135,7 +1136,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更和 audit-events 只读查询；表中 candidate/place/review/publication/research snapshot 端点属于 R0.2-05-02、R0.2-07，尚不可调用。
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 review-tasks/decisions 审核闭环；candidate/place/revision 详情、publication/research snapshot 端点仍属于后续 O01–O07 与 R0.2-07，尚不可调用。
 
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
 
@@ -1166,7 +1167,10 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | 409 | `admin_actor_version_conflict` | 管理员角色 expected version 已过期 |
 | 409 | `admin_role_safety_violation` | 试图移除最后一个有效 admin_security 等安全门失败 |
 | 409 | `place_revision_version_conflict` | expected version 已过期 |
-| 409 | `review_task_state_conflict` | 审核任务状态不允许该决定 |
+| 409 | `review_task_conflict` | 审核任务状态或 expected version 不允许该决定 |
+| 409 | `review_revision_not_candidate` | 只有 candidate Revision 可以送审 |
+| 409 | `review_revision_not_approvable` | Revision 当前状态不允许通过 |
+| 409 | `admin_operation_intent_conflict` | operation intent 已被其他审核载荷使用 |
 | 409 | `published_revision_immutable` | 试图原地修改 published Revision |
 | 422 | `review_requirements_not_met` | 送审/通过所需依赖不完整 |
 | 422 | `publication_gate_rejected` | 发布依赖闭包失败；详情含稳定 reason codes |

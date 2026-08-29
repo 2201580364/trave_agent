@@ -62,4 +62,44 @@ describe('AdminApi', () => {
     })
     expect(onUnauthorized).toHaveBeenCalledOnce()
   })
+
+  it('uses operation intents for review decisions and keeps review history read-only', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            review_task_id: 'task-1',
+            place_revision_id: 'revision-1',
+            status: 'approved',
+            assigned_reviewer_id: null,
+            version: 2,
+            created_by: 'admin-1',
+            created_at: '2026-08-30T00:00:00Z',
+            updated_at: '2026-08-30T00:01:00Z',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    const api = new AdminApi(() => 'memory-only-token', vi.fn())
+
+    await api.decidePlaceReview('task-1', {
+      expected_version: 1,
+      decision_kind: 'approve',
+      reason_code: 'OM1_FACTS_VERIFIED',
+    })
+    await api.listReviewDecisions('task-1')
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/review-tasks/task-1/decisions')
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as Record<string, unknown>
+    expect(body.operation_intent_id).toEqual(expect.any(String))
+    expect(fetchMock.mock.calls[1][0]).toContain('/review-tasks/task-1/decisions')
+    expect(fetchMock.mock.calls[1][1]?.method).toBeUndefined()
+  })
 })

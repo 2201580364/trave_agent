@@ -22,6 +22,9 @@ const LoginPage = lazy(() =>
 const NotFoundPage = lazy(() =>
   import('../pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })),
 )
+const ReviewQueuePage = lazy(() =>
+  import('../pages/ReviewQueuePage').then((module) => ({ default: module.ReviewQueuePage })),
+)
 
 export function App() {
   return (
@@ -52,6 +55,14 @@ export function App() {
                   element={
                     <RoleGate permission="admin:audit:read">
                       <AuditEventsPage />
+                    </RoleGate>
+                  }
+                />
+                <Route
+                  path="review"
+                  element={
+                    <RoleGate permission="place:review:read">
+                      <ReviewQueuePage />
                     </RoleGate>
                   }
                 />

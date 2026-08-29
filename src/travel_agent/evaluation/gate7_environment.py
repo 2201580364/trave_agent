@@ -15,7 +15,7 @@ from .gate7 import Gate7EvidenceError
 
 MANIFEST_SCHEMA_VERSION = "gate7-research-environment-v1"
 LOCKED_PROTOCOL_SHA256 = "b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89"
-CURRENT_DATABASE_REVISION = "0007_admin_identity_audit"
+CURRENT_DATABASE_REVISION = "0008_place_review_workflow"
 
 _FORMAL_PHASES = frozenset({"formative", "confirmatory", "field_pilot"})
 _STUDY_PHASES = frozenset({"dry_run", *_FORMAL_PHASES})

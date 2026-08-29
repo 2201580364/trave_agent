@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from travel_agent.application.admin import AdminIdentityService
+from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
 from travel_agent.application.planning import ExecuteGenerationHandler
 from travel_agent.application.planning.ports import DataSnapshotVersionProvider
 from travel_agent.infrastructure.database import (
@@ -80,6 +80,9 @@ def build_http_app(
     admin_identity = AdminIdentityService(
         lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
     )
+    review_workflow = PlaceReviewWorkflowService(
+        lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
+    )
     if (
         settings.admin_bootstrap_login is not None
         and settings.admin_bootstrap_password is not None
@@ -101,5 +104,6 @@ def build_http_app(
             DatabaseReadiness(sessions).check,
             share_tokens,
             admin_identity,
+            review_workflow,
         )
     )

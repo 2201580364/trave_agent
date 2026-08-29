@@ -51,3 +51,26 @@ class AdminLoginNameConflictError(ApplicationError):
 class AdminRoleSafetyError(ApplicationError):
     def __init__(self, message: str) -> None:
         super().__init__("admin_role_safety_violation", message)
+
+
+class ReviewTaskNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("review_task_not_found", "review task was not found")
+
+
+class ReviewTaskConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("review_task_conflict", "review task has changed; refresh and retry")
+
+
+class ReviewRevisionNotApprovableError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("review_revision_not_approvable", "candidate revision is not approvable")
+
+
+class ReviewRevisionNotCandidateError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "review_revision_not_candidate",
+            "only candidate revisions can enter human review",
+        )

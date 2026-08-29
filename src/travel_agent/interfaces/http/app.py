@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from travel_agent.application.admin import AdminIdentityService
+from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ApplicationError, ResourceNotFoundError
 from travel_agent.application.common.unit_of_work import UnitOfWork
@@ -75,6 +75,7 @@ class HttpContainer:
     readiness: Callable[[], dict[str, object]] | None = None
     share_tokens: PlanShareTokenCodec | None = None
     admin_identity: AdminIdentityService | None = None
+    review_workflow: PlaceReviewWorkflowService | None = None
 
 
 class AnonymousSessionInput(BaseModel):
@@ -191,7 +192,7 @@ def create_app(container: HttpContainer) -> FastAPI:
     app = FastAPI(title="Travel Agent API", version="1.0.0")
 
     if container.admin_identity is not None:
-        app.include_router(build_admin_router(container.admin_identity))
+        app.include_router(build_admin_router(container.admin_identity, container.review_workflow))
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
@@ -882,6 +883,10 @@ def _status_for(exc: ApplicationError) -> int:
         "admin_operation_intent_conflict": status.HTTP_409_CONFLICT,
         "admin_login_name_conflict": status.HTTP_409_CONFLICT,
         "admin_role_safety_violation": status.HTTP_409_CONFLICT,
+        "review_task_not_found": status.HTTP_404_NOT_FOUND,
+        "review_task_conflict": status.HTTP_409_CONFLICT,
+        "review_revision_not_approvable": status.HTTP_409_CONFLICT,
+        "review_revision_not_candidate": status.HTTP_409_CONFLICT,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
 
 

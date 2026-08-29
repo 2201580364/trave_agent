@@ -3,7 +3,7 @@
 - 文档版本：V2.9
 - 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0007 已实现；0006 增加通用地点目录和求解投影发布边界，0007 增加独立 AdminActor/Role/Session、角色关联和追加式管理审计。ReviewTask/Decision 与 PublicationBatch 仍是后续逻辑模型。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0007 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0008 已实现；0006 增加通用地点目录和求解投影发布边界，0007 增加独立 AdminActor/Role/Session、角色关联和追加式管理审计，0008 增加地点审核任务与追加式决定表。PublicationBatch 仍是后续逻辑模型。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0008 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
 - 上游：API 契约 V2.7、应用代码架构 V1.4、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019
 
@@ -897,7 +897,7 @@ And 不生成 published research snapshot
 
 ## 16. OM1 管理端数据模型（身份与审计底座已实现）
 
-本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；16.2 审核任务与决定、16.3 发布批次仍待 R0.2-05-02/R0.2-07 通过新迁移追加。0001–0006 未被改写。
+本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；16.3 发布批次仍待 R0.2-07 通过新迁移追加。0001–0007 未被改写。
 
 ### 16.1 管理身份
 

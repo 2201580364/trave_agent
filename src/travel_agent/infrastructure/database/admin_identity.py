@@ -34,6 +34,7 @@ from travel_agent.domain.admin import (
 )
 
 from .planning import Base
+from .place_review import SqlAlchemyPlaceReviewRepository
 
 
 class AdminActorRow(Base):
@@ -404,6 +405,7 @@ class SqlAlchemyAdminUnitOfWork:
         self.roles = SqlAlchemyAdminRoleRepository(self._session)
         self.sessions = SqlAlchemyAdminSessionRepository(self._session)
         self.audits = SqlAlchemyAdminAuditRepository(self._session)
+        self.reviews = SqlAlchemyPlaceReviewRepository(self._session)
         return self
 
     def __exit__(

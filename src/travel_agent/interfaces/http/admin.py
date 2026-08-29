@@ -10,8 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from travel_agent.application.admin import (
     AdminAuthenticationError,
     AdminIdentityService,
+    PlaceReviewWorkflowService,
 )
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
+from travel_agent.domain.place_catalog import PlaceReviewDecision, PlaceReviewTask
 
 
 class CreateAdminSessionInput(BaseModel):
@@ -42,7 +44,28 @@ class CreateAdminActorInput(BaseModel):
     reason_text: str | None = Field(default=None, max_length=500)
 
 
-def build_admin_router(service: AdminIdentityService) -> APIRouter:
+class SubmitPlaceReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class DecidePlaceReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    expected_version: int = Field(gt=0)
+    decision_kind: str = Field(pattern="^(approve|request_changes|cancel)$")
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+def build_admin_router(
+    service: AdminIdentityService,
+    review_workflow: PlaceReviewWorkflowService | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
     def principal(
@@ -174,6 +197,72 @@ def build_admin_router(service: AdminIdentityService) -> APIRouter:
             "offset": offset,
         }
 
+    if review_workflow is not None:
+
+        @router.get("/review-tasks")
+        def list_review_tasks(
+            current: AdminPrincipal = principal_dependency,
+            review_status: str | None = Query(default=None, max_length=32),
+            limit: int = Query(default=50, ge=1, le=100),
+            offset: int = Query(default=0, ge=0),
+        ) -> dict[str, object]:
+            tasks = review_workflow.list_tasks(
+                current, status=review_status, limit=limit, offset=offset
+            )
+            return {
+                "items": [_review_task_response(task) for task in tasks],
+                "limit": limit,
+                "offset": offset,
+            }
+
+        @router.post(
+            "/place-revisions/{revision_id}/review-tasks", status_code=status.HTTP_201_CREATED
+        )
+        def submit_place_review(
+            revision_id: str,
+            payload: SubmitPlaceReviewInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            task = review_workflow.submit(
+                current,
+                place_revision_id=revision_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _review_task_response(task)
+
+        @router.post("/review-tasks/{task_id}/decisions")
+        def decide_place_review(
+            task_id: str,
+            payload: DecidePlaceReviewInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            task = review_workflow.decide(
+                current,
+                task_id=task_id,
+                operation_intent_id=payload.operation_intent_id,
+                expected_version=payload.expected_version,
+                decision_kind=payload.decision_kind,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _review_task_response(task)
+
+        @router.get("/review-tasks/{task_id}/decisions")
+        def list_review_decisions(
+            task_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            decisions = review_workflow.list_decisions(current, task_id=task_id)
+            return {
+                "items": [_review_decision_response(decision) for decision in decisions],
+            }
+
     return router
 
 
@@ -208,4 +297,31 @@ def _audit_response(event: AdminAuditEvent) -> dict[str, object]:
         "result": event.result,
         "error_code": event.error_code,
         "occurred_at": event.occurred_at.isoformat(),
+    }
+
+
+def _review_task_response(task: PlaceReviewTask) -> dict[str, object]:
+    return {
+        "review_task_id": task.review_task_id,
+        "place_revision_id": task.place_revision_id,
+        "status": task.status,
+        "assigned_reviewer_id": task.assigned_reviewer_id,
+        "version": task.version,
+        "created_by": task.created_by,
+        "created_at": task.created_at.isoformat(),
+        "updated_at": task.updated_at.isoformat(),
+    }
+
+
+def _review_decision_response(decision: PlaceReviewDecision) -> dict[str, object]:
+    return {
+        "review_decision_id": decision.review_decision_id,
+        "review_task_id": decision.review_task_id,
+        "place_revision_id": decision.place_revision_id,
+        "actor_id": decision.actor_id,
+        "actor_role": decision.actor_role,
+        "decision_kind": decision.decision_kind,
+        "reason_code": decision.reason_code,
+        "reason_text": decision.reason_text,
+        "created_at": decision.created_at.isoformat(),
     }

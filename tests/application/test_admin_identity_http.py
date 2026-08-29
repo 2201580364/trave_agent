@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from travel_agent.application.admin import AdminIdentityService
+from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
 from travel_agent.application.admin.service import verify_admin_password
 from travel_agent.infrastructure.database import (
     AnonymousIdentityService,
@@ -29,6 +29,8 @@ from travel_agent.infrastructure.database.admin_identity import (
     AdminRoleRow,
     AdminSessionRow,
 )
+from travel_agent.infrastructure.database.place_catalog import PlaceRevisionRow, PlaceRow
+from travel_agent.infrastructure.database.place_review import PlaceReviewDecisionRow
 from travel_agent.infrastructure.memory import (
     FixedDataSnapshotVersionProvider,
     InMemoryGenerationExecutor,
@@ -97,6 +99,9 @@ def admin_context(tmp_path: Path) -> Iterator[AdminTestContext]:
         InMemoryGenerationExecutor(),
         identity,
         admin_identity=service,
+        review_workflow=PlaceReviewWorkflowService(
+            lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
+        ),
     )
     with TestClient(create_app(container)) as client:
         yield AdminTestContext(client, service, sessions)
@@ -355,7 +360,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0007_admin_identity_audit"
+    assert revision == "0008_place_review_workflow"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -386,3 +391,229 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
     assert downgraded_revision == "0006_place_catalog"
     assert "admin_actors" not in downgraded_tables
     assert "places" in downgraded_tables
+
+
+def _seed_candidate_revision(context: AdminTestContext, revision_id: str = "revision-1") -> None:
+    with context.sessions() as session:
+        session.add(
+            PlaceRow(
+                place_id="place-1",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at=NOW.isoformat(),
+                updated_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceRevisionRow(
+                place_revision_id=revision_id,
+                place_id="place-1",
+                revision_number=1,
+                lifecycle_status="candidate",
+                canonical_name="Candidate Place",
+                aliases=[],
+                place_kind="attraction",
+                category="museum",
+                admin_area="West Lake",
+                address=None,
+                geometry_kind="point",
+                duration_min=30,
+                duration_recommended=60,
+                duration_max=90,
+                internal_travel_min=0,
+                energy_level=2,
+                indoor_outdoor="indoor",
+                suitable_periods=["morning"],
+                audience_tags=[],
+                rain_suitability="suitable",
+                is_always_open=False,
+                solver_eligible=False,
+                conflicts_resolved=True,
+                source_record_ids=[],
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+                published_at=None,
+            )
+        )
+        session.commit()
+
+
+def test_place_review_submit_approve_and_audit_are_one_workflow(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context)
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    submit_payload = {
+        "operation_intent_id": "review-submit-1",
+        "reason_code": "OM1_CANDIDATE_READY",
+        "reason_text": "字段已完成初审",
+    }
+    submitted = context.client.post(
+        "/api/v1/admin/place-revisions/revision-1/review-tasks",
+        headers={**headers, "X-Request-ID": "req-review-submit"},
+        json=submit_payload,
+    )
+    assert submitted.status_code == 201
+    task = submitted.json()
+    assert task["status"] == "ready_for_review"
+    assert task["version"] == 1
+
+    replay = context.client.post(
+        "/api/v1/admin/place-revisions/revision-1/review-tasks",
+        headers=headers,
+        json=submit_payload,
+    )
+    assert replay.status_code == 201
+    assert replay.json()["review_task_id"] == task["review_task_id"]
+
+    decided = context.client.post(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers={**headers, "X-Request-ID": "req-review-approve"},
+        json={
+            "operation_intent_id": "review-approve-1",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "OM1_FACTS_VERIFIED",
+            "reason_text": "人工核验通过",
+        },
+    )
+    assert decided.status_code == 200
+    assert decided.json()["status"] == "approved"
+    assert decided.json()["version"] == 2
+
+    approve_replay = context.client.post(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-approve-1",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "OM1_FACTS_VERIFIED",
+            "reason_text": "人工核验通过",
+        },
+    )
+    assert approve_replay.status_code == 200
+    assert approve_replay.json()["status"] == "approved"
+
+    intent_conflict = context.client.post(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-approve-1",
+            "expected_version": 1,
+            "decision_kind": "request_changes",
+            "reason_code": "OM1_FACTS_VERIFIED",
+        },
+    )
+    assert intent_conflict.status_code == 409
+    assert intent_conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
+
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-1")
+        decisions = tuple(session.scalars(select(PlaceReviewDecisionRow)))
+        events = tuple(
+            session.scalars(
+                select(AdminAuditEventRow).where(
+                    AdminAuditEventRow.action.in_(
+                        ("PLACE_REVIEW_SUBMITTED", "PLACE_REVIEW_DECIDED")
+                    )
+                )
+            )
+        )
+    assert revision is not None
+    assert revision.lifecycle_status == "human_verified"
+    assert len(decisions) == 1
+    assert decisions[0].decision_kind == "approve"
+    assert {event.action for event in events} == {
+        "PLACE_REVIEW_SUBMITTED",
+        "PLACE_REVIEW_DECIDED",
+    }
+
+    history = context.client.get(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers=headers,
+    )
+    assert history.status_code == 200
+    assert history.json()["items"][0]["actor_role"] == "data_reviewer"
+
+
+def test_place_review_request_changes_keeps_candidate_and_rejects_stale_version(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-2")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    task = context.client.post(
+        "/api/v1/admin/place-revisions/revision-2/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-submit-2",
+            "reason_code": "OM1_CANDIDATE_READY",
+        },
+    ).json()
+    decision = {
+        "operation_intent_id": "review-changes-2",
+        "expected_version": 1,
+        "decision_kind": "request_changes",
+        "reason_code": "OM1_SOURCE_MISSING",
+        "reason_text": "请补充来源记录",
+    }
+    changed = context.client.post(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers=headers,
+        json=decision,
+    )
+    assert changed.status_code == 200
+    assert changed.json()["status"] == "changes_requested"
+
+    stale = context.client.post(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers=headers,
+        json={**decision, "operation_intent_id": "review-stale-2"},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "review_task_conflict"
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-2")
+    assert revision is not None
+    assert revision.lifecycle_status == "candidate"
+
+
+def test_review_rejects_non_candidate_revision_and_audits_rejection(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-3")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    task = context.client.post(
+        "/api/v1/admin/place-revisions/revision-3/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-submit-3",
+            "reason_code": "OM1_CANDIDATE_READY",
+        },
+    ).json()
+    approved = context.client.post(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-approve-3",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "OM1_FACTS_VERIFIED",
+        },
+    )
+    assert approved.status_code == 200
+    rejected = context.client.post(
+        "/api/v1/admin/place-revisions/revision-3/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-submit-again-3",
+            "reason_code": "OM1_CANDIDATE_READY",
+        },
+    )
+    assert rejected.status_code == 409
+    assert rejected.json()["error"]["code"] == "review_revision_not_candidate"
