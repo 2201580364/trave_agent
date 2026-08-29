@@ -19,13 +19,13 @@
 ## 当前总状态
 
 - 更新时间：2026-08-29
-- 当前已提交基线：`8bbca5b feat(gate7): lock research environments and bind evidence`
+- 当前已提交基线：`4f00b14 docs(gate7): audit project roadmap and align M1 validation readiness`
 - 产品里程碑：`M1 — 行程骨架验证`
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
-- 当前阶段：`Gate 7 — G7-R0.2-02 来源/合规登记与采集字段字典（当前节点）`
-- 当前任务：按 ADR-0018 建立 source registry schema、候选来源合规结论、允许用途/字段/采集方式登记、排除清单和采集字段字典；完成门禁后再进入通用地点/访问点/投影物理模型与迁移。之后由 AI 协作开发方自主检索、筛选、获取并交叉核验杭州地点资料，建设按需 OD 子图和 published research snapshot。R0.3 再实施服务器全栈 Docker Compose H5/HTTPS，R0.4 完成内部 dry run 后才招募真实参与者。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4 已完成；G7-R0.1 环境锁机制和 R0.2-01 逻辑设计已完成。当前 7 个 human_verified 路线点和 42/42 高德 OD 只足以证明技术纵向切片，不能支撑真实用户的 5–10 地点选择、替换和专家路线评审。项目已确定 R0.2 数据由 AI 自主获取、R0.3 的 edge/H5、FastAPI、迁移、MySQL、Redis 全部使用 Docker 镜像并由一个逻辑 Compose 项目管理；来源登记、物理模型、数据采集、OD 扩容、应用部署和 dry run 均尚未实施，不能宣称 Gate 7、M1 MVP 或稳定生产已完成
+- 当前阶段：`Gate 7 — G7-R0.2-03 地点物理模型、迁移与 staging/published 边界（当前节点）`
+- 当前任务：把 ADR-0018 的 Place、Geometry、AccessPoint、SourceRecord、Revision、Relation、SolverProjection 和来源治理绑定实现为 SQLAlchemy 模型、约束、仓储与新 Alembic revision；明确 staging/candidate/published 状态隔离，并保持旧 0001–0005 与 7 点历史 Revision 不改写。R0.2-04 才开始具体杭州候选目录，R0.2-05 才执行采集和人工审核；本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01 和 R0.2-02 已完成。当前 7 个 human_verified 路线点和 42/42 高德 OD 只足以证明技术纵向切片，不能支撑真实用户的 5–10 地点选择、替换和专家路线评审。来源治理现在已有 5 个首批来源、58 个允许字段、2 组排除清单和 fail-closed 校验，但通用地点物理模型、具体候选来源、数据采集、OD 扩容、应用部署和 dry run 尚未实施，不能宣称 Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -36,7 +36,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 已将产品全景升级到 V2.4，统一 `M1–M4` 与 `P0–P2` 语义，按 ADR-0004 修正体力软约束和 C1/C2/C4/C5/C6 硬约束，按 ADR-0018 修正数据治理、访问点与求解投影边界；
 - 已把数据规模拆为两层：G7-R1 研究最低目录约 50–75 个 `human_verified` Place，M1 受控上线目录原则上 80–120 个；二者均不允许用未经来源登记或未经审核的数据凑数；
 - 已同步功能完整性审查 V1.1、UI/交互/架构/API 上游 V3.4、数据模型索引 V2.6、测试硬/软约束口径、开放时间目录门槛和高德 7 点正式发布状态；
-- 当前执行节点没有因文档复审前移，仍为 `G7-R0.2-02`。下一项工程交付是 source registry、来源合规登记和采集字段字典，不是批量采集、应用部署或 M2 功能实现。
+- 文档复审完成后已按路线执行并关闭 `G7-R0.2-02`；当前转入 `G7-R0.2-03`，下一项工程交付是地点物理模型、迁移和状态隔离，不是批量采集、应用部署或 M2 功能实现。
 - G1 发现研究不依赖 H5，可与 R0.2–R0.4 并行组织，但必须在 R1 外部参与者招募锁定前关闭，以免用未经校准的目标画像开展形成性/确认性测试；它不改变当前工程节点。
 - 文档复审验证：Gate 7 environment/evidence 定向回归 `19/19` 通过；protocol 规范化 SHA-256 保持 `b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89` 且协议文件无 diff；全部 docs Markdown 相对链接可解析，269 个三级功能 ID 和 ADR 编号无重复，`git diff --check` 与敏感信息扫描通过。由于本轮不改运行代码，未重复执行全量 306 项技术基线。
 
@@ -60,9 +60,10 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | A6-9.2 我的行程与历史 Revision | 完成并通过 Chrome 验收 | 匿名主体隔离列表、更新时间排序与分页、最新 Revision 恢复、历史只读回看、返回当前版本 |
 | A6-9.3 计划分享首版 | 完成并通过 Chrome 验收 | 不可变 `plan-share-v1` 脱敏快照、HMAC 公开 token、幂等创建、公开只读链接、访客参考复制、375×812/1280×800 与 console 门禁 |
 | A6-9.4 结构化反馈首版 | 完成并通过 Chrome 验收 | Revision/节点反馈、稳定 reason codes、intent 幂等与目标去重、节点归属校验、Alembic 0005、375×812/1280×800 与 console 门禁 |
-| Gate 7 R0 验证准备 | R0.2-01 已完成 | ADR-0018 已接受通用 Place、访问点、有向端点、重叠裁决和单节点求解投影；下一项为来源/合规登记与采集字段字典 |
+| Gate 7 R0 验证准备 | R0.2-01～02 已完成 | ADR-0018 已接受通用 Place/访问点/有向端点/重叠裁决/单节点投影；来源治理已建立机器 registry、58 字段 allowlist 和 fail-closed 门禁；当前进入物理模型与迁移 |
+| Gate 7 R0.2-02 来源治理 | 完成 | 5 个首批来源、58 字段机器字典、2 组排除清单、字段级 allowlist、校验 CLI、12 项测试和来源核验报告；conditional 只进 staging，未登记/待审/禁止来源 fail closed |
 
-最新稳定技术基线：全量 306 项测试通过；Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。A6-9.4 反馈/HTTP/SQLAlchemy/readiness 定向 22 项、前端 TypeScript、H5 production build、SQLite Alembic 0005 升级均通过；Gate 7 evidence validator 9 项和研究环境锁定 10 项定向测试通过，覆盖 H3 判定、synthetic 防伪、隐私、Git/迁移/构建门禁、关键版本缺失、protocol 漂移、manifest hash 与 evidence 精确绑定；本轮 Python Ruff、4 个改动源/脚本文件隔离 strict mypy、synthetic 端到端汇总和 `git diff --check` 均通过。真实 Google Chrome 已完成 A6-9.1 替换、A6-9.2 行程历史、A6-9.3 分享和 A6-9.4 反馈闭环：当前 Revision 节点/整体反馈提交成功，刷新后新 intent 命中目标去重，历史 Revision 不显示反馈/替换入口，SQLite 只保存 1 条 trip + 1 条 node 反馈；375×812 与 1280×800 无横向溢出，完整刷新后新增 console warning/error 为 0。H5 入口约 306 KiB 的既有性能警告仍保留为 P1；全仓 strict mypy 历史债仍未清零。以上仍只是技术和验证准备证据，不证明 H3/H11 已被专家或用户证实。
+最新稳定技术基线：全量 318 项测试通过；其中 R0.2-02 来源治理新增 12/12，原 Gate 6、A6 和 Gate 7 R0.1 回归保持通过。Golden 8/8；降级 8/8；杭州公开攻略综合接近度 0.975；数据校验 7/7；性能 PERF-12-3 P95 14.94ms、PERF-20-7 P95 19.32ms，均通过。当前机器契约为 `solver-p1-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，结果结构为 `trip-result-v2`。来源 registry 和 58 字段字典通过规范化哈希、权限反例、敏感信息和 CLI 测试；新增源文件、脚本和测试的 Ruff、隔离 strict mypy 均通过。真实 Google Chrome 已完成 A6-9.1 替换、A6-9.2 行程历史、A6-9.3 分享和 A6-9.4 反馈闭环；R0.2-02 也已在用户指定的 Chrome 实例中完成 5 个来源的可见页面复核，三个政府/开放数据入口由 `pending_browser_review` 更新为 `reviewed`，但决策仍为 conditional。H5 入口约 306 KiB 的既有性能警告仍保留为 P1；全仓 strict mypy 历史债仍未清零。以上仍只是技术和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -70,12 +71,23 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 
 ### Gate 7：专家/用户验证准备
 
-- 状态：G7-R0.1 已完成；R0.2-01 已通过 ADR-0018；当前执行节点为 R0.2-02 来源/合规登记与采集字段字典，其交付物尚未开始形成。首个真实 `locked` 环境尚未生成，尚未开始招募或收集真实用户数据；
+- 状态：G7-R0.1、R0.2-01 和 R0.2-02 已完成；当前执行节点为 R0.2-03 地点物理模型、迁移与 staging/published 边界。首个真实 `locked` 环境尚未生成，尚未开始招募或收集真实用户数据；
 - 当前输入：已通过 Gate 6 的求解器证据、A6 完整浏览器纵向切片、结构化 Revision/节点反馈能力；
 - 已完成产物：`gate7-validation-plan.md`、专家评审表、用户主持脚本、`gate7-protocol-v1.json`、匿名 evidence validator/aggregate report、`gate7-research-environment-v1` manifest、锁定 CLI 和环境/evidence 绑定测试；
-- 本轮产物：ADR-0018 已确定通用 Place、封闭地点/几何枚举、human_verified 到离访问点、`departure→arrival` 有向 OD、单 Place 单 solver 节点、重叠实体裁决、投影哈希和兼容策略；
-- 下一产物：source registry、来源合规结论和采集字段字典；其后才是通用地点数据模型/迁移、由 AI 自主建立的杭州候选清单/覆盖矩阵、OD 按需子图和 published research snapshot，再进入 edge/api/migrate/MySQL/Redis 统一 Compose 的服务器 H5/HTTPS、locked manifest 与内部 dry run；
+- 本轮产物：`hangzhou-m1-source-registry-v1`、`m1-place-collection-fields-v1`、来源/采集领域规范、来源核验报告、fail-closed 校验器和 CLI；高德/和风 approved，三个政府/开放数据入口 conditional，社交/OTA 批量采集 prohibited；
+- 下一产物：通用地点物理模型、迁移、仓储和 staging/published 状态隔离；其后才是由 AI 自主建立的杭州候选清单/覆盖矩阵、采集审核、OD 按需子图和 published research snapshot，再进入 edge/api/migrate/MySQL/Redis 统一 Compose 的服务器 H5/HTTPS、locked manifest 与内部 dry run；
 - 门禁原则：不得用自动化测试、Chrome 验收或团队内部主观判断冒充 H3/H11 的真实证据；Gate 7 结果决定 M1 补修、受控试运行或进入 M2，而不是预设一定晋级。
+
+### G7-R0.2-02 来源治理与采集字段字典（2026-08-29）
+
+- 新增 `data/governance/hangzhou-source-registry-v1.json`：登记 5 个首批来源，高德/和风为现有用途内 `approved`，杭州文旅/西湖管委会/杭州开放数据为 `conditional`；
+- 新增 2 组排除清单：未获授权前禁止批量采集社交 UGC 和 OTA/评论页，不保存账号、评论全文、媒体、Cookie/token 或实时库存页面副本；
+- 新增 `place-collection-field-dictionary-v1.json`：58 个地点、访问点、时间、体验、关系、趋势、OD、天气和 provenance 叶子字段，全部 `pii_allowed=false`；
+- 新增生产侧 fail-closed 判定：`source_id + field_id + collection_mode + target_stage` 四元组同时通过才允许写入；conditional 只进 staging，未登记/待审/禁止来源稳定拒绝；
+- 新增校验 CLI、12 项自动化测试、领域规范和来源核验报告；完成 Chrome 复核后的 registry 规范化哈希 `c0085129bbca7a38c963985a8c29ef7b857275d8ff833b53cca9b6207470d21a`，dictionary 哈希 `773a7db58357b0cda5a7f9fa1fbd6a1e3d7351288e7601bbd0196d084ee7ed3a`；
+- 官方公开 HTTPS 核验覆盖杭州文旅、西湖管委会、杭州开放数据、高德文档/条款、和风服务条款/限制/归属/EULA；robots 404 不解释为采集许可，未稳定核验的浙江省博物馆和 OSM 未进入允许清单；
+- 已使用用户指定的 Google Chrome 可用实例完成首批 5 个来源复核：杭州文旅和西湖管委会主办主体可见，西湖“我想游”栏目可见，杭州数据开放平台可打开 4 页通用许可协议，高德/和风官方文档与条款入口可见；三个政府/开放数据入口更新为 `reviewed + conditional`，不因页面可见而放宽 staging-only、逐页面和数据集级审查边界；
+- 验证结果：全量 pytest `318/318`，新增范围 Ruff 和 strict mypy 通过；R0.2-02 完成，当前进入 R0.2-03，不批量采集地点。
 
 ### A4：应用代码架构设计
 
@@ -189,7 +201,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - R0.4 内部 dry run 不计入用户分母，必须覆盖 T01–T10、大数据量选择/替换、区域类型展示、manifest→evidence→report、隐私、弱网和失败恢复；开放 blocker 和影响核心任务的 major 为 0 后才能招募；
 - 产品功能树 V3.4 新增地点类型、入口、solver projection、来源/staging、覆盖矩阵、趋势软信号、按需 OD 子图、研究数据发布、全栈 Compose 和 R0.2～R0.4 发布门禁；数据模型 V2.6 已同步 ADR-0018 逻辑边界，但不声称新表/迁移已实现；
 - 本轮只修改规划与 ADR 文档，不改 protocol、代码、数据库或服务器；已通过相对链接、三级功能 ID 唯一性、protocol canonical hash 和 `git diff --check` 复核，最新代码测试基线继续沿用提交 `8bbca5b` 前已通过的全量 306 项；
-- 下一执行任务固定为 `R0.2-02 数据来源/合规登记和采集字段字典`，其后才是数据模型/迁移、候选清单、采集审核、OD 改造和研究快照发布。
+- R0.2-02 已在 2026-08-29 完成；下一执行任务固定为 `R0.2-03 地点物理模型、迁移与 staging/published 边界`，其后才是候选清单、采集审核、OD 改造和研究快照发布。
 
 ## 本轮完成（2026-08-25）
 
@@ -644,7 +656,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
 | 6 | A6 | 首个浏览器可操作纵向切片 | 已完成（100% 仅指技术纵向切片；替换、我的行程、计划分享、结构化反馈均通过 Chrome 验收） |
-| 7 | G7 | 真实专家评审与用户验证 | R0.2-01 地点/投影 ADR 已完成；R0.2-02～07、R0.3 部署、R0.4 dry run、招募和真实证据未开始 |
+| 7 | G7 | 真实专家评审与用户验证 | R0.2-01 地点/投影 ADR 与 R0.2-02 来源治理已完成；当前 R0.2-03，后续候选/采集/OD/发布、R0.3 部署、R0.4 dry run、招募和真实证据未开始 |
 
 ## 首个可用目标
 

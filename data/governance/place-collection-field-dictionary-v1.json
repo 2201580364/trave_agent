@@ -1,0 +1,588 @@
+{
+  "schema_version": "place-collection-field-dictionary-v1",
+  "dictionary_id": "m1-place-collection-fields-v1",
+  "generated_at": "2026-08-29T13:29:00+08:00",
+  "scope": "M1杭州研究地点、真实OD与天气上下文的允许采集字段；不包含用户评论原文、账号信息或未授权媒体",
+  "fields": [
+    {
+      "field_id": "provenance.source_record_id",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider", "licensed_weather_provider", "curated_editorial"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "为每条来源记录生成稳定ID，不使用页面标题或数组顺序临时推导。",
+      "publish_rule": "published事实必须能回溯至少一个来源记录ID。"
+    },
+    {
+      "field_id": "provenance.source_url",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider", "licensed_weather_provider", "curated_editorial"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "保存公开页面、数据集说明或API文档入口，不保存带Key、token、Cookie或签名的完整请求URL。",
+      "publish_rule": "URL必须与source_id和采集时间一起进入审计元数据。"
+    },
+    {
+      "field_id": "provenance.observed_at",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider", "licensed_weather_provider", "curated_editorial"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "使用带时区时间记录实际观察或API响应时间。",
+      "publish_rule": "硬事实缺少observed_at不得发布。"
+    },
+    {
+      "field_id": "provenance.content_sha256",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider", "licensed_weather_provider", "curated_editorial"],
+      "allowed_collection_modes": ["api", "dataset_download", "public_page_fetch"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "允许保存响应或页面规范化内容的SHA-256；哈希不能替代许可，也不要求把原始页面提交Git。",
+      "publish_rule": "自动采集证据必须有内容哈希；纯人工引用可由审核记录说明无法取哈希。"
+    },
+    {
+      "field_id": "place.canonical_name",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "优先使用运营方或政府正式名称；地图名称仅作候选并与官方来源交叉核验。",
+      "publish_rule": "名称冲突必须人工裁决并保留别名。"
+    },
+    {
+      "field_id": "place.aliases",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "只保留可用于搜索和去重的公开别名，不收集用户自造昵称。",
+      "publish_rule": "别名不得覆盖正式名称或制造不存在的独立地点。"
+    },
+    {
+      "field_id": "place.place_kind",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data"],
+      "allowed_collection_modes": ["dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "按ADR-0018裁决point/area/route/market/show等业务类型，不能直接复制Provider POI分类。",
+      "publish_rule": "类型和几何组合必须被当前投影规则支持。"
+    },
+    {
+      "field_id": "place.category",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "curated_editorial"],
+      "allowed_collection_modes": ["dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "映射到项目用户可感知类别；攻略只能提供候选软标签。",
+      "publish_rule": "类别必须来自版本化枚举并通过人工审核。"
+    },
+    {
+      "field_id": "place.admin_area",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "采集公开行政区和城市代码，不保存个人位置。",
+      "publish_rule": "必须与杭州发布城市一致。"
+    },
+    {
+      "field_id": "place.address",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "只采集公开场所地址；景区多入口时地址不能替代访问点。",
+      "publish_rule": "与官方名称、POI和访问点存在歧义时必须人工裁决。"
+    },
+    {
+      "field_id": "place.geometry_kind",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "记录point/polygon/line等事实几何类型；地图POI命中不能把区域自动降为点。",
+      "publish_rule": "必须与place_kind和投影能力一致。"
+    },
+    {
+      "field_id": "place.geometry",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_open_data", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "dataset_download", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "保存来源坐标或获许可的数据集几何；不从截图手工反推精确边界。",
+      "publish_rule": "坐标系、来源、采集时间和人工审核状态完整后才能发布。"
+    },
+    {
+      "field_id": "access.arrival.name",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "记录游客实际可到达入口名称；开放区域使用审核后的代表到达点。",
+      "publish_rule": "不得使用几何中心或模糊地址冒充入口。"
+    },
+    {
+      "field_id": "access.arrival.kind",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "标记gate/route_start/area_representative等访问点语义。",
+      "publish_rule": "访问点类型必须与地点类型匹配。"
+    },
+    {
+      "field_id": "access.arrival.lat",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "优先通过有许可地图API获得候选，经官方语义和人工地图复核。",
+      "publish_rule": "必须human_verified且位于目标地点合理范围。"
+    },
+    {
+      "field_id": "access.arrival.lng",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "与arrival.lat成对采集并保留坐标系。",
+      "publish_rule": "不得缺失、填0或与纬度交换。"
+    },
+    {
+      "field_id": "access.departure.name",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "记录默认离开点；同入口返回也必须显式登记。",
+      "publish_rule": "路线终点和景区出口语义必须可解释。"
+    },
+    {
+      "field_id": "access.departure.kind",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "标记gate/route_end/same_as_arrival等离开语义。",
+      "publish_rule": "不得在OD计算时临时交换路线方向。"
+    },
+    {
+      "field_id": "access.departure.lat",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "通过Provider候选和人工审核确定离开坐标。",
+      "publish_rule": "必须human_verified；缺失时不能进入求解投影。"
+    },
+    {
+      "field_id": "access.departure.lng",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "与departure.lat成对采集并保留坐标系。",
+      "publish_rule": "不得缺失、填0或与纬度交换。"
+    },
+    {
+      "field_id": "access.same_as_arrival",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "licensed_map_provider"],
+      "allowed_collection_modes": ["api", "manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "只有确认同入口返回时才设为true。",
+      "publish_rule": "路线和单向景区不得默认继承。"
+    },
+    {
+      "field_id": "time.is_always_open",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "只描述公共空间本身，不继承内部场馆、商户或演出开放语义。",
+      "publish_rule": "需来源和人工判断，不能由缺少营业时间反推。"
+    },
+    {
+      "field_id": "time.rules",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "抽取日期范围、开放、关闭和last_entry候选，保留原始出处。",
+      "publish_rule": "通过九条时间规则校验、适用日期解析和冲突裁决。"
+    },
+    {
+      "field_id": "time.close_days",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "采集固定闭馆星期数组，不从单次临时通知推导长期规则。",
+      "publish_rule": "与日期例外共同审核。"
+    },
+    {
+      "field_id": "time.close_day_exceptions",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "记录法定节假日、临时开放和顺延闭馆的适用日期与来源。",
+      "publish_rule": "必须结构化到明确日期范围，过期例外不外推。"
+    },
+    {
+      "field_id": "time.fixed_sessions",
+      "fact_class": "hard_fact",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "采集表演或市集实际场次、日期和地点。",
+      "publish_rule": "同日多场次无法唯一投影时拒绝进入当前solver。"
+    },
+    {
+      "field_id": "experience.duration_min",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "综合官方路线、规模和多攻略人工判断下限，不复制单篇攻略的伪精确值。",
+      "publish_rule": "与recommended/max组成合理范围并留下审核理由。"
+    },
+    {
+      "field_id": "experience.duration_recommended",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "形成供投影使用的推荐分钟值，同时保留用户可见范围。",
+      "publish_rule": "必须位于min/max范围内并绑定审核记录。"
+    },
+    {
+      "field_id": "experience.duration_max",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "表示常规完整游览上界，不等于景区营业时长。",
+      "publish_rule": "不得小于recommended。"
+    },
+    {
+      "field_id": "experience.internal_walk_min",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "区域和路线内部步行计入游览预算，不重复进入节点间OD。",
+      "publish_rule": "需与访问点和路线方向共同审核。"
+    },
+    {
+      "field_id": "experience.energy_level",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "按领域标准评为1–5级，仅作分天均衡与节奏提示。",
+      "publish_rule": "不得作为硬日上限，也不得从单条评论自动推导。"
+    },
+    {
+      "field_id": "experience.indoor_outdoor",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "允许indoor/outdoor/mixed，不能把有室内子地点的景区整体标为室内。",
+      "publish_rule": "C5仅在结构化极端天气规则下使用。"
+    },
+    {
+      "field_id": "experience.suitable_periods",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "记录策展时段偏好和理由，不与开放时间混用。",
+      "publish_rule": "作为软偏好并标注来源等级。"
+    },
+    {
+      "field_id": "experience.audience_tags",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "只使用项目枚举的亲子、长辈友好等场景标签，不采集用户画像。",
+      "publish_rule": "标签是推荐依据，不伪装为无障碍认证。"
+    },
+    {
+      "field_id": "experience.rain_suitability",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator", "curated_editorial"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "区分普通雨天体验提示和极端天气禁排，不自动把室内等同安全。",
+      "publish_rule": "普通天气为软提示，极端天气规则另行版本化。"
+    },
+    {
+      "field_id": "relation.relation_type",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "使用contains/part_of/overlaps/same_experience等受控关系。",
+      "publish_rule": "同体验关系必须进入重叠选择裁决。"
+    },
+    {
+      "field_id": "relation.related_place_id",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "关联稳定place_id，不以名称临时匹配。",
+      "publish_rule": "目标Place必须存在且关系双向语义完整。"
+    },
+    {
+      "field_id": "relation.selection_exclusion_group",
+      "fact_class": "reviewed_attribute",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "human_verified",
+      "pii_allowed": false,
+      "collection_rule": "父子或同体验地点无法同时选择时生成稳定互斥组。",
+      "publish_rule": "未裁决重叠不得进入求解输入。"
+    },
+    {
+      "field_id": "relation.review_decision",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["government", "official_operator"],
+      "allowed_collection_modes": ["manual_reference", "public_page_fetch"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "保存裁决结论、理由、审核人角色和时间，不保存个人敏感信息。",
+      "publish_rule": "重叠、重复和硬事实冲突必须有可回溯结论。"
+    },
+    {
+      "field_id": "external.gaode_poi_id",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "只通过已授权高德Web服务获取，不从页面DOM或截图抓取。",
+      "publish_rule": "与访问点语义和坐标审核记录一起发布。"
+    },
+    {
+      "field_id": "trend.score",
+      "fact_class": "soft_signal",
+      "allowed_source_roles": ["curated_editorial"],
+      "allowed_collection_modes": ["manual_reference"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "只能由多个已登记公开攻略的人工作业生成衰减分数，不抓取平台用户数据。",
+      "publish_rule": "不得作为硬事实或直接决定必选。"
+    },
+    {
+      "field_id": "trend.source_count",
+      "fact_class": "soft_signal",
+      "allowed_source_roles": ["curated_editorial"],
+      "allowed_collection_modes": ["manual_reference"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "记录独立来源数量，不记录作者账号。",
+      "publish_rule": "必须与观察窗口和理由码一起使用。"
+    },
+    {
+      "field_id": "trend.observed_at",
+      "fact_class": "soft_signal",
+      "allowed_source_roles": ["curated_editorial"],
+      "allowed_collection_modes": ["manual_reference"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "记录人工综合完成时间。",
+      "publish_rule": "过期趋势必须衰减或失效。"
+    },
+    {
+      "field_id": "trend.window",
+      "fact_class": "soft_signal",
+      "allowed_source_roles": ["curated_editorial"],
+      "allowed_collection_modes": ["manual_reference"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "记录趋势观察覆盖的日期范围。",
+      "publish_rule": "不得使用无法说明窗口的网红指数。"
+    },
+    {
+      "field_id": "trend.reason_codes",
+      "fact_class": "soft_signal",
+      "allowed_source_roles": ["curated_editorial"],
+      "allowed_collection_modes": ["manual_reference"],
+      "publish_requirement": "curated_review",
+      "pii_allowed": false,
+      "collection_rule": "只保存受控理由码和短摘要，不保存评论或文章原文。",
+      "publish_rule": "必须可解释且不能包含个人信息。"
+    },
+    {
+      "field_id": "od.origin_access_point_id",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "使用审核后的离开访问点作为起点。",
+      "publish_rule": "必须与快照内访问点ID映射一起固化。"
+    },
+    {
+      "field_id": "od.destination_access_point_id",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "使用审核后的到达访问点作为终点。",
+      "publish_rule": "方向不可交换，A到B和B到A独立。"
+    },
+    {
+      "field_id": "od.mode",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "保存walking/transit/driving等实际成功模式。",
+      "publish_rule": "失败模式和最终选择必须可审计。"
+    },
+    {
+      "field_id": "od.duration_min",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "解析Provider真实路网耗时，缺边不得填0。",
+      "publish_rule": "近似值必须显式标记，不能冒充Provider结果。"
+    },
+    {
+      "field_id": "od.distance_m",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "保存道路距离而非直线距离。",
+      "publish_rule": "与模式、耗时和方向绑定。"
+    },
+    {
+      "field_id": "od.provider",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "记录Provider稳定ID，不记录Key。",
+      "publish_rule": "必须与数据版本和抓取时间同时存在。"
+    },
+    {
+      "field_id": "od.fetched_at",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "记录带时区请求完成时间。",
+      "publish_rule": "缺少时间不得发布为真实路网。"
+    },
+    {
+      "field_id": "od.data_version",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["licensed_map_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "每次构建使用新的不可变版本。",
+      "publish_rule": "Revision必须能回放对应OD子图。"
+    },
+    {
+      "field_id": "weather.date",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_weather_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "使用目的地本地日期。",
+      "publish_rule": "不能把过期天气用于未来研究场景。"
+    },
+    {
+      "field_id": "weather.status",
+      "fact_class": "provider_fact",
+      "allowed_source_roles": ["licensed_weather_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "provider_verified",
+      "pii_allowed": false,
+      "collection_rule": "按版本化映射生成normal/advisory/extreme。",
+      "publish_rule": "保留原Provider字段摘要和映射版本。"
+    },
+    {
+      "field_id": "weather.provider",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["licensed_weather_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "记录Provider稳定ID和归属要求，不记录凭证。",
+      "publish_rule": "UI和报告按Provider条款标注来源。"
+    },
+    {
+      "field_id": "weather.fetched_at",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["licensed_weather_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "记录带时区API响应时间。",
+      "publish_rule": "必须与研究日期和数据版本一致。"
+    },
+    {
+      "field_id": "weather.data_version",
+      "fact_class": "provenance",
+      "allowed_source_roles": ["licensed_weather_provider"],
+      "allowed_collection_modes": ["api"],
+      "publish_requirement": "required",
+      "pii_allowed": false,
+      "collection_rule": "天气快照使用不可变版本ID。",
+      "publish_rule": "环境manifest绑定准确天气版本和哈希。"
+    }
+  ]
+}

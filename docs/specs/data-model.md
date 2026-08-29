@@ -188,7 +188,7 @@ places
 - 默认到达点、可选离开点和 access point 审核状态；
 - 建议时长下限/推荐值/上限及来源；
 - 内部步行预算、适合时段、室内外和人群标签；
-- source registry、采集时间、许可/条款检查和 review status；
+- source registry、采集时间、许可/条款检查和 review status；R0.2-02 已由 [地点数据来源与采集规范](../domain/地点数据来源与采集规范.md) 和 `data/governance/` 机器资产固定来源/字段/方式/目标阶段四元组门禁；
 - candidate/human_verified/published 生命周期；
 - 投影到当前 solver `Attraction` 的版本和规则。
 

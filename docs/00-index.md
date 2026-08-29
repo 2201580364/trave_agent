@@ -12,7 +12,7 @@
 |---|---|
 | 产品 / 投资人 | [process/project-status.md](process/project-status.md) → [process/project-roadmap.md](process/project-roadmap.md) → [product/产品功能完整性审查.md](product/产品功能完整性审查.md) → [product/功能模块设计.md](product/功能模块设计.md) → [product/信息架构与UI设计.md](product/信息架构与UI设计.md) → [product/交互流程与状态机设计.md](product/交互流程与状态机设计.md) → [product/应用代码架构设计.md](product/应用代码架构设计.md) → [assumptions.md](assumptions.md) → [product/旅行助手产品文档.md](product/旅行助手产品文档.md) |
 | 工程师（后端/求解器） | [process/project-status.md](process/project-status.md) → [process/project-roadmap.md](process/project-roadmap.md) → [product/应用代码架构设计.md](product/应用代码架构设计.md) → [assumptions.md](assumptions.md) → [product/M1 MVP技术选型文档.md](product/M1 MVP技术选型文档.md) → [domain/](domain/) |
-| 工程师（数据） | [process/project-status.md](process/project-status.md) → [decisions/ADR-0018-place-catalog-and-solver-projection.md](decisions/ADR-0018-place-catalog-and-solver-projection.md) → [test/gate7-data-deployment-readiness-plan.md](test/gate7-data-deployment-readiness-plan.md) → [specs/data-model.md](specs/data-model.md) → [domain/开放时间数据规范.md](domain/开放时间数据规范.md) → [research/README.md](research/README.md) |
+| 工程师（数据） | [process/project-status.md](process/project-status.md) → [decisions/ADR-0018-place-catalog-and-solver-projection.md](decisions/ADR-0018-place-catalog-and-solver-projection.md) → [domain/地点数据来源与采集规范.md](domain/地点数据来源与采集规范.md) → [test/gate7-data-deployment-readiness-plan.md](test/gate7-data-deployment-readiness-plan.md) → [specs/data-model.md](specs/data-model.md) → [domain/开放时间数据规范.md](domain/开放时间数据规范.md) → [research/README.md](research/README.md) |
 | 测试 / 验证 | [assumptions.md](assumptions.md) → [process/gates.md](process/gates.md) → [specs/](specs/) → [test/README.md](test/README.md) → [test/gate7-validation-plan.md](test/gate7-validation-plan.md) → [test/gate7-data-deployment-readiness-plan.md](test/gate7-data-deployment-readiness-plan.md) → [ops/gate7-controlled-h5-docker-deployment.md](ops/gate7-controlled-h5-docker-deployment.md) → [test/gate7-research-environment.md](test/gate7-research-environment.md) |
 
 ## 目录结构
@@ -29,6 +29,8 @@ docs/
   test/                  测试方案 + Golden Cases + 验证报告
   ops/                   部署、外部 Provider、迁移与恢复操作说明
   process/               AI 协作开发 Gate、完整路线图、统一状态与任务协议
+data/
+  governance/            ★ 可提交、非敏感、版本化的来源登记与采集字段字典
 ```
 
 ## 命名约定

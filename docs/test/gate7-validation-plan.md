@@ -3,7 +3,7 @@
 - 文档版本：V1.1
 - 日期：2026-08-29
 - 产品里程碑：M1 — 行程骨架验证
-- 当前状态：R0.1 环境锁机制和 R0.2-01 地点/投影 ADR 已完成；R0.2-02～07 杭州研究数据、R0.3 服务器 H5 和 R0.4 内部 dry run 待执行；尚未招募、尚未收集真实用户证据
+- 当前状态：R0.1、R0.2-01 和 R0.2-02 来源治理已完成；当前进入 R0.2-03 地点物理模型与迁移，R0.2-04～07、R0.3 服务器 H5 和 R0.4 内部 dry run 待执行；尚未招募、尚未收集真实用户证据
 - 关联假设：H1、H2、H3、H6、H7、H11
 - 技术输入：Gate 6 已通过；A6 首个浏览器可操作纵向切片已收口
 
@@ -55,7 +55,7 @@ G7-R0.1 protocol/证据/环境锁定机制
 R0 不以“文档存在”为完成。外部参与者开始前必须依次通过：
 
 - R0.1：protocol、证据 Schema、研究环境 manifest 和隐私门禁；
-- R0.2：先按 [`ADR-0018`](../decisions/ADR-0018-place-catalog-and-solver-projection.md) 建设通用 Place、访问点与求解投影，再形成足以支持真实选择的杭州 published research snapshot；当前 7 个路线点只保留为技术回归基线；候选来源由 AI 自主检索、获取、登记和交叉核验，未经合规与人工审核不得发布；
+- R0.2：先按 [`ADR-0018`](../decisions/ADR-0018-place-catalog-and-solver-projection.md) 建设通用 Place、访问点与求解投影，再形成足以支持真实选择的杭州 published research snapshot；当前 7 个路线点只保留为技术回归基线；R0.2-02 已建立 [来源与采集规范](../domain/地点数据来源与采集规范.md)、机器 registry、58 字段 allowlist 和 fail-closed 校验，后续候选来源未经登记与人工审核不得发布；
 - R0.3：参与者可从自有手机访问的受控服务器 H5，或有书面理由限定为主持人设备的现场研究环境；edge/H5、FastAPI、迁移任务、MySQL、Redis 必须由一个逻辑 Docker Compose 项目统一管理；
 - R0.4：团队内部 dry run，开放 blocker 和影响核心任务的 major 均为 0。
 

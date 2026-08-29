@@ -1,0 +1,286 @@
+{
+  "schema_version": "source-registry-v1",
+  "registry_id": "hangzhou-m1-source-registry-v1",
+  "city_id": "hangzhou",
+  "reviewed_at": "2026-08-29T13:49:25+08:00",
+  "review_policy_version": "source-policy-v1",
+  "scope": "G7-R0.2杭州研究地点、OD和天气的非敏感来源登记；不是法律意见，也不授权超出各来源条款的使用",
+  "limitations": [
+    "已在用户指定的Google Chrome可用实例中完成首批5个来源的可见页面复核；政府站点仍保持conditional，具体页面、数据集和字段仍需逐项登记，Chrome可访问不等于批量采集许可。",
+    "robots.txt缺失或返回404不等于允许自动抓取；政府站点当前只允许人工引用或低频、显式页面的staging采集。",
+    "开放数据平台必须按具体数据集另建来源记录并审查数据集许可，门户首页本身不授权数据集发布。"
+  ],
+  "sources": [
+    {
+      "source_id": "hangzhou-wgly-public-web",
+      "display_name": "杭州市文化广电旅游局公开网站",
+      "source_kind": "government_public_site",
+      "roles": ["government"],
+      "decision": "conditional",
+      "review_status": "reviewed",
+      "base_urls": ["https://wgly.hangzhou.gov.cn/"],
+      "collection_modes": ["manual_reference", "public_page_fetch"],
+      "allowed_fields": [
+        "provenance.source_record_id", "provenance.source_url", "provenance.observed_at", "provenance.content_sha256",
+        "place.canonical_name", "place.aliases", "place.place_kind", "place.category", "place.admin_area", "place.address", "place.geometry_kind", "place.geometry",
+        "access.arrival.name", "access.arrival.kind", "access.departure.name", "access.departure.kind", "access.same_as_arrival",
+        "time.is_always_open", "time.rules", "time.close_days", "time.close_day_exceptions", "time.fixed_sessions",
+        "experience.duration_min", "experience.duration_recommended", "experience.duration_max", "experience.internal_walk_min", "experience.energy_level", "experience.indoor_outdoor", "experience.suitable_periods", "experience.audience_tags", "experience.rain_suitability",
+        "relation.relation_type", "relation.related_place_id", "relation.selection_exclusion_group", "relation.review_decision"
+      ],
+      "prohibited_fields": ["user.*", "review.full_text", "media.binary", "credential.*"],
+      "conditions": [
+        "每个页面单独保存source_url、observed_at和字段级出处。",
+        "只进入staging；具体场馆或景区事实发布前必须登记并审核运营方页面或完成双源人工裁决。",
+        "不进行站点级批量遍历，不保存整页副本、图片、视频或个人信息。"
+      ],
+      "attribution_policy": "source_url_and_observed_at",
+      "raw_retention": "metadata_and_hash_only",
+      "credential_policy": "none",
+      "rate_limit_policy": "manual_or_explicit_low_frequency_pages_only",
+      "terms_evidence": [
+        {
+          "kind": "homepage",
+          "url": "https://wgly.hangzhou.gov.cn/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "c9a14ea09f3b1552762d3692e6ce1a57a978735c9c91a71bd8c5a1ae62562ad8"
+        },
+        {
+          "kind": "robots",
+          "url": "https://wgly.hangzhou.gov.cn/robots.txt",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 404,
+          "content_sha256": "ee1a27178227546d3dcc49e611a6d72e4f1c30080ee4493ae4085b58a49e28e6"
+        }
+      ],
+      "reviewed_at": "2026-08-29T13:49:25+08:00",
+      "next_review_on": "2026-09-29",
+      "notes": "Chrome可见页确认站点页眉为杭州市文化广电旅游局、页脚主办主体一致；政府公开事实优先级高，但首页可访问不代表批量采集许可，当前故意限制为conditional。"
+    },
+    {
+      "source_id": "hangzhou-westlake-admin-public-web",
+      "display_name": "杭州西湖风景名胜区管委会公开网站",
+      "source_kind": "official_operator_site",
+      "roles": ["government", "official_operator"],
+      "decision": "conditional",
+      "review_status": "reviewed",
+      "base_urls": ["https://westlake.hangzhou.gov.cn/"],
+      "collection_modes": ["manual_reference", "public_page_fetch"],
+      "allowed_fields": [
+        "provenance.source_record_id", "provenance.source_url", "provenance.observed_at", "provenance.content_sha256",
+        "place.canonical_name", "place.aliases", "place.place_kind", "place.category", "place.admin_area", "place.address", "place.geometry_kind", "place.geometry",
+        "access.arrival.name", "access.arrival.kind", "access.departure.name", "access.departure.kind", "access.same_as_arrival",
+        "time.is_always_open", "time.rules", "time.close_days", "time.close_day_exceptions", "time.fixed_sessions",
+        "experience.duration_min", "experience.duration_recommended", "experience.duration_max", "experience.internal_walk_min", "experience.energy_level", "experience.indoor_outdoor", "experience.suitable_periods", "experience.audience_tags", "experience.rain_suitability",
+        "relation.relation_type", "relation.related_place_id", "relation.selection_exclusion_group", "relation.review_decision"
+      ],
+      "prohibited_fields": ["user.*", "review.full_text", "media.binary", "credential.*"],
+      "conditions": [
+        "每个具体栏目或公告页面单独登记，不使用首页摘要替代开放时间和临时公告。",
+        "只进入staging；入口、开放区域和父子地点关系必须人工地图复核并形成裁决。",
+        "不进行站点级批量遍历，不保存整页副本、图片、视频或个人信息。"
+      ],
+      "attribution_policy": "source_url_and_observed_at",
+      "raw_retention": "metadata_and_hash_only",
+      "credential_policy": "none",
+      "rate_limit_policy": "manual_or_explicit_low_frequency_pages_only",
+      "terms_evidence": [
+        {
+          "kind": "homepage",
+          "url": "https://westlake.hangzhou.gov.cn/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "658d9196adf1f59bb202e3b630d5c25e46677ca83c14f05a2023090cdf1e39ed"
+        },
+        {
+          "kind": "robots",
+          "url": "https://westlake.hangzhou.gov.cn/robots.txt",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 404,
+          "content_sha256": "ee1a27178227546d3dcc49e611a6d72e4f1c30080ee4493ae4085b58a49e28e6"
+        },
+        {
+          "kind": "documentation",
+          "url": "https://westlake.hangzhou.gov.cn/col/col1597393/index.html",
+          "checked_at": "2026-08-29T13:49:25+08:00",
+          "http_status": 200
+        }
+      ],
+      "reviewed_at": "2026-08-29T13:49:25+08:00",
+      "next_review_on": "2026-09-29",
+      "notes": "Chrome可见页确认主办单位为杭州西湖风景名胜区管理委员会，且“我想游”栏目公开展示西湖十景和活动条目；用于景区、开放区域、公告和访问语义候选，但不自动把景区内部设施继承为全天开放。"
+    },
+    {
+      "source_id": "hangzhou-open-data-portal",
+      "display_name": "杭州市数据开放平台",
+      "source_kind": "open_data_portal",
+      "roles": ["government", "licensed_open_data"],
+      "decision": "conditional",
+      "review_status": "reviewed",
+      "base_urls": ["https://data.hangzhou.gov.cn/"],
+      "collection_modes": ["dataset_download", "manual_reference"],
+      "allowed_fields": [
+        "provenance.source_record_id", "provenance.source_url", "provenance.observed_at", "provenance.content_sha256",
+        "place.canonical_name", "place.aliases", "place.place_kind", "place.category", "place.admin_area", "place.address", "place.geometry_kind", "place.geometry"
+      ],
+      "prohibited_fields": ["dataset.unspecified_license", "user.*", "media.binary", "credential.*"],
+      "conditions": [
+        "每个数据集必须另建source_id并记录数据集页面、许可、更新频率、字段和归属要求。",
+        "未明确允许再利用的具体数据集只能用于候选发现，不进入published。",
+        "下载文件只进入受控staging，提交Git前仅保留允许发布的结构化事实、来源元数据和哈希。"
+      ],
+      "attribution_policy": "dataset_specific",
+      "raw_retention": "metadata_and_hash_only",
+      "credential_policy": "none",
+      "rate_limit_policy": "per_dataset_terms_and_documented_download_only",
+      "terms_evidence": [
+        {
+          "kind": "homepage",
+          "url": "https://data.hangzhou.gov.cn/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "51535fefc706039ead3ace0d64748b62b8a43db6e79791109dbbd83b0a29e857"
+        },
+        {
+          "kind": "robots",
+          "url": "https://data.hangzhou.gov.cn/robots.txt",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 404,
+          "content_sha256": "6c0445d6952eba54b4c0cc5705555f01378f23193b3492b6d724e5ee5ca52488"
+        },
+        {
+          "kind": "terms",
+          "url": "https://data.hangzhou.gov.cn/dop/pdf/agreement.pdf?20260702",
+          "checked_at": "2026-08-29T13:49:25+08:00",
+          "http_status": 200
+        }
+      ],
+      "reviewed_at": "2026-08-29T13:49:25+08:00",
+      "next_review_on": "2026-09-29",
+      "notes": "Chrome可见页确认平台由中共杭州市委、杭州市人民政府主办，并能打开4页《数据开放授权许可使用协议》；门户级协议和登记仍不能替代具体数据集级许可审查。"
+    },
+    {
+      "source_id": "gaode-web-service",
+      "display_name": "高德开放平台Web服务API",
+      "source_kind": "licensed_api",
+      "roles": ["licensed_map_provider"],
+      "decision": "approved",
+      "review_status": "reviewed",
+      "base_urls": ["https://lbs.amap.com/", "https://restapi.amap.com/"],
+      "collection_modes": ["api"],
+      "allowed_fields": [
+        "provenance.source_record_id", "provenance.source_url", "provenance.observed_at", "provenance.content_sha256",
+        "place.canonical_name", "place.aliases", "place.admin_area", "place.address", "place.geometry_kind", "place.geometry",
+        "access.arrival.name", "access.arrival.kind", "access.arrival.lat", "access.arrival.lng",
+        "access.departure.name", "access.departure.kind", "access.departure.lat", "access.departure.lng", "access.same_as_arrival",
+        "external.gaode_poi_id",
+        "od.origin_access_point_id", "od.destination_access_point_id", "od.mode", "od.duration_min", "od.distance_m", "od.provider", "od.fetched_at", "od.data_version"
+      ],
+      "prohibited_fields": ["credential.*", "request_url_with_key", "user.location_history", "raw_response_unbounded"],
+      "conditions": [
+        "Key只从.env或服务器Secret注入，日志、快照和source registry不保存Key或带Key请求URL。",
+        "POI和坐标是候选，正式访问点仍需human_verified；路线缓存、展示和归属遵守Provider条款。",
+        "调用受每日预算、限流、熔断和版本化缓存约束。"
+      ],
+      "attribution_policy": "provider_terms",
+      "raw_retention": "contract_limited_cache",
+      "credential_policy": "environment_only",
+      "rate_limit_policy": "provider_contract_plus_project_budget_and_throttle",
+      "terms_evidence": [
+        {
+          "kind": "documentation",
+          "url": "https://lbs.amap.com/api/webservice/summary",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "345bc71ea32a46f9fb496002a710fc28d4a30feab1cdc69244aa29998e3cc074"
+        },
+        {
+          "kind": "terms",
+          "url": "https://terms.alicdn.com/legal-agreement/terms/c_platform_service_agreement/20250314165704167/20250314165704167.html",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "01bcbe291290b49a48a88252b34c15c24d7ecb26620b5178a5d1f41150504beb"
+        }
+      ],
+      "reviewed_at": "2026-08-29T13:29:00+08:00",
+      "next_review_on": "2026-11-29",
+      "notes": "已有真实Key、42/42严格有向OD、缓存和生产回放证据；本登记不扩大既有合同权利。"
+    },
+    {
+      "source_id": "qweather-developer-service",
+      "display_name": "和风天气开发服务",
+      "source_kind": "licensed_api",
+      "roles": ["licensed_weather_provider"],
+      "decision": "approved",
+      "review_status": "reviewed",
+      "base_urls": ["https://dev.qweather.com/", "https://www.qweather.com/"],
+      "collection_modes": ["api"],
+      "allowed_fields": [
+        "provenance.source_record_id", "provenance.source_url", "provenance.observed_at", "provenance.content_sha256",
+        "weather.date", "weather.status", "weather.provider", "weather.fetched_at", "weather.data_version"
+      ],
+      "prohibited_fields": ["credential.*", "request_headers", "raw_response_unbounded"],
+      "conditions": [
+        "API KEY和专属Host只从环境注入，日志和数据文件不保存凭证。",
+        "按照使用限制、来源标注和开发者许可控制缓存、展示和再分发。",
+        "研究环境锁定准确forecast版本，不把不同日期天气混入同一环境。"
+      ],
+      "attribution_policy": "provider_terms",
+      "raw_retention": "contract_limited_cache",
+      "credential_policy": "environment_only",
+      "rate_limit_policy": "provider_contract_plus_project_budget_and_cache",
+      "terms_evidence": [
+        {
+          "kind": "terms",
+          "url": "https://dev.qweather.com/docs/terms/tos/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "4b1f6f07a8b91355f839e62ff33f9cb5693cff7e8142c45044191d634197f689"
+        },
+        {
+          "kind": "restriction",
+          "url": "https://dev.qweather.com/docs/terms/restriction/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "3c81f77f9a98c597093921544ee5133111bfb4896bec735f29513ec3e0fe91bd"
+        },
+        {
+          "kind": "attribution",
+          "url": "https://dev.qweather.com/docs/terms/attribution/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "ad833f437b1ee54ca6ce6204f71478545e162e9ec583e911eea53ec37245eb39"
+        },
+        {
+          "kind": "terms",
+          "url": "https://www.qweather.com/terms/developers-eula/",
+          "checked_at": "2026-08-29T13:29:00+08:00",
+          "http_status": 200,
+          "content_sha256": "f24c79005a3aad687c47b2e21baf5293738d53d52e0cfc6f44c2f58cbe1996a7"
+        }
+      ],
+      "reviewed_at": "2026-08-29T13:29:00+08:00",
+      "next_review_on": "2026-11-29",
+      "notes": "已有真实三日天气、正式bundle、生产回放和来源字段证据。"
+    }
+  ],
+  "exclusions": [
+    {
+      "exclusion_id": "social-ugc-bulk-pages",
+      "host_patterns": ["xiaohongshu.com", "douyin.com", "mp.weixin.qq.com", "weixin.qq.com"],
+      "reason_code": "SOCIAL_UGC_BULK_COLLECTION_NOT_AUTHORIZED",
+      "prohibited_collection_modes": ["api", "dataset_download", "public_page_fetch"],
+      "prohibited_content": ["用户昵称和账号", "评论或帖子全文", "图片和视频", "Cookie/token/验证码", "用户画像和互动关系"],
+      "reconsideration_trigger": "获得官方API、书面授权或逐项用户内容授权，并完成版权、隐私、保留期和内容治理评审。"
+    },
+    {
+      "exclusion_id": "ota-review-bulk-pages",
+      "host_patterns": ["dianping.com", "ctrip.com", "trip.com", "mafengwo.cn"],
+      "reason_code": "OTA_REVIEW_BULK_COLLECTION_NOT_AUTHORIZED",
+      "prohibited_collection_modes": ["api", "dataset_download", "public_page_fetch"],
+      "prohibited_content": ["评论全文", "用户身份", "未授权媒体", "实时价格或库存页面副本", "登录态和反爬凭证"],
+      "reconsideration_trigger": "接入官方联盟/API或取得明确授权，并完成价格时效、归属、缓存、再分发和用户内容许可评审。"
+    }
+  ]
+}
