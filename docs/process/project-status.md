@@ -8,7 +8,7 @@
 
 ### 2026-08-30 续接进度
 
-`G7-R0.2-05-02` 正在实施：追加 Alembic `0008_place_review_workflow`，新增 `PlaceReviewTask`/`PlaceReviewDecision` 不可变领域值对象，并完成送审、审核决定、Revision 状态联动、追加式审计、幂等重放和版本冲突语义。独立 `admin-web` 已接入 O08 审核队列首版，可查看任务/决定历史并执行通过、退回修改和关闭；O01–O07 的候选详情、地图、时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0008_place_review_workflow`，服务器 MySQL/Redis 未连接。
+`G7-R0.2-05-02` 正在实施：追加 Alembic `0008_place_review_workflow`，新增 `PlaceReviewTask`/`PlaceReviewDecision` 不可变领域值对象，并完成送审、审核决定、Revision 状态联动、追加式审计、幂等重放和版本冲突语义。独立 `admin-web` 已接入 O08 审核队列首版和 O02 候选地点清单首版，可查看任务/决定历史、候选 Revision 基础事实并执行审核操作；O01 待办摘要及 O03–O07 的地点详情、地图、时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0008_place_review_workflow`，服务器 MySQL/Redis 未连接。
 
 | 术语 | 含义 |
 |---|---|
@@ -29,8 +29,8 @@
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
 - 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
-- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。当前已形成 candidate→送审→驳回/通过闭环和 O08 队列首版，继续补齐 O01–O07 的候选/Revision 详情及依赖证据展示；不通过 SQL 手工改状态，未审核依赖仍阻断发布。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心和 O08 队列首版，但 O01–O07 证据面、72 个 candidate 批量审核、OD 扩容、不可变数据发布、应用部署和 dry run 仍未完成，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。当前已形成 candidate→送审→驳回/通过闭环、O08 队列首版和 O02 候选清单首版，继续补齐 O01、O03–O07 的候选/Revision 详情及依赖证据展示；不通过 SQL 手工改状态，未审核依赖仍阻断发布。本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版和 O02 候选清单首版，但 O01、O03–O07 证据面、72 个 candidate 批量审核、OD 扩容、不可变数据发布、应用部署和 dry run 仍未完成，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -160,8 +160,9 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 审核操作均写入 `AdminAuditEvent`，携带 request ID、operation intent、规范化 operation digest、前后摘要和稳定错误码；相同 intent 可安全重放，不同载荷冲突；任务使用 version 乐观锁，过期决定返回 409；
 - 新增管理 API：`GET /review-tasks`、`POST /place-revisions/{revision_id}/review-tasks`、`POST /review-tasks/{task_id}/decisions`、`GET /review-tasks/{task_id}/decisions`；非 candidate Revision、未知任务和重复决定均有稳定错误语义；
 - 独立 `admin-web` 新增审核队列入口：按任务状态筛选、查看任务/决定历史、执行通过/退回修改/关闭；前端不复制 Revision 状态规则，所有状态变更由服务端 RBAC、事务和乐观锁决定；
-- 验证：审核专项后端测试 `9/9`、相关数据库测试 `12/12`、admin-web typecheck、Vitest `3/3`、Vite production build、全量 pytest `343/343` 和 `git diff --check` 通过；Chrome 已打开本地审核入口，管理员登录后的可视化操作验收待用户在当前会话确认输入本地密码后继续；
-- 当前剩余：O01 待办摘要、O02 候选列表/覆盖矩阵、O03 Revision 详情、O04 地图/访问点、O05 开放时间、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；本机不部署 MySQL/Redis，Chrome 可视化验收待本地服务重启后执行。
+- 新增 O02 候选清单首版：`GET /api/v1/admin/candidates` 和 `GET /api/v1/admin/place-revisions/{revision_id}`，支持按 lifecycle status 查询并返回 Revision 基础事实、来源记录数量、冲突裁决和 solver eligibility；admin-web 提供候选列表、详情展开和只读边界；
+- 验证：审核与候选专项后端测试 `10/10`、相关数据库测试 `12/12`、admin-web typecheck、Vitest `4/4`、Vite production build、全量 pytest `344/344` 和 `git diff --check` 通过；Chrome 已打开本地审核入口，管理员登录后的可视化操作验收待用户在当前会话确认输入本地密码后继续；
+- 当前剩余：O01 待办摘要、O03 Revision 详情增强、O04 地图/访问点、O05 开放时间、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；本机不部署 MySQL/Redis。
 
 ### A4：应用代码架构设计
 

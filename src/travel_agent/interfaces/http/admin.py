@@ -13,7 +13,7 @@ from travel_agent.application.admin import (
     PlaceReviewWorkflowService,
 )
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
-from travel_agent.domain.place_catalog import PlaceReviewDecision, PlaceReviewTask
+from travel_agent.domain.place_catalog import PlaceReviewDecision, PlaceReviewTask, PlaceRevision
 
 
 class CreateAdminSessionInput(BaseModel):
@@ -199,6 +199,33 @@ def build_admin_router(
 
     if review_workflow is not None:
 
+        @router.get("/candidates")
+        def list_candidates(
+            current: AdminPrincipal = principal_dependency,
+            lifecycle_status: str | None = Query(default="candidate", max_length=24),
+            limit: int = Query(default=50, ge=1, le=100),
+            offset: int = Query(default=0, ge=0),
+        ) -> dict[str, object]:
+            revisions = review_workflow.list_revisions(
+                current,
+                lifecycle_status=lifecycle_status,
+                limit=limit,
+                offset=offset,
+            )
+            return {
+                "items": [_revision_response(revision) for revision in revisions],
+                "limit": limit,
+                "offset": offset,
+            }
+
+        @router.get("/place-revisions/{revision_id}")
+        def get_place_revision(
+            revision_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.get_revision(current, revision_id=revision_id)
+            return _revision_response(revision)
+
         @router.get("/review-tasks")
         def list_review_tasks(
             current: AdminPrincipal = principal_dependency,
@@ -310,6 +337,38 @@ def _review_task_response(task: PlaceReviewTask) -> dict[str, object]:
         "created_by": task.created_by,
         "created_at": task.created_at.isoformat(),
         "updated_at": task.updated_at.isoformat(),
+    }
+
+
+def _revision_response(revision: PlaceRevision) -> dict[str, object]:
+    return {
+        "place_revision_id": revision.place_revision_id,
+        "place_id": revision.place_id,
+        "revision_number": revision.revision_number,
+        "lifecycle_status": revision.lifecycle_status,
+        "canonical_name": revision.canonical_name,
+        "aliases": list(revision.aliases),
+        "place_kind": revision.place_kind,
+        "category": revision.category,
+        "admin_area": revision.admin_area,
+        "address": revision.address,
+        "geometry_kind": revision.geometry_kind,
+        "duration_min": revision.duration_min,
+        "duration_recommended": revision.duration_recommended,
+        "duration_max": revision.duration_max,
+        "internal_travel_min": revision.internal_travel_min,
+        "energy_level": revision.energy_level,
+        "indoor_outdoor": revision.indoor_outdoor,
+        "suitable_periods": list(revision.suitable_periods),
+        "audience_tags": list(revision.audience_tags),
+        "rain_suitability": revision.rain_suitability,
+        "is_always_open": revision.is_always_open,
+        "solver_eligible": revision.solver_eligible,
+        "conflicts_resolved": revision.conflicts_resolved,
+        "source_record_ids": list(revision.source_record_ids),
+        "created_at": revision.created_at.isoformat(),
+        "reviewed_at": revision.reviewed_at.isoformat() if revision.reviewed_at else None,
+        "published_at": revision.published_at.isoformat() if revision.published_at else None,
     }
 
 

@@ -1136,7 +1136,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 review-tasks/decisions 审核闭环；candidate/place/revision 详情、publication/research snapshot 端点仍属于后续 O01–O07 与 R0.2-07，尚不可调用。
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、review-tasks/decisions 审核闭环；地图、时间、来源、关系子资源和 publication/research snapshot 端点仍属于后续 O03–O07 与 R0.2-07，尚不可调用。
 
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
 

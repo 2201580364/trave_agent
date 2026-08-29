@@ -11,6 +11,7 @@ import type {
   ReviewDecision,
   ReviewTask,
   ReviewTaskStatus,
+  PlaceRevision,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -81,6 +82,15 @@ export class AdminApi {
     const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (status !== undefined) query.set('review_status', status)
     return this.request(`/review-tasks?${query}`)
+  }
+
+  listCandidates(status = 'candidate', limit = 50, offset = 0): Promise<PageResponse<PlaceRevision>> {
+    const query = new URLSearchParams({ lifecycle_status: status, limit: String(limit), offset: String(offset) })
+    return this.request(`/candidates?${query}`)
+  }
+
+  getPlaceRevision(revisionId: string): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}`)
   }
 
   decidePlaceReview(

@@ -540,6 +540,31 @@ def test_place_review_submit_approve_and_audit_are_one_workflow(
     assert history.json()["items"][0]["actor_role"] == "data_reviewer"
 
 
+def test_candidate_list_and_revision_detail_are_permission_scoped(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-candidates")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    candidates = context.client.get("/api/v1/admin/candidates", headers=headers)
+    assert candidates.status_code == 200
+    assert candidates.json()["items"][0]["place_revision_id"] == "revision-candidates"
+    assert candidates.json()["items"][0]["lifecycle_status"] == "candidate"
+
+    detail = context.client.get(
+        "/api/v1/admin/place-revisions/revision-candidates", headers=headers
+    )
+    assert detail.status_code == 200
+    assert detail.json()["canonical_name"] == "Candidate Place"
+
+    missing = context.client.get(
+        "/api/v1/admin/place-revisions/missing", headers=headers
+    )
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "resource_not_found"
+
+
 def test_place_review_request_changes_keeps_candidate_and_rejects_stale_version(
     admin_context: AdminTestContext,
 ) -> None:

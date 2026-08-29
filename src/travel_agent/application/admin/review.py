@@ -47,6 +47,10 @@ class ReviewRepository(Protocol):
 
     def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
 
+    def list_revisions(
+        self, *, lifecycle_status: str | None, limit: int, offset: int
+    ) -> tuple[PlaceRevision, ...]: ...
+
     def add_task(self, task: PlaceReviewTask) -> None: ...
 
     def add_decision(self, decision: PlaceReviewDecision) -> None: ...
@@ -99,6 +103,32 @@ class PlaceReviewWorkflowService:
         self._require(principal, "place:review:read")
         with self._uow_factory() as uow:
             return uow.reviews.list_tasks(status=status, limit=limit, offset=offset)
+
+    def list_revisions(
+        self,
+        principal: AdminPrincipal,
+        *,
+        lifecycle_status: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[PlaceRevision, ...]:
+        self._require(principal, "place:candidate:read")
+        with self._uow_factory() as uow:
+            return uow.reviews.list_revisions(
+                lifecycle_status=lifecycle_status,
+                limit=limit,
+                offset=offset,
+            )
+
+    def get_revision(
+        self, principal: AdminPrincipal, *, revision_id: str
+    ) -> PlaceRevision:
+        self._require(principal, "place:candidate:read")
+        with self._uow_factory() as uow:
+            revision = uow.reviews.get_revision(revision_id)
+            if revision is None:
+                raise ResourceNotFoundError
+            return revision
 
     def list_decisions(
         self, principal: AdminPrincipal, *, task_id: str

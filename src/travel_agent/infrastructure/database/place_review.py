@@ -70,6 +70,24 @@ class SqlAlchemyPlaceReviewRepository:
             return None
         return _revision_from_row(row)
 
+    def list_revisions(
+        self, *, lifecycle_status: str | None, limit: int, offset: int
+    ) -> tuple[PlaceRevision, ...]:
+        statement = select(PlaceRevisionRow)
+        if lifecycle_status is not None:
+            statement = statement.where(
+                PlaceRevisionRow.lifecycle_status == lifecycle_status
+            )
+        rows = self._session.scalars(
+            statement.order_by(
+                PlaceRevisionRow.created_at.desc(),
+                PlaceRevisionRow.place_revision_id.asc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        return tuple(_revision_from_row(row) for row in rows)
+
     def get_open_task_for_revision(self, revision_id: str) -> PlaceReviewTask | None:
         row = self._session.scalar(
             select(PlaceReviewTaskRow)
