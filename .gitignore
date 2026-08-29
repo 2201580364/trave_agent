@@ -66,3 +66,6 @@ var/
 /id_rsa.pub
 *.pem
 *.ppk
+/admin-web/node_modules/*
+/admin-web/dist/
+/admin-web/*.tsbuildinfo

@@ -1,0 +1,19 @@
+import { AdminApiError } from './adminApi'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  admin_authentication_required: '管理员会话无效或已过期，请重新登录。',
+  admin_permission_denied: '当前管理员没有执行此操作的权限。',
+  admin_operation_intent_conflict: '该操作标识已被用于不同内容，请关闭窗口后重新操作。',
+  admin_login_name_conflict: '该登录名已存在，请使用其他登录名。',
+  admin_actor_version_conflict: '管理员资料已被其他操作更新，请刷新列表后重试。',
+  admin_role_safety_violation: '不能移除最后一个有效安全管理员的安全角色，请先建立恢复路径。',
+  domain_validation_failed: '提交内容未通过安全或格式校验，请检查后重试。',
+}
+
+export function adminErrorMessage(error: unknown): string {
+  if (error instanceof AdminApiError) {
+    const message = ERROR_MESSAGES[error.code] ?? error.message
+    return error.requestId ? `${message}（请求 ${error.requestId}）` : message
+  }
+  return '管理服务暂时不可用，请稍后重试。'
+}

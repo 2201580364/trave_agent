@@ -20,13 +20,13 @@
 ## 当前总状态
 
 - 更新时间：2026-08-29
-- 当前已提交基线：`41b2cd8 feat(data): add Hangzhou candidate catalog and coverage gate`
+- 当前已提交基线：`9af0330 feat(admin): add OM1 identity RBAC and audit foundation`；工作区另有未提交的 `admin-web/`、`docs/decisions/ADR-0020-admin-web-ui-stack.md` 与测试依赖变更
 - 产品里程碑：`M1 — 行程骨架验证`
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
-- 当前阶段：`Gate 7 — G7-R0.2-05-01B O00/O16 管理 Web 壳与安全操作面（当前节点）`
-- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座之上，建立独立 React/Vite 管理 Web 的 O00 登录、会话超时、O16 管理员/角色和最小 O15 审计只读操作面；不打入 Taro 用户包，不提前实现 O01–O08 地点审核，不连接或迁移服务器数据库。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04 和 R0.2-05-01A 已完成。72 个 candidate 仍只是后续审核池，尚未批量 human_verified 或进入求解器。Alembic `0007_admin_identity_audit` 已实现独立管理身份、会话、服务端 RBAC、管理员创建/角色管理和追加式业务审计；admin-web、地点审核任务/决定、OD 扩容、不可变数据发布、应用部署和 dry run 仍未完成，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
+- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，实现 O01–O08 地点审核工作台 P0（候选、待办、地点、地图、时间、来源、关系和审核页面），形成 candidate→送审→驳回/通过闭环；不通过 SQL 手工改状态，未审核依赖仍阻断发布。本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成。72 个 candidate 仍只是后续审核池，尚未批量 human_verified 或进入求解器。Alembic `0007_admin_identity_audit` 已实现独立管理身份、会话、服务端 RBAC、管理员创建/角色管理和追加式业务审计；独立 admin-web 的 O00 登录/超时、O16 管理员/角色和最小 O15 审计只读面已实现并通过 typecheck/test/build 与全量 pytest。地点审核任务/决定、OD 扩容、不可变数据发布、应用部署和 dry run 仍未完成，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -38,7 +38,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 已把数据规模拆为两层：G7-R1 研究最低目录约 50–75 个 `human_verified` Place，M1 受控上线目录原则上 80–120 个；二者均不允许用未经来源登记或未经审核的数据凑数；
 - 已同步功能完整性审查 V1.2、用户功能 V3.5、管理端功能 V1.1、UI/交互 V1.4、架构 V1.4、API V2.7、数据模型 V2.9、测试硬/软约束口径、开放时间目录门槛和高德 7 点正式发布状态；
 - 已接受 ADR-0019，建立 OM1–OM4 管理侧路线、ADM-* 功能树、O00–O16 页面族和独立管理 API/RBAC/业务审计边界；R0.2-04 不等待管理端，R0.2-05 批量 human_verified 前必须完成 OM1 P0 审核闭环；
-- 文档复审完成后已依次关闭 `G7-R0.2-02`、`G7-R0.2-03` 和 R0.2-04；R0.2-05-01A 管理身份/API/审计后端底座也已完成，当前转入 05-01B 管理 Web 壳，不是批量发布、应用部署或 M2 功能实现。
+- 文档复审完成后已依次关闭 `G7-R0.2-02`、`G7-R0.2-03` 和 R0.2-04；R0.2-05-01A 管理身份/API/审计后端底座与 R0.2-05-01B 管理 Web 壳均已实现并验证，当前转入 05-02 地点审核工作台，不是批量发布、应用部署或 M2 功能实现。
 - G1 发现研究不依赖 H5，可与 R0.2–R0.4 并行组织，但必须在 R1 外部参与者招募锁定前关闭，以免用未经校准的目标画像开展形成性/确认性测试；它不改变当前工程节点。
 - 文档复审验证：Gate 7 environment/evidence 定向回归 `19/19` 通过；protocol 规范化 SHA-256 保持 `b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89` 且协议文件无 diff；全部 docs Markdown 相对链接可解析，269 个三级功能 ID 和 ADR 编号无重复，`git diff --check` 与敏感信息扫描通过。由于本轮不改运行代码，未重复执行全量 306 项技术基线。
 
@@ -55,7 +55,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | A1 功能模块设计 | 完成并持续同步（V3.5） | 14 个跨里程碑用户/平台一级功能域；新增 OM1–OM4 管理路线映射，详细管理功能见 `docs/product/管理端功能模块设计.md` |
 | 项目文档体系与完整路线复审 | 完成（路线图 V1.0） | 统一 M/G/A/R 四套坐标、G0–G7 证据审计、M1 剩余路线、M2–M4 工作包、完成定义和每轮更新规则；识别 Gate 1 真实用户证据债务，见 `docs/process/project-roadmap.md` |
 | 产品功能完整性复审 | 完成并持续同步（V1.2） | 补齐评论、小记/回顾和地点数据审核管理端三类缺口，见 `docs/product/产品功能完整性审查.md` |
-| 管理端产品设计与后端底座 | OM1–OM4 路线完成；R0.2-05-01A 后端底座完成 | ADR-0019、ADM-1～ADM-13、O00–O16；独立管理身份/API/RBAC/审计已实现，admin-web 与地点审核页面待实现 |
+| 管理端产品设计与后端底座 | OM1–OM4 路线完成；R0.2-05-01B 管理 Web 壳完成 | ADR-0019、ADR-0020、ADM-1～ADM-13、O00–O16；独立管理身份/API/RBAC/审计与 admin-web 已实现，地点审核与发布页面待实现 |
 | A2 信息架构与 UI 设计 | M1 用户端详细设计；OM1 管理端产品级 IA 完成（V1.4） | 保留用户端三模式；新增桌面管理布局、O00–O16 页面和响应式边界，见 `docs/product/信息架构与UI设计.md` |
 | A3 交互流程与状态机 | M1 详细设计；OM1 核心流程登记（V1.4） | IF-01–IF-24 保持用户路线；新增 IF-26–IF-30 管理身份、编辑、审核、发布和裁决，见 `docs/product/交互流程与状态机设计.md` |
 | A4 应用代码架构设计 | 完成并同步管理边界（V1.4） | 两套前端、用户/管理 API 分离、共享领域门禁；管理身份和审计底座已实现，Governance 审核/发布继续按后续工作包落地 |
@@ -68,8 +68,9 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | Gate 7 R0.2-03 地点物理模型 | 完成 | `place_catalog` 领域模型、12 张 SQLAlchemy 表、Alembic `0006_place_catalog`、来源哈希绑定、candidate/human_verified/published 隔离、稳定 projection hash、发布门禁和 8 项测试 |
 | Gate 7 R0.2-04 候选清单与覆盖矩阵 | 完成 | 72 个 candidate、11 区域、9 类别、18 夜间/固定时段、28 室内/雨天、24 非点状候选、11 组未裁决关系线索、确定性覆盖矩阵、CLI 和 7 项测试 |
 | Gate 7 R0.2-05-01A 管理后端底座 | 完成 | 独立 AdminActor/Role/Session、scrypt、会话摘要、服务端 RBAC、管理员创建/角色乐观锁与幂等、追加式 AuditEvent、`/api/v1/admin` 和 Alembic 0007；6 项专项测试 |
+| Gate 7 R0.2-05-01B 管理 Web 壳与安全操作面 | 完成 | ADR-0020 独立 `admin-web/`、O00 登录/超时、O16 管理员与角色、最小 O15 审计只读；token 仅存 React 内存；`npm run typecheck/test/build` 通过，全量 pytest 通过 |
 
-最新稳定技术基线：全量 `340/340` 通过；R0.2-05-01A 管理身份/RBAC/审计专项 `6/6`、相关身份/生产组合/HTTP/SQLAlchemy 回归 `33/33` 通过。新增范围 Ruff 和隔离依赖后的 strict mypy 通过；数据库 head/readiness 已升级为 `0007_admin_identity_audit`。服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。连续多轮压力式回归中曾两次出现已知 Windows `WinError 10055` 瞬时 socketpair 资源错误；新专项 TestClient 已收敛为上下文托管，失败用例、专项整组和最终全量均通过，不判定为业务缺陷。全仓 Ruff/strict mypy 历史债仍未清零。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
+最新稳定技术基线：全量 pytest `340/340` 通过；admin-web `4/4` 测试、`tsc -b` 与 Vite 生产构建通过；R0.2-05-01A 管理身份/RBAC/审计专项 `6/6`、相关身份/生产组合/HTTP/SQLAlchemy 回归 `33/33` 通过。新增范围 Ruff 和隔离依赖后的 strict mypy 通过；数据库 head/readiness 已升级为 `0007_admin_identity_audit`。服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。连续多轮压力式回归中曾两次出现已知 Windows `WinError 10055` 瞬时 socketpair 资源错误；新专项 TestClient 已收敛为上下文托管，失败用例、专项整组和最终全量均通过，不判定为业务缺陷。全仓 Ruff/strict mypy 历史债仍未清零。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -77,11 +78,11 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 
 ### Gate 7：专家/用户验证准备
 
-- 状态：G7-R0.1、R0.2-01～04 和 R0.2-05-01A 已完成；当前执行节点为 R0.2-05-01B O00/O16 管理 Web 壳与安全操作面。首个真实 `locked` 环境尚未生成，尚未开始招募或收集真实用户数据；
+- 状态：G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；当前执行节点为 R0.2-05-02 OM1 地点审核工作台 P0。首个真实 `locked` 环境尚未生成，尚未开始招募或收集真实用户数据；
 - 当前输入：已通过 Gate 6 的求解器证据、A6 完整浏览器纵向切片、结构化 Revision/节点反馈能力；
 - 已完成产物：`gate7-validation-plan.md`、专家评审表、用户主持脚本、`gate7-protocol-v1.json`、匿名 evidence validator/aggregate report、`gate7-research-environment-v1` manifest、锁定 CLI 和环境/evidence 绑定测试；
 - 已完成数据底座：`hangzhou-m1-source-registry-v1`、58 字段字典、来源校验 CLI；`place_catalog` 领域模型；12 张地点表和 Alembic `0006_place_catalog`；candidate→published 依赖闭包门禁；`hangzhou-m1-candidate-catalog-v1` 的 72 个 candidate、覆盖矩阵和关系线索；
-- 下一产物：R0.2-05-01B 的独立 admin-web、O00 登录/超时、O16 管理员与角色、最小 O15 审计只读页；其后依次是 R0.2-05-02 地点审核工作台、R0.2-05-03 批量采集审核、R0.2-06 OD 按需子图和 R0.2-07 OM1 发布中心/published research snapshot，再进入统一 Compose 的服务器 H5/HTTPS、locked manifest 与内部 dry run；
+- 下一产物：R0.2-05-02 地点审核工作台 P0（O01–O08）；其后依次是 R0.2-05-03 批量采集审核、R0.2-06 OD 按需子图和 R0.2-07 OM1 发布中心/published research snapshot，再进入统一 Compose 的服务器 H5/HTTPS、locked manifest 与内部 dry run；
 - 门禁原则：不得用自动化测试、Chrome 验收或团队内部主观判断冒充 H3/H11 的真实证据；Gate 7 结果决定 M1 补修、受控试运行或进入 M2，而不是预设一定晋级。
 
 ### G7-R0.2-02 来源治理与采集字段字典（2026-08-29）
@@ -137,6 +138,16 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 新增 Alembic `0007_admin_identity_audit`，追加 admin_actors/admin_roles/admin_actor_roles/admin_sessions/admin_audit_events 5 张表并种下 6 个角色目录；0001–0006 未修改；readiness head 同步为 0007，服务器 MySQL 保持 0002；
 - 新增 6 项专项测试，覆盖一次性引导、密码/token 摘要、普通 token 隔离、撤销、RBAC、管理员创建幂等、角色版本/旧会话失效、最后安全管理员保护、拒绝审计、敏感理由拦截和空库升级；专项 6/6、相关回归 32/32 通过；
 - R0.2-05-01A 已完成。当前进入 05-01B 独立管理 Web 壳；O01–O08 地点审核、批量 human_verified、O09 发布中心和服务器迁移均未开始。
+
+### G7-R0.2-05-01B 独立管理 Web 壳与安全操作面（2026-08-29）
+
+- 新增并接受 ADR-0020：管理前端作为独立 `admin-web/` 工程，采用 React 19 + TypeScript + Vite + React Router + Ant Design + Vitest + Testing Library + `@testing-library/jest-dom`；依赖与构建产物不进入 Taro 用户包；
+- 新增 O00 登录页、会话超时与安全退出；Bearer token 仅保存在 React 进程内存，不写入 `localStorage`、`sessionStorage`、Cookie、URL、日志或错误文本，页面刷新后必须重新登录；
+- 新增 O16 管理员与角色页：管理员列表、创建管理员、角色调整、乐观锁冲突处理、高风险操作输入登录名二次确认；前端仅用权限改善交互，服务端 RBAC 仍是授权事实来源；
+- 新增最小 O15 审计只读页：动作/目标/理由/结果/请求 ID 查询、分页与摘要详情；不提供编辑、删除或导出原始敏感内容；
+- 新增 `AdminApi` 薄客户端和错误码映射；401/会话过期时清空内存主体并回登录页；本地 Vite 将 `/api` 与 `/health` 代理到 `127.0.0.1:8000`；
+- 验证：admin-web `typecheck`、`4/4` Vitest、Vite 生产构建通过；后端全量 pytest `340/340` 通过；本轮未连接或迁移服务器 MySQL/Redis；
+- R0.2-05-01B 已完成。下一节点为 R0.2-05-02 地点审核工作台 P0。
 
 ### A4：应用代码架构设计
 
@@ -740,8 +751,8 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；
 - M4 自动游记、旅行档案和长期偏好仅完成产品功能骨架，尚未进入详细 PRD 或实现；
-- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成，但 admin-web、管理员身份、RBAC、审核任务、发布中心和管理审计均未实现；
-- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理和 R0.2-03 通用地点物理模型/发布门禁已完成；杭州 50–75 个研究地点、OM1 管理审核闭环、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
+- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计以及 O00/O15/O16 admin-web 安全操作面已实现，地点审核任务和发布中心仍未实现；
+- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-01B 管理 Web 安全操作面已完成；杭州 50–75 个研究地点、OM1 管理审核闭环、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
 
 ## 每轮结束更新模板
 
