@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import cast
@@ -77,6 +77,8 @@ class ProductionHttpSettings:
     database: DatabaseSettings
     published_snapshot: PublishedSnapshotSettings
     plan_share_token_secret: str
+    admin_bootstrap_login: str | None = None
+    admin_bootstrap_password: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(
@@ -90,6 +92,13 @@ class ProductionHttpSettings:
             raise ValueError(
                 "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET must contain at least 32 bytes"
             )
+        admin_login = os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "").strip()
+        admin_password = os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "")
+        if bool(admin_login) != bool(admin_password):
+            raise ValueError(
+                "TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN and "
+                "TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD must be configured together"
+            )
         return cls(
             DatabaseSettings.from_env(load_dotenv_file=False),
             PublishedSnapshotSettings.from_env(
@@ -97,6 +106,8 @@ class ProductionHttpSettings:
                 relative_to=loaded.resolve().parent if loaded is not None else None,
             ),
             secret,
+            admin_login or None,
+            admin_password or None,
         )
 
 
@@ -144,6 +155,8 @@ def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
             HttpSettings(
                 settings.database,
                 settings.plan_share_token_secret,
+                settings.admin_bootstrap_login,
+                settings.admin_bootstrap_password,
             ),
             snapshot_versions,
             published_data,

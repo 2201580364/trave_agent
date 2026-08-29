@@ -1,11 +1,11 @@
 # M1 业务数据与 OM1 管理逻辑数据模型
 
-- 文档版本：V2.8
+- 文档版本：V2.9
 - 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0006 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈，0006 增加通用地点目录、来源记录、Revision、几何、访问点、时间规则、关系、互斥组和求解投影发布边界。OM1 管理身份、审核任务、发布批次和结构化管理审计只完成逻辑设计，尚未创建后续迁移。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0006 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0007 已实现；0006 增加通用地点目录和求解投影发布边界，0007 增加独立 AdminActor/Role/Session、角色关联和追加式管理审计。ReviewTask/Decision 与 PublicationBatch 仍是后续逻辑模型。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0007 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.6、应用代码架构 V1.3、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019
+- 上游：API 契约 V2.7、应用代码架构 V1.4、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019
 
 ## 1. 建模目标与原则
 
@@ -782,9 +782,11 @@ degradations
   → Revision/节点反馈、intent 幂等和主体/Revision/目标去重约束
 0006_place_catalog
   → 通用 Place、来源、Revision、几何、访问点、时间、关系、互斥组和求解投影发布边界
+0007_admin_identity_audit
+  → 独立管理员身份、角色、会话摘要、服务端 RBAC 版本和追加式业务审计
 ```
 
-以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再依次执行 0003、0004、0005、0006，并确认 readiness 的 `expected_revision/current_revision` 都是 `0006_place_catalog`。R0.2-03 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
+以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再依次执行 0003、0004、0005、0006、0007，并确认 readiness 的 `expected_revision/current_revision` 都是 `0007_admin_identity_audit`。R0.2-05-01A 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
 
 每次迁移必须：
 
@@ -893,9 +895,9 @@ And 不生成 published research snapshot
 - [x] candidate/human_verified/published 状态隔离和稳定 projection hash 发布门禁已实现；
 - [x] 未提前创建 Execution/Journal/Community/Retrospective 空表。
 
-## 16. OM1 管理端逻辑数据模型（待实现）
+## 16. OM1 管理端数据模型（身份与审计底座已实现）
 
-本节定义 R0.2-05 的目标模型，不表示仓库已经存在 0007，也不预占迁移编号。实现前必须复核现有 `principals`、部署认证方式和 MySQL 约束能力，然后通过新的追加迁移落地；不得修改 0001–0006。
+本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；16.2 审核任务与决定、16.3 发布批次仍待 R0.2-05-02/R0.2-07 通过新迁移追加。0001–0006 未被改写。
 
 ### 16.1 管理身份
 
@@ -907,6 +909,7 @@ And 不生成 published research snapshot
 | `login_name` | 唯一登录名或外部身份映射键；不与普通 principal 混用 |
 | `credential_digest` | 使用选定认证方案的安全摘要；SSO 时可为空 |
 | `status` | active/disabled/locked |
+| `version` | 管理员资料/角色乐观锁版本 |
 | `session_version` | 角色或安全状态变化时使旧会话失效 |
 | `created_at/updated_at` | 审计时间 |
 
@@ -921,6 +924,7 @@ And 不生成 published research snapshot
 
 - 只保存不可逆 session/token 摘要；
 - 保存 actor、session_version、expires_at、revoked_at 和必要安全元数据；
+- 保存签发时 `issued_role_keys`；认证时必须与 actor 当前 role set 和 session_version 同时一致；
 - 不保存密码、token 原值或完整 User-Agent；
 - 普通用户匿名凭证不能作为 admin session 外键或自动升级来源。
 
@@ -976,6 +980,7 @@ ReviewTask 状态不能替代 `PlaceRevision.review_status`；它表达人员工
 | `before_digest/after_digest` | 规范化前后摘要，不保存完整秘密/第三方正文 |
 | `reason_code/reason_text` | 结构化理由；自由文本受限 |
 | `request_id/operation_intent_id` | HTTP 和幂等关联 |
+| `operation_digest` | 规范化非敏感操作载荷摘要，用于识别同 intent 不同载荷 |
 | `result/error_code` | succeeded/rejected/failed 及稳定码 |
 | `occurred_at` | UTC 时间点 |
 

@@ -1,9 +1,9 @@
 # M1 用户 API 与 OM1 管理 API 契约
 
-- 文档版本：V2.6
+- 文档版本：V2.7
 - 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理 API 只完成设计边界，尚未实现
+- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理身份、会话、管理员创建/角色管理、只读审计查询和独立 `/api/v1/admin` 底座已实现，地点审核与发布端点仍待后续工作包实现
 - 上游：功能模块 V3.5、管理端功能 V1.0、UI V1.4、交互 V1.4、应用代码架构 V1.3、ADR-0005、ADR-0009、ADR-0018、ADR-0019
 - API 前缀：用户端 `/api/v1`；管理端 `/api/v1/admin`
 
@@ -1097,7 +1097,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 
 ## 15. OM1 管理 API 设计边界
 
-本节是 R0.2-05 的实现输入，不属于当前已实现 HTTP v1。实现时不得通过通用 CRUD 暴露任意状态写入。
+本节同时记录 R0.2-05 的已实现底座和后续实现输入。R0.2-05-01A 已实现管理身份、会话、服务端 RBAC、管理员创建/角色变更和追加式审计查询；地点编辑、审核和发布端点仍不得通过通用 CRUD 暴露任意状态写入。
 
 ### 15.1 管理身份和认证
 
@@ -1105,7 +1105,9 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 - 管理会话至少绑定 `admin_actor_id + role_set + expires_at + session_version`；
 - 角色变化或会话撤销后，旧会话不能继续写入；
 - 401 表示未认证/会话失效，403 表示已认证但角色不足；
-- 具体密码、SSO 或企业身份 Provider 在 R0.2-05-01 实现评审时锁定，不能把初始管理员密码写入代码、镜像、文档或 Git。
+- R0.2-05-01A 采用标准库 `scrypt` 密码摘要和高熵随机 Bearer token；数据库只保存密码摘要和 token SHA-256；
+- 首个管理员只允许在 `admin_actors` 为空时通过成对的 `TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN/PASSWORD` 环境变量一次性引导，成功后必须从部署环境移除；不能把初始密码写入代码、镜像、文档或 Git；
+- 后续可通过独立 ADR 将认证 Provider 升级为企业 SSO，但不能自动把普通 principal 提升为管理员。
 
 ### 15.2 端点族
 
@@ -1114,6 +1116,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `POST /api/v1/admin/sessions` | 未认证 | 创建管理员会话 |
 | `DELETE /api/v1/admin/sessions/current` | 任意管理员 | 撤销当前会话 |
 | `GET /api/v1/admin/me` | 任意管理员 | 返回当前 actor、角色和权限摘要 |
+| `POST /api/v1/admin/admin-actors` | admin_security | 创建独立管理员并分配最小角色；初始密码不进入审计 |
 | `GET /api/v1/admin/candidates` | editor/reviewer/publisher/viewer | 查询候选和覆盖维度 |
 | `POST /api/v1/admin/candidates` | data_editor | 创建最小候选，不伪造 human_verified |
 | `GET /api/v1/admin/places/{place_id}` | editor/reviewer/publisher/viewer | 查询 Place、当前 Revision 和依赖摘要 |
@@ -1131,6 +1134,8 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/audit-events` | admin_security/受权只读角色 | 只读查询结构化管理审计 |
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
+
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更和 audit-events 只读查询；表中 candidate/place/review/publication/research snapshot 端点属于 R0.2-05-02、R0.2-07，尚不可调用。
 
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
 
@@ -1157,6 +1162,9 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | 401 | `admin_authentication_required` | 管理会话缺失、失效或已撤销 |
 | 403 | `admin_permission_denied` | 当前角色不能执行操作 |
 | 409 | `admin_operation_intent_conflict` | 同 intent 对应不同载荷 |
+| 409 | `admin_login_name_conflict` | 管理员登录名已存在 |
+| 409 | `admin_actor_version_conflict` | 管理员角色 expected version 已过期 |
+| 409 | `admin_role_safety_violation` | 试图移除最后一个有效 admin_security 等安全门失败 |
 | 409 | `place_revision_version_conflict` | expected version 已过期 |
 | 409 | `review_task_state_conflict` | 审核任务状态不允许该决定 |
 | 409 | `published_revision_immutable` | 试图原地修改 published Revision |

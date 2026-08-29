@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from travel_agent.application.admin import AdminIdentityService
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ApplicationError, ResourceNotFoundError
 from travel_agent.application.common.unit_of_work import UnitOfWork
@@ -59,6 +60,8 @@ from travel_agent.domain.planning import (
 from travel_agent.infrastructure.database.identity import AnonymousIdentityService
 from travel_agent.infrastructure.solver import PublishedSolverDataProvider
 
+from .admin import build_admin_router
+
 
 @dataclass(frozen=True, slots=True)
 class HttpContainer:
@@ -71,6 +74,7 @@ class HttpContainer:
     catalog: PublishedSolverDataProvider | None = None
     readiness: Callable[[], dict[str, object]] | None = None
     share_tokens: PlanShareTokenCodec | None = None
+    admin_identity: AdminIdentityService | None = None
 
 
 class AnonymousSessionInput(BaseModel):
@@ -185,6 +189,9 @@ class SubmitNodeFeedbackInput(BaseModel):
 
 def create_app(container: HttpContainer) -> FastAPI:
     app = FastAPI(title="Travel Agent API", version="1.0.0")
+
+    if container.admin_identity is not None:
+        app.include_router(build_admin_router(container.admin_identity))
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
@@ -869,6 +876,12 @@ def _status_for(exc: ApplicationError) -> int:
         "invalid_attraction_replacement": status.HTTP_422_UNPROCESSABLE_ENTITY,
         "plan_share_intent_conflict": status.HTTP_409_CONFLICT,
         "feedback_intent_conflict": status.HTTP_409_CONFLICT,
+        "admin_authentication_required": status.HTTP_401_UNAUTHORIZED,
+        "admin_permission_denied": status.HTTP_403_FORBIDDEN,
+        "admin_actor_version_conflict": status.HTTP_409_CONFLICT,
+        "admin_operation_intent_conflict": status.HTTP_409_CONFLICT,
+        "admin_login_name_conflict": status.HTTP_409_CONFLICT,
+        "admin_role_safety_violation": status.HTTP_409_CONFLICT,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
 
 

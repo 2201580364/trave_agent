@@ -9,8 +9,8 @@
 
 M1 应用层规格已经完成 A5 同步：
 
-- [api-contract.md](api-contract.md) V2.6：已实现的匿名会话、草稿、GenerationIntent、Trip/Revision、计划分享和结构化反馈，以及待实现的 OM1 管理 API/RBAC 边界；
-- [data-model.md](data-model.md) V2.8：持久化实体、事务、发布快照、Alembic 0001–0006 实际链，以及待实现的 AdminActor、ReviewTask、PublicationBatch 和管理审计逻辑模型。
+- [api-contract.md](api-contract.md) V2.7：已实现的用户 HTTP 能力，以及 OM1 管理身份/会话/RBAC/管理员角色/只读审计底座和待实现的地点审核/发布端点；
+- [data-model.md](data-model.md) V2.9：持久化实体、事务、发布快照、Alembic 0001–0007 实际链；AdminActor/Role/Session/AuditEvent 已实现，ReviewTask 和 PublicationBatch 待后续追加。
 
 旧 `/regenerate`、单一 `transport_type` 和单表 `trips.itinerary JSON` 不再是当前实现依据。
 

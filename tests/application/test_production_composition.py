@@ -64,6 +64,33 @@ def test_production_settings_reject_short_plan_share_secret(
         ProductionHttpSettings.from_env(dotenv_path=tmp_path / "missing.env")
 
 
+def test_admin_bootstrap_settings_must_be_paired_and_hide_password(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TRAVEL_AGENT_DATABASE_URL", "sqlite:///./production-test.db")
+    monkeypatch.setenv("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_ROOT", str(tmp_path))
+    monkeypatch.setenv("TRAVEL_AGENT_PUBLISHED_CITY_ID", "hangzhou")
+    monkeypatch.setenv("TRAVEL_AGENT_PUBLISHED_SNAPSHOT_VERSION", VERSION)
+    monkeypatch.setenv(
+        "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET",
+        "test-plan-share-secret-2026-08-28-at-least-32-bytes",
+    )
+    monkeypatch.setenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "root.admin")
+    monkeypatch.delenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", raising=False)
+
+    with pytest.raises(ValueError, match="must be configured together"):
+        ProductionHttpSettings.from_env(dotenv_path=tmp_path / "missing.env")
+
+    monkeypatch.setenv(
+        "TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "Root-Admin-Password-2026!"
+    )
+    settings = ProductionHttpSettings.from_env(dotenv_path=tmp_path / "missing.env")
+
+    assert settings.admin_bootstrap_login == "root.admin"
+    assert "Root-Admin-Password-2026!" not in repr(settings)
+
+
 def test_production_settings_require_explicit_published_version(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -13,6 +13,14 @@ py -3.12 scripts/validate_candidate_catalog.py --json
 
 该门禁只证明 candidate 数量、来源绑定、覆盖和关系线索结构有效，不把候选 POI、代表点或覆盖标签升级为 human_verified/published。执行证据见 [`reports/g7-r0.2-04-hangzhou-candidate-coverage-2026-08-29.md`](reports/g7-r0.2-04-hangzhou-candidate-coverage-2026-08-29.md)。
 
+R0.2-05-01A 管理身份、RBAC 和结构化审计底座使用独立安全回归：
+
+```powershell
+py -3.12 -m pytest tests/application/test_admin_identity_http.py -q
+```
+
+覆盖一次性管理员引导、scrypt、token 摘要、普通 token 隔离、撤销、服务端 RBAC、管理员创建/角色幂等、旧会话失效、最后安全管理员保护、拒绝审计和 Alembic 0007。执行证据见 [`reports/g7-r0.2-05-01a-admin-identity-audit-2026-08-29.md`](reports/g7-r0.2-05-01a-admin-identity-audit-2026-08-29.md)。
+
 ## 测试分层
 
 | 层 | 内容 | 对应目标 |

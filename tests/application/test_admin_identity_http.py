@@ -1,0 +1,388 @@
+"""G7-R0.2-05-01 administrator identity, RBAC, and audit tests."""
+
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+from alembic import command
+from alembic.config import Config
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.orm import Session, sessionmaker
+
+from travel_agent.application.admin import AdminIdentityService
+from travel_agent.application.admin.service import verify_admin_password
+from travel_agent.infrastructure.database import (
+    AnonymousIdentityService,
+    SqlAlchemyAdminUnitOfWork,
+    SqlAlchemyUnitOfWork,
+    create_schema,
+)
+from travel_agent.infrastructure.database.admin_identity import (
+    AdminActorRow,
+    AdminAuditEventRow,
+    AdminRoleRow,
+    AdminSessionRow,
+)
+from travel_agent.infrastructure.memory import (
+    FixedDataSnapshotVersionProvider,
+    InMemoryGenerationExecutor,
+    SequenceIdGenerator,
+)
+from travel_agent.interfaces.http import HttpContainer, create_app
+
+NOW = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
+ROOT_LOGIN = "root.admin"
+ROOT_PASSWORD = "Root-Admin-Password-2026!"
+EDITOR_PASSWORD = "Editor-Password-2026!"
+
+
+class FixedClock:
+    def now(self) -> datetime:
+        return NOW
+
+
+class SequenceTokenGenerator:
+    def __init__(self, prefix: str) -> None:
+        self._prefix = prefix
+        self._next = 1
+
+    def new_token(self) -> str:
+        value = f"{self._prefix}-{self._next}-non-public-credential"
+        self._next += 1
+        return value
+
+
+@dataclass(slots=True)
+class AdminTestContext:
+    client: TestClient
+    service: AdminIdentityService
+    sessions: sessionmaker[Session]
+
+
+@pytest.fixture
+def admin_context(tmp_path: Path) -> Iterator[AdminTestContext]:
+    engine = create_engine(f"sqlite:///{tmp_path / 'admin.db'}")
+    create_schema(engine)
+    sessions = sessionmaker(engine, expire_on_commit=False)
+    ids = SequenceIdGenerator()
+    clock = FixedClock()
+    service = AdminIdentityService(
+        lambda: SqlAlchemyAdminUnitOfWork(sessions),
+        clock,
+        ids,
+        SequenceTokenGenerator("admin-token"),
+    )
+    assert service.bootstrap_initial_admin(ROOT_LOGIN, ROOT_PASSWORD) is True
+
+    def uow_factory() -> SqlAlchemyUnitOfWork:
+        return SqlAlchemyUnitOfWork(sessions)
+
+    identity = AnonymousIdentityService(
+        sessions,
+        clock,
+        ids,
+        SequenceTokenGenerator("anonymous-token"),
+    )
+    container = HttpContainer(
+        uow_factory,
+        clock,
+        ids,
+        FixedDataSnapshotVersionProvider({}),
+        InMemoryGenerationExecutor(),
+        identity,
+        admin_identity=service,
+    )
+    with TestClient(create_app(container)) as client:
+        yield AdminTestContext(client, service, sessions)
+
+
+def _login(client: TestClient, login: str, password: str) -> tuple[str, dict[str, str]]:
+    response = client.post(
+        "/api/v1/admin/sessions",
+        headers={"X-Request-ID": f"req-login-{login}"},
+        json={"login_name": login, "password": password},
+    )
+    assert response.status_code == 201
+    token = response.json()["access_token"]
+    return token, {"Authorization": f"Bearer {token}"}
+
+
+def test_bootstrap_is_one_time_and_never_persists_plaintext_secret(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+
+    assert context.service.bootstrap_initial_admin("other.admin", ROOT_PASSWORD) is False
+    with context.sessions() as session:
+        actor = session.scalar(select(AdminActorRow))
+        roles = tuple(session.scalars(select(AdminRoleRow).order_by(AdminRoleRow.role_key)))
+        audits = tuple(session.scalars(select(AdminAuditEventRow)))
+
+    assert actor is not None
+    assert actor.login_name == ROOT_LOGIN
+    assert actor.credential_digest.startswith("scrypt$")
+    assert ROOT_PASSWORD not in actor.credential_digest
+    assert [role.role_key for role in roles] == [
+        "admin_security",
+        "content_moderator",
+        "data_editor",
+        "data_publisher",
+        "data_reviewer",
+        "research_viewer",
+    ]
+    assert [event.action for event in audits] == ["ADMIN_ACTOR_BOOTSTRAPPED"]
+    assert audits[0].after_digest is not None
+    assert audits[0].reason_text is None
+    assert (
+        verify_admin_password(
+            ROOT_PASSWORD,
+            "scrypt$1073741824$8$1$" + ("00" * 16) + "$" + ("00" * 32),
+        )
+        is False
+    )
+
+
+def test_admin_session_is_independent_revocable_and_stores_only_token_digest(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    rejected = context.client.post(
+        "/api/v1/admin/sessions",
+        headers={"X-Request-ID": "req-bad-login"},
+        json={"login_name": ROOT_LOGIN, "password": "Wrong-Password-2026!"},
+    )
+    assert rejected.status_code == 401
+    assert rejected.json()["error"]["code"] == "admin_authentication_required"
+
+    token, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    me = context.client.get("/api/v1/admin/me", headers=headers)
+    assert me.status_code == 200
+    assert "admin_security" in me.json()["role_keys"]
+    assert "admin:actor:roles:write" in me.json()["permissions"]
+
+    with context.sessions() as session:
+        stored = session.scalar(
+            select(AdminSessionRow).order_by(AdminSessionRow.created_at.desc())
+        )
+    assert stored is not None
+    assert stored.token_hash == hashlib.sha256(token.encode("utf-8")).hexdigest()
+    assert token not in stored.token_hash
+    assert stored.client_ip_hash is not None
+    assert stored.user_agent_hash is not None
+
+    anonymous = context.client.post(
+        "/api/v1/anonymous-sessions", json={"device_installation_id": "device-admin-test"}
+    ).json()["access_token"]
+    ordinary_token = context.client.get(
+        "/api/v1/admin/me",
+        headers={"Authorization": f"Bearer {anonymous}"},
+    )
+    assert ordinary_token.status_code == 401
+    assert ordinary_token.json()["error"]["code"] == "admin_authentication_required"
+
+    assert (
+        context.client.delete("/api/v1/admin/sessions/current", headers=headers).status_code
+        == 204
+    )
+    assert context.client.get("/api/v1/admin/me", headers=headers).status_code == 401
+
+
+def test_server_side_rbac_role_versioning_idempotency_and_session_invalidation(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _, root_headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    create_payload = {
+        "operation_intent_id": "op-create-editor-1",
+        "login_name": "place.editor",
+        "initial_password": EDITOR_PASSWORD,
+        "role_keys": ["data_editor"],
+        "reason_code": "OM1_TEAM_PROVISIONING",
+        "reason_text": "为地点候选录入建立最小权限账号",
+    }
+    created = context.client.post(
+        "/api/v1/admin/admin-actors", headers=root_headers, json=create_payload
+    )
+    assert created.status_code == 201
+    editor_id = created.json()["admin_actor_id"]
+    assert created.json()["role_keys"] == ["data_editor"]
+    assert created.json()["reused"] is False
+
+    replay = context.client.post(
+        "/api/v1/admin/admin-actors", headers=root_headers, json=create_payload
+    )
+    assert replay.status_code == 201
+    assert replay.json()["admin_actor_id"] == editor_id
+    assert replay.json()["reused"] is True
+    conflicting_replay = context.client.post(
+        "/api/v1/admin/admin-actors",
+        headers=root_headers,
+        json={**create_payload, "initial_password": "Changed-Password-2026!"},
+    )
+    assert conflicting_replay.status_code == 409
+    assert conflicting_replay.json()["error"]["code"] == (
+        "admin_operation_intent_conflict"
+    )
+
+    _, editor_headers = _login(context.client, "place.editor", EDITOR_PASSWORD)
+    forbidden = context.client.get(
+        "/api/v1/admin/admin-actors", headers=editor_headers
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["error"]["code"] == "admin_permission_denied"
+
+    role_payload = {
+        "operation_intent_id": "op-editor-roles-1",
+        "expected_version": 1,
+        "role_keys": ["data_editor", "research_viewer"],
+        "reason_code": "RESEARCH_READ_ACCESS_GRANTED",
+        "reason_text": "允许编辑查看研究快照",
+    }
+    changed = context.client.put(
+        f"/api/v1/admin/admin-actors/{editor_id}/roles",
+        headers=root_headers,
+        json=role_payload,
+    )
+    assert changed.status_code == 200
+    assert changed.json()["version"] == 2
+    assert changed.json()["session_version"] == 2
+    assert changed.json()["reused"] is False
+    assert context.client.get("/api/v1/admin/me", headers=editor_headers).status_code == 401
+
+    repeated = context.client.put(
+        f"/api/v1/admin/admin-actors/{editor_id}/roles",
+        headers=root_headers,
+        json=role_payload,
+    )
+    assert repeated.status_code == 200
+    assert repeated.json()["reused"] is True
+    conflict = context.client.put(
+        f"/api/v1/admin/admin-actors/{editor_id}/roles",
+        headers=root_headers,
+        json={**role_payload, "role_keys": ["research_viewer"]},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
+
+
+def test_last_security_role_is_protected_and_rejected_attempt_is_audited(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    actor = context.client.get("/api/v1/admin/admin-actors", headers=headers).json()[
+        "items"
+    ][0]
+    response = context.client.put(
+        f"/api/v1/admin/admin-actors/{actor['admin_actor_id']}/roles",
+        headers={**headers, "X-Request-ID": "req-remove-last-security"},
+        json={
+            "operation_intent_id": "op-remove-last-security",
+            "expected_version": 1,
+            "role_keys": ["data_editor"],
+            "reason_code": "ROLE_SCOPE_REDUCED",
+            "reason_text": "缩小管理员职责范围",
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "admin_role_safety_violation"
+
+    audit = context.client.get(
+        "/api/v1/admin/audit-events",
+        headers=headers,
+        params={"result": "rejected", "action": "ADMIN_ACTOR_ROLES_CHANGE"},
+    )
+    assert audit.status_code == 200
+    event = audit.json()["items"][0]
+    assert event["operation_intent_id"] == "op-remove-last-security"
+    assert event["request_id"] == "req-remove-last-security"
+    assert event["error_code"] == "admin_role_safety_violation"
+    assert event["before_digest"] is not None
+    assert event["after_digest"] is None
+    assert context.client.patch(
+        f"/api/v1/admin/audit-events/{event['audit_event_id']}", headers=headers
+    ).status_code == 404
+
+
+def test_reason_text_rejects_likely_credentials(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    response = context.client.post(
+        "/api/v1/admin/admin-actors",
+        headers=headers,
+        json={
+            "operation_intent_id": "op-sensitive-reason",
+            "login_name": "unsafe.editor",
+            "initial_password": EDITOR_PASSWORD,
+            "role_keys": ["data_editor"],
+            "reason_code": "OM1_TEAM_PROVISIONING",
+            "reason_text": "临时 password 是某个值",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "domain_validation_failed"
+    assert EDITOR_PASSWORD not in response.text
+
+
+def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -> None:
+    database = tmp_path / "admin-migrated.db"
+    config = Config("alembic.ini")
+    config.attributes["skip_dotenv"] = True
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+
+    command.upgrade(config, "head")
+
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+        roles = connection.execute(
+            text("SELECT role_key FROM admin_roles ORDER BY role_key")
+        ).scalars()
+        table_names = {
+            row[0]
+            for row in connection.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            )
+        }
+
+    assert revision == "0007_admin_identity_audit"
+    assert set(roles) == {
+        "admin_security",
+        "content_moderator",
+        "data_editor",
+        "data_publisher",
+        "data_reviewer",
+        "research_viewer",
+    }
+    assert {
+        "admin_actors",
+        "admin_roles",
+        "admin_actor_roles",
+        "admin_sessions",
+        "admin_audit_events",
+    }.issubset(table_names)
+
+    command.downgrade(config, "0006_place_catalog")
+    with engine.connect() as connection:
+        downgraded_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+        downgraded_tables = {
+            row[0]
+            for row in connection.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            )
+        }
+    assert downgraded_revision == "0006_place_catalog"
+    assert "admin_actors" not in downgraded_tables
+    assert "places" in downgraded_tables

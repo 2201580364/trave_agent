@@ -8,7 +8,7 @@
 
 **M1 — 行程骨架验证**：以 H3“行程比用户自己排更合理”为主命题，同时验证 H1/H2/H6/H7/H11。历史“4 个月”只是完整团队投入参考，不是当前承诺日期。不做 M2 推荐/小记和 M3 社区实现。
 
-**Gate 6 求解器技术验证已通过，当前处于 Gate 7 准备的 `G7-R0.2-05-01 OM1 管理身份、管理 API 与审计底座`。** 求解器核心实现已阶段性完成，M1 对外契约已稳定并版本化；A1–A6 首轮纵向切片、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 `place_catalog`/Alembic 0006 发布门禁和 R0.2-04 候选覆盖已完成。当前已有 72 个 candidate、11 区域、9 类别、18 夜间/固定时段、28 室内/雨天候选和 11 组未裁决关系线索，仍不得描述为 human_verified/published。管理侧 OM1–OM4 产品设计和 ADR-0019 已完成，但 admin-web、管理身份/API/RBAC、审核任务和管理审计尚未实现；当前先补管理底座，再实现审核工作台和批量审核 50–75 个研究 Place。服务器 MySQL 仍停在 0002，本机禁止安装或启动 MySQL/Redis。`spike/` 是历史验证原型，不是生产实现模板。
+**Gate 6 求解器技术验证已通过，当前处于 Gate 7 准备的 `G7-R0.2-05-01B O00/O16 管理 Web 壳与安全操作面`。** 求解器核心实现已阶段性完成，M1 对外契约已稳定并版本化；A1–A6 首轮纵向切片、R0.2-01～04 和 R0.2-05-01A 已完成。当前已有 72 个 candidate 和 11 组未裁决关系线索，仍不得描述为 human_verified/published。OM1 独立管理身份、会话、服务端 RBAC、管理员创建/角色管理、追加式审计和 Alembic `0007_admin_identity_audit` 已实现；admin-web、审核任务/决定和发布批次尚未实现。服务器 MySQL 仍停在 0002，本机禁止安装或启动 MySQL/Redis。`spike/` 是历史验证原型，不是生产实现模板。
 完整假设账本见 [docs/assumptions.md](docs/assumptions.md)。
 
 ## 技术栈速览
@@ -16,7 +16,7 @@
 | 层 | 选型 |
 |---|---|
 | 前端 | Taro 4 + React 18 + TypeScript（H5 + 微信小程序），Zustand |
-| 管理端（OM1 待实现） | 独立 React + TypeScript + Vite 桌面 Web；不打入 Taro 用户包 |
+| 管理端（OM1 进行中） | 独立 React + TypeScript + Vite 桌面 Web；不打入 Taro 用户包 |
 | 后端 | Python 3.12 + FastAPI + SQLAlchemy 2.0 + Celery + Redis |
 | 核心求解器 | OR-Tools（M1 分层：已发布 OD 的确定性聚类与日负载均衡 → TSP-TW 天内排序 → 约束校验 → 时间填充） |
 | 存储 | MySQL 8 + Redis + 腾讯云 COS |
@@ -91,6 +91,6 @@ Gate 定义、权威来源优先级与冲突处理见 [docs/process/gates.md](do
 
 ## 当前最该做的三件事（按优先级）
 
-1. 执行 R0.2-05-01：实现 OM1 管理身份、会话、服务端 RBAC、`/api/v1/admin` 和追加式结构化审计底座，不预设迁移编号。
+1. 执行 R0.2-05-01B：实现独立 admin-web 的 O00 登录/超时、O16 管理员/角色和最小 O15 审计只读页，复用已实现的管理 API。
 2. 执行 R0.2-05-02：实现 O01–O08 地点审核工作台 P0，并以 72 个 candidate 验证送审、驳回和通过闭环。
 3. 通过管理端执行 R0.2-05-03 的来源补全、归一、去重、冲突裁决和 50–75 个研究 Place 人工审核，再进入按需 OD 和发布。

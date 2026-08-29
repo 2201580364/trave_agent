@@ -1,5 +1,6 @@
 """SQLAlchemy persistence adapters."""
 
+from .admin_identity import SqlAlchemyAdminUnitOfWork
 from .feedback import SqlAlchemyFeedbackRepository
 from .identity import AnonymousIdentityService
 from .place_catalog import SqlAlchemyPlaceCatalogRepository
@@ -18,6 +19,7 @@ __all__ = [
     "DatabaseReadiness",
     "DatabaseSettings",
     "SqlAlchemyFeedbackRepository",
+    "SqlAlchemyAdminUnitOfWork",
     "SqlAlchemyPlaceCatalogRepository",
     "SqlAlchemyUnitOfWork",
     "SqlAlchemyPlanShareRepository",

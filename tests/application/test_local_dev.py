@@ -27,13 +27,19 @@ def test_local_catalog_is_explicit_and_covers_evening_attraction() -> None:
     assert all(item.attraction.data_verified for item in published.attractions)
 
 
-def test_local_app_uses_migrated_database_and_serves_catalog(tmp_path: Path) -> None:
+def test_local_app_uses_migrated_database_and_serves_catalog(
+    tmp_path: Path, monkeypatch
+) -> None:
     database_path = tmp_path / "local-dev.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     migration = Config("alembic.ini")
     migration.attributes["skip_dotenv"] = True
     migration.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(migration, "head")
+    monkeypatch.setenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "local.admin")
+    monkeypatch.setenv(
+        "TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "Local-Admin-Password-2026!"
+    )
 
     client = TestClient(
         build_local_dev_app(
@@ -55,3 +61,12 @@ def test_local_app_uses_migrated_database_and_serves_catalog(tmp_path: Path) -> 
     )
     assert response.status_code == 200
     assert len(response.json()["items"]) == 7
+    admin_session = client.post(
+        "/api/v1/admin/sessions",
+        json={
+            "login_name": "local.admin",
+            "password": "Local-Admin-Password-2026!",
+        },
+    )
+    assert admin_session.status_code == 201
+    assert "admin_security" in admin_session.json()["role_keys"]

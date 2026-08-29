@@ -53,6 +53,8 @@ def build_local_dev_app(
             HttpSettings(
                 DatabaseSettings(url=resolved_url),
                 "local-only-plan-share-secret-2026-08-28-do-not-use-production",
+                os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN") or None,
+                os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD") or None,
             ),
             snapshots,
             catalog,
