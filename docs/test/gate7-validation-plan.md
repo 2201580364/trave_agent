@@ -1,9 +1,9 @@
 # Gate 7 专家评审与用户验证方案
 
-- 文档版本：V1.1
+- 文档版本：V1.2
 - 日期：2026-08-29
 - 产品里程碑：M1 — 行程骨架验证
-- 当前状态：R0.1、R0.2-01～03 已完成；当前进入 R0.2-04 杭州候选地点清单与覆盖矩阵，R0.2-05～07、R0.3 服务器 H5 和 R0.4 内部 dry run 待执行；尚未招募、尚未收集真实用户证据
+- 当前状态：R0.1、R0.2-01～03 已完成；当前进入 R0.2-04 杭州候选地点清单与覆盖矩阵。OM1 管理端产品设计已完成、实现未开始；R0.2-05-01/02 管理底座与审核工作台、R0.2-05-03～07 数据审核/OD/发布、R0.3 服务器 H5/admin-web 和 R0.4 内部 dry run 待执行；尚未招募、尚未收集真实用户证据
 - 关联假设：H1、H2、H3、H6、H7、H11
 - 技术输入：Gate 6 已通过；A6 首个浏览器可操作纵向切片已收口
 
@@ -56,7 +56,7 @@ R0 不以“文档存在”为完成。外部参与者开始前必须依次通�
 
 - R0.1：protocol、证据 Schema、研究环境 manifest 和隐私门禁；
 - R0.2：先按 [`ADR-0018`](../decisions/ADR-0018-place-catalog-and-solver-projection.md) 建设通用 Place、访问点与求解投影，再形成足以支持真实选择的杭州 published research snapshot；当前 7 个路线点只保留为技术回归基线；R0.2-02 已建立 [来源与采集规范](../domain/地点数据来源与采集规范.md)、机器 registry、58 字段 allowlist 和 fail-closed 校验，后续候选来源未经登记与人工审核不得发布；
-- R0.3：参与者可从自有手机访问的受控服务器 H5，或有书面理由限定为主持人设备的现场研究环境；edge/H5、FastAPI、迁移任务、MySQL、Redis 必须由一个逻辑 Docker Compose 项目统一管理；
+- R0.3：参与者可从自有手机访问的受控服务器 H5，或有书面理由限定为主持人设备的现场研究环境；edge/user-H5/admin-web、FastAPI、迁移任务、MySQL、Redis 必须由一个逻辑 Docker Compose 项目统一管理，管理端使用独立身份/RBAC；
 - R0.4：团队内部 dry run，开放 blocker 和影响核心任务的 major 均为 0。
 
 详细数据、渠道和部署门禁见 [`gate7-data-deployment-readiness-plan.md`](gate7-data-deployment-readiness-plan.md)。微信小程序正式上线不是 G7-R1 前置条件；移动端 H5 + HTTPS 是当前推荐研究入口，小程序体验版可在形成性问题关闭后补充验证。

@@ -1,6 +1,6 @@
 # Gate 7 研究环境锁定规范
 
-- 文档版本：V1.1
+- 文档版本：V1.2
 - 日期：2026-08-29
 - 产品里程碑：M1 — 行程骨架验证
 - Gate：G7-R0.1
@@ -26,6 +26,8 @@ Schema 为 `gate7-research-environment-v1`，固定以下内容：
 | 运行构建 | `database_revision`、`required_database_revision`、`frontend_build_kind`、`frontend_build_sha256` |
 | 证据边界 | `evidence_storage_kind`、`raw_evidence_in_git=false`、`limitations` |
 | 判定解释 | `lock_reasons` |
+
+`gate7-research-environment-v1` 的 `frontend_build_sha256` 专指参与者实际使用的用户 H5 artifact。OM1 管理端尚未实现；后续 admin-web 的 artifact hash 和镜像 digest 先进入部署发布记录。若研究要求把管理端构建也纳入环境身份，必须创建 manifest Schema v2 并同步 validator、example 和测试，不能在 v1 中静默增加字段或偷换 `frontend_build_sha256` 含义。任何管理操作导致 published snapshot 改变时，仍必须生成新的数据 hash 和 study environment ID。
 
 Manifest 不能包含 API Key、数据库/Redis 密码、完整连接串、私钥、token、`.env` 内容、参与者联系方式、原始录音或精确私人行程。
 

@@ -1,11 +1,11 @@
-# M1 持久化数据模型
+# M1 业务数据与 OM1 管理逻辑数据模型
 
-- 文档版本：V2.7
+- 文档版本：V2.8
 - 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0006 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈，0006 增加通用地点目录、来源记录、Revision、几何、访问点、时间规则、关系、互斥组和求解投影发布边界。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0006 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0006 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈，0006 增加通用地点目录、来源记录、Revision、几何、访问点、时间规则、关系、互斥组和求解投影发布边界。OM1 管理身份、审核任务、发布批次和结构化管理审计只完成逻辑设计，尚未创建后续迁移。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0006 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.5、应用代码架构 V1.2、ADR-0002、ADR-0005、ADR-0009、ADR-0018
+- 上游：API 契约 V2.6、应用代码架构 V1.3、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019
 
 ## 1. 建模目标与原则
 
@@ -892,3 +892,114 @@ And 不生成 published research snapshot
 - [x] 通用地点、来源、Revision、几何、访问点、时间、关系、互斥组和单节点投影已形成 0006 物理模型；
 - [x] candidate/human_verified/published 状态隔离和稳定 projection hash 发布门禁已实现；
 - [x] 未提前创建 Execution/Journal/Community/Retrospective 空表。
+
+## 16. OM1 管理端逻辑数据模型（待实现）
+
+本节定义 R0.2-05 的目标模型，不表示仓库已经存在 0007，也不预占迁移编号。实现前必须复核现有 `principals`、部署认证方式和 MySQL 约束能力，然后通过新的追加迁移落地；不得修改 0001–0006。
+
+### 16.1 管理身份
+
+#### `admin_actors`
+
+| 字段 | 说明 |
+|---|---|
+| `admin_actor_id` | 稳定内部 ID |
+| `login_name` | 唯一登录名或外部身份映射键；不与普通 principal 混用 |
+| `credential_digest` | 使用选定认证方案的安全摘要；SSO 时可为空 |
+| `status` | active/disabled/locked |
+| `session_version` | 角色或安全状态变化时使旧会话失效 |
+| `created_at/updated_at` | 审计时间 |
+
+#### `admin_roles` / `admin_actor_roles`
+
+- 角色键至少包括 `data_editor/data_reviewer/data_publisher/research_viewer/content_moderator/admin_security`；
+- `(admin_actor_id, role_key)` 唯一；
+- 角色分配和撤销不物理删除审计事实；
+- 最后一个 `admin_security` 的移除必须有恢复策略和高风险门禁。
+
+#### `admin_sessions`
+
+- 只保存不可逆 session/token 摘要；
+- 保存 actor、session_version、expires_at、revoked_at 和必要安全元数据；
+- 不保存密码、token 原值或完整 User-Agent；
+- 普通用户匿名凭证不能作为 admin session 外键或自动升级来源。
+
+### 16.2 审核任务与决定
+
+#### `place_review_tasks`
+
+| 字段 | 说明 |
+|---|---|
+| `review_task_id` | 主键 |
+| `place_revision_id` | 准确待审 Revision；同一开放任务唯一 |
+| `status` | draft/ready_for_review/in_review/changes_requested/approved/closed |
+| `assigned_reviewer_id` | 可空；绑定 AdminActor |
+| `version` | 乐观锁 |
+| `created_by/created_at/updated_at` | 创建和时间事实 |
+
+ReviewTask 状态不能替代 `PlaceRevision.review_status`；它表达人员工作流，Revision 表达业务事实成熟度。
+
+#### `place_review_decisions`
+
+- 追加式记录 approve/request_changes/cancel 等决定；
+- 绑定 task、Revision、actor、actor role、reason code、受限说明和 created_at；
+- approve 与 Revision 进入 human_verified 在同一事务中完成；
+- 不允许 UPDATE 改写历史决定，纠正通过新决定或新任务表达。
+
+### 16.3 发布批次
+
+#### `place_publication_batches`
+
+- 保存 publication_intent_id、发起人、状态、目标数据版本、规范化输入哈希、质量报告摘要和时间；
+- 同 publication_intent_id 只对应一个规范化载荷；
+- 批次状态建议 `previewed/running/completed/partial_failed/failed`；
+- 批次成功不替代逐 Revision/Projection 的 published 状态。
+
+#### `place_publication_batch_items`
+
+- 绑定 batch、place_revision、projection、结果和稳定 reason codes；
+- `(batch_id, place_revision_id)` 唯一；
+- 部分失败必须可逐项查询，不能只保留一个批次错误字符串。
+
+研究快照继续使用现有发布快照边界；如当前物理表不足，后续迁移只追加快照与批次关系，不改写历史 snapshot 内容。
+
+### 16.4 管理业务审计
+
+#### `admin_audit_events`
+
+| 字段 | 说明 |
+|---|---|
+| `audit_event_id` | 追加式主键 |
+| `actor_id/actor_role` | 操作者及当时生效角色 |
+| `action` | 稳定动作码 |
+| `target_type/target_id/target_revision` | 被操作对象 |
+| `before_digest/after_digest` | 规范化前后摘要，不保存完整秘密/第三方正文 |
+| `reason_code/reason_text` | 结构化理由；自由文本受限 |
+| `request_id/operation_intent_id` | HTTP 和幂等关联 |
+| `result/error_code` | succeeded/rejected/failed 及稳定码 |
+| `occurred_at` | UTC 时间点 |
+
+审计表与 ADR-0005 文件日志分离：
+
+- 日志每日分级并按月压缩，可按保留期清理；
+- 管理审计默认长期保留，按合规策略归档；
+- 日志异常不能导致业务事务伪成功；审计写入与高风险业务状态变更应在同一事务或可靠 outbox 中完成；
+- 管理端只读查询，不能提供编辑/删除 API。
+
+### 16.5 OM1 数据验收场景
+
+```gherkin
+Given data_editor 创建并送审 candidate Revision
+When reviewer approve
+Then ReviewDecision、Revision=human_verified 和 AuditEvent 原子提交
+And editor 不能伪造 reviewer actor
+
+Given published Revision 需要修改
+When editor 保存新事实
+Then 创建新的 candidate Revision
+And 原 published Revision、Projection、TripRevision 和研究快照哈希不变
+
+Given 月度运行日志已经压缩并清理
+When 查询同月的地点发布操作
+Then admin_audit_events 仍可按 actor、target 和 publication intent 查询
+```

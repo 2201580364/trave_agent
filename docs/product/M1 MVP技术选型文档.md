@@ -1,11 +1,11 @@
 ﻿# 旅行AI Agent — M1 MVP 技术选型文档
 
-**版本**：V1.1  
+**版本**：V1.2
 **文档类型**：技术选型（已确认）  
 **关联文档**：旅行助手产品文档.md（当前 V2.4）
 **状态**：历史技术选型基线；具体应用架构、API、数据模型和首切片范围以 A4/A5 当前文档为准
 
-> 同步说明（2026-08-29）：技术栈方向仍有效，但本文早期的单 `trips.itinerary JSON`、`POST /api/trips/generate`、`regenerate`、单一 `transport_type` 和默认 Celery/WebSocket 流程已被 [应用代码架构设计.md](应用代码架构设计.md)、[../specs/api-contract.md](../specs/api-contract.md)、[../specs/data-model.md](../specs/data-model.md) 替代。正文中 K-Means 固定分天、3/5/8 星日硬预算、普通天气硬约束、80–120 条“爬虫入库”和旧 Phase/P1/P2 阶段描述均只保留为历史选型背景，不是当前实现要求；现行约束以 ADR-0004，地点与 OD 以 ADR-0018，阶段与路线以 [项目完整路线图](../process/project-roadmap.md) 为准。
+> 同步说明（2026-08-29）：技术栈方向仍有效，但本文早期的单 `trips.itinerary JSON`、`POST /api/trips/generate`、`regenerate`、单一 `transport_type` 和默认 Celery/WebSocket 流程已被 [应用代码架构设计.md](应用代码架构设计.md)、[../specs/api-contract.md](../specs/api-contract.md)、[../specs/data-model.md](../specs/data-model.md) 替代。正文中 K-Means 固定分天、3/5/8 星日硬预算、普通天气硬约束、80–120 条“爬虫入库”和旧 Phase/P1/P2 阶段描述均只保留为历史选型背景，不是当前实现要求；现行约束以 ADR-0004，地点与 OD 以 ADR-0018，管理端以 ADR-0019，阶段与路线以 [项目完整路线图](../process/project-roadmap.md) 为准。
 
 ---
 
@@ -496,10 +496,27 @@ Month 4 ─── 分享 + 打磨 + 测试
   Week 3-4: 用户测试（n≥20）、Bug 修复、性能优化、上线准备
 ```
 
+## 十二、OM1 管理端技术选型增量
+
+OM1 不复用 Taro 用户端页面。管理端面向桌面审核，建议采用：
+
+| 层 | 选型 | 说明 |
+|---|---|---|
+| 管理前端 | React + TypeScript + Vite | 独立 `admin-web` 工作区和构建产物 |
+| 路由/服务端状态 | React Router + TanStack Query 或等价方案 | URL 保留筛选条件；服务端是审核状态事实来源 |
+| UI | 成熟桌面组件库优先，具体依赖在 R0.2-05-01 锁定 | 重点支持表格、表单、版本差异、权限和可访问性 |
+| 地图 | 浏览器地图适配层 | 几何、入口和路线端点可视化；服务端 Web 服务 Key 不进入浏览器 |
+| API | FastAPI `/api/v1/admin` | 与用户 API 使用不同认证上下文，复用 application/domain 门禁 |
+| 身份 | 独立 AdminActor/Session + 服务端 RBAC | 初始密码/SSO 方案在实现前锁定；秘密只从环境注入 |
+| 审计 | MySQL 追加式管理审计 | 与 debug/info/error 每日日志及月度 ZIP 分离 |
+| 部署 | 独立 admin-web 容器/静态 artifact，同一 Compose 管理 | 可单独启停和回滚，不把管理代码打入用户 H5 bundle |
+
+当前只接受技术方向，不表示依赖已经安装或管理端已经实现。OM1 首个切片不引入微前端、工作流引擎、独立管理微服务或多租户平台。
+
 ---
 
 **文档结束**
 
 ---
 
-*V1.1 变更说明：所有第七节待决策事项已确认。前端改为 Taro 多端、LLM 改为可插拔架构、部署改为腾讯云、认证改为微信扫码登录、求解器确认方案 B + 天气方案 C、景点数据改为爬虫+LLM+人工校准、分享卡片改为服务端渲染。新增第十一节 M1 开发里程碑建议。*
+*V1.2 变更说明：保留 V1.1 历史技术基线，新增 OM1 独立桌面管理前端、管理 API/RBAC、结构化审计和 Compose 部署方向；实际依赖和认证方案在 R0.2-05-01 实现评审时锁定。*

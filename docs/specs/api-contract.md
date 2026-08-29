@@ -1,11 +1,11 @@
-# M1 HTTP API 契约
+# M1 用户 API 与 OM1 管理 API 契约
 
-- 文档版本：V2.5
-- 日期：2026-08-28
+- 文档版本：V2.6
+- 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现
-- 上游：功能模块 V3.4、UI V1.3、交互 V1.3、应用代码架构 V1.2、ADR-0005、ADR-0009、ADR-0018
-- API 前缀：`/api/v1`
+- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理 API 只完成设计边界，尚未实现
+- 上游：功能模块 V3.5、管理端功能 V1.0、UI V1.4、交互 V1.4、应用代码架构 V1.3、ADR-0005、ADR-0009、ADR-0018、ADR-0019
+- API 前缀：用户端 `/api/v1`；管理端 `/api/v1/admin`
 
 ## 1. 契约目标
 
@@ -1094,3 +1094,100 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 - [x] 首切片接口和 P1 接口区分；
 - [x] 计划分享未与旅程回顾混用；
 - [x] 关键接口具有 Given/When/Then 验收场景。
+
+## 15. OM1 管理 API 设计边界
+
+本节是 R0.2-05 的实现输入，不属于当前已实现 HTTP v1。实现时不得通过通用 CRUD 暴露任意状态写入。
+
+### 15.1 管理身份和认证
+
+- 管理员使用独立认证上下文；匿名/普通用户 Bearer token 不能访问管理 API；
+- 管理会话至少绑定 `admin_actor_id + role_set + expires_at + session_version`；
+- 角色变化或会话撤销后，旧会话不能继续写入；
+- 401 表示未认证/会话失效，403 表示已认证但角色不足；
+- 具体密码、SSO 或企业身份 Provider 在 R0.2-05-01 实现评审时锁定，不能把初始管理员密码写入代码、镜像、文档或 Git。
+
+### 15.2 端点族
+
+| 方法与路径 | 最小角色 | 语义 |
+|---|---|---|
+| `POST /api/v1/admin/sessions` | 未认证 | 创建管理员会话 |
+| `DELETE /api/v1/admin/sessions/current` | 任意管理员 | 撤销当前会话 |
+| `GET /api/v1/admin/me` | 任意管理员 | 返回当前 actor、角色和权限摘要 |
+| `GET /api/v1/admin/candidates` | editor/reviewer/publisher/viewer | 查询候选和覆盖维度 |
+| `POST /api/v1/admin/candidates` | data_editor | 创建最小候选，不伪造 human_verified |
+| `GET /api/v1/admin/places/{place_id}` | editor/reviewer/publisher/viewer | 查询 Place、当前 Revision 和依赖摘要 |
+| `POST /api/v1/admin/places/{place_id}/revisions` | data_editor | 基于指定 Revision 创建 candidate Revision |
+| `PATCH /api/v1/admin/place-revisions/{revision_id}` | data_editor | 以 expected version 编辑 candidate |
+| `POST /api/v1/admin/place-revisions/{revision_id}/review-requests` | data_editor | 创建/重提审核任务 |
+| `GET /api/v1/admin/review-tasks` | data_reviewer | 查询待审核队列 |
+| `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve 或 request_changes；写 ReviewDecision |
+| `POST /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/publications` | data_publisher | 通过 publication intent 调用发布用例 |
+| `POST /api/v1/admin/publication-batches` | data_publisher | 创建批次预览/执行，不隐藏逐项失败 |
+| `GET /api/v1/admin/research-snapshots` | publisher/viewer | 查询不可变研究快照和质量报告 |
+| `POST /api/v1/admin/research-snapshots` | data_publisher | 从明确 published 集合创建快照 |
+| `POST /api/v1/admin/places/{place_id}/retirements` | data_publisher | 退役当前发布版本，不物理删除历史 |
+| `GET /api/v1/admin/audit-events` | admin_security/受权只读角色 | 只读查询结构化管理审计 |
+| `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
+| `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
+
+几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
+
+### 15.3 管理写入通用字段
+
+```json
+{
+  "operation_intent_id": "uuid",
+  "expected_version": 3,
+  "reason_code": "SOURCE_CONFLICT_RESOLVED",
+  "reason_text": "可选、非敏感、长度受限"
+}
+```
+
+- `operation_intent_id` 保证双击和网络重发稳定；同 ID 不同规范化载荷返回 409；
+- `expected_version` 防止编辑、审核和角色变更静默覆盖；
+- 发布必须使用独立 `publication_intent_id`，不能复用编辑或审核 intent；
+- reason text 不允许 API Key、密码、token、Cookie、个人联系方式、第三方页面全文或 Gate 7 原始研究内容。
+
+### 15.4 管理错误码
+
+| HTTP | 机器码 | 语义 |
+|---:|---|---|
+| 401 | `admin_authentication_required` | 管理会话缺失、失效或已撤销 |
+| 403 | `admin_permission_denied` | 当前角色不能执行操作 |
+| 409 | `admin_operation_intent_conflict` | 同 intent 对应不同载荷 |
+| 409 | `place_revision_version_conflict` | expected version 已过期 |
+| 409 | `review_task_state_conflict` | 审核任务状态不允许该决定 |
+| 409 | `published_revision_immutable` | 试图原地修改 published Revision |
+| 422 | `review_requirements_not_met` | 送审/通过所需依赖不完整 |
+| 422 | `publication_gate_rejected` | 发布依赖闭包失败；详情含稳定 reason codes |
+| 422 | `conditional_source_staging_only` | conditional 来源不能进入 published |
+| 422 | `overlap_resolution_required` | 地点重叠或互斥尚未裁决 |
+
+`publication_gate_rejected` 的 `details.reason_codes` 直接使用 PlaceCatalog 稳定拒绝码，不由前端将错误字符串猜成状态。
+
+### 15.5 OM1 API 验收场景
+
+```gherkin
+Given 普通匿名用户拥有有效 access token
+When 调用 /api/v1/admin/places
+Then 返回 401 或 403
+And 不泄露候选、管理员或审核信息
+
+Given data_editor 已编辑 candidate Revision
+When 直接请求 publications 端点
+Then 服务端按角色和业务状态拒绝
+And 不把 Revision 改为 human_verified/published
+
+Given human_verified Revision 缺少已审核 departure access point
+When data_publisher 运行 publication check 或 publication
+Then 返回 publication_gate_rejected
+And details 包含稳定缺失端点 reason code
+And Revision/Projection 状态不变
+
+Given 同一 publication_intent_id 和相同载荷被提交两次
+When 第一次已经成功
+Then 第二次返回同一发布结果
+And 不重复创建 Projection、快照或审计终态
+```

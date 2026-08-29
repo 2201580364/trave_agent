@@ -2,7 +2,7 @@
 
 旅行助手：输入目的地，自动规划旅行路线，搞定衣食住行。
 
-当前处于 `M1 — 行程骨架验证` 的 A6 应用产品化阶段。求解器核心已阶段性完成，首个匿名浏览器纵向切片采用 FastAPI + SQLAlchemy + Taro/React。
+当前处于 `M1 — 行程骨架验证 / Gate 7 R0.2-04 杭州候选清单与覆盖矩阵`。求解器核心已阶段性完成，首个匿名浏览器纵向切片采用 FastAPI + SQLAlchemy + Taro/React；管理侧 OM1 产品设计已完成，但独立管理 Web、管理 API/RBAC 和业务审计尚未实现。
 
 ## 本地纵向切片
 
@@ -22,4 +22,4 @@ npm run dev:h5
 
 然后访问 `http://127.0.0.1:10086`。本地数据库位于 `.local/`，运行日志遵循 `logs/<module>/<level>/YYYY-MM-DD.log`；两者均不会提交到 Git。
 
-项目整体状态和续接入口见 `docs/process/project-status.md`。
+项目整体状态和续接入口见 `docs/process/project-status.md`；管理侧路线和功能见 `docs/product/管理端功能模块设计.md`。

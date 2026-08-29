@@ -1,10 +1,10 @@
 # Gate 7 受控 H5 全容器部署方案
 
-- 文档版本：V1.0
+- 文档版本：V1.1
 - 日期：2026-08-29
 - 产品里程碑：M1 — 行程骨架验证
 - 所属阶段：G7-R0.3
-- 当前状态：部署设计已确定，Compose 应用层尚未实现
+- 当前状态：用户 H5 与 OM1 管理端部署边界已确定，Compose 应用层尚未实现
 - 部署约束：所有应用与依赖服务统一使用 Docker 镜像，由 Docker Compose 管理
 
 ## 1. 部署结论
@@ -16,7 +16,8 @@ G7-R1 的受控测试入口采用移动端 H5。服务器宿主机不直接安�
 ```text
 name: travel-agent
 
-edge       HTTPS、H5 静态文件、/api 与 /health 反向代理
+edge       HTTPS、用户 H5、管理端静态文件、/api 与 /health 反向代理
+admin-web  OM1 桌面管理端构建产物；可由 edge 挂载或独立静态容器提供
 api        FastAPI/Uvicorn 生产组合根
 migrate    与 api 同镜像的一次性 Alembic 迁移任务
 mysql      MySQL 8.0 持久化数据库
@@ -35,8 +36,9 @@ backup     可选 tools profile，一次性备份/校验任务
         ▼
 ┌──────────────────────┐
 │ edge                  │
-│ Caddy + H5 artifact   │
-│ /       → static H5   │
+│ Caddy + UI artifacts  │
+│ /       → user H5     │
+│ /admin/ → admin-web   │
 │ /api/*  → api:8000    │
 │ /health → api:8000    │
 └──────────┬───────────┘
@@ -61,6 +63,7 @@ backup     可选 tools profile，一次性备份/校验任务
 - `api` 同时加入 `frontend` 和 `backend`；
 - `mysql`、`redis` 只加入 `backend`；
 - 公网只开放 edge 的 80/443；
+- `/admin/` 与 `/api/v1/admin/*` 使用独立管理员认证；初期受控环境可叠加邀请访问或 IP allowlist，但网络隐藏不能替代服务端 RBAC；
 - API 8000 不映射公网端口；
 - MySQL/Redis 不开放公网端口；
 - 运维确需宿主机验证时，只允许保留已有 `127.0.0.1:13306/16379` 回环绑定，应用容器始终使用 `mysql:3306`、`redis:6379` 服务名。
@@ -86,12 +89,13 @@ deploy/production/api.Dockerfile
 - 关闭 Uvicorn access log，业务日志写入受控文件卷；
 - 镜像标签包含 Git commit，不使用不可追踪的 `latest` 作为研究锁依据。
 
-### 3.2 Edge/H5 镜像
+### 3.2 Edge、用户 H5 与管理端镜像
 
 计划新增：
 
 ```text
 deploy/production/web.Dockerfile
+deploy/production/admin-web.Dockerfile
 deploy/production/Caddyfile
 ```
 
@@ -99,7 +103,10 @@ deploy/production/Caddyfile
 
 ```text
 Node 22 + npm ci + npm run build:h5
-→ 只复制 frontend/dist 到 Caddy 运行镜像
+→ 只复制 frontend/dist 到用户 H5/Caddy 运行镜像
+
+Node 22 + npm ci + npm run build（OM1 实现后）
+→ 只复制 admin-web/dist 到管理端静态镜像或 edge 管理目录
 ```
 
 要求：
@@ -111,6 +118,8 @@ Node 22 + npm ci + npm run build:h5
 - 开启压缩、静态资源缓存和基础安全响应头；
 - 研究环境使用受控域名和可信 HTTPS；
 - H5 artifact 目录 SHA-256 和最终镜像 digest 都进入研究环境记录。
+- admin-web 使用独立构建目录/hash，不能和用户 H5 共用会话配置或把管理 DTO 打入用户 bundle；
+- 高德 Web 服务 Key、MySQL/Redis 凭证不进入任何前端镜像。管理地图如使用浏览器 SDK，必须使用独立受域名/用途限制的浏览器端凭证，并与服务端 Web 服务 Key 分离；
 
 ### 3.3 迁移任务
 
@@ -135,9 +144,10 @@ docker compose run --rm migrate
 
 ```text
 deploy/production/
-├── docker-compose.yml          # edge/api/migrate/mysql/redis/backup
+├── docker-compose.yml          # edge/user-h5/admin-web/api/migrate/mysql/redis/backup
 ├── api.Dockerfile
 ├── web.Dockerfile
+├── admin-web.Dockerfile
 ├── Caddyfile
 ├── infra.env.example
 ├── app.env.example             # 仅变量名和占位值
@@ -151,7 +161,7 @@ deploy/production/
 可以使用 Compose profile 控制一次性工具：
 
 ```text
-default profile  edge/api/mysql/redis
+default profile  edge/user-h5/admin-web/api/mysql/redis
 tools profile    migrate/backup/restore validation
 ```
 
@@ -172,7 +182,7 @@ tools profile    migrate/backup/restore validation
 - 真实值不进入 Git、镜像层、Compose 文件、构建参数或研究 manifest；
 - `app.env` 只包含应用 MySQL DML URL、Redis ACL URL、Provider 设置、发布数据路径和分享密钥；
 - `migrate.env` 不注入常驻 API；
-- 高德/和风 Key 只进入 API/数据构建任务需要的环境，不进入 edge；
+- 高德/和风服务端 Key 只进入 API/数据构建任务需要的环境，不进入 edge、user-h5 或 admin-web；
 - 容器日志、`docker inspect` 输出和健康检查不得回显密码或完整连接串；
 - 不使用 Compose 命令行 `-e PASSWORD=...`，避免进入 shell history。
 
@@ -189,7 +199,7 @@ tools profile    migrate/backup/restore validation
 /srv/travel-agent/research/gate7/    受控原始研究材料，不进入应用镜像
 ```
 
-API 将 `/srv/travel-agent/logs` 和 published 数据目录分别以可写/只读方式挂载。原始研究材料不挂载进普通 API/edge 容器，只有经过授权的研究处理任务可以访问。
+API 将 `/srv/travel-agent/logs` 和 published 数据目录分别以可写/只读方式挂载。原始研究材料不挂载进普通 API/edge/user-h5/admin-web 容器，只有经过授权的研究处理任务可以访问。管理业务审计写入 MySQL，不依赖文件日志卷作为唯一证据。
 
 ## 7. 日志规则
 
@@ -218,7 +228,8 @@ logs/api/error/YYYY-MM-DD.log
 | mysql | 容器内 socket `SELECT 1` |
 | redis | ACL 用户 `PING` |
 | api | `/health/ready`，校验 DB revision、published snapshot 和依赖状态 |
-| edge | 本地请求首页和 `/health` 代理 |
+| edge | 本地请求用户首页、受保护管理入口和 `/health` 代理 |
+| admin-web | 静态 artifact 可读取；管理 API 未认证请求被拒绝 |
 
 启动顺序不只依赖 `depends_on`：
 
@@ -236,12 +247,12 @@ mysql/redis healthy
 
 ```text
 1. 固定 clean Git commit
-2. 构建 api/edge 镜像
-3. 记录镜像 digest 和 H5 artifact hash
+2. 构建 api/edge/user-h5/admin-web 镜像
+3. 记录镜像 digest、用户 H5 artifact hash 和 admin-web artifact hash
 4. docker compose config 门禁
 5. 服务器数据库/Redis 备份
 6. docker compose run --rm migrate
-7. docker compose up -d mysql redis api edge
+7. docker compose up -d mysql redis api user-h5 admin-web edge
 8. 等待全部 healthy
 9. 执行持久化、身份隔离、分享/反馈和数据版本验收
 10. 真实 Google Chrome 移动端/桌面端回放
@@ -254,7 +265,7 @@ mysql/redis healthy
 
 ## 10. 回滚和恢复
 
-- API/edge 镜像保留至少当前和上一研究批次 digest；
+- API/edge/user-h5/admin-web 镜像保留至少当前和上一研究批次 digest；
 - published snapshot 不覆盖，只切换版本指针；
 - MySQL 迁移前必须完成可校验备份；
 - 数据库 schema 变化优先采用向后兼容 expand/contract；
@@ -271,7 +282,7 @@ mysql/redis healthy
 - 数据库达到研究构建要求 revision；
 - published research snapshot 可加载并通过 hash 校验；
 - API 日志按模块/级别/日期落盘并可月度归档；
-- H5 从受控 HTTPS 地址可访问；
+- 用户 H5 从受控 HTTPS 地址可访问；管理端使用独立登录和权限，普通用户不能访问候选/审核数据；
 - 身份隔离、Revision、分享和反馈通过；
 - Chrome 移动端/桌面端及受控失败恢复通过；
 - 镜像 digest、artifact hash 和 Compose 版本进入 locked manifest；
@@ -279,4 +290,4 @@ mysql/redis healthy
 
 ## 12. 当前实施边界
 
-本文件只确定部署方式。当前尚未新增 API/web Dockerfile，也未扩展现有 Compose；服务器上的 MySQL/Redis 继续按已验收的 `travel-agent-infra` 项目运行。在 R0.2 数据模型和迁移确定前，不提前重建服务器应用栈，避免短期内连续迁移和重复发布。
+本文件只确定部署方式。当前尚未新增 API/user-h5/admin-web Dockerfile，也未扩展现有 Compose；服务器上的 MySQL/Redis 继续按已验收的 `travel-agent-infra` 项目运行。OM1 管理端、后续迁移和 R0.2 published research snapshot 未完成前，不提前重建服务器应用栈，避免短期内连续迁移和重复发布。

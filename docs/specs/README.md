@@ -9,8 +9,8 @@
 
 M1 应用层规格已经完成 A5 同步：
 
-- [api-contract.md](api-contract.md) V2.5：匿名会话、草稿、GenerationIntent、Trip/Revision、计划分享、结构化反馈、错误码和接口验收；
-- [data-model.md](data-model.md) V2.6：持久化实体、唯一约束、事务、发布快照、计划分享、反馈、ADR-0018 地点逻辑边界和 Alembic 顺序；通用 Place 物理表与迁移仍属于 G7-R0.2-03。
+- [api-contract.md](api-contract.md) V2.6：已实现的匿名会话、草稿、GenerationIntent、Trip/Revision、计划分享和结构化反馈，以及待实现的 OM1 管理 API/RBAC 边界；
+- [data-model.md](data-model.md) V2.8：持久化实体、事务、发布快照、Alembic 0001–0006 实际链，以及待实现的 AdminActor、ReviewTask、PublicationBatch 和管理审计逻辑模型。
 
 旧 `/regenerate`、单一 `transport_type` 和单表 `trips.itinerary JSON` 不再是当前实现依据。
 
