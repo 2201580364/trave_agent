@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from travel_agent.runtime_config import load_runtime_environment
 
-EXPECTED_ALEMBIC_REVISION = "0005_feedbacks"
+EXPECTED_ALEMBIC_REVISION = "0006_place_catalog"
 
 
 @dataclass(frozen=True, slots=True)

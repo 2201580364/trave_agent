@@ -61,12 +61,12 @@ npm run build:h5
 Set-Location ..
 ```
 
-3. 在实际研究数据库执行并核对当前代码要求的 Alembic revision。当前要求为 `0005_feedbacks`；
+3. 在实际研究数据库执行并核对当前代码要求的 Alembic revision。当前要求为 `0006_place_catalog`；
 4. 使用通过 R0.2 覆盖、来源、人工审核和 OD 扩容门禁的不可变 published research snapshot；现有 `hangzhou-published-2026-08-27-v1` 只有 7 个路线点，只用于技术回归，不作为 G7-R1 充分数据集；
 5. 在 `.local/gate7/<study_environment_id>/` 或外部受控研究空间准备原始证据目录。`.local/` 已被 Git 忽略；
 6. 不读取或复制 `.env` 内容到 manifest。数据库 revision 只传版本标识，不传数据库 URL。
 
-数据和部署详细前置见 [`gate7-data-deployment-readiness-plan.md`](gate7-data-deployment-readiness-plan.md)。服务器验证报告仍记录为 `0002_anonymous_identity`，而当前应用要求至少 `0005_feedbacks`，未来地点目录还会产生经 ADR 确认的新迁移。因此必须先完成 R0.2 数据模型，再在 R0.3 一次性按迁移链部署和验证；本规范和工具不会自行连接服务器或执行迁移。
+数据和部署详细前置见 [`gate7-data-deployment-readiness-plan.md`](gate7-data-deployment-readiness-plan.md)。服务器验证报告仍记录为 `0002_anonymous_identity`，而当前应用要求 `0006_place_catalog`。地点目录迁移已在 R0.2-03 实现，但仍须在 R0.3 先备份、再按 0003→0004→0005→0006 顺序部署和验证；本规范和工具不会自行连接服务器或执行迁移。
 
 ### 4.2 生成 manifest
 
@@ -75,7 +75,7 @@ py -3.12 scripts/lock_gate7_environment.py `
   --study-environment-id m1-hangzhou-formative-01 `
   --study-phase formative `
   --data-snapshot var/published/hangzhou-g7-formative-v1.json `
-  --database-revision 0005_feedbacks `
+  --database-revision 0006_place_catalog `
   --frontend-build frontend/dist `
   --frontend-build-kind h5-production `
   --evidence-storage-kind controlled_local `

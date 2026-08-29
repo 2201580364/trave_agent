@@ -4,7 +4,7 @@
 - 日期：2026-08-29
 - 产品里程碑：M1 — 行程骨架验证
 - 所属阶段：G7-R0.2～G7-R0.4
-- 当前状态：R0.2-01 地点类型/求解投影和 R0.2-02 来源治理已完成；当前进入 R0.2-03 数据模型、迁移和 staging/published 边界；尚未开始数据批量采集、服务器应用部署或真实参与者招募
+- 当前状态：R0.2-01～03 已完成；当前进入 R0.2-04 首批杭州候选清单与覆盖矩阵；尚未开始地点事实批量采集与人工审核、服务器应用部署或真实参与者招募
 - 前置输入：Gate 6 已通过；A6 技术纵向切片已完成；G7-R0.1 研究环境锁定机制已完成
 
 ## 1. 决策摘要
@@ -76,7 +76,7 @@ R0.2-01 已通过 [`ADR-0018`](../decisions/ADR-0018-place-catalog-and-solver-pr
 | `category` | 自然、文化、博物馆、宗教、城市漫步、亲子、夜间、购物生活方式等 | 用于筛选、覆盖和推荐，不替代 place kind |
 | `access_point_kind` | `visitor_entrance`、`visitor_exit`、`route_start`、`route_end`、`performance_location`、`meeting_point`、`area_representative` | 作为真实 OD 端点并支持多入口区域 |
 
-已接受方案是新增通用 `places` 目录、访问点、几何、来源、revision、地点关系与 `solver_place_projections`，再将已发布地点投影为求解器可消费的 `Attraction`。M1 每个用户可选 Place 最多生成一个 solver 节点；真实 OD 使用 `origin.departure_access_point → destination.arrival_access_point`。R0.2-03 完成物理数据模型前不创建迁移，也不长期把所有区域语义继续堆入单一 `attractions` 表。
+已接受方案是新增通用 `places` 目录、访问点、几何、来源、revision、地点关系与 `solver_place_projections`，再将已发布地点投影为求解器可消费的 `Attraction`。M1 每个用户可选 Place 最多生成一个 solver 节点；真实 OD 使用 `origin.departure_access_point → destination.arrival_access_point`。R0.2-03 已完成 `place_catalog` 物理模型和 Alembic `0006_place_catalog`，没有把区域语义继续堆入单一 `attractions` 表。R0.2-04 只建立候选清单和覆盖矩阵；R0.2-05 才采集、归一并人工审核地点事实。
 
 区域型地点进入 M1 求解时至少需要：
 
@@ -293,8 +293,8 @@ P0/P1/P2 只表示当前 M1/G7 前置实现优先级，不表示产品里程碑�
 ```text
 R0.2-01 地点类型与求解投影 ADR — 已完成（ADR-0018）
 R0.2-02 数据来源/合规登记和采集字段字典 — 已完成
-R0.2-03 数据模型、迁移和 staging/published 边界 — 当前节点
-R0.2-04 首批杭州候选清单与覆盖矩阵
+R0.2-03 数据模型、迁移和 staging/published 边界 — 已完成
+R0.2-04 首批杭州候选清单与覆盖矩阵 — 当前节点
 R0.2-05 采集、归一、去重和人工审核
 R0.2-06 OD 按需子图、缓存和回放改造
 R0.2-07 数据门禁与杭州研究快照发布

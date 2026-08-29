@@ -1,9 +1,9 @@
 # M1 持久化数据模型
 
-- 文档版本：V2.6
+- 文档版本：V2.7
 - 日期：2026-08-29
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0005 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈及双重唯一约束。A6-8.2 真实 MySQL 8.0.46 的 0002 基线已通过；0003–0005 待服务器执行。ADR-0018 已确定通用地点目录、访问点、关系和版本化求解投影的逻辑边界，但尚未形成物理表或迁移，当前 SQL 不能冒充已实现的数据运营库
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0006 已实现；0003 增加用户修订血缘，0004 增加不可变脱敏计划分享，0005 增加 Revision/节点结构化反馈，0006 增加通用地点目录、来源记录、Revision、几何、访问点、时间规则、关系、互斥组和求解投影发布边界。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0006 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
 - 上游：API 契约 V2.5、应用代码架构 V1.2、ADR-0002、ADR-0005、ADR-0009、ADR-0018
 
@@ -166,41 +166,45 @@ CREATE TABLE attractions (
 
 `data_verified=true AND conflict=false AND status=active` 是发布必要条件，但还需通过时间规则、天气和 OD 一致性门禁。
 
-#### G7-R0.2 已接受逻辑边界：通用地点目录（物理模型尚未实现）
+#### G7-R0.2-03 已实现：通用地点目录物理模型
 
-当前 `attractions` 适用于点状景点和 7 点技术基线，不足以可靠表达街区、多入口景区、步行路线、市集和固定表演。ADR-0018 已接受以下逻辑边界；具体 SQLAlchemy 表、约束、索引和 Alembic revision 在 R0.2-03 确定：
+当前 `attractions` 继续只服务点状景点和 7 点历史技术基线。ADR-0018 的通用地点事实模型已由 `place_catalog` 领域模块、SQLAlchemy 映射和 Alembic `0006_place_catalog` 实现，不反向改写旧求解器事实：
 
 ```text
 places
-├── place_access_points
-├── place_geometries / route definition
 ├── place_source_records
 ├── place_revisions
-├── place_time_rules / closures / exceptions
-├── place_relations / selection exclusion groups
+│   ├── place_geometries
+│   ├── place_access_points
+│   ├── place_time_rules
+│   ├── place_closures
+│   └── place_date_exceptions
+├── place_relations
+├── selection_exclusion_groups
+│   └── selection_exclusion_members
 └── solver_place_projections
 ```
 
-建议字段至少覆盖：
+物理模型和约束覆盖：
 
 - `place_kind`：attraction/scenic_area/neighborhood/walking_route/market/show/experience；
 - `geometry_kind`：point/area/route；
-- 默认到达点、可选离开点和 access point 审核状态；
-- 建议时长下限/推荐值/上限及来源；
-- 内部步行预算、适合时段、室内外和人群标签；
-- source registry、采集时间、许可/条款检查和 review status；R0.2-02 已由 [地点数据来源与采集规范](../domain/地点数据来源与采集规范.md) 和 `data/governance/` 机器资产固定来源/字段/方式/目标阶段四元组门禁；
-- candidate/human_verified/published 生命周期；
-- 投影到当前 solver `Attraction` 的版本和规则。
+- `PlaceSourceRecord` 强制绑定 source、registry/dictionary ID 与规范化 SHA-256、来源 URL、采集方式、来源决策和目标阶段；conditional 来源在领域构造阶段即拒绝 `target_stage=published`；
+- `PlaceRevision` 使用 `(place_id, revision_number)` 唯一约束，保存名称、类型、几何类型、时长范围、内部步行、体力、室内外、适用时段、人群、雨天适配、来源闭包和 candidate/human_verified/published/retired 生命周期；
+- 几何、访问点、时间规则、闭馆日和日期例外分别持久化，访问点坐标使用 `DECIMAL(10,7)`，跨午夜分钟值允许到 2880；
+- `PlaceRelation` 表达 contains/part_of/overlaps/same_experience，并保存 pending/resolved/not_required 裁决状态；互斥组与成员使用独立表和唯一约束；
+- `SolverPlaceProjection` 在同一 `data_snapshot_version` 内约束 solver node ID 唯一、PlaceRevision 唯一，保存显式到达/离开访问点、时长范围、solver payload 和稳定 SHA-256；
+- 仓储拒绝直接插入 published Revision 或 projection；唯一发布入口加载 Place、Revision、来源、几何、访问点、时间和关系依赖闭包，执行 fail-closed 门禁后在同一事务中更新 Revision 与 projection 状态。
 
 投影的有向路网端点固定为 `origin.departure_access_point → destination.arrival_access_point`。M1 中一个用户可选 Place 最多投影为一个 solver 节点；路线内部步行计入游览时长，不重复计入节点间 OD。现有 API `attraction_id` 在 M1 暂时承载稳定 `place_id` 作为兼容别名，不能用其字段名反推事实类型。
 
-在物理模型和迁移完成前：
+当前实施边界：
 
-- 不修改 0001–0005 的历史迁移；
-- 不为未来表预占虚假的 Alembic revision 编号；
+- 0001–0005 历史迁移未修改，0006 只新增表、索引、唯一约束和外键；
 - 不把区域中心点当作 human_verified 游客入口；
 - 不把 raw/candidate 爬取记录直接写入 published snapshot；
-- 现有 `attractions` 和 JSON published snapshot 继续只承担历史回放和小规模技术基线。
+- 现有 `attractions`、7 点 JSON published snapshot 和历史 TripRevision 不迁移、不覆盖、不重算；
+- R0.2-03 只提供事实与发布边界，尚未采集杭州 50–75 个研究地点，也尚未生成 immutable research snapshot；这些分别属于 R0.2-04～07。
 
 ### 5.3 `attraction_time_rules`
 
@@ -776,9 +780,11 @@ degradations
   → 公开 token 摘要、plan-share-v1 不可变脱敏快照和查询索引
 0005_feedbacks
   → Revision/节点反馈、intent 幂等和主体/Revision/目标去重约束
+0006_place_catalog
+  → 通用 Place、来源、Revision、几何、访问点、时间、关系、互斥组和求解投影发布边界
 ```
 
-以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；发布当前应用前必须先备份，再依次执行 0003、0004、0005，并确认 readiness 的 `expected_revision/current_revision` 都是 `0005_feedbacks`。
+以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再依次执行 0003、0004、0005、0006，并确认 readiness 的 `expected_revision/current_revision` 都是 `0006_place_catalog`。R0.2-03 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
 
 每次迁移必须：
 
@@ -850,6 +856,27 @@ And validation_report 保留缺失边
 And 非同点 travel_min=0 被拒绝
 ```
 
+### A5-DATA-07 地点投影发布边界
+
+```gherkin
+Given PlaceRevision 为 human_verified
+And 到达/离开访问点、几何和时间规则均 human_verified
+And 来源闭包、重叠裁决和 projection hash 完整
+When 仓储执行 publish_projection
+Then Revision 与 SolverPlaceProjection 在同一事务中进入 published
+And 直接插入 published 对象被拒绝
+```
+
+### A5-DATA-08 不完整地点稳定拒绝
+
+```gherkin
+Given 访问点未审核、时间规则缺失、同日表演场次歧义或重叠关系未裁决
+When 运行 projection publication gate
+Then 返回稳定 reason codes
+And 不修改 candidate/human_verified 状态
+And 不生成 published research snapshot
+```
+
 ## 15. A5 数据退出条件
 
 - [x] 主体、草稿、Intent、SolverRun、Trip 和 Revision 关系明确；
@@ -862,4 +889,6 @@ And 非同点 travel_min=0 被拒绝
 - [x] Revision 只保存质量门通过且守恒的结果；
 - [x] token、日志、删除和保留边界明确；
 - [x] 迁移顺序和数据库验收场景明确；
+- [x] 通用地点、来源、Revision、几何、访问点、时间、关系、互斥组和单节点投影已形成 0006 物理模型；
+- [x] candidate/human_verified/published 状态隔离和稳定 projection hash 发布门禁已实现；
 - [x] 未提前创建 Execution/Journal/Community/Retrospective 空表。

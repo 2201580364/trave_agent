@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime
 from types import TracebackType
 from typing import Any, Self
@@ -42,7 +43,7 @@ from travel_agent.domain.planning import (
 
 class Base(DeclarativeBase):
     @declared_attr.directive
-    def __table_args__(cls) -> dict[str, str]:
+    def __table_args__(cls) -> Any:
         return {
             "mysql_engine": "InnoDB",
             "mysql_charset": "utf8mb4",
@@ -255,22 +256,28 @@ class SqlAlchemyTripRepository:
             raise ValueError("trip_id does not exist")
 
 
-class _SqlAlchemyRepository:
-    def __init__(self, session: Session, row_type, entity_from_row, values) -> None:
+class _SqlAlchemyRepository[EntityT, RowT: Base]:
+    def __init__(
+        self,
+        session: Session,
+        row_type: type[RowT],
+        entity_from_row: Callable[[RowT], EntityT],
+        values: Callable[[EntityT], dict[str, Any]],
+    ) -> None:
         self._session = session
         self._row_type = row_type
         self._entity_from_row = entity_from_row
         self._values = values
 
-    def get(self, record_id: str):
+    def get(self, record_id: str) -> EntityT | None:
         row = self._session.get(self._row_type, record_id)
         return self._entity_from_row(row) if row is not None else None
 
-    def add(self, entity) -> None:
+    def add(self, entity: EntityT) -> None:
         self._session.add(self._row_type(**self._values(entity)))
         self._session.flush()
 
-    def save(self, entity) -> None:
+    def save(self, entity: EntityT) -> None:
         identity = self._row_type.__mapper__.primary_key[0].key
         record_id = getattr(entity, identity)
         row = self._session.get(self._row_type, record_id)
@@ -281,7 +288,9 @@ class _SqlAlchemyRepository:
         self._session.flush()
 
 
-class SqlAlchemyTripRevisionRepository(_SqlAlchemyRepository):
+class SqlAlchemyTripRevisionRepository(
+    _SqlAlchemyRepository[TripRevision, TripRevisionRow]
+):
     def __init__(self, session: Session) -> None:
         super().__init__(session, TripRevisionRow, _revision_from_row, _revision_values)
 
@@ -304,6 +313,7 @@ class SqlAlchemyUnitOfWork:
 
     def __enter__(self) -> Self:
         from .feedback import SqlAlchemyFeedbackRepository
+        from .place_catalog import SqlAlchemyPlaceCatalogRepository
         from .sharing import SqlAlchemyPlanShareRepository
 
         self._session = self._session_factory()
@@ -316,6 +326,7 @@ class SqlAlchemyUnitOfWork:
         )
         self.plan_shares = SqlAlchemyPlanShareRepository(self._session)
         self.feedbacks = SqlAlchemyFeedbackRepository(self._session)
+        self.place_catalog = SqlAlchemyPlaceCatalogRepository(self._session)
         return self
 
     def __exit__(

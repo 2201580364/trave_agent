@@ -2,6 +2,7 @@
 
 from .feedback import SqlAlchemyFeedbackRepository
 from .identity import AnonymousIdentityService
+from .place_catalog import SqlAlchemyPlaceCatalogRepository
 from .planning import Base, SqlAlchemyUnitOfWork, create_schema
 from .runtime import (
     DatabaseReadiness,
@@ -17,6 +18,7 @@ __all__ = [
     "DatabaseReadiness",
     "DatabaseSettings",
     "SqlAlchemyFeedbackRepository",
+    "SqlAlchemyPlaceCatalogRepository",
     "SqlAlchemyUnitOfWork",
     "SqlAlchemyPlanShareRepository",
     "create_schema",
