@@ -87,7 +87,7 @@ export function CandidatesPage() {
   )
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
         <div>
           <Typography.Title level={2}>候选地点清单</Typography.Title>

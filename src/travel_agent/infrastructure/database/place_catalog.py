@@ -29,6 +29,7 @@ from travel_agent.domain.place_catalog import (
     PlaceGeometry,
     PlaceRelation,
     PlaceRevision,
+    PlaceRevisionEvidence,
     PlaceSourceRecord,
     PlaceTimeRule,
     ProjectionPublicationContext,
@@ -426,11 +427,91 @@ class SqlAlchemyPlaceCatalogRepository:
     ) -> SolverPlaceProjection | None:
         row = self._session.scalar(
             select(SolverPlaceProjectionRow)
+            .join(
+                PlaceRevisionRow,
+                PlaceRevisionRow.place_revision_id
+                == SolverPlaceProjectionRow.place_revision_id,
+            )
             .where(SolverPlaceProjectionRow.place_revision_id == place_revision_id)
-            .order_by(SolverPlaceProjectionRow.created_at.desc())
+            .where(
+                SolverPlaceProjectionRow.place_id == PlaceRevisionRow.place_id
+            )
+            .order_by(
+                SolverPlaceProjectionRow.created_at.desc(),
+                SolverPlaceProjectionRow.projection_id.desc(),
+            )
             .limit(1)
         )
         return _projection_from_row(row) if row is not None else None
+
+    def load_revision_evidence(
+        self, place_revision_id: str
+    ) -> PlaceRevisionEvidence | None:
+        """Load O04 evidence without requiring a prepared Projection."""
+
+        revision_row = self._session.get(PlaceRevisionRow, place_revision_id)
+        if revision_row is None:
+            return None
+        revision = _revision_from_row(revision_row)
+
+        geometry_rows = self._session.scalars(
+            select(PlaceGeometryRow)
+            .where(PlaceGeometryRow.place_revision_id == place_revision_id)
+            .order_by(PlaceGeometryRow.created_at, PlaceGeometryRow.geometry_id)
+        )
+        access_point_rows = self._session.scalars(
+            select(PlaceAccessPointRow)
+            .where(PlaceAccessPointRow.place_revision_id == place_revision_id)
+            .order_by(PlaceAccessPointRow.created_at, PlaceAccessPointRow.access_point_id)
+        )
+        geometries = tuple(_geometry_from_row(row) for row in geometry_rows)
+        access_points = tuple(_access_point_from_row(row) for row in access_point_rows)
+        referenced_source_ids = tuple(
+            dict.fromkeys(
+                (
+                    *revision.source_record_ids,
+                    *(geometry.source_record_id for geometry in geometries),
+                    *(point.source_record_id for point in access_points),
+                )
+            )
+        )
+        source_rows = (
+            tuple(
+                self._session.scalars(
+                    select(PlaceSourceRecordRow)
+                    .where(
+                        PlaceSourceRecordRow.place_id == revision_row.place_id,
+                        PlaceSourceRecordRow.source_record_id.in_(referenced_source_ids),
+                    )
+                    .order_by(
+                        PlaceSourceRecordRow.created_at,
+                        PlaceSourceRecordRow.source_record_id,
+                    )
+                )
+            )
+            if referenced_source_ids
+            else ()
+        )
+        source_by_id = {
+            row.source_record_id: _source_record_from_row(row) for row in source_rows
+        }
+        source_records = tuple(
+            source_by_id[source_id]
+            for source_id in referenced_source_ids
+            if source_id in source_by_id
+        )
+        return PlaceRevisionEvidence(
+            revision=revision,
+            source_records=source_records,
+            geometries=geometries,
+            access_points=access_points,
+            projection=self.get_projection_for_revision(place_revision_id),
+            missing_source_record_ids=tuple(
+                source_id
+                for source_id in referenced_source_ids
+                if source_id not in source_by_id
+            ),
+        )
 
     def load_publication_context(
         self, projection_id: str
@@ -445,33 +526,74 @@ class SqlAlchemyPlaceCatalogRepository:
         if revision_row is None or place_row is None:
             return None
 
-        source_rows = self._session.scalars(
-            select(PlaceSourceRecordRow).where(
-                PlaceSourceRecordRow.source_record_id.in_(revision_row.source_record_ids)
-            )
-        )
-        geometry_rows = self._session.scalars(
-            select(PlaceGeometryRow).where(
-                PlaceGeometryRow.place_revision_id == revision_row.place_revision_id
-            )
-        )
-        access_rows = self._session.scalars(
-            select(PlaceAccessPointRow).where(
-                PlaceAccessPointRow.place_revision_id == revision_row.place_revision_id
-            )
-        )
-        time_rule_rows = self._session.scalars(
-            select(PlaceTimeRuleRow).where(
-                PlaceTimeRuleRow.place_revision_id == revision_row.place_revision_id
-            )
-        )
-        relation_rows = self._session.scalars(
-            select(PlaceRelationRow).where(
-                or_(
-                    PlaceRelationRow.from_place_id == place_row.place_id,
-                    PlaceRelationRow.to_place_id == place_row.place_id,
+        # Materialize every projection dependency before loading sources.  A
+        # source record is globally keyed, so loading only the revision's
+        # source IDs would miss a source referenced by a geometry, access
+        # point, or time rule.  The source query intentionally does not filter
+        # by place: the domain publication gate must distinguish a missing
+        # source from an existing source belonging to another Place and emit
+        # the stable SOURCE_RECORD_PLACE_MISMATCH reason.
+        geometry_rows = tuple(
+            self._session.scalars(
+                select(PlaceGeometryRow).where(
+                    PlaceGeometryRow.place_revision_id
+                    == revision_row.place_revision_id
                 )
             )
+        )
+        access_rows = tuple(
+            self._session.scalars(
+                select(PlaceAccessPointRow).where(
+                    PlaceAccessPointRow.place_revision_id
+                    == revision_row.place_revision_id
+                )
+            )
+        )
+        time_rule_rows = tuple(
+            self._session.scalars(
+                select(PlaceTimeRuleRow).where(
+                    PlaceTimeRuleRow.place_revision_id
+                    == revision_row.place_revision_id
+                )
+            )
+        )
+        relation_rows = tuple(
+            self._session.scalars(
+                select(PlaceRelationRow).where(
+                    or_(
+                        PlaceRelationRow.from_place_id == place_row.place_id,
+                        PlaceRelationRow.to_place_id == place_row.place_id,
+                    )
+                )
+            )
+        )
+        referenced_source_ids = tuple(
+            dict.fromkeys(
+                (
+                    *revision_row.source_record_ids,
+                    *(row.source_record_id for row in geometry_rows),
+                    *(row.source_record_id for row in access_rows),
+                    *(row.source_record_id for row in time_rule_rows),
+                )
+            )
+        )
+        source_rows = (
+            tuple(
+                self._session.scalars(
+                    select(PlaceSourceRecordRow)
+                    .where(
+                        PlaceSourceRecordRow.source_record_id.in_(
+                            referenced_source_ids
+                        )
+                    )
+                    .order_by(
+                        PlaceSourceRecordRow.created_at,
+                        PlaceSourceRecordRow.source_record_id,
+                    )
+                )
+            )
+            if referenced_source_ids
+            else ()
         )
         return ProjectionPublicationContext(
             place=_place_from_row(place_row),

@@ -19,6 +19,7 @@ from .entities import (
     SelectionExclusionMember,
     SolverPlaceProjection,
 )
+from .evidence import PlaceRevisionEvidence
 from .projection import ProjectionPublicationContext
 
 
@@ -41,6 +42,9 @@ class PlaceCatalogRepository(Protocol):
     def get_projection_for_revision(
         self, place_revision_id: str
     ) -> SolverPlaceProjection | None: ...
+    def load_revision_evidence(
+        self, place_revision_id: str
+    ) -> PlaceRevisionEvidence | None: ...
     def load_publication_context(
         self, projection_id: str
     ) -> ProjectionPublicationContext | None: ...

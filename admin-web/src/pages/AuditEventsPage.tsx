@@ -154,7 +154,7 @@ export function AuditEventsPage() {
   const offset = filters.offset ?? 0
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
         <div>
           <Typography.Title level={2}>审计中心</Typography.Title>

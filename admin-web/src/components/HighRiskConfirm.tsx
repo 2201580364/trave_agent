@@ -39,7 +39,7 @@ export function HighRiskConfirm({
       onOk={onConfirm}
       onCancel={onCancel}
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Typography.Paragraph>{description}</Typography.Paragraph>
         <Typography.Text type="secondary">
           请输入 <Typography.Text code>{confirmationText}</Typography.Text> 以确认：

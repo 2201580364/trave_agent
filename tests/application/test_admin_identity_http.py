@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 from alembic import command
@@ -29,7 +30,14 @@ from travel_agent.infrastructure.database.admin_identity import (
     AdminRoleRow,
     AdminSessionRow,
 )
-from travel_agent.infrastructure.database.place_catalog import PlaceRevisionRow, PlaceRow
+from travel_agent.infrastructure.database.place_catalog import (
+    PlaceAccessPointRow,
+    PlaceGeometryRow,
+    PlaceRevisionRow,
+    PlaceRow,
+    PlaceSourceRecordRow,
+    SolverPlaceProjectionRow,
+)
 from travel_agent.infrastructure.database.place_review import PlaceReviewDecisionRow
 from travel_agent.infrastructure.memory import (
     FixedDataSnapshotVersionProvider,
@@ -37,6 +45,7 @@ from travel_agent.infrastructure.memory import (
     SequenceIdGenerator,
 )
 from travel_agent.interfaces.http import HttpContainer, create_app
+from travel_agent.interfaces.http.admin import safe_source_url
 
 NOW = datetime(2026, 8, 29, 12, 0, tzinfo=UTC)
 ROOT_LOGIN = "root.admin"
@@ -573,6 +582,275 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     )
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "resource_not_found"
+
+
+def test_revision_evidence_is_revision_scoped_and_exposes_projection_endpoints(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-evidence")
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-evidence")
+        assert revision is not None
+        revision.source_record_ids = [
+            "source-evidence",
+            "source-sensitive",
+            "missing-source",
+            "source-other-place",
+        ]
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-evidence",
+                place_id="place-1",
+                source_id="manual-reference",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="dictionary-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://example.test/evidence",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="conditional",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-sensitive",
+                place_id="place-1",
+                source_id="manual-reference-sensitive",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="dictionary-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url=(
+                    "https://example.test/evidence?x-api-key=private-value"
+                    "&client_secret=private-secret&keep=1#fragment-token"
+                ),
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="conditional",
+                observed_at=NOW.isoformat(),
+                content_sha256="e" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceRow(
+                place_id="place-2",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at=NOW.isoformat(),
+                updated_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-other-place",
+                place_id="place-2",
+                source_id="other-place-source",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="dictionary-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://other.example/leaked-source",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="conditional",
+                observed_at=NOW.isoformat(),
+                content_sha256="f" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceGeometryRow(
+                geometry_id="geometry-evidence",
+                place_revision_id="revision-evidence",
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.15, 30.25]},
+                source_record_id="source-evidence",
+                review_status="candidate",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
+        session.add(
+            PlaceGeometryRow(
+                geometry_id="geometry-cross-place",
+                place_revision_id="revision-evidence",
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.16, 30.26]},
+                source_record_id="source-other-place",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="access-evidence",
+                place_revision_id="revision-evidence",
+                access_point_kind="visitor_entrance",
+                name="主入口",
+                lat=30.25,
+                lng=120.15,
+                source_record_id="source-evidence",
+                review_status="candidate",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=None,
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="access-cross-place",
+                place_revision_id="revision-evidence",
+                access_point_kind="visitor_exit",
+                name="错绑出口",
+                lat=30.26,
+                lng=120.16,
+                source_record_id="source-other-place",
+                review_status="human_verified",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            SolverPlaceProjectionRow(
+                projection_id="projection-evidence",
+                projection_version="projection-v1",
+                data_snapshot_version="snapshot-evidence",
+                place_id="place-1",
+                place_revision_id="revision-evidence",
+                solver_node_id=42,
+                place_kind="attraction",
+                geometry_kind="point",
+                arrival_access_point_id="access-evidence",
+                departure_access_point_id="access-evidence",
+                duration_min=30,
+                duration_recommended=60,
+                duration_max=90,
+                internal_travel_min=5,
+                solver_payload={"source": "test"},
+                projection_hash="d" * 64,
+                status="candidate",
+                gate_reason_codes=[],
+                created_at=NOW.isoformat(),
+                published_at=None,
+            )
+        )
+        session.add(
+            SolverPlaceProjectionRow(
+                projection_id="projection-evidence-z",
+                projection_version="projection-v1",
+                data_snapshot_version="snapshot-evidence-2",
+                place_id="place-1",
+                place_revision_id="revision-evidence",
+                solver_node_id=43,
+                place_kind="attraction",
+                geometry_kind="point",
+                arrival_access_point_id="access-evidence",
+                departure_access_point_id="access-evidence",
+                duration_min=30,
+                duration_recommended=60,
+                duration_max=90,
+                internal_travel_min=5,
+                solver_payload={"source": "test-tie"},
+                projection_hash="1" * 64,
+                status="candidate",
+                gate_reason_codes=[],
+                created_at=NOW.isoformat(),
+                published_at=None,
+            )
+        )
+        session.commit()
+
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    response = context.client.get(
+        "/api/v1/admin/place-revisions/revision-evidence/evidence",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["revision"]["place_revision_id"] == "revision-evidence"
+    assert body["sources"][0]["source_record_id"] == "source-evidence"
+    valid_geometry = next(
+        item for item in body["geometries"] if item["geometry_id"] == "geometry-evidence"
+    )
+    assert valid_geometry["geometry"] == {
+        "type": "Point",
+        "coordinates": [120.15, 30.25],
+    }
+    assert valid_geometry["source_record_valid"] is True
+    cross_geometry = next(
+        item for item in body["geometries"] if item["geometry_id"] == "geometry-cross-place"
+    )
+    assert cross_geometry["source_record_valid"] is False
+    valid_access_point = next(
+        item for item in body["access_points"] if item["access_point_id"] == "access-evidence"
+    )
+    assert valid_access_point["lat"] == pytest.approx(30.25)
+    assert valid_access_point["source_record_valid"] is True
+    cross_access_point = next(
+        item for item in body["access_points"] if item["access_point_id"] == "access-cross-place"
+    )
+    assert cross_access_point["source_record_valid"] is False
+    assert body["projection"]["arrival_access_point_id"] == "access-evidence"
+    assert body["projection"]["departure_access_point_id"] == "access-evidence"
+    assert body["projection"]["projection_id"] == "projection-evidence-z"
+    assert body["sources"][1]["source_record_id"] == "source-sensitive"
+    assert body["sources"][1]["source_url_redacted"] is True
+    assert "private-value" not in response.text
+    assert "fragment-token" not in response.text
+    assert "other.example" not in response.text
+    assert body["missing_source_record_ids"] == [
+        "missing-source",
+        "source-other-place",
+    ]
+
+    unauthenticated = context.client.get(
+        "/api/v1/admin/place-revisions/revision-evidence/evidence"
+    )
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["error"]["code"] == "admin_authentication_required"
+
+    missing = context.client.get(
+        "/api/v1/admin/place-revisions/missing/evidence",
+        headers=headers,
+    )
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "resource_not_found"
+
+
+def test_safe_source_url_redacts_credential_variants_and_preserves_ipv6() -> None:
+    redacted = safe_source_url(
+        "https://[::1]:8080/path?X-API-Key=private-key"
+        "&client_secret=private-secret&access-token=private-token&keep=1#fragment"
+    )
+
+    assert "private-key" not in redacted
+    assert "private-secret" not in redacted
+    assert "private-token" not in redacted
+    assert "fragment" not in redacted
+    assert redacted.startswith("https://[::1]:8080/path?")
+    parsed = urlsplit(redacted)
+    assert parsed.hostname == "::1"
+    assert parsed.port == 8080
+    assert parse_qsl(parsed.query, keep_blank_values=True)[-1] == ("keep", "1")
+
+    assert safe_source_url("https://example.test:invalid/path") == "[invalid source URL]"
+    assert safe_source_url("https://[::1/path") == "[invalid source URL]"
 
 
 def test_revision_editing_creates_new_candidate_and_keeps_base_immutable(

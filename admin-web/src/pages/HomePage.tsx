@@ -3,7 +3,7 @@ import { Alert, Card, Col, Row, Space, Statistic, Typography } from 'antd'
 
 export function HomePage() {
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div>
         <Typography.Title level={2}>管理首页</Typography.Title>
         <Typography.Paragraph type="secondary">
@@ -13,7 +13,7 @@ export function HomePage() {
       <Alert
         showIcon
         type="warning"
-        message="研究数据尚未发布"
+        title="研究数据尚未发布"
         description="现有 72 个地点均为 candidate，不能描述为 human_verified 或 published；本页不伪造审核通过率、待办量或发布版本。"
       />
       <Row gutter={[16, 16]}>

@@ -17,6 +17,7 @@ from .entities import (
     SelectionExclusionMember,
     SolverPlaceProjection,
 )
+from .evidence import PlaceRevisionEvidence
 from .projection import (
     ProjectionPublicationContext,
     ProjectionPublicationError,
@@ -49,6 +50,7 @@ __all__ = [
     "SelectionExclusionGroup",
     "SelectionExclusionMember",
     "SolverPlaceProjection",
+    "PlaceRevisionEvidence",
     "REVIEW_DECISION_KINDS",
     "REVIEW_TASK_STATUSES",
     "PlaceReviewDecision",

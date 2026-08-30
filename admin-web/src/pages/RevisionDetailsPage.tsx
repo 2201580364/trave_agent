@@ -9,12 +9,12 @@ import {
   SendOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Space, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Space, Table, Tag, Typography, message } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceRevision } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceGeometryEvidence, PlaceRevision, PlaceRevisionEvidence } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 
@@ -50,8 +50,11 @@ export function RevisionDetailsPage() {
   const navigate = useNavigate()
   const { revisionId } = useParams<{ revisionId: string }>()
   const [revision, setRevision] = useState<PlaceRevision | null>(null)
+  const [evidence, setEvidence] = useState<PlaceRevisionEvidence | null>(null)
   const [loading, setLoading] = useState(true)
+  const [evidenceLoading, setEvidenceLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [form] = Form.useForm()
@@ -63,15 +66,35 @@ export function RevisionDetailsPage() {
       return
     }
     setLoading(true)
+    setEvidenceLoading(true)
     setError(null)
-    try {
-      setRevision(await api.getPlaceRevision(revisionId))
-    } catch (reason) {
-      setRevision(null)
-      setError(adminErrorMessage(reason))
-    } finally {
-      setLoading(false)
-    }
+    setEvidenceError(null)
+
+    const revisionRequest = api.getPlaceRevision(revisionId)
+      .then((nextRevision) => {
+        setRevision(nextRevision)
+      })
+      .catch((reason: unknown) => {
+        setRevision(null)
+        setError(adminErrorMessage(reason))
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+
+    const evidenceRequest = api.getPlaceRevisionEvidence(revisionId)
+      .then((nextEvidence) => {
+        setEvidence(nextEvidence)
+      })
+      .catch((reason: unknown) => {
+        setEvidence(null)
+        setEvidenceError(adminErrorMessage(reason))
+      })
+      .finally(() => {
+        setEvidenceLoading(false)
+      })
+
+    await Promise.all([revisionRequest, evidenceRequest])
   }, [api, revisionId])
 
   useEffect(() => {
@@ -159,7 +182,7 @@ export function RevisionDetailsPage() {
   }
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
         <div>
           <Typography.Title level={2}>Revision 详情</Typography.Title>
@@ -201,7 +224,7 @@ export function RevisionDetailsPage() {
       {revision !== null && (
         <>
           <Card>
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
               <Space wrap>
                 <Typography.Title level={3} style={{ margin: 0 }}>
                   {revision.canonical_name}
@@ -271,21 +294,23 @@ export function RevisionDetailsPage() {
             </Descriptions>
           </Card>
 
+          <EvidenceCard evidence={evidence} loading={evidenceLoading} error={evidenceError} />
+
           <Card title="发布阻断摘要">
             {blockers.length === 0 ? (
-              <Alert showIcon type="success" icon={<CheckCircleOutlined />} message="当前 Revision 没有从详情字段识别出的阻断项" />
+              <Alert showIcon type="success" icon={<CheckCircleOutlined />} title="当前 Revision 没有从详情字段识别出的阻断项" />
             ) : (
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Alert showIcon type="warning" message={`当前有 ${blockers.length} 项需要处理`} />
+              <Space orientation="vertical" style={{ width: '100%' }}>
+                <Alert showIcon type="warning" title={`当前有 ${blockers.length} 项需要处理`} />
                 {blockers.map((blocker) => (
                   <Typography.Text key={blocker} type="secondary">
                     <CloseCircleOutlined /> {blocker}
                   </Typography.Text>
                 ))}
-              </Space>
+            </Space>
             )}
             <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-              本摘要只基于当前 Revision API 返回字段；几何、访问点、开放时间、来源冲突和关系裁决的逐项证据将在 O04–O07 页面接入后显示。
+              本摘要仍只基于当前 Revision API 返回字段；O04 的几何与访问点证据已在上方展示，开放时间、来源冲突和关系裁决将在 O05–O07 页面接入后显示。
             </Typography.Paragraph>
           </Card>
         </>
@@ -300,6 +325,237 @@ export function RevisionDetailsPage() {
       </Modal>
     </Space>
   )
+}
+
+function EvidenceCard({
+  evidence,
+  loading,
+  error,
+}: {
+  evidence: PlaceRevisionEvidence | null
+  loading: boolean
+  error: string | null
+}) {
+  if (loading) return <Card title="地图、几何与访问点（O04）" loading />
+  if (error !== null) {
+    return (
+      <Card title="地图、几何与访问点（O04）">
+        <Alert showIcon type="warning" title="O04 证据暂不可用" description={error} />
+      </Card>
+    )
+  }
+  if (evidence === null) {
+    return (
+      <Card title="地图、几何与访问点（O04）">
+        <Alert showIcon type="warning" title="当前 Revision 没有可读取的 O04 证据" />
+      </Card>
+    )
+  }
+
+  const projection = evidence.projection
+  return (
+    <Card title="地图、几何与访问点（O04）">
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
+          <Descriptions.Item label="来源证据">
+            {evidence.sources.length > 0
+              ? evidence.sources.map((source) => (
+                  <Tag key={source.source_record_id}>
+                    {source.source_id} · {source.source_decision}
+                    {source.source_url_redacted ? ' · URL 已脱敏' : ''}
+                  </Tag>
+                ))
+              : '未关联来源'}
+          </Descriptions.Item>
+          <Descriptions.Item label="几何记录数">{evidence.geometries.length}</Descriptions.Item>
+          <Descriptions.Item label="访问点记录数">{evidence.access_points.length}</Descriptions.Item>
+          <Descriptions.Item label="Projection">
+            {projection ? `${projection.projection_id} · ${projection.status}` : '未准备'}
+          </Descriptions.Item>
+          <Descriptions.Item label="到达端点">
+            {projection ? projection.arrival_access_point_id : '未选择'}
+          </Descriptions.Item>
+          <Descriptions.Item label="离开端点">
+            {projection ? projection.departure_access_point_id : '未选择'}
+          </Descriptions.Item>
+        </Descriptions>
+
+        {evidence.missing_source_record_ids.length > 0 && (
+          <Alert
+            showIcon
+            type="warning"
+            title="来源证据不完整"
+            description={`以下来源记录缺失或不属于当前 Place：${evidence.missing_source_record_ids.join('、')}`}
+          />
+        )}
+
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          几何证据
+        </Typography.Title>
+        <Table<PlaceGeometryEvidence>
+          rowKey="geometry_id"
+          size="small"
+          pagination={false}
+          dataSource={evidence.geometries}
+          scroll={{ x: 900 }}
+          columns={[
+            { title: '类型', dataIndex: 'geometry_kind', width: 110 },
+            {
+              title: '状态',
+              dataIndex: 'review_status',
+              width: 120,
+              render: (value: string, item) => (
+                <Space size={4}>
+                  <Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>
+                  {!item.active && <Tag>已停用</Tag>}
+                </Space>
+              ),
+            },
+            {
+              title: '图形数据',
+              dataIndex: 'geometry',
+              width: 390,
+              render: (value: Record<string, unknown>) => (
+                <Typography.Text code style={{ wordBreak: 'break-all' }}>
+                  {JSON.stringify(value)}
+                </Typography.Text>
+              ),
+            },
+            {
+              title: '来源记录',
+              key: 'source_record_id',
+              width: 240,
+              render: (_: unknown, item) => (
+                <Space size={4}>
+                  <Typography.Text ellipsis={{ tooltip: item.source_record_id }}>
+                    {item.source_record_id}
+                  </Typography.Text>
+                  <Tag color={item.source_record_valid ? 'success' : 'error'}>
+                    {item.source_record_valid ? '有效' : '无效'}
+                  </Tag>
+                </Space>
+              ),
+            },
+            {
+              title: '核验时间',
+              dataIndex: 'reviewed_at',
+              width: 190,
+              render: (value: string | null) => formatOptionalDateTime(value),
+            },
+          ]}
+          locale={{ emptyText: '当前没有几何证据' }}
+        />
+
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          访问点证据
+        </Typography.Title>
+        <Table<PlaceAccessPointEvidence>
+          rowKey="access_point_id"
+          size="small"
+          pagination={false}
+          dataSource={evidence.access_points}
+          scroll={{ x: 1000 }}
+          columns={[
+            { title: '名称', dataIndex: 'name', width: 180 },
+            {
+              title: '用途',
+              dataIndex: 'access_point_kind',
+              width: 150,
+              render: (value: string) => accessPointKindLabel(value),
+            },
+            {
+              title: '坐标',
+              key: 'coordinate',
+              width: 190,
+              render: (_: unknown, item) => `${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}`,
+            },
+            {
+              title: 'Projection 端点',
+              key: 'projection_role',
+              width: 170,
+              render: (_: unknown, item) => projectionRole(item.access_point_id, projection),
+            },
+            {
+              title: '状态',
+              dataIndex: 'review_status',
+              width: 120,
+              render: (value: string, item) => (
+                <Space size={4}>
+                  <Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>
+                  {!item.active && <Tag>已停用</Tag>}
+                </Space>
+              ),
+            },
+            {
+              title: '来源记录',
+              key: 'source_record_id',
+              width: 240,
+              render: (_: unknown, item) => (
+                <Space size={4}>
+                  <Typography.Text ellipsis={{ tooltip: item.source_record_id }}>
+                    {item.source_record_id}
+                  </Typography.Text>
+                  <Tag color={item.source_record_valid ? 'success' : 'error'}>
+                    {item.source_record_valid ? '有效' : '无效'}
+                  </Tag>
+                </Space>
+              ),
+            },
+          ]}
+          locale={{ emptyText: '当前没有访问点证据' }}
+        />
+
+        {projection === null ? (
+          <Alert showIcon type="info" title="尚未准备 Solver Projection，访问点不会被自动选作求解端点" />
+        ) : (
+          <Alert
+            showIcon
+            type="info"
+            title={`Projection 已明确绑定到达端点 ${projection.arrival_access_point_id} 和离开端点 ${projection.departure_access_point_id}`}
+          />
+        )}
+      </Space>
+    </Card>
+  )
+}
+
+function reviewStatusLabel(value: string): string {
+  const labels: Record<string, string> = {
+    candidate: '候选',
+    human_verified: '人工已核验',
+    rejected: '已驳回',
+  }
+  return labels[value] ?? value
+}
+
+function reviewStatusColor(value: string): string | undefined {
+  if (value === 'human_verified') return 'success'
+  if (value === 'rejected') return 'error'
+  return undefined
+}
+
+function accessPointKindLabel(value: string): string {
+  const labels: Record<string, string> = {
+    visitor_entrance: '游客入口',
+    visitor_exit: '游客出口',
+    route_start: '路线起点',
+    route_end: '路线终点',
+    performance_location: '演出位置',
+    meeting_point: '集合点',
+    area_representative: '区域代表点',
+  }
+  return labels[value] ?? value
+}
+
+function projectionRole(
+  accessPointId: string,
+  projection: PlaceRevisionEvidence['projection'],
+): string {
+  if (projection === null) return '未选择'
+  const roles: string[] = []
+  if (projection.arrival_access_point_id === accessPointId) roles.push('到达')
+  if (projection.departure_access_point_id === accessPointId) roles.push('离开')
+  return roles.length > 0 ? roles.join(' / ') : '未选择'
 }
 
 function publicationBlockers(revision: PlaceRevision): string[] {

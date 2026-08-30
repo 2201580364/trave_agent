@@ -24,6 +24,7 @@ from travel_agent.domain.place_catalog import (
     PlaceSourceRecord,
     PlaceTimeRule,
     ProjectionPublicationContext,
+    ProjectionPublicationError,
     SelectionExclusionGroup,
     SelectionExclusionMember,
     SolverPlaceProjection,
@@ -243,6 +244,18 @@ def test_complete_human_verified_projection_passes_and_publishes_immutably() -> 
     assert projection.projection_hash == context.projection.projection_hash
 
 
+def test_gate_rejects_source_record_belonging_to_another_place() -> None:
+    cross_place_source = _source("place_other")
+    context = replace(_context(), source_records=(cross_place_source,))
+
+    reasons = evaluate_projection_publication(context)
+
+    assert "SOURCE_RECORD_PLACE_MISMATCH" in reasons
+    # The source exists and is active; the failure is its Place ownership, not
+    # an absent source record.
+    assert "MISSING_SOURCE_RECORD" not in reasons
+
+
 def test_gate_rejects_unverified_access_hash_drift_and_overlap() -> None:
     relation = PlaceRelation(
         "relation_overlap_1",
@@ -393,6 +406,37 @@ def test_sqlalchemy_catalog_persists_and_only_gate_can_publish(tmp_path: Path) -
     assert restored_projection is not None
     assert restored_projection.status == "published"
     assert restored_projection.projection_hash == _projection().projection_hash
+
+
+def test_sqlalchemy_publication_context_rejects_cross_place_source(tmp_path: Path) -> None:
+    database = tmp_path / "cross-place-source.db"
+    engine = create_engine(f"sqlite:///{database}")
+    create_schema(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        uow.place_catalog.add_place(_place())
+        uow.place_catalog.add_place(_place("place_other"))
+        # Keep the source ID referenced by the revision, but attach the source
+        # row itself to a different Place.  This is the corruption the
+        # publication gate must surface explicitly.
+        uow.place_catalog.add_source_record(_source("place_other"))
+        uow.place_catalog.add_revision(_revision())
+        uow.place_catalog.add_geometry(_geometry())
+        for point in _access_points():
+            uow.place_catalog.add_access_point(point)
+        uow.place_catalog.add_time_rule(_time_rule())
+        uow.place_catalog.add_projection(_projection())
+
+        context = uow.place_catalog.load_publication_context("projection_westlake_1")
+        assert context is not None
+        assert context.source_records[0].place_id == "place_other"
+        with pytest.raises(ProjectionPublicationError) as exc_info:
+            uow.place_catalog.publish_projection(
+                "projection_westlake_1", published_at=NOW
+            )
+
+    assert "SOURCE_RECORD_PLACE_MISMATCH" in exc_info.value.reason_codes
 
 
 def test_repository_rejects_direct_published_inserts(tmp_path: Path) -> None:

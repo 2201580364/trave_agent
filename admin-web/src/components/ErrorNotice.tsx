@@ -7,7 +7,7 @@ export function ErrorNotice({ message, onClose }: { message: string; onClose?: (
       showIcon
       closable={onClose !== undefined}
       onClose={onClose}
-      message="操作未完成"
+      title="操作未完成"
       description={message}
     />
   )

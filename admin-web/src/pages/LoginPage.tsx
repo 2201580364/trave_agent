@@ -33,8 +33,8 @@ export function LoginPage() {
 
   return (
     <main className="login-page">
-      <Card className="login-card" bordered={false}>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Card className="login-card" variant="borderless">
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
           <div className="login-heading">
             <SafetyCertificateOutlined className="login-mark" />
             <div>
@@ -43,12 +43,12 @@ export function LoginPage() {
             </div>
           </div>
           {sessionReason === 'expired' && (
-            <Alert showIcon type="warning" message="会话已到期，请重新登录。" />
+            <Alert showIcon type="warning" title="会话已到期，请重新登录。" />
           )}
           {sessionReason === 'signed-out' && (
-            <Alert showIcon type="success" message="已安全退出管理会话。" />
+            <Alert showIcon type="success" title="已安全退出管理会话。" />
           )}
-          {error !== null && <Alert showIcon type="error" message={error} />}
+          {error !== null && <Alert showIcon type="error" title={error} />}
           <Form<LoginFields> layout="vertical" requiredMark={false} onFinish={submit}>
             <Form.Item
               name="login_name"

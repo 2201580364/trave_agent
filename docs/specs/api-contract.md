@@ -1126,6 +1126,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/review-tasks` | data_reviewer | 查询待审核队列 |
 | `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve、request_changes 或 cancel；写 ReviewDecision 并使用 expected version |
 | `GET /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | 查询追加式决定历史 |
+| `GET /api/v1/admin/place-revisions/{revision_id}/evidence` | editor/reviewer/publisher/viewer | 查询 Revision 绑定的几何、访问点、来源摘要和 Projection 端点；只读，不跨 Revision 推断 |
 | `GET /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/publications` | data_publisher | 通过 publication intent 调用发布用例 |
 | `POST /api/v1/admin/publication-batches` | data_publisher | 创建批次预览/执行，不隐藏逐项失败 |
@@ -1136,11 +1137,20 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、发布门检查和 Projection 级发布入口已可调用。地图、时间、来源、关系子资源和独立 research snapshot/批次发布仍属于后续 O03–O07 与 R0.2-07。
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、Revision evidence、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、发布门检查和 Projection 级发布入口已可调用。O04 当前只实现 Revision 级只读证据查询；几何/访问点写入与审核、O05 时间、O06 来源、O07 关系子资源和独立 research snapshot/批次发布仍属于后续切片。
 
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
+
+`GET /api/v1/admin/place-revisions/{revision_id}/evidence` 的 `sources` 只包含属于当前
+Place 的来源记录；几何/访问点引用的来源也会纳入结果。`missing_source_record_ids`
+显式列出缺失、错绑或不可读取的来源 ID，不能把不完整证据伪装成完整证据。来源 URL
+在响应前会移除用户信息、片段并对 credential-like 查询参数脱敏；`source_url_redacted`
+标记是否发生脱敏。`projection` 只返回当前 Revision 且 Place 归属一致的最新 Projection，
+同一创建时间按 `projection_id` 做稳定排序；没有 Projection 时返回 `null`。`geometries[]`
+和 `access_points[]` 的 `source_record_valid` 逐行标识其来源是否为当前 Place 的
+active 来源记录；错绑或缺失来源必须显示为 `false`，不能只依赖顶部汇总警告。
 
 ### 15.3 管理写入通用字段
 

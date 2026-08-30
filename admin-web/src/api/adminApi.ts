@@ -12,6 +12,7 @@ import type {
   ReviewTask,
   ReviewTaskStatus,
   PlaceRevision,
+  PlaceRevisionEvidence,
   PublicationCheck,
 } from './types'
 
@@ -92,6 +93,10 @@ export class AdminApi {
 
   getPlaceRevision(revisionId: string): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}`)
+  }
+
+  getPlaceRevisionEvidence(revisionId: string): Promise<PlaceRevisionEvidence> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/evidence`)
   }
 
   createPlaceRevision(

@@ -63,7 +63,7 @@ export function ReviewQueuePage() {
   )
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
         <div>
           <Typography.Title level={2}>地点审核工作台</Typography.Title>
@@ -152,7 +152,7 @@ function ReviewTaskDetails({
   }
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
+    <Space orientation="vertical" style={{ width: '100%' }}>
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
         <Descriptions.Item label="创建人">{task.created_by}</Descriptions.Item>
         <Descriptions.Item label="Revision">{task.place_revision_id}</Descriptions.Item>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,7 +14,12 @@ from travel_agent.application.admin import (
     PlaceReviewWorkflowService,
 )
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
-from travel_agent.domain.place_catalog import PlaceReviewDecision, PlaceReviewTask, PlaceRevision
+from travel_agent.domain.place_catalog import (
+    PlaceReviewDecision,
+    PlaceReviewTask,
+    PlaceRevision,
+    PlaceRevisionEvidence,
+)
 
 
 class CreateAdminSessionInput(BaseModel):
@@ -300,6 +306,16 @@ def build_admin_router(
                 "reason_codes": list(reasons),
             }
 
+        @router.get("/place-revisions/{revision_id}/evidence")
+        def get_place_revision_evidence(
+            revision_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            evidence = review_workflow.get_revision_evidence(
+                current, revision_id=revision_id
+            )
+            return _revision_evidence_response(evidence)
+
         @router.post("/place-revisions/{revision_id}/publications")
         def publish_place_revision(
             revision_id: str,
@@ -504,6 +520,156 @@ def _revision_response(revision: PlaceRevision) -> dict[str, object]:
         "published_at": revision.published_at.isoformat() if revision.published_at else None,
         "review_flags": list(revision.review_flags),
     }
+
+
+def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, object]:
+    projection = evidence.projection
+    valid_source_ids = {
+        source.source_record_id
+        for source in evidence.source_records
+        if source.status == "active"
+    }
+    return {
+        "revision": _revision_response(evidence.revision),
+        "sources": [
+            {
+                "source_record_id": source.source_record_id,
+                "source_id": source.source_id,
+                "source_url": safe_source_url(source.source_url),
+                "source_url_redacted": safe_source_url(source.source_url)
+                != source.source_url,
+                "collection_mode": source.collection_mode,
+                "target_stage": source.target_stage,
+                "source_decision": source.source_decision,
+                "observed_at": source.observed_at.isoformat(),
+                "status": source.status,
+            }
+            for source in evidence.source_records
+        ],
+        "geometries": [
+            {
+                "geometry_id": geometry.geometry_id,
+                "geometry_kind": geometry.geometry_kind,
+                "geometry": geometry.geometry,
+                "source_record_id": geometry.source_record_id,
+                "source_record_valid": geometry.source_record_id in valid_source_ids,
+                "review_status": geometry.review_status,
+                "active": geometry.active,
+                "created_at": geometry.created_at.isoformat(),
+                "reviewed_at": (
+                    geometry.reviewed_at.isoformat() if geometry.reviewed_at else None
+                ),
+            }
+            for geometry in evidence.geometries
+        ],
+        "access_points": [
+            {
+                "access_point_id": point.access_point_id,
+                "access_point_kind": point.access_point_kind,
+                "name": point.name,
+                "lat": float(point.lat),
+                "lng": float(point.lng),
+                "source_record_id": point.source_record_id,
+                "source_record_valid": point.source_record_id in valid_source_ids,
+                "review_status": point.review_status,
+                "active": point.active,
+                "fetched_at": point.fetched_at.isoformat() if point.fetched_at else None,
+                "reviewed_at": point.reviewed_at.isoformat() if point.reviewed_at else None,
+                "created_at": point.created_at.isoformat(),
+            }
+            for point in evidence.access_points
+        ],
+        "projection": (
+            {
+                "projection_id": projection.projection_id,
+                "projection_version": projection.projection_version,
+                "data_snapshot_version": projection.data_snapshot_version,
+                "solver_node_id": projection.solver_node_id,
+                "place_kind": projection.place_kind,
+                "geometry_kind": projection.geometry_kind,
+                "arrival_access_point_id": projection.arrival_access_point_id,
+                "departure_access_point_id": projection.departure_access_point_id,
+                "status": projection.status,
+                "projection_hash": projection.projection_hash,
+                "gate_reason_codes": list(projection.gate_reason_codes),
+                "created_at": projection.created_at.isoformat(),
+                "published_at": (
+                    projection.published_at.isoformat() if projection.published_at else None
+                ),
+            }
+            if projection is not None
+            else None
+        ),
+        "missing_source_record_ids": list(evidence.missing_source_record_ids),
+    }
+
+
+_SENSITIVE_SOURCE_QUERY_KEYS = {
+    "accesskey",
+    "accesstoken",
+    "apikey",
+    "auth",
+    "authorization",
+    "bearer",
+    "clientsecret",
+    "clienttoken",
+    "credential",
+    "credentials",
+    "jwt",
+    "key",
+    "password",
+    "passwd",
+    "privatekey",
+    "secret",
+    "signature",
+    "sig",
+    "token",
+    "xapikey",
+}
+
+
+def _is_sensitive_source_query_key(key: str) -> bool:
+    """Recognize common credential query parameters after normalizing spelling."""
+
+    normalized_key = "".join(character for character in key.lower() if character.isalnum())
+    if normalized_key in _SENSITIVE_SOURCE_QUERY_KEYS:
+        return True
+    return normalized_key.endswith(
+        ("key", "token", "secret", "password", "passwd", "signature", "sig")
+    )
+
+
+def safe_source_url(value: str) -> str:
+    """Keep source links useful without reflecting credential-like URL parts."""
+
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname or ""
+        port = parsed.port
+    except ValueError:
+        return "[invalid source URL]"
+    # urlsplit().hostname strips IPv6 brackets; restore them before
+    # reconstructing a redacted URL so the result remains parseable.
+    if ":" in hostname and not hostname.startswith("["):
+        hostname = f"[{hostname}]"
+    if port is not None:
+        hostname = f"{hostname}:{port}"
+    netloc = hostname
+    redacted = parsed.username is not None or parsed.password is not None
+    query_pairs = []
+    for key, query_value in parse_qsl(parsed.query, keep_blank_values=True):
+        if _is_sensitive_source_query_key(key):
+            query_value = "[REDACTED]"
+            redacted = True
+        query_pairs.append((key, query_value))
+    fragment = parsed.fragment
+    if fragment:
+        fragment = "[REDACTED]"
+        redacted = True
+    if redacted:
+        query = urlencode(query_pairs)
+        return urlunsplit((parsed.scheme, netloc, parsed.path, query, fragment))
+    return value
 
 
 def _review_decision_response(decision: PlaceReviewDecision) -> dict[str, object]:

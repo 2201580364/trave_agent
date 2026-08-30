@@ -19,6 +19,7 @@ from travel_agent.domain.place_catalog import (
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
+    PlaceRevisionEvidence,
     ProjectionPublicationError,
     SolverPlaceProjection,
     evaluate_projection_publication,
@@ -157,6 +158,18 @@ class PlaceReviewWorkflowService:
             if revision is None:
                 raise ResourceNotFoundError
             return revision
+
+    def get_revision_evidence(
+        self, principal: AdminPrincipal, *, revision_id: str
+    ) -> PlaceRevisionEvidence:
+        """Return revision-scoped geometry/access-point evidence for O04."""
+
+        self._require(principal, "place:candidate:read")
+        with self._uow_factory() as uow:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+            return evidence
 
     def create_revision(
         self,

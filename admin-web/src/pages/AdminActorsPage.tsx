@@ -179,7 +179,7 @@ export function AdminActorsPage() {
         fixed: 'left',
         width: 190,
         render: (value: string, actor) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Typography.Text strong>{value}</Typography.Text>
             {actor.admin_actor_id === principal?.admin_actor_id && <Tag color="blue">当前账号</Tag>}
           </Space>
@@ -235,7 +235,7 @@ export function AdminActorsPage() {
   )
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
         <div>
           <Typography.Title level={2}>管理员与角色</Typography.Title>
@@ -358,7 +358,7 @@ function RoleCheckboxes() {
       rules={[{ required: true, type: 'array', min: 1, message: '至少选择一个角色' }]}
     >
       <Checkbox.Group style={{ width: '100%' }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space orientation="vertical" style={{ width: '100%' }}>
           {ROLE_CATALOG.map((role) => (
             <Checkbox key={role.key} value={role.key} disabled={'disabled' in role && role.disabled}>
               <Space>

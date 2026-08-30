@@ -119,13 +119,43 @@ def evaluate_projection_publication(
     ):
         reasons.add("PROJECTION_DURATION_MISMATCH")
 
-    source_records = {
+    # Source IDs are only globally unique, while the facts they support are
+    # scoped to a Place.  Keep the global lookup separate from the usable
+    # current-Place set so an existing source from another Place is reported
+    # as a provenance mismatch instead of being treated as a valid source (or
+    # silently disappearing as a missing one).
+    source_records_by_id = {
+        record.source_record_id: record for record in context.source_records
+    }
+    active_source_records = {
         record.source_record_id: record
         for record in context.source_records
         if record.status == "active"
     }
+    source_record_ids = tuple(
+        dict.fromkeys(
+            (
+                *revision.source_record_ids,
+                *(geometry.source_record_id for geometry in context.geometries),
+                *(point.source_record_id for point in context.access_points),
+                *(rule.source_record_id for rule in context.time_rules),
+            )
+        )
+    )
+    if any(
+        source_record_id in source_records_by_id
+        and source_records_by_id[source_record_id].place_id != place.place_id
+        for source_record_id in source_record_ids
+    ):
+        reasons.add("SOURCE_RECORD_PLACE_MISMATCH")
+
+    source_records = {
+        source_record_id: record
+        for source_record_id, record in active_source_records.items()
+        if record.place_id == place.place_id
+    }
     if not revision.source_record_ids or any(
-        source_record_id not in source_records
+        source_record_id not in active_source_records
         for source_record_id in revision.source_record_ids
     ):
         reasons.add("MISSING_SOURCE_RECORD")

@@ -151,6 +151,70 @@ export type PublicationCheck = {
   reason_codes: string[]
 }
 
+export type PlaceRevisionEvidence = {
+  revision: PlaceRevision
+  sources: PlaceEvidenceSource[]
+  geometries: PlaceGeometryEvidence[]
+  access_points: PlaceAccessPointEvidence[]
+  projection: PlaceProjectionEvidence | null
+  missing_source_record_ids: string[]
+}
+
+export type PlaceEvidenceSource = {
+  source_record_id: string
+  source_id: string
+  source_url: string
+  source_url_redacted: boolean
+  collection_mode: string
+  target_stage: string
+  source_decision: string
+  observed_at: string
+  status: string
+}
+
+export type PlaceGeometryEvidence = {
+  geometry_id: string
+  geometry_kind: string
+  geometry: Record<string, unknown>
+  source_record_id: string
+  source_record_valid: boolean
+  review_status: string
+  active: boolean
+  created_at: string
+  reviewed_at: string | null
+}
+
+export type PlaceAccessPointEvidence = {
+  access_point_id: string
+  access_point_kind: string
+  name: string
+  lat: number
+  lng: number
+  source_record_id: string
+  source_record_valid: boolean
+  review_status: string
+  active: boolean
+  fetched_at: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export type PlaceProjectionEvidence = {
+  projection_id: string
+  projection_version: string
+  data_snapshot_version: string
+  solver_node_id: number
+  place_kind: string
+  geometry_kind: string
+  arrival_access_point_id: string
+  departure_access_point_id: string
+  status: string
+  projection_hash: string
+  gate_reason_codes: string[]
+  created_at: string
+  published_at: string | null
+}
+
 export type ApiErrorBody = {
   error?: {
     code?: string
