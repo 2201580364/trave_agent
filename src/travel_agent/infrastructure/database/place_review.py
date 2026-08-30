@@ -161,6 +161,12 @@ class SqlAlchemyPlaceReviewRepository:
         )
         return tuple(_task_from_row(row) for row in rows)
 
+    def count_tasks(self, *, status: str | None) -> int:
+        statement = select(func.count()).select_from(PlaceReviewTaskRow)
+        if status is not None:
+            statement = statement.where(PlaceReviewTaskRow.status == status)
+        return int(self._session.scalar(statement) or 0)
+
     def add_task(self, task: PlaceReviewTask) -> None:
         self._session.add(
             PlaceReviewTaskRow(

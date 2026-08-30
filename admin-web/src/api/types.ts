@@ -175,6 +175,12 @@ export type PlaceTimePreview = {
   rule_ids: string[]
 }
 
+export type DashboardSummary = {
+  revisions: { candidate: number; human_verified: number; published: number }
+  review_tasks: Record<string, number>
+  recent_ready_tasks: ReviewTask[]
+}
+
 export type PlaceTimeRuleEvidence = {
   time_rule_id: string
   rule_kind: string

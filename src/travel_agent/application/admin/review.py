@@ -61,6 +61,8 @@ class ReviewRepository(Protocol):
         self, *, status: str | None, limit: int, offset: int
     ) -> tuple[PlaceReviewTask, ...]: ...
 
+    def count_tasks(self, *, status: str | None) -> int: ...
+
     def list_decisions(self, task_id: str) -> tuple[PlaceReviewDecision, ...]: ...
 
     def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
@@ -157,6 +159,22 @@ class PlaceReviewWorkflowService:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
             return uow.reviews.count_revisions(lifecycle_status=lifecycle_status)
+
+    def dashboard_summary(self, principal: AdminPrincipal) -> dict[str, object]:
+        self._require(principal, "place:candidate:read")
+        with self._uow_factory() as uow:
+            candidates = uow.reviews.count_revisions(lifecycle_status="candidate")
+            verified = uow.reviews.count_revisions(lifecycle_status="human_verified")
+            published = uow.reviews.count_revisions(lifecycle_status="published")
+            tasks: dict[str, int] = {}
+            for task_status in ("ready_for_review", "in_review", "changes_requested", "approved", "closed"):
+                tasks[task_status] = uow.reviews.count_tasks(status=task_status)
+            recent = uow.reviews.list_tasks(status="ready_for_review", limit=5, offset=0)
+            return {
+                "revisions": {"candidate": candidates, "human_verified": verified, "published": published},
+                "review_tasks": tasks,
+                "recent_ready_tasks": tuple(recent),
+            }
 
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
         self._require(principal, "place:candidate:read")

@@ -1,26 +1,33 @@
 import { AuditOutlined, DatabaseOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { Alert, Card, Col, Row, Space, Statistic, Typography } from 'antd'
+import { useEffect, useState } from 'react'
+import { adminErrorMessage } from '../api/errorMessages'
+import type { DashboardSummary } from '../api/types'
+import { useAdminSession } from '../auth/AdminSessionProvider'
 
 export function HomePage() {
+  const { api } = useAdminSession()
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => { void api.getDashboardSummary().then(setSummary).catch((reason) => setError(adminErrorMessage(reason))) }, [api])
   return (
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div>
         <Typography.Title level={2}>管理首页</Typography.Title>
         <Typography.Paragraph type="secondary">
-          当前切片提供管理身份、角色安全操作和最小审计查询；地点审核工作台将在下一节点接入。
+          研究数据治理与受控发布概览。
         </Typography.Paragraph>
       </div>
       <Alert
         showIcon
         type="warning"
         title="研究数据尚未发布"
-        description="现有 72 个地点均为 candidate，不能描述为 human_verified 或 published；本页不伪造审核通过率、待办量或发布版本。"
+        description={error ?? '统计来自当前数据库，审核状态以服务端聚合结果为准。'}
       />
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic prefix={<DatabaseOutlined />} title="候选地点" value={72} suffix="个" />
-            <Typography.Text type="secondary">来自已版本化候选目录，不代表审核通过。</Typography.Text>
+            <Statistic prefix={<DatabaseOutlined />} title="候选地点" value={summary?.revisions.candidate ?? 0} suffix="个" />
           </Card>
         </Col>
         <Col xs={24} md={8}>
@@ -31,11 +38,11 @@ export function HomePage() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic prefix={<AuditOutlined />} title="当前节点" value="05-01B" />
-            <Typography.Text type="secondary">安全操作面，不包含地点审核决定。</Typography.Text>
+            <Statistic prefix={<AuditOutlined />} title="已发布" value={summary?.revisions.published ?? 0} suffix="个" />
           </Card>
         </Col>
       </Row>
+      <Card title="审核待办"><Typography.Text>待审核 {summary?.review_tasks.ready_for_review ?? 0} 个，审核中 {summary?.review_tasks.in_review ?? 0} 个，需修改 {summary?.review_tasks.changes_requested ?? 0} 个。</Typography.Text></Card>
     </Space>
   )
 }

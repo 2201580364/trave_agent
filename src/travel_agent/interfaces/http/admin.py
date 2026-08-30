@@ -839,6 +839,17 @@ def build_admin_router(
                 "total": total,
             }
 
+        @router.get("/dashboard-summary")
+        def get_dashboard_summary(
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            summary = review_workflow.dashboard_summary(current)
+            return {
+                "revisions": summary["revisions"],
+                "review_tasks": summary["review_tasks"],
+                "recent_ready_tasks": [_review_task_response(task) for task in summary["recent_ready_tasks"]],
+            }
+
         @router.get("/place-revisions/{revision_id}")
         def get_place_revision(
             revision_id: str,

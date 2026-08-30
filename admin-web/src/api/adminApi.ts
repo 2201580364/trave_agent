@@ -22,6 +22,7 @@ import type {
   RetirePlaceEvidenceInput,
   PublicationCheck,
   PlaceTimePreview,
+  DashboardSummary,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -111,6 +112,8 @@ export class AdminApi {
     const query = new URLSearchParams({ service_date: serviceDate })
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-preview?${query}`)
   }
+
+  getDashboardSummary(): Promise<DashboardSummary> { return this.request('/dashboard-summary') }
 
   createGeometry(revisionId: string, input: PlaceGeometryInput): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/geometries`, {
