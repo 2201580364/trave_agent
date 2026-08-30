@@ -821,6 +821,14 @@ class SqlAlchemyPlaceCatalogRepository:
                 )
             )
         )
+        relations = tuple(
+            _relation_from_row(row)
+            for row in self._session.scalars(
+                select(PlaceRelationRow)
+                .where(or_(PlaceRelationRow.from_place_id == revision.place_id, PlaceRelationRow.to_place_id == revision.place_id))
+                .order_by(PlaceRelationRow.created_at, PlaceRelationRow.relation_id)
+            )
+        )
         referenced_source_ids = tuple(
             dict.fromkeys(
                 (
@@ -864,6 +872,7 @@ class SqlAlchemyPlaceCatalogRepository:
             time_rules=time_rules,
             closures=closures,
             date_exceptions=date_exceptions,
+            relations=relations,
             projection=self.get_projection_for_revision(place_revision_id),
             missing_source_record_ids=tuple(
                 source_id for source_id in referenced_source_ids if source_id not in source_by_id

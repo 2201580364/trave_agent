@@ -160,8 +160,24 @@ export type PlaceRevisionEvidence = {
   time_rules: PlaceTimeRuleEvidence[]
   closures: PlaceClosureEvidence[]
   date_exceptions: PlaceDateExceptionEvidence[]
+  relations?: PlaceRelationEvidence[]
   projection: PlaceProjectionEvidence | null
   missing_source_record_ids: string[]
+}
+
+export type PlaceRelationEvidence = {
+  relation_id: string
+  from_place_id: string
+  to_place_id: string
+  relation_type: string
+  source_record_id: string
+  source_record_valid: boolean
+  review_status: string
+  resolution_status: string
+  decision_note: string | null
+  active: boolean
+  created_at: string
+  reviewed_at: string | null
 }
 
 export type PlaceTimePreview = {

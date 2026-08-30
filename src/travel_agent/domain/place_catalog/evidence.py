@@ -10,6 +10,7 @@ from .entities import (
     PlaceDateException,
     PlaceGeometry,
     PlaceRevision,
+    PlaceRelation,
     PlaceSourceRecord,
     PlaceTimeRule,
     SolverPlaceProjection,
@@ -34,3 +35,4 @@ class PlaceRevisionEvidence:
     date_exceptions: tuple[PlaceDateException, ...]
     projection: SolverPlaceProjection | None
     missing_source_record_ids: tuple[str, ...] = ()
+    relations: tuple[PlaceRelation, ...] = ()

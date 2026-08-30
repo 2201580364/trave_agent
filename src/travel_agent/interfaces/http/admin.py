@@ -1169,6 +1169,23 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
             }
             for exception in evidence.date_exceptions
         ],
+        "relations": [
+            {
+                "relation_id": relation.relation_id,
+                "from_place_id": relation.from_place_id,
+                "to_place_id": relation.to_place_id,
+                "relation_type": relation.relation_type,
+                "source_record_id": relation.source_record_id,
+                "source_record_valid": relation.source_record_id in valid_source_ids,
+                "review_status": relation.review_status,
+                "resolution_status": relation.resolution_status,
+                "decision_note": relation.decision_note,
+                "active": relation.active,
+                "created_at": relation.created_at.isoformat(),
+                "reviewed_at": relation.reviewed_at.isoformat() if relation.reviewed_at else None,
+            }
+            for relation in evidence.relations
+        ],
         "projection": (
             {
                 "projection_id": projection.projection_id,

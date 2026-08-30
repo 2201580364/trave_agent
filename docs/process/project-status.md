@@ -8,7 +8,7 @@
 
 ### 2026-08-30 续接进度（O05 指定日期解析预览）
 
-`G7-R0.2-05-02` 正在实施：O05 时间证据已完成 candidate CRUD、逐项审核和指定日期解析预览纵向切片；O01 管理首页已接入真实 Revision/审核任务聚合；O06 已完成来源冲突只读聚合、candidate 裁决写入及 reviewer approve 门禁联动。解析由后端按已核验证据稳定计算，日期例外优先于周规则并返回固定 reason codes；前端仅展示结果。O07 关系和批量审核仍待后续推进。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
+`G7-R0.2-05-02` 正在实施：O05 时间证据已完成 candidate CRUD、逐项审核和指定日期解析预览纵向切片；O01 管理首页已接入真实 Revision/审核任务聚合；O06 已完成来源冲突只读聚合、candidate 裁决写入及 reviewer approve 门禁联动；O07 已将 PlaceRelation 纳入 Revision evidence 只读装配。解析由后端按已核验证据稳定计算，日期例外优先于周规则并返回固定 reason codes；前端仅展示结果。O07 关系裁决写入和批量审核仍待后续推进。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
 
 本轮 O04 只读证据收口（2026-08-30）：发布上下文现在会收集 Revision、Geometry、AccessPoint 和 TimeRule 的完整来源依赖闭包，并校验来源与当前 Place 的归属；跨 Place 的 active 来源稳定返回 `SOURCE_RECORD_PLACE_MISMATCH`，缺失或 inactive 来源仍返回 `MISSING_SOURCE_RECORD`。证据接口只返回当前 Place 的来源摘要，几何和访问点逐行提供 `source_record_valid`，Projection 按当前 Revision/Place 过滤并以 `projection_id` 稳定排序。来源 URL 已覆盖用户信息、fragment、credential-like 查询参数、非法端口和 IPv6 方括号边界。O03 Revision 基础详情与 O04 Evidence 已独立加载，Evidence 暂时不可用时不会清空基础事实或审核操作。Google Chrome 管理会话和 O04 页面已完成可视化复核，控制台新增 warn/error 为 0。
 
