@@ -270,6 +270,13 @@ export class AdminApi {
     })
   }
 
+  decidePlaceReviewBatch(items: Array<{ task_id: string; expected_version: number; decision_kind: ReviewDecision['decision_kind']; reason_code: string; reason_text?: string }>): Promise<{ total: number; succeeded: ReviewTask[]; failed: Array<{ task_id: string; error_code: string; message: string }> }> {
+    return this.request('/review-tasks/batch-decisions', {
+      method: 'POST',
+      body: JSON.stringify({ items: items.map((item) => ({ ...item, operation_intent_id: createOperationIntent('review-batch') })) }),
+    })
+  }
+
   listReviewDecisions(taskId: string): Promise<{ items: ReviewDecision[] }> {
     return this.request(`/review-tasks/${encodeURIComponent(taskId)}/decisions`)
   }

@@ -1,5 +1,5 @@
 import { FileSearchOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, Descriptions, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Descriptions, Input, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,6 +24,10 @@ export function ReviewQueuePage() {
   const [tasks, setTasks] = useState<ReviewTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [batchDecision, setBatchDecision] = useState<ReviewDecision['decision_kind']>('approve')
+  const [batchReason, setBatchReason] = useState('OM1_BATCH_REVIEW')
+  const [batchWorking, setBatchWorking] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +45,18 @@ export function ReviewQueuePage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const submitBatch = async () => {
+    const selectedTasks = tasks.filter((task) => selected.includes(task.review_task_id))
+    if (!selectedTasks.length) return
+    setBatchWorking(true)
+    try {
+      const result = await api.decidePlaceReviewBatch(selectedTasks.map((task) => ({ task_id: task.review_task_id, expected_version: task.version, decision_kind: batchDecision, reason_code: batchReason })))
+      message.success(`批量处理完成：成功 ${result.succeeded.length}，失败 ${result.failed.length}`)
+      setSelected([])
+      await load()
+    } catch (reason) { setError(adminErrorMessage(reason)) } finally { setBatchWorking(false) }
+  }
 
   const columns = useMemo(
     () => [
@@ -93,6 +109,8 @@ export function ReviewQueuePage() {
           dataSource={tasks}
           loading={loading}
           pagination={false}
+          rowSelection={{ selectedRowKeys: selected, onChange: (keys) => setSelected(keys as string[]), getCheckboxProps: (task) => ({ disabled: !['ready_for_review', 'in_review', 'changes_requested'].includes(task.status) }) }}
+          title={() => <Space wrap><Typography.Text>已选 {selected.length} 项</Typography.Text><Select value={batchDecision} onChange={setBatchDecision} options={[{ value: 'approve', label: '批量通过' }, { value: 'request_changes', label: '批量退回修改' }, { value: 'cancel', label: '批量关闭' }]} /><Input value={batchReason} onChange={(event) => setBatchReason(event.target.value)} style={{ width: 190 }} /><Button type="primary" onClick={() => void submitBatch()} disabled={!selected.length || !batchReason} loading={batchWorking}>提交批量审核</Button></Space>}
           scroll={{ x: 900 }}
           expandable={{
             expandedRowRender: (task) => (
