@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from types import TracebackType
 from typing import Protocol, Self
@@ -18,11 +18,14 @@ from travel_agent.application.planning.ports import IdGenerator
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
 from travel_agent.domain.place_catalog import (
     PlaceAccessPoint,
+    PlaceClosure,
+    PlaceDateException,
     PlaceGeometry,
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
     PlaceRevisionEvidence,
+    PlaceTimeRule,
     ProjectionPublicationError,
     SolverPlaceProjection,
     evaluate_projection_publication,
@@ -506,6 +509,522 @@ class PlaceReviewWorkflowService:
             ),
         )
 
+    def create_time_rule(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        expected_revision_version: int,
+        rule_kind: str,
+        weekdays: tuple[int, ...],
+        start_minute: int | None,
+        end_minute: int | None,
+        last_entry_minute: int | None,
+        valid_from: date | None,
+        valid_to: date | None,
+        source_record_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        time_rule_id = self._ids.new_id("time_rule")
+        payload = {
+            "revision_id": revision_id,
+            "expected_revision_version": expected_revision_version,
+            "rule_kind": rule_kind,
+            "weekdays": list(weekdays),
+            "start_minute": start_minute,
+            "end_minute": end_minute,
+            "last_entry_minute": last_entry_minute,
+            "valid_from": valid_from.isoformat() if valid_from else None,
+            "valid_to": valid_to.isoformat() if valid_to else None,
+            "source_record_id": source_record_id,
+        }
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_TIME_RULE_CREATED",
+            target_id=time_rule_id,
+            payload=payload,
+            mutate=lambda uow, _revision: (
+                uow.catalog.create_time_rule(
+                    PlaceTimeRule(
+                        time_rule_id,
+                        revision_id,
+                        rule_kind,
+                        weekdays,
+                        start_minute,
+                        end_minute,
+                        last_entry_minute,
+                        valid_from,
+                        valid_to,
+                        source_record_id,
+                        "candidate",
+                        True,
+                        self._clock.now(),
+                    ),
+                    expected_revision_version=expected_revision_version,
+                ),
+                time_rule_id,
+            ),
+        )
+
+    def update_time_rule(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        time_rule_id: str,
+        expected_revision_version: int,
+        rule_kind: str,
+        weekdays: tuple[int, ...],
+        start_minute: int | None,
+        end_minute: int | None,
+        last_entry_minute: int | None,
+        valid_from: date | None,
+        valid_to: date | None,
+        source_record_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        payload = {
+            "revision_id": revision_id,
+            "time_rule_id": time_rule_id,
+            "expected_revision_version": expected_revision_version,
+            "rule_kind": rule_kind,
+            "weekdays": list(weekdays),
+            "start_minute": start_minute,
+            "end_minute": end_minute,
+            "last_entry_minute": last_entry_minute,
+            "valid_from": valid_from.isoformat() if valid_from else None,
+            "valid_to": valid_to.isoformat() if valid_to else None,
+            "source_record_id": source_record_id,
+        }
+
+        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+            current = next(
+                (item for item in evidence.time_rules if item.time_rule_id == time_rule_id),
+                None,
+            )
+            if current is None:
+                raise ResourceNotFoundError
+            updated = replace(
+                current,
+                rule_kind=rule_kind,
+                weekdays=weekdays,
+                start_minute=start_minute,
+                end_minute=end_minute,
+                last_entry_minute=last_entry_minute,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                source_record_id=source_record_id,
+                review_status="candidate",
+                active=True,
+                reviewed_at=None,
+            )
+            return (
+                uow.catalog.update_time_rule(
+                    updated,
+                    expected_revision_version=expected_revision_version,
+                ),
+                time_rule_id,
+            )
+
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_TIME_RULE_UPDATED",
+            target_id=time_rule_id,
+            payload=payload,
+            mutate=mutate,
+        )
+
+    def retire_time_rule(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        time_rule_id: str,
+        expected_revision_version: int,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        return self._retire_time_evidence(
+            principal,
+            revision_id=revision_id,
+            evidence_kind="time_rule",
+            evidence_id=time_rule_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+        )
+
+    def create_closure(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        expected_revision_version: int,
+        weekday: int,
+        source_record_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        closure_id = self._ids.new_id("closure")
+        payload = {
+            "revision_id": revision_id,
+            "expected_revision_version": expected_revision_version,
+            "weekday": weekday,
+            "source_record_id": source_record_id,
+        }
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_CLOSURE_CREATED",
+            target_id=closure_id,
+            payload=payload,
+            mutate=lambda uow, _revision: (
+                uow.catalog.create_closure(
+                    PlaceClosure(
+                        closure_id,
+                        revision_id,
+                        weekday,
+                        source_record_id,
+                        "candidate",
+                        True,
+                        self._clock.now(),
+                    ),
+                    expected_revision_version=expected_revision_version,
+                ),
+                closure_id,
+            ),
+        )
+
+    def update_closure(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        closure_id: str,
+        expected_revision_version: int,
+        weekday: int,
+        source_record_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        payload = {
+            "revision_id": revision_id,
+            "closure_id": closure_id,
+            "expected_revision_version": expected_revision_version,
+            "weekday": weekday,
+            "source_record_id": source_record_id,
+        }
+
+        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+            current = next(
+                (item for item in evidence.closures if item.closure_id == closure_id),
+                None,
+            )
+            if current is None:
+                raise ResourceNotFoundError
+            updated = replace(
+                current,
+                weekday=weekday,
+                source_record_id=source_record_id,
+                review_status="candidate",
+                active=True,
+                reviewed_at=None,
+            )
+            return (
+                uow.catalog.update_closure(
+                    updated,
+                    expected_revision_version=expected_revision_version,
+                ),
+                closure_id,
+            )
+
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_CLOSURE_UPDATED",
+            target_id=closure_id,
+            payload=payload,
+            mutate=mutate,
+        )
+
+    def retire_closure(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        closure_id: str,
+        expected_revision_version: int,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        return self._retire_time_evidence(
+            principal,
+            revision_id=revision_id,
+            evidence_kind="closure",
+            evidence_id=closure_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+        )
+
+    def create_date_exception(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        expected_revision_version: int,
+        service_date: date,
+        exception_kind: str,
+        start_minute: int | None,
+        end_minute: int | None,
+        last_entry_minute: int | None,
+        source_record_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        date_exception_id = self._ids.new_id("date_exception")
+        payload = {
+            "revision_id": revision_id,
+            "expected_revision_version": expected_revision_version,
+            "service_date": service_date.isoformat(),
+            "exception_kind": exception_kind,
+            "start_minute": start_minute,
+            "end_minute": end_minute,
+            "last_entry_minute": last_entry_minute,
+            "source_record_id": source_record_id,
+        }
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_DATE_EXCEPTION_CREATED",
+            target_id=date_exception_id,
+            payload=payload,
+            mutate=lambda uow, _revision: (
+                uow.catalog.create_date_exception(
+                    PlaceDateException(
+                        date_exception_id,
+                        revision_id,
+                        service_date,
+                        exception_kind,
+                        start_minute,
+                        end_minute,
+                        last_entry_minute,
+                        source_record_id,
+                        "candidate",
+                        True,
+                        self._clock.now(),
+                    ),
+                    expected_revision_version=expected_revision_version,
+                ),
+                date_exception_id,
+            ),
+        )
+
+    def update_date_exception(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        date_exception_id: str,
+        expected_revision_version: int,
+        service_date: date,
+        exception_kind: str,
+        start_minute: int | None,
+        end_minute: int | None,
+        last_entry_minute: int | None,
+        source_record_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        payload = {
+            "revision_id": revision_id,
+            "date_exception_id": date_exception_id,
+            "expected_revision_version": expected_revision_version,
+            "service_date": service_date.isoformat(),
+            "exception_kind": exception_kind,
+            "start_minute": start_minute,
+            "end_minute": end_minute,
+            "last_entry_minute": last_entry_minute,
+            "source_record_id": source_record_id,
+        }
+
+        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+            current = next(
+                (
+                    item
+                    for item in evidence.date_exceptions
+                    if item.date_exception_id == date_exception_id
+                ),
+                None,
+            )
+            if current is None:
+                raise ResourceNotFoundError
+            updated = replace(
+                current,
+                service_date=service_date,
+                exception_kind=exception_kind,
+                start_minute=start_minute,
+                end_minute=end_minute,
+                last_entry_minute=last_entry_minute,
+                source_record_id=source_record_id,
+                review_status="candidate",
+                active=True,
+                reviewed_at=None,
+            )
+            return (
+                uow.catalog.update_date_exception(
+                    updated,
+                    expected_revision_version=expected_revision_version,
+                ),
+                date_exception_id,
+            )
+
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_DATE_EXCEPTION_UPDATED",
+            target_id=date_exception_id,
+            payload=payload,
+            mutate=mutate,
+        )
+
+    def retire_date_exception(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        date_exception_id: str,
+        expected_revision_version: int,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        return self._retire_time_evidence(
+            principal,
+            revision_id=revision_id,
+            evidence_kind="date_exception",
+            evidence_id=date_exception_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+        )
+
+    def _retire_time_evidence(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        evidence_kind: str,
+        evidence_id: str,
+        expected_revision_version: int,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        repository_method = {
+            "time_rule": "retire_time_rule",
+            "closure": "retire_closure",
+            "date_exception": "retire_date_exception",
+        }[evidence_kind]
+        action = f"PLACE_{evidence_kind.upper()}_RETIRED"
+        payload = {
+            "revision_id": revision_id,
+            f"{evidence_kind}_id": evidence_id,
+            "expected_revision_version": expected_revision_version,
+        }
+
+        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            method = getattr(uow.catalog, repository_method)
+            return (
+                method(
+                    evidence_id,
+                    place_revision_id=revision_id,
+                    expected_revision_version=expected_revision_version,
+                ),
+                evidence_id,
+            )
+
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action=action,
+            target_id=evidence_id,
+            payload=payload,
+            mutate=mutate,
+        )
+
     def _mutate_evidence(
         self,
         principal: AdminPrincipal,
@@ -529,7 +1048,7 @@ class PlaceReviewWorkflowService:
         with self._uow_factory() as uow:
             existing = self._replay(uow, operation_intent_id, operation_digest)
             if existing is not None:
-                revision = uow.reviews.get_revision(existing.target_id)
+                revision = uow.reviews.get_revision(revision_id)
                 if revision is None:
                     raise ResourceNotFoundError
                 return revision
@@ -553,7 +1072,7 @@ class PlaceReviewWorkflowService:
                 self._event(
                     actor,
                     action=action,
-                    target_type="place_geometry" if "GEOMETRY" in action else "place_access_point",
+                    target_type=_evidence_target_type(action),
                     target_id=actual_target_id,
                     target_revision=str(updated.revision_number),
                     before_digest=_revision_digest(revision),
@@ -618,6 +1137,12 @@ class PlaceReviewWorkflowService:
                 if evidence_kind == "geometry"
                 else evidence.access_points
                 if evidence_kind == "access_point"
+                else evidence.time_rules
+                if evidence_kind == "time_rule"
+                else evidence.closures
+                if evidence_kind == "closure"
+                else evidence.date_exceptions
+                if evidence_kind == "date_exception"
                 else ()
             )
             current = next(
@@ -1141,7 +1666,13 @@ class PlaceReviewWorkflowService:
                 evidence = uow.catalog.load_revision_evidence(task.place_revision_id)
                 if evidence is None or any(
                     item.active and item.review_status != "human_verified"
-                    for item in (*evidence.geometries, *evidence.access_points)
+                    for item in (
+                        *evidence.geometries,
+                        *evidence.access_points,
+                        *evidence.time_rules,
+                        *evidence.closures,
+                        *evidence.date_exceptions,
+                    )
                 ):
                     self._reject(
                         uow,
@@ -1383,11 +1914,36 @@ def _revision_digest(revision: PlaceRevision) -> str:
     )
 
 
-def _evidence_digest(value: PlaceGeometry | PlaceAccessPoint) -> str:
-    evidence_id = (
-        value.geometry_id
-        if isinstance(value, PlaceGeometry)
-        else value.access_point_id
+def _evidence_target_type(action: str) -> str:
+    for marker, target_type in (
+        ("DATE_EXCEPTION", "place_date_exception"),
+        ("ACCESS_POINT", "place_access_point"),
+        ("TIME_RULE", "place_time_rule"),
+        ("GEOMETRY", "place_geometry"),
+        ("CLOSURE", "place_closure"),
+    ):
+        if marker in action:
+            return target_type
+    raise ValueError("unknown place evidence action")
+
+
+def _evidence_digest(
+    value: PlaceGeometry
+    | PlaceAccessPoint
+    | PlaceTimeRule
+    | PlaceClosure
+    | PlaceDateException,
+) -> str:
+    evidence_id = next(
+        getattr(value, name)
+        for name in (
+            "geometry_id",
+            "access_point_id",
+            "time_rule_id",
+            "closure_id",
+            "date_exception_id",
+        )
+        if hasattr(value, name)
     )
     return _digest(
         {

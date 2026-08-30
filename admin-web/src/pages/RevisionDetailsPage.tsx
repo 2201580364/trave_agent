@@ -9,12 +9,12 @@ import {
   SendOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Alert, App as AntApp, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Space, Table, Tag, Typography } from 'antd'
+import { Alert, App as AntApp, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceDateExceptionEvidence, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 
@@ -316,9 +316,16 @@ export function RevisionDetailsPage() {
             onError={setError}
           />
           <TimeEvidenceCard
+            api={api}
             evidence={evidence}
             loading={evidenceLoading}
             error={evidenceError}
+            revision={revision}
+            canEdit={hasPermission('place:candidate:write')}
+            canReview={hasPermission('place:review:decide')}
+            onSuccess={(text) => messageApi.success(text)}
+            onChanged={load}
+            onError={setError}
           />
 
           <Card title="发布阻断摘要">
@@ -593,14 +600,151 @@ function EvidenceCard({
 }
 
 function TimeEvidenceCard({
+  api,
   evidence,
   loading,
   error,
+  revision,
+  canEdit,
+  canReview,
+  onSuccess,
+  onChanged,
+  onError,
 }: {
+  api: ReturnType<typeof useAdminSession>['api']
   evidence: PlaceRevisionEvidence | null
   loading: boolean
   error: string | null
+  revision: PlaceRevision
+  canEdit: boolean
+  canReview: boolean
+  onSuccess: (text: string) => void
+  onChanged: () => Promise<void>
+  onError: (message: string) => void
 }) {
+  const editable = revision.lifecycle_status === 'candidate' && canEdit
+  const reviewable = revision.lifecycle_status === 'candidate' && canReview
+  const [modal, setModal] = useState<'time_rule' | 'closure' | 'date_exception' | null>(null)
+  const [editing, setEditing] = useState<PlaceTimeRuleEvidence | PlaceClosureEvidence | PlaceDateExceptionEvidence | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm()
+
+  const openEditor = (
+    kind: 'time_rule' | 'closure' | 'date_exception',
+    item?: PlaceTimeRuleEvidence | PlaceClosureEvidence | PlaceDateExceptionEvidence,
+  ) => {
+    setEditing(item ?? null)
+    form.resetFields()
+    if (kind === 'time_rule') {
+      const rule = item as PlaceTimeRuleEvidence | undefined
+      form.setFieldsValue(rule ?? { rule_kind: 'opening_hours', weekdays: [1, 2, 3, 4, 5] })
+    } else if (kind === 'closure') {
+      const closure = item as PlaceClosureEvidence | undefined
+      form.setFieldsValue(closure ?? { weekday: 1 })
+    } else {
+      const exception = item as PlaceDateExceptionEvidence | undefined
+      form.setFieldsValue(exception ?? { exception_kind: 'closed' })
+    }
+    setModal(kind)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const values = await form.validateFields()
+      const base = {
+        expected_revision_version: revision.revision_version,
+        operation_intent_id: `time-evidence-${crypto.randomUUID()}`,
+        reason_code: editing ? 'TIME_EVIDENCE_UPDATED' : 'TIME_EVIDENCE_CREATED',
+      }
+      if (modal === 'time_rule') {
+        const input: PlaceTimeRuleInput = {
+          ...base,
+          rule_kind: values.rule_kind,
+          weekdays: values.weekdays,
+          start_minute: values.start_minute ?? null,
+          end_minute: values.end_minute ?? null,
+          last_entry_minute: values.last_entry_minute ?? null,
+          valid_from: values.valid_from || null,
+          valid_to: values.valid_to || null,
+          source_record_id: values.source_record_id,
+        }
+        if (editing) await api.updateTimeRule(revision.place_revision_id, (editing as PlaceTimeRuleEvidence).time_rule_id, input)
+        else await api.createTimeRule(revision.place_revision_id, input)
+      } else if (modal === 'closure') {
+        const input: PlaceClosureInput = {
+          ...base,
+          weekday: values.weekday,
+          source_record_id: values.source_record_id,
+        }
+        if (editing) await api.updateClosure(revision.place_revision_id, (editing as PlaceClosureEvidence).closure_id, input)
+        else await api.createClosure(revision.place_revision_id, input)
+      } else if (modal === 'date_exception') {
+        const input: PlaceDateExceptionInput = {
+          ...base,
+          service_date: values.service_date,
+          exception_kind: values.exception_kind,
+          start_minute: values.start_minute ?? null,
+          end_minute: values.end_minute ?? null,
+          last_entry_minute: values.last_entry_minute ?? null,
+          source_record_id: values.source_record_id,
+        }
+        if (editing) await api.updateDateException(revision.place_revision_id, (editing as PlaceDateExceptionEvidence).date_exception_id, input)
+        else await api.createDateException(revision.place_revision_id, input)
+      }
+      setModal(null)
+      await onChanged()
+      onSuccess('时间证据已保存，Revision 需重新送审')
+    } catch (reason) {
+      if (!isFormValidationError(reason)) onError(adminErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const review = async (
+    kind: 'time_rule' | 'closure' | 'date_exception',
+    id: string,
+    status: 'human_verified' | 'rejected',
+  ) => {
+    setSaving(true)
+    try {
+      await api.reviewEvidence(revision.place_revision_id, kind, id, {
+        review_status: status,
+        operation_intent_id: `time-evidence-review-${crypto.randomUUID()}`,
+        reason_code: status === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED',
+      })
+      await onChanged()
+      onSuccess(status === 'human_verified' ? '时间证据已通过核验' : '时间证据已驳回')
+    } catch (reason) {
+      onError(adminErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const retire = async (
+    kind: 'time_rule' | 'closure' | 'date_exception',
+    id: string,
+  ) => {
+    setSaving(true)
+    try {
+      const input = {
+        expected_revision_version: revision.revision_version,
+        operation_intent_id: `time-evidence-retire-${crypto.randomUUID()}`,
+        reason_code: 'TIME_EVIDENCE_RETIRED',
+      }
+      if (kind === 'time_rule') await api.retireTimeRule(revision.place_revision_id, id, input)
+      else if (kind === 'closure') await api.retireClosure(revision.place_revision_id, id, input)
+      else await api.retireDateException(revision.place_revision_id, id, input)
+      await onChanged()
+      onSuccess('时间证据已停用，Revision 需重新送审')
+    } catch (reason) {
+      onError(adminErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
   if (loading) return <Card title="开放时间与固定场次（O05）" loading />
   if (error !== null || evidence === null) {
     return (
@@ -620,10 +764,10 @@ function TimeEvidenceCard({
         <Alert
           showIcon
           type="info"
-          title="当前为只读证据面"
-          description="周规则、闭馆日和日期例外均严格绑定当前 Revision；写入、逐项审核和指定日期解析预览将在下一切片接入。"
+          title="时间证据严格绑定当前 Revision"
+          description="编辑会递增 Revision 版本并清除既有审核/求解资格；逐项核验要求先建立开放审核任务。指定日期解析预览仍将在下一切片接入。"
         />
-        <Typography.Title level={5} style={{ margin: 0 }}>周规则与固定场次</Typography.Title>
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}><Typography.Title level={5} style={{ margin: 0 }}>周规则与固定场次</Typography.Title>{editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openEditor('time_rule')}>新增</Button>}</Space>
         <Table<PlaceTimeRuleEvidence>
           rowKey="time_rule_id"
           size="small"
@@ -638,10 +782,11 @@ function TimeEvidenceCard({
             { title: '有效期', key: 'validity', width: 220, render: (_: unknown, item) => `${item.valid_from ?? '不限'} – ${item.valid_to ?? '不限'}` },
             { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
             { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}><Typography.Text>{item.source_record_id}</Typography.Text><Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceTimeRuleEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('time_rule', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('time_rule', item.time_rule_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('time_rule', item.time_rule_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('time_rule', item.time_rule_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: evidence.revision.is_always_open ? '全天开放，无需周时间窗' : '尚未采集周规则或固定场次' }}
         />
-        <Typography.Title level={5} style={{ margin: 0 }}>固定闭馆日</Typography.Title>
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}><Typography.Title level={5} style={{ margin: 0 }}>固定闭馆日</Typography.Title>{editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openEditor('closure')}>新增</Button>}</Space>
         <Table<PlaceClosureEvidence>
           rowKey="closure_id"
           size="small"
@@ -651,10 +796,11 @@ function TimeEvidenceCard({
             { title: '闭馆星期', dataIndex: 'weekday', render: weekdayLabel },
             { title: '状态', dataIndex: 'review_status', render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
             { title: '来源', key: 'source', render: (_: unknown, item) => <Space size={4}>{item.source_record_id}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceClosureEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('closure', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('closure', item.closure_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('closure', item.closure_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('closure', item.closure_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '没有固定闭馆日记录' }}
         />
-        <Typography.Title level={5} style={{ margin: 0 }}>日期例外</Typography.Title>
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}><Typography.Title level={5} style={{ margin: 0 }}>日期例外</Typography.Title>{editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openEditor('date_exception')}>新增</Button>}</Space>
         <Table<PlaceDateExceptionEvidence>
           rowKey="date_exception_id"
           size="small"
@@ -668,10 +814,33 @@ function TimeEvidenceCard({
             { title: '最晚入园', dataIndex: 'last_entry_minute', width: 120, render: minuteLabel },
             { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
             { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}>{item.source_record_id}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceDateExceptionEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('date_exception', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('date_exception', item.date_exception_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('date_exception', item.date_exception_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('date_exception', item.date_exception_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '没有日期例外记录' }}
         />
       </Space>
+      <Modal title={timeEvidenceModalTitle(modal)} open={modal !== null} onOk={() => void save()} onCancel={() => setModal(null)} confirmLoading={saving} forceRender>
+        <Form form={form} layout="vertical">
+          {modal === 'time_rule' && <>
+            <Form.Item name="rule_kind" label="规则类型" rules={[{ required: true }]}><Select options={[{ value: 'opening_hours', label: '开放时间' }, { value: 'fixed_session', label: '固定场次' }, { value: 'last_entry', label: '最晚入园规则' }]} /></Form.Item>
+            <Form.Item name="weekdays" label="适用星期" rules={[{ required: true }]}><Select mode="multiple" options={weekdayOptions()} /></Form.Item>
+            <MinuteFields />
+            <Form.Item name="valid_from" label="有效期开始"><Input placeholder="YYYY-MM-DD" /></Form.Item>
+            <Form.Item name="valid_to" label="有效期结束"><Input placeholder="YYYY-MM-DD" /></Form.Item>
+            <SourceRecordField />
+          </>}
+          {modal === 'closure' && <>
+            <Form.Item name="weekday" label="闭馆星期" rules={[{ required: true }]}><Select options={weekdayOptions()} /></Form.Item>
+            <SourceRecordField />
+          </>}
+          {modal === 'date_exception' && <>
+            <Form.Item name="service_date" label="例外日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
+            <Form.Item name="exception_kind" label="例外类型" rules={[{ required: true }]}><Select options={[{ value: 'closed', label: '临时关闭' }, { value: 'open_override', label: '开放覆盖' }, { value: 'session_override', label: '场次覆盖' }]} /></Form.Item>
+            <MinuteFields />
+            <SourceRecordField />
+          </>}
+        </Form>
+      </Modal>
     </Card>
   )
 }
@@ -682,6 +851,30 @@ function minuteLabel(value: number | null): string {
   const minute = value % 1440
   const time = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
   return dayOffset > 0 ? `次日 ${time} (+${dayOffset * 1440})` : time
+}
+
+function MinuteFields() {
+  return <>
+    <Alert showIcon type="info" title="时间使用 0–2880 分钟" description="例如 09:30 = 570；跨午夜后的次日 00:30 = 1470。临时关闭无需填写时间。" />
+    <Form.Item name="start_minute" label="开始分钟"><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
+    <Form.Item name="end_minute" label="结束分钟"><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
+    <Form.Item name="last_entry_minute" label="最晚入园分钟"><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
+  </>
+}
+
+function SourceRecordField() {
+  return <Form.Item name="source_record_id" label="来源记录 ID" rules={[{ required: true }]}><Input /></Form.Item>
+}
+
+function weekdayOptions() {
+  return [1, 2, 3, 4, 5, 6, 7].map((value) => ({ value, label: weekdayLabel(value) }))
+}
+
+function timeEvidenceModalTitle(kind: 'time_rule' | 'closure' | 'date_exception' | null): string {
+  if (kind === 'time_rule') return '周规则或固定场次'
+  if (kind === 'closure') return '固定闭馆日'
+  if (kind === 'date_exception') return '日期例外'
+  return '时间证据'
 }
 
 function weekdayLabel(value: number): string {

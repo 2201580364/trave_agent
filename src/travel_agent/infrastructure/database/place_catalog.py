@@ -487,6 +487,170 @@ class SqlAlchemyPlaceCatalogRepository:
             raise ValueError("place revision not found")
         return revision
 
+    def create_time_rule(
+        self,
+        rule: PlaceTimeRule,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(rule.place_revision_id, expected_revision_version)
+        self.add_time_rule(rule)
+        return self._require_revision(rule.place_revision_id)
+
+    def update_time_rule(
+        self,
+        rule: PlaceTimeRule,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(rule.place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceTimeRuleRow)
+            .where(
+                PlaceTimeRuleRow.time_rule_id == rule.time_rule_id,
+                PlaceTimeRuleRow.place_revision_id == rule.place_revision_id,
+            )
+            .values(**_time_rule_values(rule))
+        )
+        if result.rowcount != 1:
+            raise ValueError("time rule not found")
+        return self._require_revision(rule.place_revision_id)
+
+    def retire_time_rule(
+        self,
+        time_rule_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        return self._retire_time_evidence(
+            PlaceTimeRuleRow,
+            PlaceTimeRuleRow.time_rule_id,
+            time_rule_id,
+            place_revision_id=place_revision_id,
+            expected_revision_version=expected_revision_version,
+            not_found_message="time rule not found",
+        )
+
+    def create_closure(
+        self,
+        closure: PlaceClosure,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(closure.place_revision_id, expected_revision_version)
+        self.add_closure(closure)
+        return self._require_revision(closure.place_revision_id)
+
+    def update_closure(
+        self,
+        closure: PlaceClosure,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(closure.place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceClosureRow)
+            .where(
+                PlaceClosureRow.closure_id == closure.closure_id,
+                PlaceClosureRow.place_revision_id == closure.place_revision_id,
+            )
+            .values(**_closure_values(closure))
+        )
+        if result.rowcount != 1:
+            raise ValueError("closure not found")
+        return self._require_revision(closure.place_revision_id)
+
+    def retire_closure(
+        self,
+        closure_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        return self._retire_time_evidence(
+            PlaceClosureRow,
+            PlaceClosureRow.closure_id,
+            closure_id,
+            place_revision_id=place_revision_id,
+            expected_revision_version=expected_revision_version,
+            not_found_message="closure not found",
+        )
+
+    def create_date_exception(
+        self,
+        exception: PlaceDateException,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(exception.place_revision_id, expected_revision_version)
+        self.add_date_exception(exception)
+        return self._require_revision(exception.place_revision_id)
+
+    def update_date_exception(
+        self,
+        exception: PlaceDateException,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(exception.place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceDateExceptionRow)
+            .where(
+                PlaceDateExceptionRow.date_exception_id == exception.date_exception_id,
+                PlaceDateExceptionRow.place_revision_id == exception.place_revision_id,
+            )
+            .values(**_date_exception_values(exception))
+        )
+        if result.rowcount != 1:
+            raise ValueError("date exception not found")
+        return self._require_revision(exception.place_revision_id)
+
+    def retire_date_exception(
+        self,
+        date_exception_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        return self._retire_time_evidence(
+            PlaceDateExceptionRow,
+            PlaceDateExceptionRow.date_exception_id,
+            date_exception_id,
+            place_revision_id=place_revision_id,
+            expected_revision_version=expected_revision_version,
+            not_found_message="date exception not found",
+        )
+
+    def _retire_time_evidence(
+        self,
+        table: type[PlaceTimeRuleRow] | type[PlaceClosureRow] | type[PlaceDateExceptionRow],
+        key: object,
+        evidence_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+        not_found_message: str,
+    ) -> PlaceRevision:
+        self._bump_revision(place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(table)
+            .where(
+                key == evidence_id,
+                table.place_revision_id == place_revision_id,
+            )
+            .values(active=False, review_status="rejected", reviewed_at=None)
+        )
+        if result.rowcount != 1:
+            raise ValueError(not_found_message)
+        return self._require_revision(place_revision_id)
+
+    def _require_revision(self, revision_id: str) -> PlaceRevision:
+        revision = self.get_revision(revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
     def review_evidence(
         self,
         *,
@@ -496,20 +660,17 @@ class SqlAlchemyPlaceCatalogRepository:
         review_status: str,
         reviewed_at: datetime,
     ) -> PlaceRevision:
-        table = (
-            PlaceGeometryRow
-            if evidence_kind == "geometry"
-            else PlaceAccessPointRow
-            if evidence_kind == "access_point"
-            else None
-        )
-        key = (
-            table.geometry_id
-            if evidence_kind == "geometry"
-            else table.access_point_id
-            if table is not None
-            else None
-        )
+        table_and_key = {
+            "geometry": (PlaceGeometryRow, PlaceGeometryRow.geometry_id),
+            "access_point": (PlaceAccessPointRow, PlaceAccessPointRow.access_point_id),
+            "time_rule": (PlaceTimeRuleRow, PlaceTimeRuleRow.time_rule_id),
+            "closure": (PlaceClosureRow, PlaceClosureRow.closure_id),
+            "date_exception": (
+                PlaceDateExceptionRow,
+                PlaceDateExceptionRow.date_exception_id,
+            ),
+        }.get(evidence_kind)
+        table, key = table_and_key if table_and_key is not None else (None, None)
         if table is None or key is None or review_status not in {"human_verified", "rejected"}:
             raise ValueError("invalid evidence review")
         result = self._session.execute(

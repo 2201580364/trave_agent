@@ -170,4 +170,21 @@ describe('RevisionDetailsPage', () => {
     expect(screen.getAllByText('无效').length).toBeGreaterThan(0)
     expect(screen.getAllByText('已停用').length).toBeGreaterThan(0)
   })
+
+  it('shows O05 edit and reviewer actions only when the administrator has permissions', async () => {
+    mocks.permissions.add('place:candidate:write')
+    mocks.permissions.add('place:review:decide')
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce(timeEvidence)
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('开放时间与固定场次（O05）')).toBeTruthy())
+
+    expect(screen.getAllByText('新增')).toHaveLength(5)
+    const buttonLabels = [...document.querySelectorAll('button')]
+      .map((button) => button.textContent?.replace(/\s/g, ''))
+    expect(buttonLabels.filter((label) => label === '通过')).toHaveLength(2)
+    expect(buttonLabels.filter((label) => label === '驳回')).toHaveLength(2)
+  })
 })

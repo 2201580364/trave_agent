@@ -67,6 +67,63 @@ class PlaceCatalogRepository(Protocol):
         place_revision_id: str,
         expected_revision_version: int,
     ) -> PlaceRevision: ...
+    def create_time_rule(
+        self,
+        rule: PlaceTimeRule,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def update_time_rule(
+        self,
+        rule: PlaceTimeRule,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def retire_time_rule(
+        self,
+        time_rule_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def create_closure(
+        self,
+        closure: PlaceClosure,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def update_closure(
+        self,
+        closure: PlaceClosure,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def retire_closure(
+        self,
+        closure_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def create_date_exception(
+        self,
+        exception: PlaceDateException,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def update_date_exception(
+        self,
+        exception: PlaceDateException,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def retire_date_exception(
+        self,
+        date_exception_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
     def review_evidence(
         self,
         *,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -136,6 +136,49 @@ class PlaceAccessPointInput(BaseModel):
     lng: Decimal = Field(ge=Decimal("-180"), le=Decimal("180"))
     source_record_id: str = Field(min_length=1, max_length=64)
     fetched_at: datetime | None = None
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PlaceTimeRuleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    rule_kind: str = Field(pattern="^(opening_hours|fixed_session|last_entry)$")
+    weekdays: tuple[int, ...] = Field(min_length=1, max_length=7)
+    start_minute: int | None = Field(default=None, ge=0, le=2880)
+    end_minute: int | None = Field(default=None, ge=0, le=2880)
+    last_entry_minute: int | None = Field(default=None, ge=0, le=2880)
+    valid_from: date | None = None
+    valid_to: date | None = None
+    source_record_id: str = Field(min_length=1, max_length=64)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PlaceClosureInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    weekday: int = Field(ge=1, le=7)
+    source_record_id: str = Field(min_length=1, max_length=64)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PlaceDateExceptionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    service_date: date
+    exception_kind: str = Field(pattern="^(closed|open_override|session_override)$")
+    start_minute: int | None = Field(default=None, ge=0, le=2880)
+    end_minute: int | None = Field(default=None, ge=0, le=2880)
+    last_entry_minute: int | None = Field(default=None, ge=0, le=2880)
+    source_record_id: str = Field(min_length=1, max_length=64)
     operation_intent_id: str = Field(min_length=1, max_length=64)
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
@@ -368,7 +411,12 @@ def build_admin_router(
         def review_place_evidence(
             revision_id: str,
             evidence_kind: Annotated[
-                str, Path(pattern="^(geometry|access_point)$")
+                str,
+                Path(
+                    pattern=(
+                        "^(geometry|access_point|time_rule|closure|date_exception)$"
+                    )
+                ),
             ],
             evidence_id: str,
             payload: ReviewPlaceEvidenceInput,
@@ -512,6 +560,216 @@ def build_admin_router(
                 current,
                 revision_id=revision_id,
                 access_point_id=access_point_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/time-rules")
+        def create_place_time_rule(
+            revision_id: str,
+            payload: PlaceTimeRuleInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_time_rule(
+                current,
+                revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                rule_kind=payload.rule_kind,
+                weekdays=payload.weekdays,
+                start_minute=payload.start_minute,
+                end_minute=payload.end_minute,
+                last_entry_minute=payload.last_entry_minute,
+                valid_from=payload.valid_from,
+                valid_to=payload.valid_to,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.patch("/place-revisions/{revision_id}/time-rules/{time_rule_id}")
+        def update_place_time_rule(
+            revision_id: str,
+            time_rule_id: str,
+            payload: PlaceTimeRuleInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.update_time_rule(
+                current,
+                revision_id=revision_id,
+                time_rule_id=time_rule_id,
+                expected_revision_version=payload.expected_revision_version,
+                rule_kind=payload.rule_kind,
+                weekdays=payload.weekdays,
+                start_minute=payload.start_minute,
+                end_minute=payload.end_minute,
+                last_entry_minute=payload.last_entry_minute,
+                valid_from=payload.valid_from,
+                valid_to=payload.valid_to,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.delete("/place-revisions/{revision_id}/time-rules/{time_rule_id}")
+        def retire_place_time_rule(
+            revision_id: str,
+            time_rule_id: str,
+            payload: RetirePlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.retire_time_rule(
+                current,
+                revision_id=revision_id,
+                time_rule_id=time_rule_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/closures")
+        def create_place_closure(
+            revision_id: str,
+            payload: PlaceClosureInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_closure(
+                current,
+                revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                weekday=payload.weekday,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.patch("/place-revisions/{revision_id}/closures/{closure_id}")
+        def update_place_closure(
+            revision_id: str,
+            closure_id: str,
+            payload: PlaceClosureInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.update_closure(
+                current,
+                revision_id=revision_id,
+                closure_id=closure_id,
+                expected_revision_version=payload.expected_revision_version,
+                weekday=payload.weekday,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.delete("/place-revisions/{revision_id}/closures/{closure_id}")
+        def retire_place_closure(
+            revision_id: str,
+            closure_id: str,
+            payload: RetirePlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.retire_closure(
+                current,
+                revision_id=revision_id,
+                closure_id=closure_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/date-exceptions")
+        def create_place_date_exception(
+            revision_id: str,
+            payload: PlaceDateExceptionInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_date_exception(
+                current,
+                revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                service_date=payload.service_date,
+                exception_kind=payload.exception_kind,
+                start_minute=payload.start_minute,
+                end_minute=payload.end_minute,
+                last_entry_minute=payload.last_entry_minute,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.patch(
+            "/place-revisions/{revision_id}/date-exceptions/{date_exception_id}"
+        )
+        def update_place_date_exception(
+            revision_id: str,
+            date_exception_id: str,
+            payload: PlaceDateExceptionInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.update_date_exception(
+                current,
+                revision_id=revision_id,
+                date_exception_id=date_exception_id,
+                expected_revision_version=payload.expected_revision_version,
+                service_date=payload.service_date,
+                exception_kind=payload.exception_kind,
+                start_minute=payload.start_minute,
+                end_minute=payload.end_minute,
+                last_entry_minute=payload.last_entry_minute,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.delete(
+            "/place-revisions/{revision_id}/date-exceptions/{date_exception_id}"
+        )
+        def retire_place_date_exception(
+            revision_id: str,
+            date_exception_id: str,
+            payload: RetirePlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.retire_date_exception(
+                current,
+                revision_id=revision_id,
+                date_exception_id=date_exception_id,
                 expected_revision_version=payload.expected_revision_version,
                 operation_intent_id=payload.operation_intent_id,
                 reason_code=payload.reason_code,

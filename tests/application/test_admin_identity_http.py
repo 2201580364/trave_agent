@@ -657,7 +657,7 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
     assert conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
 
     invalid_kind = context.client.post(
-        path.replace("/geometry/", "/time_rule/"),
+        path.replace("/geometry/", "/unknown/"),
         headers=root_headers,
         json=payload,
     )
@@ -715,6 +715,303 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
     )
     assert forbidden.status_code == 403
     assert forbidden.json()["error"]["code"] == "admin_permission_denied"
+
+
+def test_time_evidence_crud_review_and_revision_gate_form_one_versioned_workflow(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    revision_id = "revision-time-crud"
+    _seed_candidate_revision(context, revision_id)
+    with context.sessions() as session:
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-time-crud",
+                place_id="place-1",
+                source_id="official-opening-hours",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="dictionary-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://example.test/opening-hours",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="approved",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.commit()
+
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    common = {
+        "source_record_id": "source-time-crud",
+        "reason_code": "TIME_EVIDENCE_EDITED",
+    }
+    time_rule = {
+        **common,
+        "expected_revision_version": 1,
+        "rule_kind": "fixed_session",
+        "weekdays": [5, 6],
+        "start_minute": 1410,
+        "end_minute": 1470,
+        "last_entry_minute": 1400,
+        "valid_from": "2026-09-01",
+        "valid_to": "2026-12-31",
+        "operation_intent_id": "create-time-rule",
+    }
+    created_rule = context.client.post(
+        f"/api/v1/admin/place-revisions/{revision_id}/time-rules",
+        headers=headers,
+        json=time_rule,
+    )
+    assert created_rule.status_code == 200
+    assert created_rule.json()["revision_version"] == 2
+    assert created_rule.json()["solver_eligible"] is False
+
+    replay = context.client.post(
+        f"/api/v1/admin/place-revisions/{revision_id}/time-rules",
+        headers=headers,
+        json=time_rule,
+    )
+    assert replay.status_code == 200
+    assert replay.json()["revision_version"] == 2
+
+    evidence = context.client.get(
+        f"/api/v1/admin/place-revisions/{revision_id}/evidence",
+        headers=headers,
+    ).json()
+    time_rule_id = evidence["time_rules"][0]["time_rule_id"]
+    updated_rule = context.client.patch(
+        f"/api/v1/admin/place-revisions/{revision_id}/time-rules/{time_rule_id}",
+        headers=headers,
+        json={
+            **time_rule,
+            "expected_revision_version": 2,
+            "end_minute": 1500,
+            "operation_intent_id": "update-time-rule",
+        },
+    )
+    assert updated_rule.status_code == 200
+    assert updated_rule.json()["revision_version"] == 3
+
+    created_closure = context.client.post(
+        f"/api/v1/admin/place-revisions/{revision_id}/closures",
+        headers=headers,
+        json={
+            **common,
+            "expected_revision_version": 3,
+            "weekday": 1,
+            "operation_intent_id": "create-closure",
+        },
+    )
+    assert created_closure.status_code == 200
+    assert created_closure.json()["revision_version"] == 4
+    evidence = context.client.get(
+        f"/api/v1/admin/place-revisions/{revision_id}/evidence",
+        headers=headers,
+    ).json()
+    closure_id = evidence["closures"][0]["closure_id"]
+    updated_closure = context.client.patch(
+        f"/api/v1/admin/place-revisions/{revision_id}/closures/{closure_id}",
+        headers=headers,
+        json={
+            **common,
+            "expected_revision_version": 4,
+            "weekday": 2,
+            "operation_intent_id": "update-closure",
+        },
+    )
+    assert updated_closure.status_code == 200
+    assert updated_closure.json()["revision_version"] == 5
+
+    exception_payload = {
+        **common,
+        "expected_revision_version": 5,
+        "service_date": "2026-10-01",
+        "exception_kind": "session_override",
+        "start_minute": 1500,
+        "end_minute": 1560,
+        "last_entry_minute": 1490,
+        "operation_intent_id": "create-date-exception",
+    }
+    created_exception = context.client.post(
+        f"/api/v1/admin/place-revisions/{revision_id}/date-exceptions",
+        headers=headers,
+        json=exception_payload,
+    )
+    assert created_exception.status_code == 200
+    assert created_exception.json()["revision_version"] == 6
+    evidence = context.client.get(
+        f"/api/v1/admin/place-revisions/{revision_id}/evidence",
+        headers=headers,
+    ).json()
+    date_exception_id = evidence["date_exceptions"][0]["date_exception_id"]
+    updated_exception = context.client.patch(
+        f"/api/v1/admin/place-revisions/{revision_id}/date-exceptions/{date_exception_id}",
+        headers=headers,
+        json={
+            **exception_payload,
+            "expected_revision_version": 6,
+            "end_minute": 1590,
+            "operation_intent_id": "update-date-exception",
+        },
+    )
+    assert updated_exception.status_code == 200
+    assert updated_exception.json()["revision_version"] == 7
+
+    for version, kind, evidence_id in (
+        (7, "time-rules", time_rule_id),
+        (9, "closures", closure_id),
+        (11, "date-exceptions", date_exception_id),
+    ):
+        retired = context.client.request(
+            "DELETE",
+            f"/api/v1/admin/place-revisions/{revision_id}/{kind}/{evidence_id}",
+            headers=headers,
+            json={
+                "expected_revision_version": version,
+                "operation_intent_id": f"retire-{kind}",
+                "reason_code": "TIME_EVIDENCE_RETIRED",
+            },
+        )
+        assert retired.status_code == 200
+        assert retired.json()["revision_version"] == version + 1
+        current = context.client.get(
+            f"/api/v1/admin/place-revisions/{revision_id}/evidence",
+            headers=headers,
+        ).json()
+        key = {
+            "time-rules": "time_rules",
+            "closures": "closures",
+            "date-exceptions": "date_exceptions",
+        }[kind]
+        retired_item = next(
+            item for item in current[key] if evidence_id in item.values()
+        )
+        assert retired_item["active"] is False
+
+        if kind == "time-rules":
+            restore_payload = {
+                **time_rule,
+                "expected_revision_version": version + 1,
+                "end_minute": 1500,
+                "operation_intent_id": "restore-time-rule",
+            }
+        elif kind == "closures":
+            restore_payload = {
+                **common,
+                "expected_revision_version": version + 1,
+                "weekday": 2,
+                "operation_intent_id": "restore-closure",
+            }
+        else:
+            restore_payload = {
+                **exception_payload,
+                "expected_revision_version": version + 1,
+                "end_minute": 1590,
+                "operation_intent_id": "restore-date-exception",
+            }
+        restored = context.client.patch(
+            f"/api/v1/admin/place-revisions/{revision_id}/{kind}/{evidence_id}",
+            headers=headers,
+            json=restore_payload,
+        )
+        assert restored.status_code == 200
+        assert restored.json()["revision_version"] == version + 2
+
+    submitted = context.client.post(
+        f"/api/v1/admin/place-revisions/{revision_id}/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "submit-time-evidence",
+            "reason_code": "READY_FOR_REVIEW",
+        },
+    )
+    assert submitted.status_code == 201
+    task_id = submitted.json()["review_task_id"]
+    premature = context.client.post(
+        f"/api/v1/admin/review-tasks/{task_id}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "premature-time-approval",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "FACTS_VERIFIED",
+        },
+    )
+    assert premature.status_code == 409
+    assert premature.json()["error"]["code"] == "review_revision_not_approvable"
+
+    for kind, evidence_id in (
+        ("time_rule", time_rule_id),
+        ("closure", closure_id),
+        ("date_exception", date_exception_id),
+    ):
+        reviewed = context.client.post(
+            f"/api/v1/admin/place-revisions/{revision_id}/evidence/{kind}/{evidence_id}/review",
+            headers=headers,
+            json={
+                "operation_intent_id": f"review-{kind}",
+                "review_status": "human_verified",
+                "reason_code": "EVIDENCE_APPROVED",
+            },
+        )
+        assert reviewed.status_code == 200
+
+    approved = context.client.post(
+        f"/api/v1/admin/review-tasks/{task_id}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "approve-time-revision",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "FACTS_VERIFIED",
+        },
+    )
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved"
+
+    final_evidence = context.client.get(
+        f"/api/v1/admin/place-revisions/{revision_id}/evidence",
+        headers=headers,
+    ).json()
+    assert final_evidence["time_rules"][0]["end_minute"] == 1500
+    assert final_evidence["closures"][0]["weekday"] == 2
+    assert final_evidence["date_exceptions"][0]["end_minute"] == 1590
+    assert all(
+        item["review_status"] == "human_verified"
+        for item in (
+            *final_evidence["time_rules"],
+            *final_evidence["closures"],
+            *final_evidence["date_exceptions"],
+        )
+    )
+
+    with context.sessions() as session:
+        actions = set(
+            session.scalars(
+                select(AdminAuditEventRow.action).where(
+                    AdminAuditEventRow.target_type.in_(
+                        ("place_time_rule", "place_closure", "place_date_exception")
+                    )
+                )
+            )
+        )
+    assert {
+        "PLACE_TIME_RULE_CREATED",
+        "PLACE_TIME_RULE_UPDATED",
+        "PLACE_TIME_RULE_RETIRED",
+        "PLACE_CLOSURE_CREATED",
+        "PLACE_CLOSURE_UPDATED",
+        "PLACE_CLOSURE_RETIRED",
+        "PLACE_DATE_EXCEPTION_CREATED",
+        "PLACE_DATE_EXCEPTION_UPDATED",
+        "PLACE_DATE_EXCEPTION_RETIRED",
+        "PLACE_EVIDENCE_REVIEWED",
+    } <= actions
 
 
 def test_revision_evidence_is_revision_scoped_and_exposes_projection_endpoints(

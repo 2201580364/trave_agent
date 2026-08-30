@@ -31,8 +31,8 @@
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
 - 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
-- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。O04 Geometry/AccessPoint candidate 写入、软停用、逐项 reviewer 审核和发布门禁已完成；当前实现 O05 时间证据面，先确保周规则、闭馆日、日期例外按 Revision/Place 边界可见且可追溯，再进入写入审核与解析预览。72 条研究数据不得通过 SQL 手工改状态，未审核依赖继续阻断发布；本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情、O04 写入/逐项审核、候选分页以及 Revision→重新审核→Projection 发布业务闭环。O05 只读时间证据装配、页面展示、自动化回归和 Chrome 验收也已完成；仍缺 O05 写入/逐项审核/指定日期预览、O01、O06–O07、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。O04 Geometry/AccessPoint 与 O05 时间证据 candidate 写入、软停用、逐项 reviewer 审核和发布门禁依赖已完成；当前收口 O05 的指定日期解析预览。72 条研究数据不得通过 SQL 手工改状态，未审核依赖继续阻断发布；本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情、O04/O05 写入与逐项审核、候选分页以及 Revision→重新审核→Projection 发布业务闭环。O05 指定日期解析预览仍待完成；仍缺 O01、O06–O07、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -75,7 +75,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | Gate 7 R0.2-04 候选清单与覆盖矩阵 | 完成 | 72 个 candidate、11 区域、9 类别、18 夜间/固定时段、28 室内/雨天、24 非点状候选、11 组未裁决关系线索、确定性覆盖矩阵、CLI 和 7 项测试 |
 | Gate 7 R0.2-05-01A 管理后端底座 | 完成 | 独立 AdminActor/Role/Session、scrypt、会话摘要、服务端 RBAC、管理员创建/角色乐观锁与幂等、追加式 AuditEvent、`/api/v1/admin` 和 Alembic 0007；6 项专项测试 |
 | Gate 7 R0.2-05-01B 管理 Web 壳与安全操作面 | 完成 | ADR-0020 独立 `admin-web/`、O00 登录/超时、O16 管理员与角色、最小 O15 审计只读；token 仅存 React 内存；`npm run typecheck/test/build` 通过，全量 pytest 通过 |
-| Gate 7 R0.2-05-02 地点审核工作台 P0 | 进行中 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情首版、O04 只读证据首版、跨 Place 来源发布门禁、Revision 版本化发布闭环和完整 Chrome 验收报告；O01、O04 写入/审核、O05–O07 证据面和批量审核待完成 |
+| Gate 7 R0.2-05-02 地点审核工作台 P0 | 进行中 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情、O04/O05 写入与逐项审核、跨 Place 来源发布门禁、Revision 版本化发布闭环和 Chrome 验收；O01、O05 指定日期预览、O06–O07 证据面和批量审核待完成 |
 
 最新稳定技术基线：上一轮全量 pytest `349/349` 通过；本轮已完成迁移链升级到 `0010_place_revision_version`，O04 新增测试仍待补齐。数据库 head/readiness 目标为 `0010_place_revision_version`，服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。全仓 Ruff 仍有 37 项历史风格债（迁移、spike 和既有测试/求解器文件），strict mypy 历史债仍未清零；本轮已修改文件的 Ruff 仍需在实现完成后复跑。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
@@ -174,10 +174,10 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 候选地点清单已支持服务端分页：`GET /api/v1/admin/candidates` 返回 `limit`、`offset`、`total`，数据库按稳定创建时间/ID 顺序执行 `LIMIT/OFFSET`；admin-web 默认每页 20 条，可切换 50/100 条并按页请求，刷新回到第一页；
 - 验证：审核与候选专项后端测试 `10/10`、O04 evidence API 专项测试 `1/1`（含缺失/跨 Place 来源、URL 脱敏、无认证和 Projection 稳定排序）、相关数据库测试 `12/12`、admin-web typecheck、Vitest `5/5`、Vite production build、全量 pytest `349/349` 和 `git diff --check` 通过；Chrome 已完成管理员登录后的首页、管理员/角色、审计中心（展开/动作筛选）、审核工作台、候选清单、退出和受保护路由验收，并完成 Revision 版本化发布路径从新建、编辑、送审到发布的 Chrome 操作；
 - O04 Geometry/AccessPoint candidate 新增、编辑、软停用和逐项 reviewer approve/reject 已完成；Revision 级 approve 会检查全部 active O04 证据均已 human_verified，写入自动递增 Revision 版本并重置求解/审核资格；
-- O05 只读时间证据面已实现：同一 evidence 接口返回 `time_rules`、`closures`、`date_exceptions`，三类来源均纳入当前 Place 依赖闭包并逐项标识有效性；admin-web 独立展示周规则、固定场次、闭馆日、日期例外及跨午夜“次日 +1440”语义，O04/O05 请求失败时分别降级；
-- 当前剩余：O05 时间写入、逐项审核和指定日期解析预览，O01 待办摘要、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；Revision 差异视图、证据依赖复制策略和独立 research snapshot 仍属于后续切片；本机不部署 MySQL/Redis。
+- O05 时间证据已实现 candidate 新增、编辑、软停用/重新启用与 reviewer 逐项通过/驳回；写入递增 Revision 版本、清除求解/审核资格并写入管理审计；Revision 级 approve 会检查全部 active 时间证据均为 `human_verified`；
+- 当前剩余：O05 指定日期解析预览，O01 待办摘要、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；Revision 差异视图、证据依赖复制策略和独立 research snapshot 仍属于后续切片；本机不部署 MySQL/Redis。
 
-- 下一切片：完成 O05 时间规则、闭馆日和日期例外的 candidate CRUD 与逐项 reviewer 审核；复用 Revision 乐观锁、operation intent、审计和开放 review task 门禁。之后由后端提供指定日期解析预览并把时间完整性纳入 Revision approve，不允许前端自行猜测日期覆盖或固定场次冲突。
+- 下一切片：由后端提供 O05 指定日期解析预览，把日期例外覆盖、多天闭馆、跨午夜和固定场次同日歧义以稳定结果返回；随后进入 O01 管理首页待办摘要，再推进 O06/O07。
 
 ### A4：应用代码架构设计
 
@@ -736,16 +736,16 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 
 ## 后续队列
 
-### 本轮更新（2026-08-30，O05 只读时间证据）
+### 本轮更新（2026-08-30，O05 时间证据写入与审核）
 
 - 当前里程碑：M1；当前 Gate：G7 / R0.2-05-02 OM1 O05 地点审核工作台。
-- 本轮完成：Revision evidence 装配 `PlaceTimeRule`、`PlaceClosure`、`PlaceDateException`；来源依赖闭包和逐项 `source_record_valid` 同步覆盖三类时间证据；admin-web 新增独立 O05 只读卡片并明确跨午夜“次日”语义。
-- 边界：本切片不提供时间证据写入、逐项审核或指定日期解析预览；O04 与 O05 各自独立降级，证据服务异常不会清空 O03 基础事实和审核操作。
-- 验证结果：完整后端测试 351/351 通过；admin-web typecheck、Vitest 7/7、production build通过；相关 Python Ruff 和 `git diff --check` 通过。
+- 本轮完成：三类 O05 时间证据 candidate CRUD、软停用/重新启用、Revision 版本递增、幂等审计和 reviewer 逐项通过/驳回；Revision approve 已纳入 active 时间证据完整性门禁；admin-web 新增三类编辑表单和按权限显示的操作列。
+- 边界：指定日期解析预览尚未接入；解析必须由后端按正式开放时间规则完成，前端不能自行覆盖日期例外或固定场次冲突。
+- 验证结果：完整后端测试 352/352 通过；admin-web typecheck、Vitest 8/8、production build 通过；相关 Python Ruff 和 `git diff --check` 通过。
 - Chrome 验收：从 72 条候选清单进入“西湖音乐喷泉表演” Revision，O05 卡片、三类空状态、O03/O04/O05 分区和更新后的边界文案均符合预期，控制台新增 warn/error 为 0；未通过 SQL 手工制造时间数据。详见 `docs/test/reports/g7-r0.2-05-02-o05-time-evidence-chrome-2026-08-30.md`。
-- 当前进度：O04 已提交；O05 只读时间证据纵向切片已完成并达到可提交状态。
-- 遗留问题：O05 CRUD/逐项审核/解析预览，O01、O06、O07、发布中心和批量审核仍属于后续节点；SQLite datetime adapter 警告和全仓历史 Ruff 不属于本轮阻断。
-- 下一步：提交 `feat(admin): expose revision time evidence`；随后进入 O05 时间证据写入与 reviewer 审核闭环。
+- 当前进度：O05 时间证据写入与 reviewer 逐项审核纵向切片已完成，达到可提交状态。
+- 遗留问题：O05 指定日期解析预览，O01、O06、O07、发布中心和批量审核仍属于后续节点；SQLite datetime adapter 警告和全仓历史 Ruff 不属于本轮阻断。
+- 下一步：提交 `feat(admin): add time evidence review workflow`；随后实现 O05 指定日期解析预览。
 
 | 顺序 | 阶段 | 内容 | 当前状态 |
 |---|---|---|---|
@@ -792,8 +792,8 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；
 - M4 自动游记、旅行档案和长期偏好仅完成产品功能骨架，尚未进入详细 PRD 或实现；
-- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计以及 O00/O15/O16、O02/O03/O04 admin-web 安全操作面已实现，O04 几何/访问点 candidate 写入、编辑、软停用和逐项 reviewer approve/reject 已完成；O01/O05–O07 和发布中心仍未实现；
-- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-01B 管理 Web 安全操作面已完成；R0.2-05-02 中 O04 Geometry/AccessPoint 写入与逐项审核已完成。杭州批量 human_verified、O05–O07、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
+- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计以及 O00/O15/O16、O02/O03/O04/O05 admin-web 安全操作面已实现，O04 几何/访问点和 O05 时间证据 candidate 写入、编辑、软停用及逐项 reviewer approve/reject 已完成；O01、O05 指定日期预览、O06–O07 和发布中心仍未实现；
+- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-01B 管理 Web 安全操作面已完成；R0.2-05-02 中 O04/O05 写入与逐项审核已完成。杭州批量 human_verified、O05 指定日期预览、O06–O07、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
 
 ## 每轮结束更新模板
 

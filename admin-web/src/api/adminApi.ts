@@ -16,6 +16,9 @@ import type {
   ReviewPlaceEvidenceInput,
   PlaceGeometryInput,
   PlaceAccessPointInput,
+  PlaceClosureInput,
+  PlaceDateExceptionInput,
+  PlaceTimeRuleInput,
   RetirePlaceEvidenceInput,
   PublicationCheck,
 } from './types'
@@ -135,6 +138,60 @@ export class AdminApi {
 
   retireAccessPoint(revisionId: string, accessPointId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/access-points/${encodeURIComponent(accessPointId)}`, {
+      method: 'DELETE', body: JSON.stringify(input),
+    })
+  }
+
+  createTimeRule(revisionId: string, input: PlaceTimeRuleInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-rules`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  updateTimeRule(revisionId: string, timeRuleId: string, input: PlaceTimeRuleInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-rules/${encodeURIComponent(timeRuleId)}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    })
+  }
+
+  retireTimeRule(revisionId: string, timeRuleId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-rules/${encodeURIComponent(timeRuleId)}`, {
+      method: 'DELETE', body: JSON.stringify(input),
+    })
+  }
+
+  createClosure(revisionId: string, input: PlaceClosureInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/closures`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  updateClosure(revisionId: string, closureId: string, input: PlaceClosureInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/closures/${encodeURIComponent(closureId)}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    })
+  }
+
+  retireClosure(revisionId: string, closureId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/closures/${encodeURIComponent(closureId)}`, {
+      method: 'DELETE', body: JSON.stringify(input),
+    })
+  }
+
+  createDateException(revisionId: string, input: PlaceDateExceptionInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/date-exceptions`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  updateDateException(revisionId: string, dateExceptionId: string, input: PlaceDateExceptionInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/date-exceptions/${encodeURIComponent(dateExceptionId)}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    })
+  }
+
+  retireDateException(revisionId: string, dateExceptionId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/date-exceptions/${encodeURIComponent(dateExceptionId)}`, {
       method: 'DELETE', body: JSON.stringify(input),
     })
   }

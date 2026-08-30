@@ -230,6 +230,43 @@ export type PlaceAccessPointInput = {
   reason_text?: string
 }
 
+export type PlaceTimeRuleInput = {
+  expected_revision_version: number
+  rule_kind: 'opening_hours' | 'fixed_session' | 'last_entry'
+  weekdays: number[]
+  start_minute: number | null
+  end_minute: number | null
+  last_entry_minute: number | null
+  valid_from: string | null
+  valid_to: string | null
+  source_record_id: string
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
+export type PlaceClosureInput = {
+  expected_revision_version: number
+  weekday: number
+  source_record_id: string
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
+export type PlaceDateExceptionInput = {
+  expected_revision_version: number
+  service_date: string
+  exception_kind: 'closed' | 'open_override' | 'session_override'
+  start_minute: number | null
+  end_minute: number | null
+  last_entry_minute: number | null
+  source_record_id: string
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
 export type RetirePlaceEvidenceInput = {
   expected_revision_version: number
   operation_intent_id: string

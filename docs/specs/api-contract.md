@@ -1137,7 +1137,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、Revision evidence、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、O04 几何/访问点写入与逐项审核、发布门检查和 Projection 级发布入口已可调用。Revision evidence 已扩展 O05 只读时间证据面；O05 时间写入/逐项审核/指定日期解析预览、O06 来源、O07 关系子资源和独立 research snapshot/批次发布仍属于后续切片。
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、Revision evidence、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、O04 几何/访问点与 O05 时间证据写入/逐项审核、发布门检查和 Projection 级发布入口已可调用。O05 指定日期解析预览、O06 来源、O07 关系子资源和独立 research snapshot/批次发布仍属于后续切片。
 
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
@@ -1181,6 +1181,15 @@ O04 几何与访问点写入（仅 candidate Revision）使用以下 Revision-sc
 `reviewed_at`，驳回时清空该时间；审核操作不替代 Revision 级 review task。Revision
 级 approve 会检查全部 active Geometry/AccessPoint 均为 `human_verified`，否则以
 `review_revision_not_approvable` 拒绝，不能跳过逐项核验直接进入 `human_verified`。
+
+O05 时间证据写入同样仅允许 candidate Revision：`POST/PATCH/DELETE` 分别作用于
+`/time-rules/{time_rule_id}`、`/closures/{closure_id}` 和
+`/date-exceptions/{date_exception_id}` 三类 Revision 子资源；创建、编辑、重新启用或
+软停用均携带 `expected_revision_version`、`operation_intent_id` 和审计理由，原子递增
+Revision 版本并清除求解/审核资格。逐项审核端点的 `evidence_kind` 现在支持
+`time_rule`、`closure`、`date_exception`；同 intent 重放返回当前 Revision，不同载荷返回
+`409 admin_operation_intent_conflict`。Revision 级 approve 同时检查所有 active 的
+Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_verified`。
 
 ### 15.3 管理写入通用字段
 
