@@ -28,6 +28,7 @@ const ReviewQueuePage = lazy(() =>
 const CandidatesPage = lazy(() =>
   import('../pages/CandidatesPage').then((module) => ({ default: module.CandidatesPage })),
 )
+const PublicationsPage = lazy(() => import('../pages/PublicationsPage').then((module) => ({ default: module.PublicationsPage })))
 const RevisionDetailsPage = lazy(() =>
   import('../pages/RevisionDetailsPage').then((module) => ({ default: module.RevisionDetailsPage })),
 )
@@ -80,6 +81,7 @@ export function App() {
                     </RoleGate>
                   }
                 />
+                <Route path="publications" element={<RoleGate permission="place:publication:check"><PublicationsPage /></RoleGate>} />
                 <Route
                   path="candidates/:revisionId"
                   element={

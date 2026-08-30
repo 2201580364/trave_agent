@@ -1,6 +1,7 @@
 import {
   AuditOutlined,
   CheckSquareOutlined,
+  CloudUploadOutlined,
   DatabaseOutlined,
   DashboardOutlined,
   LogoutOutlined,
@@ -30,6 +31,9 @@ export function AdminLayout() {
         : []),
       ...(hasPermission('place:review:read')
         ? [{ key: '/review', icon: <CheckSquareOutlined />, label: '地点审核' }]
+        : []),
+      ...(hasPermission('place:publication:check')
+        ? [{ key: '/publications', icon: <CloudUploadOutlined />, label: '发布中心' }]
         : []),
       ...(hasPermission('place:candidate:read')
         ? [{ key: '/candidates', icon: <DatabaseOutlined />, label: '候选地点' }]
