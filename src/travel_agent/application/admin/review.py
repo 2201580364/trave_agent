@@ -1947,6 +1947,29 @@ class PlaceReviewWorkflowService:
             uow.commit()
             return updated
 
+    def decide_batch(self, principal: AdminPrincipal, *, items: tuple[dict[str, object], ...], request_id: str) -> dict[str, object]:
+        self._require(principal, "place:review:decide")
+        if not items or len(items) > 100:
+            raise ValueError("batch must contain 1 to 100 decisions")
+        succeeded: list[PlaceReviewTask] = []
+        failed: list[dict[str, object]] = []
+        for item in items:
+            try:
+                task = self.decide(
+                    principal,
+                    task_id=str(item["task_id"]),
+                    operation_intent_id=str(item["operation_intent_id"]),
+                    expected_version=int(item["expected_version"]),
+                    decision_kind=str(item["decision_kind"]),
+                    reason_code=str(item["reason_code"]),
+                    reason_text=item.get("reason_text") if isinstance(item.get("reason_text"), str) else None,
+                    request_id=request_id,
+                )
+                succeeded.append(task)
+            except Exception as exc:
+                failed.append({"task_id": item.get("task_id"), "error_code": getattr(exc, "code", "batch_item_failed"), "message": str(exc)})
+        return {"succeeded": tuple(succeeded), "failed": tuple(failed), "total": len(items)}
+
     @staticmethod
     def _require(principal: AdminPrincipal, permission: str) -> None:
         if not principal.has_permission(permission):

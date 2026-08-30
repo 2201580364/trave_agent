@@ -1203,6 +1203,12 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 
 ### O06 来源冲突只读面
 
+### 批量审核
+
+`POST /api/v1/admin/review-tasks/batch-decisions` 需要 `place:review:decide`，请求最多包含
+100 个与单项决定相同的 payload。批量采用逐项独立提交语义：响应分别返回 `succeeded` 与
+`failed`，失败项包含 `task_id`、`error_code` 和消息；不会把部分成功伪装为原子全成功。
+
 O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{relation_id}/resolve`
 需要 `place:candidate:write`，携带 `expected_revision_version`、`resolution_status`、可选
 `decision_note`、`operation_intent_id` 和审计理由。仅允许当前 Place 的 active 关系；成功后

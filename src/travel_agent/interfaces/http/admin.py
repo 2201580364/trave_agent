@@ -69,6 +69,10 @@ class DecidePlaceReviewInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+class BatchDecidePlaceReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: tuple[DecidePlaceReviewInput, ...] = Field(min_length=1, max_length=100)
+
 
 class CreatePlaceRevisionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -985,6 +989,23 @@ def build_admin_router(
                 request_id=request.state.request_id,
             )
             return _review_task_response(task)
+
+        @router.post("/review-tasks/batch-decisions")
+        def decide_place_review_batch(
+            payload: BatchDecidePlaceReviewInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            result = review_workflow.decide_batch(
+                current,
+                items=tuple(item.model_dump() for item in payload.items),
+                request_id=request.state.request_id,
+            )
+            return {
+                "total": result["total"],
+                "succeeded": [_review_task_response(task) for task in result["succeeded"]],
+                "failed": list(result["failed"]),
+            }
 
         @router.get("/review-tasks/{task_id}/decisions")
         def list_review_decisions(
