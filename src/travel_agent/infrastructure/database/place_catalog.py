@@ -117,6 +117,7 @@ class PlaceRevisionRow(Base):
     created_at: Mapped[str] = mapped_column(String(40))
     reviewed_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     published_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    review_flags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
 
 
 class PlaceGeometryRow(Base):
@@ -420,6 +421,17 @@ class SqlAlchemyPlaceCatalogRepository:
         row = self._session.get(SolverPlaceProjectionRow, projection_id)
         return _projection_from_row(row) if row is not None else None
 
+    def get_projection_for_revision(
+        self, place_revision_id: str
+    ) -> SolverPlaceProjection | None:
+        row = self._session.scalar(
+            select(SolverPlaceProjectionRow)
+            .where(SolverPlaceProjectionRow.place_revision_id == place_revision_id)
+            .order_by(SolverPlaceProjectionRow.created_at.desc())
+            .limit(1)
+        )
+        return _projection_from_row(row) if row is not None else None
+
     def load_publication_context(
         self, projection_id: str
     ) -> ProjectionPublicationContext | None:
@@ -598,6 +610,7 @@ def _revision_values(value: PlaceRevision) -> dict[str, Any]:
         "created_at": value.created_at.isoformat(),
         "reviewed_at": _iso(value.reviewed_at),
         "published_at": _iso(value.published_at),
+        "review_flags": list(value.review_flags),
     }
 
 
@@ -630,6 +643,7 @@ def _revision_from_row(row: PlaceRevisionRow) -> PlaceRevision:
         datetime.fromisoformat(row.created_at),
         datetime.fromisoformat(row.reviewed_at) if row.reviewed_at else None,
         datetime.fromisoformat(row.published_at) if row.published_at else None,
+        tuple(row.review_flags or ()),
     )
 
 

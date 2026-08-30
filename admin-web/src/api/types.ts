@@ -53,6 +53,7 @@ export type PageResponse<T> = {
   items: T[]
   limit: number
   offset: number
+  total?: number
 }
 
 export type CreateAdminActorInput = {
@@ -141,6 +142,13 @@ export type PlaceRevision = {
   created_at: string
   reviewed_at: string | null
   published_at: string | null
+  review_flags: string[]
+}
+
+export type PublicationCheck = {
+  revision_id: string
+  publishable: boolean
+  reason_codes: string[]
 }
 
 export type ApiErrorBody = {

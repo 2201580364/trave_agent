@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Integer, String, select, update
+from sqlalchemy import Integer, String, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -14,7 +14,7 @@ from travel_agent.domain.place_catalog import (
     PlaceRevision,
 )
 
-from .place_catalog import PlaceRevisionRow, _revision_from_row
+from .place_catalog import PlaceRevisionRow, _revision_from_row, _revision_values
 from .planning import Base
 
 
@@ -70,6 +70,37 @@ class SqlAlchemyPlaceReviewRepository:
             return None
         return _revision_from_row(row)
 
+    def get_latest_revision(self, place_id: str) -> PlaceRevision | None:
+        row = self._session.scalar(
+            select(PlaceRevisionRow)
+            .where(PlaceRevisionRow.place_id == place_id)
+            .order_by(PlaceRevisionRow.revision_number.desc())
+            .limit(1)
+        )
+        return _revision_from_row(row) if row is not None else None
+
+    def add_revision(self, revision: PlaceRevision) -> None:
+        self._session.add(PlaceRevisionRow(**_revision_values(revision)))
+        try:
+            self._session.flush()
+        except IntegrityError as exc:
+            raise ValueError("place revision already exists") from exc
+
+    def update_revision(
+        self, revision: PlaceRevision, *, expected_revision_number: int
+    ) -> None:
+        result = self._session.execute(
+            update(PlaceRevisionRow)
+            .where(
+                PlaceRevisionRow.place_revision_id == revision.place_revision_id,
+                PlaceRevisionRow.revision_number == expected_revision_number,
+                PlaceRevisionRow.lifecycle_status == "candidate",
+            )
+            .values(**_revision_values(revision))
+        )
+        if result.rowcount != 1:
+            raise ValueError("candidate revision version conflict")
+
     def list_revisions(
         self, *, lifecycle_status: str | None, limit: int, offset: int
     ) -> tuple[PlaceRevision, ...]:
@@ -87,6 +118,14 @@ class SqlAlchemyPlaceReviewRepository:
             .offset(offset)
         )
         return tuple(_revision_from_row(row) for row in rows)
+
+    def count_revisions(self, *, lifecycle_status: str | None) -> int:
+        statement = select(func.count()).select_from(PlaceRevisionRow)
+        if lifecycle_status is not None:
+            statement = statement.where(
+                PlaceRevisionRow.lifecycle_status == lifecycle_status
+            )
+        return int(self._session.scalar(statement) or 0)
 
     def get_open_task_for_revision(self, revision_id: str) -> PlaceReviewTask | None:
         row = self._session.scalar(

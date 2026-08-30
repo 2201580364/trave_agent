@@ -12,7 +12,13 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export function adminErrorMessage(error: unknown): string {
   if (error instanceof AdminApiError) {
-    const message = ERROR_MESSAGES[error.code] ?? error.message
+    const reasonCodes = Array.isArray(error.details?.reason_codes)
+      ? ` (reason codes: ${error.details.reason_codes.join(', ')})`
+      : ''
+    const baseMessage = error.code === 'publication_gate_rejected'
+      ? '发布门禁未通过，请先补齐依赖证据。'
+      : (ERROR_MESSAGES[error.code] ?? error.message)
+    const message = baseMessage + reasonCodes
     return error.requestId ? `${message}（请求 ${error.requestId}）` : message
   }
   return '管理服务暂时不可用，请稍后重试。'

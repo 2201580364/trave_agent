@@ -62,6 +62,49 @@ class DecidePlaceReviewInput(BaseModel):
     reason_text: str | None = Field(default=None, max_length=500)
 
 
+class CreatePlaceRevisionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_revision_id: str = Field(min_length=1, max_length=64)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class UpdatePlaceRevisionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(gt=0)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+    canonical_name: str | None = Field(default=None, min_length=1, max_length=160)
+    aliases: tuple[str, ...] | None = None
+    place_kind: str | None = Field(default=None, min_length=1, max_length=32)
+    category: str | None = Field(default=None, min_length=1, max_length=64)
+    admin_area: str | None = Field(default=None, min_length=1, max_length=120)
+    address: str | None = Field(default=None, max_length=300)
+    geometry_kind: str | None = Field(default=None, min_length=1, max_length=20)
+    duration_min: int | None = Field(default=None, ge=0)
+    duration_recommended: int | None = Field(default=None, ge=0)
+    duration_max: int | None = Field(default=None, ge=0)
+    internal_travel_min: int | None = Field(default=None, ge=0)
+    energy_level: int | None = Field(default=None, ge=0, le=5)
+    indoor_outdoor: str | None = Field(default=None, min_length=1, max_length=20)
+    suitable_periods: tuple[str, ...] | None = None
+    audience_tags: tuple[str, ...] | None = None
+    rain_suitability: str | None = Field(default=None, min_length=1, max_length=20)
+    is_always_open: bool | None = None
+
+
+class PublishPlaceRevisionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
 def build_admin_router(
     service: AdminIdentityService,
     review_workflow: PlaceReviewWorkflowService | None = None,
@@ -199,6 +242,91 @@ def build_admin_router(
 
     if review_workflow is not None:
 
+        @router.post("/places/{place_id}/revisions", status_code=status.HTTP_201_CREATED)
+        def create_place_revision(
+            place_id: str,
+            payload: CreatePlaceRevisionInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_revision(
+                current,
+                place_id=place_id,
+                base_revision_id=payload.base_revision_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.patch("/place-revisions/{revision_id}")
+        def update_place_revision(
+            revision_id: str,
+            payload: UpdatePlaceRevisionInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            changes = payload.model_dump(
+                exclude={
+                    "expected_revision_number",
+                    "operation_intent_id",
+                    "reason_code",
+                    "reason_text",
+                },
+                exclude_unset=True,
+            )
+            revision = review_workflow.update_revision(
+                current,
+                revision_id=revision_id,
+                expected_revision_number=payload.expected_revision_number,
+                changes=changes,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.get("/place-revisions/{revision_id}/publication-checks")
+        def check_place_revision_publication(
+            revision_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            reasons = review_workflow.publication_check(current, revision_id=revision_id)
+            return {
+                "revision_id": revision_id,
+                "publishable": not reasons,
+                "reason_codes": list(reasons),
+            }
+
+        @router.post("/place-revisions/{revision_id}/publications")
+        def publish_place_revision(
+            revision_id: str,
+            payload: PublishPlaceRevisionInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            projection = review_workflow.publish_revision(
+                current,
+                revision_id=revision_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return {
+                "projection_id": projection.projection_id,
+                "place_revision_id": projection.place_revision_id,
+                "data_snapshot_version": projection.data_snapshot_version,
+                "status": projection.status,
+                "published_at": (
+                    projection.published_at.isoformat()
+                    if projection.published_at
+                    else None
+                ),
+            }
+
         @router.get("/candidates")
         def list_candidates(
             current: AdminPrincipal = principal_dependency,
@@ -212,10 +340,15 @@ def build_admin_router(
                 limit=limit,
                 offset=offset,
             )
+            total = review_workflow.count_revisions(
+                current,
+                lifecycle_status=lifecycle_status,
+            )
             return {
                 "items": [_revision_response(revision) for revision in revisions],
                 "limit": limit,
                 "offset": offset,
+                "total": total,
             }
 
         @router.get("/place-revisions/{revision_id}")
@@ -369,6 +502,7 @@ def _revision_response(revision: PlaceRevision) -> dict[str, object]:
         "created_at": revision.created_at.isoformat(),
         "reviewed_at": revision.reviewed_at.isoformat() if revision.reviewed_at else None,
         "published_at": revision.published_at.isoformat() if revision.published_at else None,
+        "review_flags": list(revision.review_flags),
     }
 
 

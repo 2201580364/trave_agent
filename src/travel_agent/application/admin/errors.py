@@ -74,3 +74,15 @@ class ReviewRevisionNotCandidateError(ApplicationError):
             "review_revision_not_candidate",
             "only candidate revisions can enter human review",
         )
+
+
+class PublicationGateRejectedError(ApplicationError):
+    """A revision/projection failed the stable publication gate."""
+
+    def __init__(self, reason_codes: tuple[str, ...]) -> None:
+        normalized = tuple(sorted(set(reason_codes)))
+        super().__init__(
+            "publication_gate_rejected",
+            "place revision cannot be published until all publication gates pass",
+            {"reason_codes": normalized},
+        )

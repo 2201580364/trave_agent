@@ -887,6 +887,7 @@ def _status_for(exc: ApplicationError) -> int:
         "review_task_conflict": status.HTTP_409_CONFLICT,
         "review_revision_not_approvable": status.HTTP_409_CONFLICT,
         "review_revision_not_candidate": status.HTTP_409_CONFLICT,
+        "publication_gate_rejected": status.HTTP_409_CONFLICT,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
 
 

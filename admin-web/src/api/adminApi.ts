@@ -12,6 +12,7 @@ import type {
   ReviewTask,
   ReviewTaskStatus,
   PlaceRevision,
+  PublicationCheck,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -91,6 +92,50 @@ export class AdminApi {
 
   getPlaceRevision(revisionId: string): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}`)
+  }
+
+  createPlaceRevision(
+    placeId: string,
+    input: { base_revision_id: string; operation_intent_id: string; reason_code: string; reason_text?: string },
+  ): Promise<PlaceRevision> {
+    return this.request(`/places/${encodeURIComponent(placeId)}/revisions`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  }
+
+  updatePlaceRevision(
+    revisionId: string,
+    input: Record<string, unknown>,
+  ): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+  }
+
+  submitPlaceReview(
+    revisionId: string,
+    input: { operation_intent_id: string; reason_code: string; reason_text?: string },
+  ): Promise<ReviewTask> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/review-tasks`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  }
+
+  checkPlaceRevisionPublication(revisionId: string): Promise<PublicationCheck> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/publication-checks`)
+  }
+
+  publishPlaceRevision(
+    revisionId: string,
+    input: { operation_intent_id: string; reason_code: string; reason_text?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/publications`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
   }
 
   decidePlaceReview(

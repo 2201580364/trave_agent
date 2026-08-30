@@ -360,7 +360,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0008_place_review_workflow"
+    assert revision == "0009_place_revision_review_flags"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -551,6 +551,16 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     assert candidates.status_code == 200
     assert candidates.json()["items"][0]["place_revision_id"] == "revision-candidates"
     assert candidates.json()["items"][0]["lifecycle_status"] == "candidate"
+    assert candidates.json()["limit"] == 50
+    assert candidates.json()["offset"] == 0
+    assert candidates.json()["total"] == 1
+
+    empty_page = context.client.get(
+        "/api/v1/admin/candidates?limit=1&offset=1", headers=headers
+    )
+    assert empty_page.status_code == 200
+    assert empty_page.json()["items"] == []
+    assert empty_page.json()["total"] == 1
 
     detail = context.client.get(
         "/api/v1/admin/place-revisions/revision-candidates", headers=headers
@@ -563,6 +573,123 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     )
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "resource_not_found"
+
+
+def test_revision_editing_creates_new_candidate_and_keeps_base_immutable(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-base")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    created = context.client.post(
+        "/api/v1/admin/places/place-1/revisions",
+        headers=headers,
+        json={
+            "base_revision_id": "revision-base",
+            "operation_intent_id": "create-revision-1",
+            "reason_code": "PLACE_FACTS_REFRESH",
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["revision_number"] == 2
+    assert created.json()["lifecycle_status"] == "candidate"
+    assert created.json()["solver_eligible"] is False
+    new_revision_id = created.json()["place_revision_id"]
+
+    created_replay = context.client.post(
+        "/api/v1/admin/places/place-1/revisions",
+        headers=headers,
+        json={
+            "base_revision_id": "revision-base",
+            "operation_intent_id": "create-revision-1",
+            "reason_code": "PLACE_FACTS_REFRESH",
+        },
+    )
+    assert created_replay.status_code == 201
+    assert created_replay.json()["place_revision_id"] == new_revision_id
+
+    updated = context.client.patch(
+        f"/api/v1/admin/place-revisions/{new_revision_id}",
+        headers=headers,
+        json={
+            "expected_revision_number": 2,
+            "operation_intent_id": "update-revision-1",
+            "reason_code": "PLACE_FACTS_EDITED",
+            "canonical_name": "Updated Candidate Place",
+            "duration_recommended": 90,
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["canonical_name"] == "Updated Candidate Place"
+    assert updated.json()["duration_recommended"] == 90
+
+    updated_replay = context.client.patch(
+        f"/api/v1/admin/place-revisions/{new_revision_id}",
+        headers=headers,
+        json={
+            "expected_revision_number": 2,
+            "operation_intent_id": "update-revision-1",
+            "reason_code": "PLACE_FACTS_EDITED",
+            "canonical_name": "Updated Candidate Place",
+            "duration_recommended": 90,
+        },
+    )
+    assert updated_replay.status_code == 200
+    assert updated_replay.json()["canonical_name"] == "Updated Candidate Place"
+
+    update_intent_conflict = context.client.patch(
+        f"/api/v1/admin/place-revisions/{new_revision_id}",
+        headers=headers,
+        json={
+            "expected_revision_number": 2,
+            "operation_intent_id": "update-revision-1",
+            "reason_code": "PLACE_FACTS_EDITED",
+            "canonical_name": "Different Place",
+        },
+    )
+    assert update_intent_conflict.status_code == 409
+    assert update_intent_conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
+
+    base = context.client.get(
+        "/api/v1/admin/place-revisions/revision-base", headers=headers
+    )
+    assert base.status_code == 200
+    assert base.json()["canonical_name"] == "Candidate Place"
+
+    task = context.client.post(
+        "/api/v1/admin/place-revisions/revision-base/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "submit-revision-base",
+            "reason_code": "READY_FOR_REVIEW",
+        },
+    )
+    assert task.status_code == 201
+    decision = context.client.post(
+        f"/api/v1/admin/review-tasks/{task.json()['review_task_id']}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "approve-revision-base",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "FACTS_VERIFIED",
+        },
+    )
+    assert decision.status_code == 200
+
+    immutable = context.client.patch(
+        "/api/v1/admin/place-revisions/revision-base",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "operation_intent_id": "update-revision-base",
+            "reason_code": "PLACE_FACTS_EDITED",
+            "canonical_name": "Should Be Rejected",
+        },
+    )
+    assert immutable.status_code == 409
+    assert immutable.json()["error"]["code"] == "review_revision_not_candidate"
 
 
 def test_place_review_request_changes_keeps_candidate_and_rejects_stale_version(

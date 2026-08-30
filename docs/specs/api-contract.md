@@ -1106,7 +1106,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 - 角色变化或会话撤销后，旧会话不能继续写入；
 - 401 表示未认证/会话失效，403 表示已认证但角色不足；
 - R0.2-05-01A 采用标准库 `scrypt` 密码摘要和高熵随机 Bearer token；数据库只保存密码摘要和 token SHA-256；
-- 首个管理员只允许在 `admin_actors` 为空时通过成对的 `TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN/PASSWORD` 环境变量一次性引导，成功后必须从部署环境移除；不能把初始密码写入代码、镜像、文档或 Git；
+- 首个管理员只允许在 `admin_actors` 为空时通过成对的 `TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN/PASSWORD` 环境变量引导；生产部署成功后必须从部署环境移除，不能把初始密码写入代码、镜像、文档或 Git；本地开发可以将长期测试凭证保存在已被 Git 忽略的 `.env`，启动钩子在已有管理员时保持幂等，不会覆盖数据库中的密码；
 - 后续可通过独立 ADR 将认证 Provider 升级为企业 SSO，但不能自动把普通 principal 提升为管理员。
 
 ### 15.2 端点族
@@ -1126,7 +1126,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/review-tasks` | data_reviewer | 查询待审核队列 |
 | `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve、request_changes 或 cancel；写 ReviewDecision 并使用 expected version |
 | `GET /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | 查询追加式决定历史 |
-| `POST /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
+| `GET /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/publications` | data_publisher | 通过 publication intent 调用发布用例 |
 | `POST /api/v1/admin/publication-batches` | data_publisher | 创建批次预览/执行，不隐藏逐项失败 |
 | `GET /api/v1/admin/research-snapshots` | publisher/viewer | 查询不可变研究快照和质量报告 |
@@ -1136,7 +1136,9 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、review-tasks/decisions 审核闭环；地图、时间、来源、关系子资源和 publication/research snapshot 端点仍属于后续 O03–O07 与 R0.2-07，尚不可调用。
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、发布门检查和 Projection 级发布入口已可调用。地图、时间、来源、关系子资源和独立 research snapshot/批次发布仍属于后续 O03–O07 与 R0.2-07。
+
+`GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
 
@@ -1173,7 +1175,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | 409 | `admin_operation_intent_conflict` | operation intent 已被其他审核载荷使用 |
 | 409 | `published_revision_immutable` | 试图原地修改 published Revision |
 | 422 | `review_requirements_not_met` | 送审/通过所需依赖不完整 |
-| 422 | `publication_gate_rejected` | 发布依赖闭包失败；详情含稳定 reason codes |
+| 409 | `publication_gate_rejected` | 发布依赖闭包失败；详情含稳定 reason codes |
 | 422 | `conditional_source_staging_only` | conditional 来源不能进入 published |
 | 422 | `overlap_resolution_required` | 地点重叠或互斥尚未裁决 |
 

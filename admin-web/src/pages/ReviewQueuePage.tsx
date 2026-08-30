@@ -1,6 +1,7 @@
-import { ReloadOutlined } from '@ant-design/icons'
+import { FileSearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Card, Descriptions, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
 import type { ReviewDecision, ReviewTask, ReviewTaskStatus } from '../api/types'
@@ -114,6 +115,7 @@ function ReviewTaskDetails({
   api: ReturnType<typeof useAdminSession>['api']
   onChanged: () => Promise<void>
 }) {
+  const navigate = useNavigate()
   const [decisions, setDecisions] = useState<ReviewDecision[]>([])
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -156,6 +158,14 @@ function ReviewTaskDetails({
         <Descriptions.Item label="Revision">{task.place_revision_id}</Descriptions.Item>
         <Descriptions.Item label="版本">{task.version}</Descriptions.Item>
       </Descriptions>
+      <Button
+        type="link"
+        icon={<FileSearchOutlined />}
+        onClick={() => navigate(`/candidates/${encodeURIComponent(task.place_revision_id)}`)}
+        style={{ alignSelf: 'flex-start', paddingInline: 0 }}
+      >
+        查看 Revision 详情
+      </Button>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
       {canDecide && (
         <Space wrap>

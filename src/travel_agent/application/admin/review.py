@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from types import TracebackType
 from typing import Protocol, Self
@@ -14,12 +15,21 @@ from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ResourceNotFoundError
 from travel_agent.application.planning.ports import IdGenerator
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
-from travel_agent.domain.place_catalog import PlaceReviewDecision, PlaceReviewTask, PlaceRevision
+from travel_agent.domain.place_catalog import (
+    PlaceReviewDecision,
+    PlaceReviewTask,
+    PlaceRevision,
+    ProjectionPublicationError,
+    SolverPlaceProjection,
+    evaluate_projection_publication,
+)
+from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 
 from .errors import (
     AdminAuthenticationError,
     AdminOperationIntentConflictError,
     AdminPermissionDeniedError,
+    PublicationGateRejectedError,
     ReviewRevisionNotApprovableError,
     ReviewRevisionNotCandidateError,
     ReviewTaskConflictError,
@@ -47,13 +57,23 @@ class ReviewRepository(Protocol):
 
     def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
 
+    def get_latest_revision(self, place_id: str) -> PlaceRevision | None: ...
+
     def list_revisions(
         self, *, lifecycle_status: str | None, limit: int, offset: int
     ) -> tuple[PlaceRevision, ...]: ...
 
+    def count_revisions(self, *, lifecycle_status: str | None) -> int: ...
+
     def add_task(self, task: PlaceReviewTask) -> None: ...
 
     def add_decision(self, decision: PlaceReviewDecision) -> None: ...
+
+    def add_revision(self, revision: PlaceRevision) -> None: ...
+
+    def update_revision(
+        self, revision: PlaceRevision, *, expected_revision_number: int
+    ) -> None: ...
 
     def advance_task(
         self, task: PlaceReviewTask, *, expected_version: int, status: str, now: datetime
@@ -74,6 +94,7 @@ class ActorRepository(Protocol):
 
 class ReviewUnitOfWork(Protocol):
     reviews: ReviewRepository
+    catalog: PlaceCatalogRepository
     audits: AuditRepository
     actors: ActorRepository
 
@@ -120,6 +141,13 @@ class PlaceReviewWorkflowService:
                 offset=offset,
             )
 
+    def count_revisions(
+        self, principal: AdminPrincipal, *, lifecycle_status: str | None
+    ) -> int:
+        self._require(principal, "place:candidate:read")
+        with self._uow_factory() as uow:
+            return uow.reviews.count_revisions(lifecycle_status=lifecycle_status)
+
     def get_revision(
         self, principal: AdminPrincipal, *, revision_id: str
     ) -> PlaceRevision:
@@ -129,6 +157,228 @@ class PlaceReviewWorkflowService:
             if revision is None:
                 raise ResourceNotFoundError
             return revision
+
+    def create_revision(
+        self,
+        principal: AdminPrincipal,
+        *,
+        place_id: str,
+        base_revision_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        self._require(principal, "place:candidate:write")
+        reason_text = self._validate_reason(reason_code, reason_text)
+        operation_digest = _digest(
+            {
+                "place_id": place_id,
+                "base_revision_id": base_revision_id,
+                "reason_code": reason_code,
+                "reason_text": reason_text,
+            }
+        )
+        now = self._clock.now()
+        with self._uow_factory() as uow:
+            existing = self._replay(uow, operation_intent_id, operation_digest)
+            if existing is not None:
+                revision = uow.reviews.get_revision(existing.target_id)
+                if revision is None:
+                    raise ResourceNotFoundError
+                return revision
+            actor = self._actor(uow, principal)
+            base = uow.reviews.get_revision(base_revision_id)
+            latest = uow.reviews.get_latest_revision(place_id)
+            if base is None or latest is None or base.place_id != place_id:
+                raise ResourceNotFoundError
+            revision = replace(
+                base,
+                place_revision_id=self._ids.new_id("place_revision"),
+                revision_number=latest.revision_number + 1,
+                lifecycle_status="candidate",
+                solver_eligible=False,
+                conflicts_resolved=False,
+                reviewed_at=None,
+                published_at=None,
+                created_at=now,
+            )
+            uow.reviews.add_revision(revision)
+            uow.audits.add(self._event(
+                actor,
+                action="PLACE_REVISION_CREATED",
+                target_type="place_revision",
+                target_id=revision.place_revision_id,
+                target_revision=str(revision.revision_number),
+                before_digest=_revision_digest(base),
+                after_digest=_revision_digest(revision),
+                reason_code=reason_code,
+                reason_text=reason_text,
+                request_id=request_id,
+                operation_intent_id=operation_intent_id,
+                operation_digest=operation_digest,
+            ))
+            uow.commit()
+            return revision
+
+    def update_revision(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        expected_revision_number: int,
+        changes: dict[str, object],
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        self._require(principal, "place:candidate:write")
+        reason_text = self._validate_reason(reason_code, reason_text)
+        allowed = {
+            "canonical_name", "aliases", "place_kind", "category", "admin_area", "address",
+            "geometry_kind", "duration_min", "duration_recommended", "duration_max",
+            "internal_travel_min", "energy_level", "indoor_outdoor", "suitable_periods",
+            "audience_tags", "rain_suitability", "is_always_open",
+        }
+        unknown = set(changes) - allowed
+        if unknown:
+            raise ValueError("unsupported revision fields: " + ", ".join(sorted(unknown)))
+        normalized = {
+            key: tuple(value)
+            if key in {"aliases", "suitable_periods", "audience_tags"} and isinstance(value, list)
+            else value
+            for key, value in changes.items()
+        }
+        operation_digest = _digest(
+            {
+                "revision_id": revision_id,
+                "expected_revision_number": expected_revision_number,
+                "changes": normalized,
+                "reason_code": reason_code,
+                "reason_text": reason_text,
+            }
+        )
+        with self._uow_factory() as uow:
+            existing = self._replay(uow, operation_intent_id, operation_digest)
+            if existing is not None:
+                revision = uow.reviews.get_revision(existing.target_id)
+                if revision is None:
+                    raise ResourceNotFoundError
+                return revision
+            actor = self._actor(uow, principal)
+            current = uow.reviews.get_revision(revision_id)
+            if current is None:
+                raise ResourceNotFoundError
+            if current.lifecycle_status != "candidate":
+                raise ReviewRevisionNotCandidateError
+            if current.revision_number != expected_revision_number:
+                raise ReviewTaskConflictError
+            updated = replace(
+                current,
+                **normalized,
+                solver_eligible=False,
+                conflicts_resolved=False,
+                reviewed_at=None,
+                published_at=None,
+            )
+            uow.reviews.update_revision(
+                updated, expected_revision_number=expected_revision_number
+            )
+            uow.audits.add(self._event(
+                actor,
+                action="PLACE_REVISION_UPDATED",
+                target_type="place_revision",
+                target_id=revision_id,
+                target_revision=str(updated.revision_number),
+                before_digest=_revision_digest(current),
+                after_digest=_revision_digest(updated),
+                reason_code=reason_code,
+                reason_text=reason_text,
+                request_id=request_id,
+                operation_intent_id=operation_intent_id,
+                operation_digest=operation_digest,
+            ))
+            uow.commit()
+            return updated
+
+    def publication_check(
+        self, principal: AdminPrincipal, *, revision_id: str
+    ) -> tuple[str, ...]:
+        self._require(principal, "place:publication:check")
+        with self._uow_factory() as uow:
+            revision = uow.reviews.get_revision(revision_id)
+            if revision is None:
+                raise ResourceNotFoundError
+            projection = uow.catalog.get_projection_for_revision(revision_id)
+            if projection is None:
+                return ("PROJECTION_NOT_FOUND",)
+            context = uow.catalog.load_publication_context(projection.projection_id)
+            if context is None:
+                return ("PROJECTION_DEPENDENCY_MISSING",)
+            return evaluate_projection_publication(context)
+
+    def publish_revision(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> SolverPlaceProjection:
+        self._require(principal, "place:publication:write")
+        reason_text = self._validate_reason(reason_code, reason_text)
+        now = self._clock.now()
+        with self._uow_factory() as uow:
+            actor = self._actor(uow, principal)
+            revision = uow.reviews.get_revision(revision_id)
+            projection = uow.catalog.get_projection_for_revision(revision_id)
+            if revision is None or projection is None:
+                raise ResourceNotFoundError
+            operation_digest = _digest(
+                {
+                    "revision_id": revision_id,
+                    "projection_id": projection.projection_id,
+                    "reason_code": reason_code,
+                    "reason_text": reason_text,
+                }
+            )
+            existing = self._replay(uow, operation_intent_id, operation_digest)
+            if existing is not None:
+                return projection
+            context = uow.catalog.load_publication_context(projection.projection_id)
+            if context is None:
+                raise PublicationGateRejectedError(("PROJECTION_DEPENDENCY_MISSING",))
+            reasons = evaluate_projection_publication(context)
+            if reasons:
+                raise PublicationGateRejectedError(reasons)
+            before_digest = _revision_digest(revision)
+            try:
+                published = uow.catalog.publish_projection(
+                    projection.projection_id, published_at=now
+                )
+            except ProjectionPublicationError as exc:
+                raise PublicationGateRejectedError(exc.reason_codes) from exc
+            uow.audits.add(self._event(
+                actor,
+                action="PLACE_REVISION_PUBLISHED",
+                target_type="place_revision",
+                target_id=revision_id,
+                target_revision=str(revision.revision_number),
+                before_digest=before_digest,
+                after_digest=_digest(
+                    {"projection_id": published.projection_id, "status": published.status}
+                ),
+                reason_code=reason_code,
+                reason_text=reason_text,
+                request_id=request_id,
+                operation_intent_id=operation_intent_id,
+                operation_digest=operation_digest,
+            ))
+            uow.commit()
+            return published
 
     def list_decisions(
         self, principal: AdminPrincipal, *, task_id: str
@@ -530,6 +780,8 @@ def _raise_review_error(error_code: str | None) -> None:
         raise ReviewRevisionNotApprovableError
     if error_code == "review_revision_not_candidate":
         raise ReviewRevisionNotCandidateError
+    if error_code == "publication_gate_rejected":
+        raise PublicationGateRejectedError(())
     if error_code == "resource_not_found":
         raise ResourceNotFoundError
     raise ValueError("review operation was previously rejected")
