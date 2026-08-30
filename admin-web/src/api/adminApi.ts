@@ -13,6 +13,10 @@ import type {
   ReviewTaskStatus,
   PlaceRevision,
   PlaceRevisionEvidence,
+  ReviewPlaceEvidenceInput,
+  PlaceGeometryInput,
+  PlaceAccessPointInput,
+  RetirePlaceEvidenceInput,
   PublicationCheck,
 } from './types'
 
@@ -97,6 +101,45 @@ export class AdminApi {
 
   getPlaceRevisionEvidence(revisionId: string): Promise<PlaceRevisionEvidence> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/evidence`)
+  }
+
+  createGeometry(revisionId: string, input: PlaceGeometryInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/geometries`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  updateGeometry(revisionId: string, geometryId: string, input: PlaceGeometryInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/geometries/${encodeURIComponent(geometryId)}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    })
+  }
+
+  retireGeometry(revisionId: string, geometryId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/geometries/${encodeURIComponent(geometryId)}`, {
+      method: 'DELETE', body: JSON.stringify(input),
+    })
+  }
+
+  createAccessPoint(revisionId: string, input: PlaceAccessPointInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/access-points`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  updateAccessPoint(revisionId: string, accessPointId: string, input: PlaceAccessPointInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/access-points/${encodeURIComponent(accessPointId)}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    })
+  }
+
+  retireAccessPoint(revisionId: string, accessPointId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/access-points/${encodeURIComponent(accessPointId)}`, {
+      method: 'DELETE', body: JSON.stringify(input),
+    })
+  }
+  reviewEvidence(revisionId: string, kind: string, id: string, input: ReviewPlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/evidence/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify(input) })
   }
 
   createPlaceRevision(

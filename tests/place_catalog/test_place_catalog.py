@@ -452,6 +452,45 @@ def test_repository_rejects_direct_published_inserts(tmp_path: Path) -> None:
             uow.place_catalog.add_projection(published_projection)
 
 
+def test_o04_candidate_evidence_mutations_bump_revision_version_and_reset_eligibility(
+    tmp_path: Path,
+) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'o04-write.db'}")
+    create_schema(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    candidate = replace(
+        _revision(),
+        lifecycle_status="candidate",
+        solver_eligible=True,
+        conflicts_resolved=True,
+        reviewed_at=None,
+        revision_version=1,
+    )
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        uow.place_catalog.add_place(_place())
+        uow.place_catalog.add_source_record(_source())
+        uow.place_catalog.add_revision(candidate)
+        updated = uow.place_catalog.create_access_point(
+            _access_points()[0], expected_revision_version=1
+        )
+        assert updated.revision_version == 2
+        assert updated.solver_eligible is False
+        assert updated.conflicts_resolved is False
+        with pytest.raises(ValueError, match="version conflict"):
+            uow.place_catalog.create_access_point(
+                _access_points()[1], expected_revision_version=1
+            )
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restored = uow.place_catalog.get_revision(candidate.place_revision_id)
+        assert restored is not None
+        assert restored.revision_version == 2
+        evidence = uow.place_catalog.load_revision_evidence(candidate.place_revision_id)
+        assert evidence is not None
+        assert len(evidence.access_points) == 1
+
+
 def test_alembic_0006_builds_catalog_tables_without_touching_old_revisions(
     tmp_path: Path,
 ) -> None:

@@ -369,7 +369,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0009_place_revision_review_flags"
+    assert revision == "0010_place_revision_version"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -582,6 +582,136 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     )
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "resource_not_found"
+
+
+def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-review-evidence")
+    with context.sessions() as session:
+        session.add(
+            PlaceGeometryRow(
+                geometry_id="geometry-review",
+                place_revision_id="revision-review-evidence",
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.15, 30.25]},
+                source_record_id="source-review",
+                review_status="candidate",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
+        session.commit()
+
+    _, root_headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    payload = {
+        "operation_intent_id": "review-geometry-1",
+        "review_status": "human_verified",
+        "reason_code": "EVIDENCE_APPROVED",
+    }
+    path = (
+        "/api/v1/admin/place-revisions/revision-review-evidence/"
+        "evidence/geometry/geometry-review/review"
+    )
+    before_submit = context.client.post(path, headers=root_headers, json=payload)
+    assert before_submit.status_code == 404
+    assert before_submit.json()["error"]["code"] == "review_task_not_found"
+    submitted = context.client.post(
+        "/api/v1/admin/place-revisions/revision-review-evidence/review-tasks",
+        headers=root_headers,
+        json={
+            "operation_intent_id": "submit-review-evidence",
+            "reason_code": "READY_FOR_REVIEW",
+        },
+    )
+    assert submitted.status_code == 201
+    premature_revision_approval = context.client.post(
+        f"/api/v1/admin/review-tasks/{submitted.json()['review_task_id']}/decisions",
+        headers=root_headers,
+        json={
+            "operation_intent_id": "premature-approve-review-evidence",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "FACTS_VERIFIED",
+        },
+    )
+    assert premature_revision_approval.status_code == 409
+    assert premature_revision_approval.json()["error"]["code"] == (
+        "review_revision_not_approvable"
+    )
+    approved = context.client.post(path, headers=root_headers, json=payload)
+    assert approved.status_code == 200
+    replay = context.client.post(path, headers=root_headers, json=payload)
+    assert replay.status_code == 200
+    conflict = context.client.post(
+        path,
+        headers=root_headers,
+        json={**payload, "review_status": "rejected"},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
+
+    invalid_kind = context.client.post(
+        path.replace("/geometry/", "/time_rule/"),
+        headers=root_headers,
+        json=payload,
+    )
+    assert invalid_kind.status_code == 422
+
+    with context.sessions() as session:
+        geometry = session.get(PlaceGeometryRow, "geometry-review")
+        audits = tuple(
+            session.scalars(
+                select(AdminAuditEventRow).where(
+                    AdminAuditEventRow.operation_intent_id == "review-geometry-1"
+                )
+            )
+        )
+    assert geometry is not None
+    assert geometry.review_status == "human_verified"
+    assert datetime.fromisoformat(geometry.reviewed_at) == NOW
+    assert len(audits) == 1
+    assert audits[0].action == "PLACE_EVIDENCE_REVIEWED"
+    assert audits[0].before_digest != audits[0].after_digest
+
+    revision_approved = context.client.post(
+        f"/api/v1/admin/review-tasks/{submitted.json()['review_task_id']}/decisions",
+        headers=root_headers,
+        json={
+            "operation_intent_id": "approve-review-evidence-revision",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "FACTS_VERIFIED",
+        },
+    )
+    assert revision_approved.status_code == 200
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-review-evidence")
+    assert revision is not None
+    assert revision.lifecycle_status == "human_verified"
+
+    editor_payload = {
+        "operation_intent_id": "create-evidence-editor",
+        "login_name": "evidence.editor",
+        "initial_password": EDITOR_PASSWORD,
+        "role_keys": ["data_editor"],
+        "reason_code": "OM1_TEAM_PROVISIONING",
+    }
+    assert context.client.post(
+        "/api/v1/admin/admin-actors",
+        headers=root_headers,
+        json=editor_payload,
+    ).status_code == 201
+    _, editor_headers = _login(context.client, "evidence.editor", EDITOR_PASSWORD)
+    forbidden = context.client.post(
+        path,
+        headers=editor_headers,
+        json={**payload, "operation_intent_id": "editor-review-attempt"},
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["error"]["code"] == "admin_permission_denied"
 
 
 def test_revision_evidence_is_revision_scoped_and_exposes_projection_endpoints(

@@ -1137,7 +1137,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、Revision evidence、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、发布门检查和 Projection 级发布入口已可调用。O04 当前只实现 Revision 级只读证据查询；几何/访问点写入与审核、O05 时间、O06 来源、O07 关系子资源和独立 research snapshot/批次发布仍属于后续切片。
+当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、Revision evidence、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、O04 几何/访问点写入与逐项审核、发布门检查和 Projection 级发布入口已可调用。O05 时间、O06 来源、O07 关系子资源和独立 research snapshot/批次发布仍属于后续切片。
 
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
@@ -1151,6 +1151,34 @@ Place 的来源记录；几何/访问点引用的来源也会纳入结果。`mis
 同一创建时间按 `projection_id` 做稳定排序；没有 Projection 时返回 `null`。`geometries[]`
 和 `access_points[]` 的 `source_record_valid` 逐行标识其来源是否为当前 Place 的
 active 来源记录；错绑或缺失来源必须显示为 `false`，不能只依赖顶部汇总警告。
+
+O04 几何与访问点写入（仅 candidate Revision）使用以下 Revision-scoped 端点：
+
+| 方法与路径 | 最小角色 | 语义 |
+|---|---|---|
+| `POST /api/v1/admin/place-revisions/{revision_id}/geometries` | data_editor | 新增 candidate Geometry |
+| `PATCH /api/v1/admin/place-revisions/{revision_id}/geometries/{geometry_id}` | data_editor | 编辑 Geometry 并回到 candidate review status |
+| `DELETE /api/v1/admin/place-revisions/{revision_id}/geometries/{geometry_id}` | data_editor | 软停用 Geometry，不物理删除 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/access-points` | data_editor | 新增 candidate AccessPoint |
+| `PATCH /api/v1/admin/place-revisions/{revision_id}/access-points/{access_point_id}` | data_editor | 编辑 AccessPoint 并回到 candidate review status |
+| `DELETE /api/v1/admin/place-revisions/{revision_id}/access-points/{access_point_id}` | data_editor | 软停用 AccessPoint，不物理删除 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review` | data_reviewer | 对 active Geometry/AccessPoint 逐项通过或驳回 |
+
+所有写入请求必须携带 `expected_revision_version`、`operation_intent_id`、稳定大写
+`reason_code` 和可选非敏感 `reason_text`。服务端在同一事务中校验 Revision 仍为
+`candidate`，原子递增 `revision_version`，重置 `solver_eligible=false`、
+`conflicts_resolved=false`、`reviewed_at=null`，并追加管理审计；版本不匹配返回
+`409 place_revision_version_conflict`。重复 intent 可安全重放，不同载荷返回
+`409 admin_operation_intent_conflict`。Geometry/AccessPoint 变更不会自动进入
+`human_verified`，必须重新送审并由 reviewer 决定；published Revision 始终只读。
+
+逐项审核请求使用 `review_status=human_verified|rejected`，并携带
+`operation_intent_id`、`reason_code` 和可选 `reason_text`。只有
+`place:review:decide` 权限可以执行，且只允许处理 candidate Revision 下仍 active
+的 Geometry/AccessPoint，并要求该 Revision 已存在开放的 review task。通过时写入
+`reviewed_at`，驳回时清空该时间；审核操作不替代 Revision 级 review task。Revision
+级 approve 会检查全部 active Geometry/AccessPoint 均为 `human_verified`，否则以
+`review_revision_not_approvable` 拒绝，不能跳过逐项核验直接进入 `human_verified`。
 
 ### 15.3 管理写入通用字段
 

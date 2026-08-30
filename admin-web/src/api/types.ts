@@ -118,6 +118,7 @@ export type PlaceRevision = {
   place_revision_id: string
   place_id: string
   revision_number: number
+  revision_version: number
   lifecycle_status: 'candidate' | 'human_verified' | 'published' | 'retired'
   canonical_name: string
   aliases: string[]
@@ -159,6 +160,37 @@ export type PlaceRevisionEvidence = {
   projection: PlaceProjectionEvidence | null
   missing_source_record_ids: string[]
 }
+
+export type PlaceGeometryInput = {
+  expected_revision_version: number
+  geometry_kind: string
+  geometry: Record<string, unknown>
+  source_record_id: string
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
+export type PlaceAccessPointInput = {
+  expected_revision_version: number
+  access_point_kind: string
+  name: string
+  lat: number
+  lng: number
+  source_record_id: string
+  fetched_at?: string | null
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
+export type RetirePlaceEvidenceInput = {
+  expected_revision_version: number
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+export type ReviewPlaceEvidenceInput = { review_status: 'human_verified' | 'rejected'; operation_intent_id: string; reason_code: string; reason_text?: string }
 
 export type PlaceEvidenceSource = {
   source_record_id: string

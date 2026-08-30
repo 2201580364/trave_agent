@@ -102,4 +102,30 @@ describe('AdminApi', () => {
     expect(fetchMock.mock.calls[1][0]).toContain('/review-tasks/task-1/decisions')
     expect(fetchMock.mock.calls[1][1]?.method).toBeUndefined()
   })
+
+  it('submits reviewer evidence decisions to the revision-scoped endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ place_revision_id: 'revision-1' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const api = new AdminApi(() => 'reviewer-token', vi.fn())
+
+    await api.reviewEvidence('revision-1', 'geometry', 'geometry-1', {
+      review_status: 'human_verified',
+      operation_intent_id: 'evidence-review-1',
+      reason_code: 'EVIDENCE_APPROVED',
+    })
+
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      '/place-revisions/revision-1/evidence/geometry/geometry-1/review',
+    )
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      review_status: 'human_verified',
+      operation_intent_id: 'evidence-review-1',
+      reason_code: 'EVIDENCE_APPROVED',
+    })
+  })
 })

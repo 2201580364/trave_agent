@@ -76,6 +76,14 @@ class ReviewRevisionNotCandidateError(ApplicationError):
         )
 
 
+class PlaceRevisionVersionConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "place_revision_version_conflict",
+            "Revision 已被其他操作更新，请刷新后重试。",
+        )
+
+
 class PublicationGateRejectedError(ApplicationError):
     """A revision/projection failed the stable publication gate."""
 

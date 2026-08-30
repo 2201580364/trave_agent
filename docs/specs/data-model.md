@@ -786,7 +786,7 @@ degradations
   → 独立管理员身份、角色、会话摘要、服务端 RBAC 版本和追加式业务审计
 ```
 
-以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再依次执行 0003、0004、0005、0006、0007、0008、0009，并确认 readiness 的 `expected_revision/current_revision` 都是 `0009_place_revision_review_flags`。R0.2-05-02 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
+以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再依次执行 0003、0004、0005、0006、0007、0008、0009、0010，并确认 readiness 的 `expected_revision/current_revision` 都是 `0010_place_revision_version`。R0.2-05-02 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
 
 每次迁移必须：
 
@@ -897,7 +897,7 @@ And 不生成 published research snapshot
 
 ## 16. OM1 管理端数据模型（身份与审计底座已实现）
 
-本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；`0009_place_revision_review_flags` 已追加实现候选 Revision 数据质量/审核标记；16.3 发布批次仍待 R0.2-07 通过新迁移追加。0001–0008 未被改写。
+本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；`0009_place_revision_review_flags` 已追加实现候选 Revision 数据质量/审核标记；`0010_place_revision_version` 已追加 Revision 子资源写入所需的乐观锁版本；16.3 发布批次仍待 R0.2-07 通过新迁移追加。0001–0009 未被改写。
 
 ### 16.1 管理身份
 

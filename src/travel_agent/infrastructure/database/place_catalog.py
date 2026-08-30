@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     or_,
     select,
+    update,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -85,15 +86,14 @@ class PlaceSourceRecordRow(Base):
 class PlaceRevisionRow(Base):
     __tablename__ = "place_revisions"
     __table_args__ = (
-        UniqueConstraint(
-            "place_id", "revision_number", name="uq_place_revisions_place_number"
-        ),
+        UniqueConstraint("place_id", "revision_number", name="uq_place_revisions_place_number"),
         MYSQL_TABLE_ARGS,
     )
 
     place_revision_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     place_id: Mapped[str] = mapped_column(ForeignKey("places.place_id"), index=True)
     revision_number: Mapped[int] = mapped_column(Integer)
+    revision_version: Mapped[int] = mapped_column(Integer, default=1, index=True)
     lifecycle_status: Mapped[str] = mapped_column(String(24), index=True)
     canonical_name: Mapped[str] = mapped_column(String(160), index=True)
     aliases: Mapped[list[str]] = mapped_column(JSON)
@@ -186,9 +186,7 @@ class PlaceTimeRuleRow(Base):
 class PlaceClosureRow(Base):
     __tablename__ = "place_closures"
     __table_args__ = (
-        UniqueConstraint(
-            "place_revision_id", "weekday", name="uq_place_closures_revision_weekday"
-        ),
+        UniqueConstraint("place_revision_id", "weekday", name="uq_place_closures_revision_weekday"),
         MYSQL_TABLE_ARGS,
     )
 
@@ -249,9 +247,7 @@ class PlaceRelationRow(Base):
     )
 
     relation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    from_place_id: Mapped[str] = mapped_column(
-        ForeignKey("places.place_id"), index=True
-    )
+    from_place_id: Mapped[str] = mapped_column(ForeignKey("places.place_id"), index=True)
     to_place_id: Mapped[str] = mapped_column(ForeignKey("places.place_id"), index=True)
     relation_type: Mapped[str] = mapped_column(String(24), index=True)
     source_record_id: Mapped[str] = mapped_column(
@@ -375,6 +371,184 @@ class SqlAlchemyPlaceCatalogRepository:
             "access point already exists",
         )
 
+    def create_geometry(
+        self,
+        geometry: PlaceGeometry,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(geometry.place_revision_id, expected_revision_version)
+        self.add_geometry(geometry)
+        revision = self.get_revision(geometry.place_revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def create_access_point(
+        self,
+        access_point: PlaceAccessPoint,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(access_point.place_revision_id, expected_revision_version)
+        self.add_access_point(access_point)
+        revision = self.get_revision(access_point.place_revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def update_geometry(
+        self,
+        geometry: PlaceGeometry,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(geometry.place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceGeometryRow)
+            .where(
+                PlaceGeometryRow.geometry_id == geometry.geometry_id,
+                PlaceGeometryRow.place_revision_id == geometry.place_revision_id,
+            )
+            .values(**_geometry_values(geometry))
+        )
+        if result.rowcount != 1:
+            raise ValueError("geometry not found")
+        revision = self.get_revision(geometry.place_revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def update_access_point(
+        self,
+        access_point: PlaceAccessPoint,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(access_point.place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceAccessPointRow)
+            .where(
+                PlaceAccessPointRow.access_point_id == access_point.access_point_id,
+                PlaceAccessPointRow.place_revision_id == access_point.place_revision_id,
+            )
+            .values(**_access_point_values(access_point))
+        )
+        if result.rowcount != 1:
+            raise ValueError("access point not found")
+        revision = self.get_revision(access_point.place_revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def retire_geometry(
+        self,
+        geometry_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceGeometryRow)
+            .where(
+                PlaceGeometryRow.geometry_id == geometry_id,
+                PlaceGeometryRow.place_revision_id == place_revision_id,
+            )
+            .values(active=False, review_status="rejected", reviewed_at=None)
+        )
+        if result.rowcount != 1:
+            raise ValueError("geometry not found")
+        revision = self.get_revision(place_revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def retire_access_point(
+        self,
+        access_point_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        self._bump_revision(place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceAccessPointRow)
+            .where(
+                PlaceAccessPointRow.access_point_id == access_point_id,
+                PlaceAccessPointRow.place_revision_id == place_revision_id,
+            )
+            .values(active=False, review_status="rejected", reviewed_at=None)
+        )
+        if result.rowcount != 1:
+            raise ValueError("access point not found")
+        revision = self.get_revision(place_revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def review_evidence(
+        self,
+        *,
+        revision_id: str,
+        evidence_kind: str,
+        evidence_id: str,
+        review_status: str,
+        reviewed_at: datetime,
+    ) -> PlaceRevision:
+        table = (
+            PlaceGeometryRow
+            if evidence_kind == "geometry"
+            else PlaceAccessPointRow
+            if evidence_kind == "access_point"
+            else None
+        )
+        key = (
+            table.geometry_id
+            if evidence_kind == "geometry"
+            else table.access_point_id
+            if table is not None
+            else None
+        )
+        if table is None or key is None or review_status not in {"human_verified", "rejected"}:
+            raise ValueError("invalid evidence review")
+        result = self._session.execute(
+            update(table)
+            .where(
+                key == evidence_id,
+                table.place_revision_id == revision_id,
+                table.active.is_(True),
+            )
+            .values(
+                review_status=review_status,
+                reviewed_at=reviewed_at if review_status == "human_verified" else None,
+            )
+        )
+        if result.rowcount != 1:
+            raise ValueError("evidence not found")
+        revision = self.get_revision(revision_id)
+        if revision is None:
+            raise ValueError("place revision not found")
+        return revision
+
+    def _bump_revision(self, revision_id: str, expected_revision_version: int) -> None:
+        result = self._session.execute(
+            update(PlaceRevisionRow)
+            .where(
+                PlaceRevisionRow.place_revision_id == revision_id,
+                PlaceRevisionRow.revision_version == expected_revision_version,
+                PlaceRevisionRow.lifecycle_status == "candidate",
+            )
+            .values(
+                revision_version=PlaceRevisionRow.revision_version + 1,
+                solver_eligible=False,
+                conflicts_resolved=False,
+                reviewed_at=None,
+            )
+        )
+        if result.rowcount != 1:
+            raise ValueError("candidate revision version conflict")
+
     def add_time_rule(self, rule: PlaceTimeRule) -> None:
         self._add(PlaceTimeRuleRow(**_time_rule_values(rule)), "time rule already exists")
 
@@ -422,20 +596,15 @@ class SqlAlchemyPlaceCatalogRepository:
         row = self._session.get(SolverPlaceProjectionRow, projection_id)
         return _projection_from_row(row) if row is not None else None
 
-    def get_projection_for_revision(
-        self, place_revision_id: str
-    ) -> SolverPlaceProjection | None:
+    def get_projection_for_revision(self, place_revision_id: str) -> SolverPlaceProjection | None:
         row = self._session.scalar(
             select(SolverPlaceProjectionRow)
             .join(
                 PlaceRevisionRow,
-                PlaceRevisionRow.place_revision_id
-                == SolverPlaceProjectionRow.place_revision_id,
+                PlaceRevisionRow.place_revision_id == SolverPlaceProjectionRow.place_revision_id,
             )
             .where(SolverPlaceProjectionRow.place_revision_id == place_revision_id)
-            .where(
-                SolverPlaceProjectionRow.place_id == PlaceRevisionRow.place_id
-            )
+            .where(SolverPlaceProjectionRow.place_id == PlaceRevisionRow.place_id)
             .order_by(
                 SolverPlaceProjectionRow.created_at.desc(),
                 SolverPlaceProjectionRow.projection_id.desc(),
@@ -444,9 +613,7 @@ class SqlAlchemyPlaceCatalogRepository:
         )
         return _projection_from_row(row) if row is not None else None
 
-    def load_revision_evidence(
-        self, place_revision_id: str
-    ) -> PlaceRevisionEvidence | None:
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None:
         """Load O04 evidence without requiring a prepared Projection."""
 
         revision_row = self._session.get(PlaceRevisionRow, place_revision_id)
@@ -492,9 +659,7 @@ class SqlAlchemyPlaceCatalogRepository:
             if referenced_source_ids
             else ()
         )
-        source_by_id = {
-            row.source_record_id: _source_record_from_row(row) for row in source_rows
-        }
+        source_by_id = {row.source_record_id: _source_record_from_row(row) for row in source_rows}
         source_records = tuple(
             source_by_id[source_id]
             for source_id in referenced_source_ids
@@ -507,21 +672,15 @@ class SqlAlchemyPlaceCatalogRepository:
             access_points=access_points,
             projection=self.get_projection_for_revision(place_revision_id),
             missing_source_record_ids=tuple(
-                source_id
-                for source_id in referenced_source_ids
-                if source_id not in source_by_id
+                source_id for source_id in referenced_source_ids if source_id not in source_by_id
             ),
         )
 
-    def load_publication_context(
-        self, projection_id: str
-    ) -> ProjectionPublicationContext | None:
+    def load_publication_context(self, projection_id: str) -> ProjectionPublicationContext | None:
         projection_row = self._session.get(SolverPlaceProjectionRow, projection_id)
         if projection_row is None:
             return None
-        revision_row = self._session.get(
-            PlaceRevisionRow, projection_row.place_revision_id
-        )
+        revision_row = self._session.get(PlaceRevisionRow, projection_row.place_revision_id)
         place_row = self._session.get(PlaceRow, projection_row.place_id)
         if revision_row is None or place_row is None:
             return None
@@ -536,24 +695,21 @@ class SqlAlchemyPlaceCatalogRepository:
         geometry_rows = tuple(
             self._session.scalars(
                 select(PlaceGeometryRow).where(
-                    PlaceGeometryRow.place_revision_id
-                    == revision_row.place_revision_id
+                    PlaceGeometryRow.place_revision_id == revision_row.place_revision_id
                 )
             )
         )
         access_rows = tuple(
             self._session.scalars(
                 select(PlaceAccessPointRow).where(
-                    PlaceAccessPointRow.place_revision_id
-                    == revision_row.place_revision_id
+                    PlaceAccessPointRow.place_revision_id == revision_row.place_revision_id
                 )
             )
         )
         time_rule_rows = tuple(
             self._session.scalars(
                 select(PlaceTimeRuleRow).where(
-                    PlaceTimeRuleRow.place_revision_id
-                    == revision_row.place_revision_id
+                    PlaceTimeRuleRow.place_revision_id == revision_row.place_revision_id
                 )
             )
         )
@@ -581,11 +737,7 @@ class SqlAlchemyPlaceCatalogRepository:
             tuple(
                 self._session.scalars(
                     select(PlaceSourceRecordRow)
-                    .where(
-                        PlaceSourceRecordRow.source_record_id.in_(
-                            referenced_source_ids
-                        )
-                    )
+                    .where(PlaceSourceRecordRow.source_record_id.in_(referenced_source_ids))
                     .order_by(
                         PlaceSourceRecordRow.created_at,
                         PlaceSourceRecordRow.source_record_id,
@@ -708,6 +860,7 @@ def _revision_values(value: PlaceRevision) -> dict[str, Any]:
         "place_revision_id": value.place_revision_id,
         "place_id": value.place_id,
         "revision_number": value.revision_number,
+        "revision_version": value.revision_version,
         "lifecycle_status": value.lifecycle_status,
         "canonical_name": value.canonical_name,
         "aliases": list(value.aliases),
@@ -766,6 +919,7 @@ def _revision_from_row(row: PlaceRevisionRow) -> PlaceRevision:
         datetime.fromisoformat(row.reviewed_at) if row.reviewed_at else None,
         datetime.fromisoformat(row.published_at) if row.published_at else None,
         tuple(row.review_flags or ()),
+        row.revision_version,
     )
 
 

@@ -9,12 +9,12 @@ import {
   SendOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Space, Table, Tag, Typography, message } from 'antd'
+import { Alert, App as AntApp, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Space, Table, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceGeometryEvidence, PlaceRevision, PlaceRevisionEvidence } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 
@@ -46,7 +46,8 @@ const reviewFlagLabels: Record<string, string> = {
 }
 
 export function RevisionDetailsPage() {
-  const { api } = useAdminSession()
+  const { api, hasPermission } = useAdminSession()
+  const { message: messageApi } = AntApp.useApp()
   const navigate = useNavigate()
   const { revisionId } = useParams<{ revisionId: string }>()
   const [revision, setRevision] = useState<PlaceRevision | null>(null)
@@ -112,7 +113,7 @@ export function RevisionDetailsPage() {
         operation_intent_id: `revision-create-${crypto.randomUUID()}`,
         reason_code: 'PLACE_FACTS_REFRESH',
       })
-      message.success(`已创建 Revision ${created.revision_number}`)
+      messageApi.success(`已创建 Revision ${created.revision_number}`)
       navigate(`/candidates/${encodeURIComponent(created.place_revision_id)}`)
     } catch (reason) {
       setError(adminErrorMessage(reason))
@@ -134,7 +135,7 @@ export function RevisionDetailsPage() {
       })
       setRevision(updated)
       setEditOpen(false)
-      message.success('Revision 已保存，需重新送审')
+      messageApi.success('Revision 已保存，需重新送审')
     } catch (reason) {
       if (!isFormValidationError(reason)) setError(adminErrorMessage(reason))
     } finally {
@@ -151,7 +152,7 @@ export function RevisionDetailsPage() {
         reason_code: 'READY_FOR_REVIEW',
       })
       await load()
-      message.success('已送入审核队列')
+      messageApi.success('已送入审核队列')
     } catch (reason) {
       setError(adminErrorMessage(reason))
     } finally {
@@ -172,7 +173,7 @@ export function RevisionDetailsPage() {
         operation_intent_id: `revision-publish-${crypto.randomUUID()}`,
         reason_code: 'PUBLISH_GATE_PASSED',
       })
-      message.success('新快照已发布')
+      messageApi.success('新快照已发布')
       await load()
     } catch (reason) {
       setError(adminErrorMessage(reason))
@@ -194,22 +195,30 @@ export function RevisionDetailsPage() {
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/candidates')}>
             返回候选地点
           </Button>
-          {revision && revision.lifecycle_status === 'candidate' && (
+          {revision && revision.lifecycle_status === 'candidate' &&
+            (hasPermission('place:candidate:write') ||
+              hasPermission('place:review:request')) && (
             <Space.Compact>
-              <Button icon={<EditOutlined />} onClick={() => { form.setFieldsValue({ canonical_name: revision.canonical_name, address: revision.address, duration_recommended: revision.duration_recommended }); setEditOpen(true) }}>
-                编辑候选
-              </Button>
-              <Button icon={<SendOutlined />} onClick={() => void submitReview()} loading={working}>
-                送审
-              </Button>
+              {hasPermission('place:candidate:write') && (
+                <Button icon={<EditOutlined />} onClick={() => { form.setFieldsValue({ canonical_name: revision.canonical_name, address: revision.address, duration_recommended: revision.duration_recommended }); setEditOpen(true) }}>
+                  编辑候选
+                </Button>
+              )}
+              {hasPermission('place:review:request') && (
+                <Button icon={<SendOutlined />} onClick={() => void submitReview()} loading={working}>
+                  送审
+                </Button>
+              )}
             </Space.Compact>
           )}
-          {revision && revision.lifecycle_status === 'human_verified' && (
+          {revision && revision.lifecycle_status === 'human_verified' &&
+            hasPermission('place:publication:write') && (
             <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => void publish()} loading={working}>
               发布新快照
             </Button>
           )}
-          {revision && revision.lifecycle_status !== 'candidate' && (
+          {revision && revision.lifecycle_status !== 'candidate' &&
+            hasPermission('place:candidate:write') && (
             <Button icon={<PlusOutlined />} onClick={() => void createRevision()} loading={working}>
               新建修订
             </Button>
@@ -294,7 +303,18 @@ export function RevisionDetailsPage() {
             </Descriptions>
           </Card>
 
-          <EvidenceCard evidence={evidence} loading={evidenceLoading} error={evidenceError} />
+          <EvidenceCard
+            api={api}
+            evidence={evidence}
+            loading={evidenceLoading}
+            error={evidenceError}
+            revision={revision}
+            canEdit={hasPermission('place:candidate:write')}
+            canReview={hasPermission('place:review:decide')}
+            onSuccess={(text) => messageApi.success(text)}
+            onChanged={load}
+            onError={setError}
+          />
 
           <Card title="发布阻断摘要">
             {blockers.length === 0 ? (
@@ -328,14 +348,59 @@ export function RevisionDetailsPage() {
 }
 
 function EvidenceCard({
+  api,
   evidence,
   loading,
   error,
+  revision,
+  canEdit,
+  canReview,
+  onSuccess,
+  onChanged,
+  onError,
 }: {
+  api: ReturnType<typeof useAdminSession>['api']
   evidence: PlaceRevisionEvidence | null
   loading: boolean
   error: string | null
+  revision: PlaceRevision
+  canEdit: boolean
+  canReview: boolean
+  onSuccess: (text: string) => void
+  onChanged: () => Promise<void>
+  onError: (message: string) => void
 }) {
+  const editable = revision.lifecycle_status === 'candidate' && canEdit
+  const reviewable = revision.lifecycle_status === 'candidate' && canReview
+  const [modal, setModal] = useState<'geometry' | 'access' | null>(null)
+  const [editing, setEditing] = useState<PlaceGeometryEvidence | PlaceAccessPointEvidence | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm()
+  const openGeometry = (item?: PlaceGeometryEvidence) => { setEditing(item ?? null); form.setFieldsValue(item ? { geometry_kind: item.geometry_kind, geometry: JSON.stringify(item.geometry), source_record_id: item.source_record_id } : { geometry_kind: revision.geometry_kind }); setModal('geometry') }
+  const openAccess = (item?: PlaceAccessPointEvidence) => { setEditing(item ?? null); form.setFieldsValue(item ? item : {}); setModal('access') }
+  const saveEvidence = async () => {
+    setSaving(true)
+    try {
+      const values = await form.validateFields()
+      const base = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-${crypto.randomUUID()}`, reason_code: editing ? 'EVIDENCE_UPDATED' : 'EVIDENCE_CREATED' }
+      if (modal === 'geometry') {
+        const input: PlaceGeometryInput = { ...base, geometry_kind: values.geometry_kind, geometry: JSON.parse(values.geometry), source_record_id: values.source_record_id }
+        if (editing) await api.updateGeometry(revision.place_revision_id, (editing as PlaceGeometryEvidence).geometry_id, input); else await api.createGeometry(revision.place_revision_id, input)
+      } else {
+        const input: PlaceAccessPointInput = { ...base, access_point_kind: values.access_point_kind, name: values.name, lat: values.lat, lng: values.lng, source_record_id: values.source_record_id }
+        if (editing) await api.updateAccessPoint(revision.place_revision_id, (editing as PlaceAccessPointEvidence).access_point_id, input); else await api.createAccessPoint(revision.place_revision_id, input)
+      }
+      setModal(null); await onChanged(); onSuccess('证据已保存，Revision 需重新送审')
+    } catch (reason) { if (!isFormValidationError(reason)) onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+  }
+  const review = async (kind: 'geometry' | 'access_point', id: string, status: 'human_verified' | 'rejected') => {
+    setSaving(true)
+    try { await api.reviewEvidence(revision.place_revision_id, kind, id, { review_status: status, operation_intent_id: `evidence-review-${crypto.randomUUID()}`, reason_code: status === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED' }); await onChanged(); onSuccess(status === 'human_verified' ? '证据已通过核验' : '证据已驳回') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+  }
+  const retire = async (kind: 'geometry' | 'access', id: string) => {
+    setSaving(true)
+    try { const input = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-retire-${crypto.randomUUID()}`, reason_code: 'EVIDENCE_RETIRED' }; if (kind === 'geometry') await api.retireGeometry(revision.place_revision_id, id, input); else await api.retireAccessPoint(revision.place_revision_id, id, input); await onChanged(); onSuccess('证据已停用，Revision 需重新送审') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+  }
   if (loading) return <Card title="地图、几何与访问点（O04）" loading />
   if (error !== null) {
     return (
@@ -389,9 +454,7 @@ function EvidenceCard({
           />
         )}
 
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          几何证据
-        </Typography.Title>
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}><Typography.Title level={5} style={{ margin: 0 }}>几何证据</Typography.Title>{editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openGeometry()}>新增</Button>}</Space>
         <Table<PlaceGeometryEvidence>
           rowKey="geometry_id"
           size="small"
@@ -439,16 +502,15 @@ function EvidenceCard({
             {
               title: '核验时间',
               dataIndex: 'reviewed_at',
-              width: 190,
+              width: 260,
               render: (value: string | null) => formatOptionalDateTime(value),
             },
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', render: (_: unknown, item: PlaceGeometryEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openGeometry(item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('geometry', item.geometry_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('geometry', item.geometry_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('geometry', item.geometry_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '当前没有几何证据' }}
         />
 
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          访问点证据
-        </Typography.Title>
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}><Typography.Title level={5} style={{ margin: 0 }}>访问点证据</Typography.Title>{editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openAccess()}>新增</Button>}</Space>
         <Table<PlaceAccessPointEvidence>
           rowKey="access_point_id"
           size="small"
@@ -463,6 +525,7 @@ function EvidenceCard({
               width: 150,
               render: (value: string) => accessPointKindLabel(value),
             },
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', render: (_: unknown, item: PlaceAccessPointEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openAccess(item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('access', item.access_point_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('access_point', item.access_point_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('access_point', item.access_point_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
             {
               title: '坐标',
               key: 'coordinate',
@@ -515,6 +578,11 @@ function EvidenceCard({
           />
         )}
       </Space>
+      <Modal title={modal === 'geometry' ? '几何证据' : '访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => setModal(null)} confirmLoading={saving} destroyOnHidden>
+        <Form form={form} layout="vertical">
+          {modal === 'geometry' ? <><Form.Item name="geometry_kind" label="几何类型" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="geometry" label="GeoJSON" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item><Form.Item name="source_record_id" label="来源记录 ID" rules={[{ required: true }]}><Input /></Form.Item></> : <><Form.Item name="access_point_kind" label="用途" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="lat" label="纬度" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item><Form.Item name="lng" label="经度" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item><Form.Item name="source_record_id" label="来源记录 ID" rules={[{ required: true }]}><Input /></Form.Item></>}
+        </Form>
+      </Modal>
     </Card>
   )
 }

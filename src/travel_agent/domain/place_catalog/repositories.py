@@ -29,6 +29,53 @@ class PlaceCatalogRepository(Protocol):
     def add_revision(self, revision: PlaceRevision) -> None: ...
     def add_geometry(self, geometry: PlaceGeometry) -> None: ...
     def add_access_point(self, access_point: PlaceAccessPoint) -> None: ...
+    def create_geometry(
+        self,
+        geometry: PlaceGeometry,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def create_access_point(
+        self,
+        access_point: PlaceAccessPoint,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def update_geometry(
+        self,
+        geometry: PlaceGeometry,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def update_access_point(
+        self,
+        access_point: PlaceAccessPoint,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def retire_geometry(
+        self,
+        geometry_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def retire_access_point(
+        self,
+        access_point_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+    def review_evidence(
+        self,
+        *,
+        revision_id: str,
+        evidence_kind: str,
+        evidence_id: str,
+        review_status: str,
+        reviewed_at: datetime,
+    ) -> PlaceRevision: ...
     def add_time_rule(self, rule: PlaceTimeRule) -> None: ...
     def add_closure(self, closure: PlaceClosure) -> None: ...
     def add_date_exception(self, exception: PlaceDateException) -> None: ...

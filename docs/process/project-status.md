@@ -8,7 +8,7 @@
 
 ### 2026-08-30 续接进度（Revision 版本化发布闭环补证）
 
-`G7-R0.2-05-02` 正在实施：审核工作流、Revision 版本化编辑与 Projection 级发布入口已经落地。独立 `admin-web` 已接入 O08 审核队列首版、O02 候选地点清单首版、O03 Revision 详情首版和 O04 几何/访问点只读证据首版，可查看任务/决定历史、候选 Revision 基础事实、Revision 绑定证据并执行送审、审核和发布操作；本轮完成了 Revision 版本化业务闭环验收：基线 Revision 进入 `human_verified`，新 Revision 经管理端新建、修改、重新送审、审核通过、publication check 后发布为新的 Projection，基线保持不变。Revision 3 已从已核验基线详情页点击“新建修订”开始，并由 Chrome 完成全路径操作。O01 待办摘要、O04 几何/访问点写入与审核、O05–O07 的时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0009_place_revision_review_flags`，服务器 MySQL/Redis 未连接。
+`G7-R0.2-05-02` 正在实施：审核工作流、Revision 版本化编辑与 Projection 级发布入口已经落地。独立 `admin-web` 已接入 O08 审核队列首版、O02 候选地点清单首版、O03 Revision 详情首版和 O04 几何/访问点只读证据首版，可查看任务/决定历史、候选 Revision 基础事实、Revision 绑定证据并执行送审、审核和发布操作；本轮完成了 Revision 版本化业务闭环验收：基线 Revision 进入 `human_verified`，新 Revision 经管理端新建、修改、重新送审、审核通过、publication check 后发布为新的 Projection，基线保持不变。Revision 3 已从已核验基线详情页点击“新建修订”开始，并由 Chrome 完成全路径操作。O01 待办摘要、O04 几何/访问点写入与审核、O05–O07 的时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
 
 本轮 O04 只读证据收口（2026-08-30）：发布上下文现在会收集 Revision、Geometry、AccessPoint 和 TimeRule 的完整来源依赖闭包，并校验来源与当前 Place 的归属；跨 Place 的 active 来源稳定返回 `SOURCE_RECORD_PLACE_MISMATCH`，缺失或 inactive 来源仍返回 `MISSING_SOURCE_RECORD`。证据接口只返回当前 Place 的来源摘要，几何和访问点逐行提供 `source_record_valid`，Projection 按当前 Revision/Place 过滤并以 `projection_id` 稳定排序。来源 URL 已覆盖用户信息、fragment、credential-like 查询参数、非法端口和 IPv6 方括号边界。O03 Revision 基础详情与 O04 Evidence 已独立加载，Evidence 暂时不可用时不会清空基础事实或审核操作。Google Chrome 管理会话和 O04 页面已完成可视化复核，控制台新增 warn/error 为 0。
 
@@ -32,7 +32,7 @@
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
 - 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
 - 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。当前已形成 candidate→送审→驳回/通过闭环、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、O04 只读证据首版和候选清单前后端分页；72 条数据均保持 `candidate` 且 `solver_eligible=false`，不通过 SQL 手工改状态，未审核依赖仍阻断发布。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、O04 只读证据首版、候选分页以及 Revision→重新审核→Projection 发布的业务闭环，并已补齐从 Chrome“新建修订”按钮开始的完整验收证据；本轮又完成跨 Place 来源发布门禁、逐行来源有效性、URL 安全边界和 O03/O04 独立降级。当前仍缺 O01、O04 几何/访问点写入与审核、O05–O07 证据面、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、O04 只读证据首版、候选分页以及 Revision→重新审核→Projection 发布的业务闭环，并已补齐从 Chrome“新建修订”按钮开始的完整验收证据；本轮又完成跨 Place 来源发布门禁、逐行来源有效性、URL 安全边界和 O03/O04 独立降级，并开始补充 O04 写入所需的 Revision 乐观锁和候选子资源 API。当前仍缺 O01、O04 写入/审核闭环、O05–O07 证据面、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -77,7 +77,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | Gate 7 R0.2-05-01B 管理 Web 壳与安全操作面 | 完成 | ADR-0020 独立 `admin-web/`、O00 登录/超时、O16 管理员与角色、最小 O15 审计只读；token 仅存 React 内存；`npm run typecheck/test/build` 通过，全量 pytest 通过 |
 | Gate 7 R0.2-05-02 地点审核工作台 P0 | 进行中 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情首版、O04 只读证据首版、跨 Place 来源发布门禁、Revision 版本化发布闭环和完整 Chrome 验收报告；O01、O04 写入/审核、O05–O07 证据面和批量审核待完成 |
 
-最新稳定技术基线：全量 pytest `349/349` 通过；本轮涉及 Python 文件 Ruff、`git diff --check`、admin-web `5/5` 测试、`tsc -b` 与 Vite 生产构建通过；R0.2-05-01A 管理身份/RBAC/审计专项、审核与候选专项通过。数据库 head/readiness 已升级为 `0009_place_revision_review_flags`。服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。全仓 Ruff 仍有 37 项历史风格债（迁移、spike 和既有测试/求解器文件），strict mypy 历史债仍未清零；本轮 O04 涉及文件无新增 Ruff 问题。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
+最新稳定技术基线：上一轮全量 pytest `349/349` 通过；本轮已完成迁移链升级到 `0010_place_revision_version`，O04 新增测试仍待补齐。数据库 head/readiness 目标为 `0010_place_revision_version`，服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。全仓 Ruff 仍有 37 项历史风格债（迁移、spike 和既有测试/求解器文件），strict mypy 历史债仍未清零；本轮已修改文件的 Ruff 仍需在实现完成后复跑。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -734,6 +734,18 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 
 ## 后续队列
 
+### 本轮更新（2026-08-30）
+
+- 当前里程碑：M1；当前 Gate：G7 / R0.2-05-02 OM1 O04 地点审核工作台。
+- 本轮完成：Revision 乐观锁迁移 `0010`；Geometry/AccessPoint candidate 新增、编辑、软停用；逐项 reviewer approve/reject；跨 Place 来源发布门禁；admin-web O04 写入与审核操作面。
+- 审核门禁：只有开放 review task 的 candidate Revision 才能逐项审核；Revision 级 approve 会检查全部 active Geometry/AccessPoint 均为 `human_verified`，不能跳过证据核验。
+- 权限边界：编辑、送审、逐项审核、新建修订和发布按钮分别按 `place:candidate:write`、`place:review:request`、`place:review:decide`、`place:candidate:write`、`place:publication:write` 显示。
+- 验证结果：完整后端测试 351/351 通过；admin-web typecheck、Vitest 6/6、production build 通过；相关 Ruff 和 `git diff --check` 通过。
+- Chrome 验收：真实完成 `candidate Revision → 送审 → Geometry 逐项通过 → 状态写回 human_verified → 审计中心出现 PLACE_EVIDENCE_REVIEWED`；再次驳回/通过后最终恢复 human_verified；无新增控制台 warn/error。
+- 当前进度：O04 Geometry/AccessPoint 写入与逐项审核闭环已完成，达到可提交状态。
+- 遗留问题：O05 时间、O06 来源、O07 关系的子资源审核，以及发布中心和批量审核仍属于后续节点；SQLite datetime adapter 警告和全仓历史 Ruff 不属于本轮阻断。
+- 下一步：提交 `feat(admin): add revision evidence editing workflow`，之后进入 O05 时间规则审核或 O01 管理首页状态收口。
+
 | 顺序 | 阶段 | 内容 | 当前状态 |
 |---|---|---|---|
 | 1 | A1 | 功能模块设计 | 已完成 |
@@ -741,7 +753,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | 3 | A3 | 核心交互流程、页面状态与异常流程 | 已完成 |
 | 3.5 | 产品功能完整性复审 | 全景需求追踪、缺口补齐与冲突登记 | 已完成 |
 | 3.6 | A2.1/A3.1 | 全路线 UI/交互边界同步 | 已完成 |
-| 3.7 | OM1–OM4 管理端产品设计 | 管理功能、页面、流程、架构、API 和逻辑数据模型 | 设计完成；身份/API/审计后端、admin-web 壳与地点审核工作台首版已实现，几何/访问点写入审核和发布中心待实现 |
+| 3.7 | OM1–OM4 管理端产品设计 | 管理功能、页面、流程、架构、API 和逻辑数据模型 | 设计完成；身份/API/审计后端、admin-web 壳与地点审核工作台首版已实现，O04 几何/访问点写入与逐项 reviewer 审核闭环已完成，发布中心待实现 |
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
 | 6 | A6 | 首个浏览器可操作纵向切片 | 已完成（100% 仅指技术纵向切片；替换、我的行程、计划分享、结构化反馈均通过 Chrome 验收） |
@@ -779,8 +791,8 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；
 - M4 自动游记、旅行档案和长期偏好仅完成产品功能骨架，尚未进入详细 PRD 或实现；
-- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计以及 O00/O15/O16、O02/O03/O04 admin-web 安全操作面已实现，O04 几何/访问点写入审核、O01/O05–O07 和发布中心仍未实现；
-- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-01B 管理 Web 安全操作面已完成，R0.2-05-02 审核工作流/版本化发布/只读证据已部分完成；杭州 50–75 个研究地点、O04 写入审核、批量 human_verified、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
+- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计以及 O00/O15/O16、O02/O03/O04 admin-web 安全操作面已实现，O04 几何/访问点 candidate 写入、编辑、软停用和逐项 reviewer approve/reject 已完成；O01/O05–O07 和发布中心仍未实现；
+- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-01B 管理 Web 安全操作面已完成；R0.2-05-02 中 O04 Geometry/AccessPoint 写入与逐项审核已完成。杭州批量 human_verified、O05–O07、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
 
 ## 每轮结束更新模板
 

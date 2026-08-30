@@ -87,13 +87,18 @@ class SqlAlchemyPlaceReviewRepository:
             raise ValueError("place revision already exists") from exc
 
     def update_revision(
-        self, revision: PlaceRevision, *, expected_revision_number: int
+        self,
+        revision: PlaceRevision,
+        *,
+        expected_revision_number: int,
+        expected_revision_version: int,
     ) -> None:
         result = self._session.execute(
             update(PlaceRevisionRow)
             .where(
                 PlaceRevisionRow.place_revision_id == revision.place_revision_id,
                 PlaceRevisionRow.revision_number == expected_revision_number,
+                PlaceRevisionRow.revision_version == expected_revision_version,
                 PlaceRevisionRow.lifecycle_status == "candidate",
             )
             .values(**_revision_values(revision))

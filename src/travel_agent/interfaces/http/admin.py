@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from travel_agent.application.admin import (
@@ -81,6 +83,7 @@ class UpdatePlaceRevisionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_revision_number: int = Field(gt=0)
+    expected_revision_version: int | None = Field(default=None, gt=0)
     operation_intent_id: str = Field(min_length=1, max_length=64)
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
@@ -107,6 +110,49 @@ class PublishPlaceRevisionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PlaceGeometryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    geometry_kind: str = Field(min_length=1, max_length=20)
+    geometry: dict[str, object]
+    source_record_id: str = Field(min_length=1, max_length=64)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PlaceAccessPointInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    access_point_kind: str = Field(min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=160)
+    lat: Decimal = Field(ge=Decimal("-90"), le=Decimal("90"))
+    lng: Decimal = Field(ge=Decimal("-180"), le=Decimal("180"))
+    source_record_id: str = Field(min_length=1, max_length=64)
+    fetched_at: datetime | None = None
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class RetirePlaceEvidenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+class ReviewPlaceEvidenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    review_status: str = Field(pattern="^(human_verified|rejected)$")
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
@@ -276,6 +322,7 @@ def build_admin_router(
             changes = payload.model_dump(
                 exclude={
                     "expected_revision_number",
+                    "expected_revision_version",
                     "operation_intent_id",
                     "reason_code",
                     "reason_text",
@@ -286,6 +333,7 @@ def build_admin_router(
                 current,
                 revision_id=revision_id,
                 expected_revision_number=payload.expected_revision_number,
+                expected_revision_version=payload.expected_revision_version,
                 changes=changes,
                 operation_intent_id=payload.operation_intent_id,
                 reason_code=payload.reason_code,
@@ -315,6 +363,162 @@ def build_admin_router(
                 current, revision_id=revision_id
             )
             return _revision_evidence_response(evidence)
+
+        @router.post("/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review")
+        def review_place_evidence(
+            revision_id: str,
+            evidence_kind: Annotated[
+                str, Path(pattern="^(geometry|access_point)$")
+            ],
+            evidence_id: str,
+            payload: ReviewPlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.review_evidence(
+                current, revision_id=revision_id, evidence_kind=evidence_kind,
+                evidence_id=evidence_id, review_status=payload.review_status,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code, reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/geometries")
+        def create_place_geometry(
+            revision_id: str,
+            payload: PlaceGeometryInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_geometry(
+                current,
+                revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                geometry_kind=payload.geometry_kind,
+                geometry=payload.geometry,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.patch("/place-revisions/{revision_id}/geometries/{geometry_id}")
+        def update_place_geometry(
+            revision_id: str,
+            geometry_id: str,
+            payload: PlaceGeometryInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.update_geometry(
+                current,
+                revision_id=revision_id,
+                geometry_id=geometry_id,
+                expected_revision_version=payload.expected_revision_version,
+                geometry_kind=payload.geometry_kind,
+                geometry=payload.geometry,
+                source_record_id=payload.source_record_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.delete("/place-revisions/{revision_id}/geometries/{geometry_id}")
+        def retire_place_geometry(
+            revision_id: str,
+            geometry_id: str,
+            payload: RetirePlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.retire_geometry(
+                current,
+                revision_id=revision_id,
+                geometry_id=geometry_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/access-points")
+        def create_place_access_point(
+            revision_id: str,
+            payload: PlaceAccessPointInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_access_point(
+                current,
+                revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                access_point_kind=payload.access_point_kind,
+                name=payload.name,
+                lat=payload.lat,
+                lng=payload.lng,
+                source_record_id=payload.source_record_id,
+                fetched_at=payload.fetched_at,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.patch("/place-revisions/{revision_id}/access-points/{access_point_id}")
+        def update_place_access_point(
+            revision_id: str,
+            access_point_id: str,
+            payload: PlaceAccessPointInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.update_access_point(
+                current,
+                revision_id=revision_id,
+                access_point_id=access_point_id,
+                expected_revision_version=payload.expected_revision_version,
+                access_point_kind=payload.access_point_kind,
+                name=payload.name,
+                lat=payload.lat,
+                lng=payload.lng,
+                source_record_id=payload.source_record_id,
+                fetched_at=payload.fetched_at,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.delete(
+            "/place-revisions/{revision_id}/access-points/{access_point_id}"
+        )
+        def retire_place_access_point(
+            revision_id: str,
+            access_point_id: str,
+            payload: RetirePlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.retire_access_point(
+                current,
+                revision_id=revision_id,
+                access_point_id=access_point_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
 
         @router.post("/place-revisions/{revision_id}/publications")
         def publish_place_revision(
@@ -494,6 +698,7 @@ def _revision_response(revision: PlaceRevision) -> dict[str, object]:
         "place_revision_id": revision.place_revision_id,
         "place_id": revision.place_id,
         "revision_number": revision.revision_number,
+        "revision_version": revision.revision_version,
         "lifecycle_status": revision.lifecycle_status,
         "canonical_name": revision.canonical_name,
         "aliases": list(revision.aliases),

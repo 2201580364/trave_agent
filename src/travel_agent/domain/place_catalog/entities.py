@@ -166,6 +166,7 @@ class PlaceRevision:
     reviewed_at: datetime | None = None
     published_at: datetime | None = None
     review_flags: tuple[str, ...] = ()
+    revision_version: int = 1
 
     def __post_init__(self) -> None:
         _required(
@@ -201,6 +202,8 @@ class PlaceRevision:
             raise ValueError("place revision source records must be unique")
         if len(self.review_flags) != len(set(self.review_flags)):
             raise ValueError("place revision review flags must be unique")
+        if self.revision_version <= 0:
+            raise ValueError("place revision version must be positive")
         _aware(self.created_at, "place revision created_at")
         _aware(self.reviewed_at, "place revision reviewed_at", required=False)
         _aware(self.published_at, "place revision published_at", required=False)

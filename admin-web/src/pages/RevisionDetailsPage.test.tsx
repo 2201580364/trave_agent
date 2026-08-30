@@ -9,11 +9,15 @@ const mocks = vi.hoisted(() => ({
     getPlaceRevision: vi.fn(),
     getPlaceRevisionEvidence: vi.fn(),
   },
+  permissions: new Set<string>(),
   navigate: vi.fn(),
 }))
 
 vi.mock('../auth/AdminSessionProvider', () => ({
-  useAdminSession: () => ({ api: mocks.api }),
+  useAdminSession: () => ({
+    api: mocks.api,
+    hasPermission: (permission: string) => mocks.permissions.has(permission),
+  }),
 }))
 
 vi.mock('react-router-dom', () => ({
@@ -24,7 +28,8 @@ vi.mock('react-router-dom', () => ({
 const revision: PlaceRevision = {
   place_revision_id: 'revision-1',
   place_id: 'place-1',
-  revision_number: 1,
+    revision_number: 1,
+    revision_version: 1,
   lifecycle_status: 'candidate',
   canonical_name: '西湖',
   aliases: [],
@@ -55,6 +60,12 @@ const revision: PlaceRevision = {
 describe('RevisionDetailsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.permissions.clear()
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       value: vi.fn().mockImplementation((query: string) => ({
