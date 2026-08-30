@@ -784,6 +784,61 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
             }
             for point in evidence.access_points
         ],
+        "time_rules": [
+            {
+                "time_rule_id": rule.time_rule_id,
+                "rule_kind": rule.rule_kind,
+                "weekdays": list(rule.weekdays),
+                "start_minute": rule.start_minute,
+                "end_minute": rule.end_minute,
+                "last_entry_minute": rule.last_entry_minute,
+                "valid_from": rule.valid_from.isoformat() if rule.valid_from else None,
+                "valid_to": rule.valid_to.isoformat() if rule.valid_to else None,
+                "source_record_id": rule.source_record_id,
+                "source_record_valid": rule.source_record_id in valid_source_ids,
+                "review_status": rule.review_status,
+                "active": rule.active,
+                "created_at": rule.created_at.isoformat(),
+                "reviewed_at": rule.reviewed_at.isoformat() if rule.reviewed_at else None,
+            }
+            for rule in evidence.time_rules
+        ],
+        "closures": [
+            {
+                "closure_id": closure.closure_id,
+                "weekday": closure.weekday,
+                "source_record_id": closure.source_record_id,
+                "source_record_valid": closure.source_record_id in valid_source_ids,
+                "review_status": closure.review_status,
+                "active": closure.active,
+                "created_at": closure.created_at.isoformat(),
+                "reviewed_at": (
+                    closure.reviewed_at.isoformat() if closure.reviewed_at else None
+                ),
+            }
+            for closure in evidence.closures
+        ],
+        "date_exceptions": [
+            {
+                "date_exception_id": exception.date_exception_id,
+                "service_date": exception.service_date.isoformat(),
+                "exception_kind": exception.exception_kind,
+                "start_minute": exception.start_minute,
+                "end_minute": exception.end_minute,
+                "last_entry_minute": exception.last_entry_minute,
+                "source_record_id": exception.source_record_id,
+                "source_record_valid": exception.source_record_id in valid_source_ids,
+                "review_status": exception.review_status,
+                "active": exception.active,
+                "created_at": exception.created_at.isoformat(),
+                "reviewed_at": (
+                    exception.reviewed_at.isoformat()
+                    if exception.reviewed_at
+                    else None
+                ),
+            }
+            for exception in evidence.date_exceptions
+        ],
         "projection": (
             {
                 "projection_id": projection.projection_id,

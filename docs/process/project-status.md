@@ -6,9 +6,9 @@
 
 ## 术语
 
-### 2026-08-30 续接进度（Revision 版本化发布闭环补证）
+### 2026-08-30 续接进度（O05 开放时间与固定场次）
 
-`G7-R0.2-05-02` 正在实施：审核工作流、Revision 版本化编辑与 Projection 级发布入口已经落地。独立 `admin-web` 已接入 O08 审核队列首版、O02 候选地点清单首版、O03 Revision 详情首版和 O04 几何/访问点只读证据首版，可查看任务/决定历史、候选 Revision 基础事实、Revision 绑定证据并执行送审、审核和发布操作；本轮完成了 Revision 版本化业务闭环验收：基线 Revision 进入 `human_verified`，新 Revision 经管理端新建、修改、重新送审、审核通过、publication check 后发布为新的 Projection，基线保持不变。Revision 3 已从已核验基线详情页点击“新建修订”开始，并由 Chrome 完成全路径操作。O01 待办摘要、O04 几何/访问点写入与审核、O05–O07 的时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
+`G7-R0.2-05-02` 正在实施：审核工作流、Revision 版本化编辑、O04 几何/访问点写入与逐项审核以及 Projection 级发布入口已经落地并提交。当前进入 O05 开放时间与固定场次，Revision evidence 已装配周规则、固定闭馆日和日期例外，并在独立 `admin-web` 详情页形成与 O04 分离降级的只读证据面；写入、逐项审核和指定日期解析预览仍待下一切片。O01 待办摘要、O06 来源、O07 关系和批量审核仍待后续推进。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
 
 本轮 O04 只读证据收口（2026-08-30）：发布上下文现在会收集 Revision、Geometry、AccessPoint 和 TimeRule 的完整来源依赖闭包，并校验来源与当前 Place 的归属；跨 Place 的 active 来源稳定返回 `SOURCE_RECORD_PLACE_MISMATCH`，缺失或 inactive 来源仍返回 `MISSING_SOURCE_RECORD`。证据接口只返回当前 Place 的来源摘要，几何和访问点逐行提供 `source_record_valid`，Projection 按当前 Revision/Place 过滤并以 `projection_id` 稳定排序。来源 URL 已覆盖用户信息、fragment、credential-like 查询参数、非法端口和 IPv6 方括号边界。O03 Revision 基础详情与 O04 Evidence 已独立加载，Evidence 暂时不可用时不会清空基础事实或审核操作。Google Chrome 管理会话和 O04 页面已完成可视化复核，控制台新增 warn/error 为 0。
 
@@ -26,13 +26,13 @@
 ## 当前总状态
 
 - 更新时间：2026-08-30
-- 当前已提交基线：`d665d72 docs(admin): record revision publication acceptance`；工作区有本轮 O04 只读证据切片，待单独提交，未包含凭证或密钥
+- 当前已提交基线：`0055dfc feat(admin): add revision evidence editing workflow`；工作区为 O05 时间证据只读切片，未包含凭证或密钥
 - 产品里程碑：`M1 — 行程骨架验证`
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
 - 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
-- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。当前已形成 candidate→送审→驳回/通过闭环、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、O04 只读证据首版和候选清单前后端分页；72 条数据均保持 `candidate` 且 `solver_eligible=false`，不通过 SQL 手工改状态，未审核依赖仍阻断发布。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、O04 只读证据首版、候选分页以及 Revision→重新审核→Projection 发布的业务闭环，并已补齐从 Chrome“新建修订”按钮开始的完整验收证据；本轮又完成跨 Place 来源发布门禁、逐行来源有效性、URL 安全边界和 O03/O04 独立降级，并开始补充 O04 写入所需的 Revision 乐观锁和候选子资源 API。当前仍缺 O01、O04 写入/审核闭环、O05–O07 证据面、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。O04 Geometry/AccessPoint candidate 写入、软停用、逐项 reviewer 审核和发布门禁已完成；当前实现 O05 时间证据面，先确保周规则、闭馆日、日期例外按 Revision/Place 边界可见且可追溯，再进入写入审核与解析预览。72 条研究数据不得通过 SQL 手工改状态，未审核依赖继续阻断发布；本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情、O04 写入/逐项审核、候选分页以及 Revision→重新审核→Projection 发布业务闭环。O05 只读时间证据装配、页面展示、自动化回归和 Chrome 验收也已完成；仍缺 O05 写入/逐项审核/指定日期预览、O01、O06–O07、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -173,9 +173,11 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - O04 证据闭包已补强：来源查询限定当前 Place，并纳入几何/访问点引用；缺失、错绑或不可读取的来源通过 `missing_source_record_ids` 显式返回；来源 URL 在管理响应中移除用户信息/片段并脱敏 credential-like 查询参数；Projection 只选择当前 Revision 且 Place 归属一致的最新记录，并以 `projection_id` 作为同时间 tie-break；
 - 候选地点清单已支持服务端分页：`GET /api/v1/admin/candidates` 返回 `limit`、`offset`、`total`，数据库按稳定创建时间/ID 顺序执行 `LIMIT/OFFSET`；admin-web 默认每页 20 条，可切换 50/100 条并按页请求，刷新回到第一页；
 - 验证：审核与候选专项后端测试 `10/10`、O04 evidence API 专项测试 `1/1`（含缺失/跨 Place 来源、URL 脱敏、无认证和 Projection 稳定排序）、相关数据库测试 `12/12`、admin-web typecheck、Vitest `5/5`、Vite production build、全量 pytest `349/349` 和 `git diff --check` 通过；Chrome 已完成管理员登录后的首页、管理员/角色、审计中心（展开/动作筛选）、审核工作台、候选清单、退出和受保护路由验收，并完成 Revision 版本化发布路径从新建、编辑、送审到发布的 Chrome 操作；
-- 当前剩余：O01 待办摘要、O04 几何/访问点写入与审核、O05 开放时间、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；Revision 差异视图、证据依赖复制策略和独立 research snapshot 仍属于后续切片；本机不部署 MySQL/Redis。
+- O04 Geometry/AccessPoint candidate 新增、编辑、软停用和逐项 reviewer approve/reject 已完成；Revision 级 approve 会检查全部 active O04 证据均已 human_verified，写入自动递增 Revision 版本并重置求解/审核资格；
+- O05 只读时间证据面已实现：同一 evidence 接口返回 `time_rules`、`closures`、`date_exceptions`，三类来源均纳入当前 Place 依赖闭包并逐项标识有效性；admin-web 独立展示周规则、固定场次、闭馆日、日期例外及跨午夜“次日 +1440”语义，O04/O05 请求失败时分别降级；
+- 当前剩余：O05 时间写入、逐项审核和指定日期解析预览，O01 待办摘要、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；Revision 差异视图、证据依赖复制策略和独立 research snapshot 仍属于后续切片；本机不部署 MySQL/Redis。
 
-- 下一切片（提交本轮后）：O04 几何/访问点候选写入与人工审核。先实现候选 Geometry/AccessPoint 的创建、编辑和软停用及 Revision 乐观锁，再接入 `operation_intent_id`、审计和 reviewer approve/reject；证据变更必须自动清除 `solver_eligible`、`conflicts_resolved`、`reviewed_at`，published Revision 保持只读。写入/审核规则稳定并有回归证据后，再接入地图 SDK；随后依次推进 O01、O05–O07 和批量审核。
+- 下一切片：完成 O05 时间规则、闭馆日和日期例外的 candidate CRUD 与逐项 reviewer 审核；复用 Revision 乐观锁、operation intent、审计和开放 review task 门禁。之后由后端提供指定日期解析预览并把时间完整性纳入 Revision approve，不允许前端自行猜测日期覆盖或固定场次冲突。
 
 ### A4：应用代码架构设计
 
@@ -734,17 +736,16 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 
 ## 后续队列
 
-### 本轮更新（2026-08-30）
+### 本轮更新（2026-08-30，O05 只读时间证据）
 
-- 当前里程碑：M1；当前 Gate：G7 / R0.2-05-02 OM1 O04 地点审核工作台。
-- 本轮完成：Revision 乐观锁迁移 `0010`；Geometry/AccessPoint candidate 新增、编辑、软停用；逐项 reviewer approve/reject；跨 Place 来源发布门禁；admin-web O04 写入与审核操作面。
-- 审核门禁：只有开放 review task 的 candidate Revision 才能逐项审核；Revision 级 approve 会检查全部 active Geometry/AccessPoint 均为 `human_verified`，不能跳过证据核验。
-- 权限边界：编辑、送审、逐项审核、新建修订和发布按钮分别按 `place:candidate:write`、`place:review:request`、`place:review:decide`、`place:candidate:write`、`place:publication:write` 显示。
-- 验证结果：完整后端测试 351/351 通过；admin-web typecheck、Vitest 6/6、production build 通过；相关 Ruff 和 `git diff --check` 通过。
-- Chrome 验收：真实完成 `candidate Revision → 送审 → Geometry 逐项通过 → 状态写回 human_verified → 审计中心出现 PLACE_EVIDENCE_REVIEWED`；再次驳回/通过后最终恢复 human_verified；无新增控制台 warn/error。
-- 当前进度：O04 Geometry/AccessPoint 写入与逐项审核闭环已完成，达到可提交状态。
-- 遗留问题：O05 时间、O06 来源、O07 关系的子资源审核，以及发布中心和批量审核仍属于后续节点；SQLite datetime adapter 警告和全仓历史 Ruff 不属于本轮阻断。
-- 下一步：提交 `feat(admin): add revision evidence editing workflow`，之后进入 O05 时间规则审核或 O01 管理首页状态收口。
+- 当前里程碑：M1；当前 Gate：G7 / R0.2-05-02 OM1 O05 地点审核工作台。
+- 本轮完成：Revision evidence 装配 `PlaceTimeRule`、`PlaceClosure`、`PlaceDateException`；来源依赖闭包和逐项 `source_record_valid` 同步覆盖三类时间证据；admin-web 新增独立 O05 只读卡片并明确跨午夜“次日”语义。
+- 边界：本切片不提供时间证据写入、逐项审核或指定日期解析预览；O04 与 O05 各自独立降级，证据服务异常不会清空 O03 基础事实和审核操作。
+- 验证结果：完整后端测试 351/351 通过；admin-web typecheck、Vitest 7/7、production build通过；相关 Python Ruff 和 `git diff --check` 通过。
+- Chrome 验收：从 72 条候选清单进入“西湖音乐喷泉表演” Revision，O05 卡片、三类空状态、O03/O04/O05 分区和更新后的边界文案均符合预期，控制台新增 warn/error 为 0；未通过 SQL 手工制造时间数据。详见 `docs/test/reports/g7-r0.2-05-02-o05-time-evidence-chrome-2026-08-30.md`。
+- 当前进度：O04 已提交；O05 只读时间证据纵向切片已完成并达到可提交状态。
+- 遗留问题：O05 CRUD/逐项审核/解析预览，O01、O06、O07、发布中心和批量审核仍属于后续节点；SQLite datetime adapter 警告和全仓历史 Ruff 不属于本轮阻断。
+- 下一步：提交 `feat(admin): expose revision time evidence`；随后进入 O05 时间证据写入与 reviewer 审核闭环。
 
 | 顺序 | 阶段 | 内容 | 当前状态 |
 |---|---|---|---|
@@ -757,7 +758,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | 4 | A4 | 应用代码架构、模块边界与依赖规则 | 已完成 |
 | 5 | A5 | API 与持久化数据模型同步 | 已完成 |
 | 6 | A6 | 首个浏览器可操作纵向切片 | 已完成（100% 仅指技术纵向切片；替换、我的行程、计划分享、结构化反馈均通过 Chrome 验收） |
-| 7 | G7 | 真实专家评审与用户验证 | R0.2-01～04、05-01A、05-01B 已完成；当前 05-02。后续完成 O04 写入审核、O01/O05–O07、批量审核、OD、发布、R0.3 部署、R0.4 dry run、招募和真实证据 |
+| 7 | G7 | 真实专家评审与用户验证 | R0.2-01～04、05-01A、05-01B 已完成；当前 05-02。O04 写入审核已完成，正在推进 O05；后续完成 O01/O05–O07、批量审核、OD、发布、R0.3 部署、R0.4 dry run、招募和真实证据 |
 
 ## 首个可用目标
 

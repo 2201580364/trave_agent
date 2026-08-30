@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceDateExceptionEvidence, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 
@@ -315,6 +315,11 @@ export function RevisionDetailsPage() {
             onChanged={load}
             onError={setError}
           />
+          <TimeEvidenceCard
+            evidence={evidence}
+            loading={evidenceLoading}
+            error={evidenceError}
+          />
 
           <Card title="发布阻断摘要">
             {blockers.length === 0 ? (
@@ -330,7 +335,7 @@ export function RevisionDetailsPage() {
             </Space>
             )}
             <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-              本摘要仍只基于当前 Revision API 返回字段；O04 的几何与访问点证据已在上方展示，开放时间、来源冲突和关系裁决将在 O05–O07 页面接入后显示。
+              本摘要仍只基于当前 Revision API 返回字段；O04 几何/访问点与 O05 时间证据已在上方展示，来源冲突和关系裁决将在 O06–O07 页面接入后显示。
             </Typography.Paragraph>
           </Card>
         </>
@@ -585,6 +590,110 @@ function EvidenceCard({
       </Modal>
     </Card>
   )
+}
+
+function TimeEvidenceCard({
+  evidence,
+  loading,
+  error,
+}: {
+  evidence: PlaceRevisionEvidence | null
+  loading: boolean
+  error: string | null
+}) {
+  if (loading) return <Card title="开放时间与固定场次（O05）" loading />
+  if (error !== null || evidence === null) {
+    return (
+      <Card title="开放时间与固定场次（O05）">
+        <Alert
+          showIcon
+          type="warning"
+          title="O05 时间证据暂不可用"
+          description={error ?? '当前 Revision 没有可读取的时间证据'}
+        />
+      </Card>
+    )
+  }
+  return (
+    <Card title="开放时间与固定场次（O05）">
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Alert
+          showIcon
+          type="info"
+          title="当前为只读证据面"
+          description="周规则、闭馆日和日期例外均严格绑定当前 Revision；写入、逐项审核和指定日期解析预览将在下一切片接入。"
+        />
+        <Typography.Title level={5} style={{ margin: 0 }}>周规则与固定场次</Typography.Title>
+        <Table<PlaceTimeRuleEvidence>
+          rowKey="time_rule_id"
+          size="small"
+          pagination={false}
+          dataSource={evidence.time_rules}
+          scroll={{ x: 1050 }}
+          columns={[
+            { title: '规则类型', dataIndex: 'rule_kind', width: 150, render: timeRuleKindLabel },
+            { title: '适用星期', dataIndex: 'weekdays', width: 180, render: (days: number[]) => days.map(weekdayLabel).join('、') },
+            { title: '开放/场次', key: 'window', width: 190, render: (_: unknown, item) => `${minuteLabel(item.start_minute)} – ${minuteLabel(item.end_minute)}` },
+            { title: '最晚入园', dataIndex: 'last_entry_minute', width: 120, render: minuteLabel },
+            { title: '有效期', key: 'validity', width: 220, render: (_: unknown, item) => `${item.valid_from ?? '不限'} – ${item.valid_to ?? '不限'}` },
+            { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
+            { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}><Typography.Text>{item.source_record_id}</Typography.Text><Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+          ]}
+          locale={{ emptyText: evidence.revision.is_always_open ? '全天开放，无需周时间窗' : '尚未采集周规则或固定场次' }}
+        />
+        <Typography.Title level={5} style={{ margin: 0 }}>固定闭馆日</Typography.Title>
+        <Table<PlaceClosureEvidence>
+          rowKey="closure_id"
+          size="small"
+          pagination={false}
+          dataSource={evidence.closures}
+          columns={[
+            { title: '闭馆星期', dataIndex: 'weekday', render: weekdayLabel },
+            { title: '状态', dataIndex: 'review_status', render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
+            { title: '来源', key: 'source', render: (_: unknown, item) => <Space size={4}>{item.source_record_id}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+          ]}
+          locale={{ emptyText: '没有固定闭馆日记录' }}
+        />
+        <Typography.Title level={5} style={{ margin: 0 }}>日期例外</Typography.Title>
+        <Table<PlaceDateExceptionEvidence>
+          rowKey="date_exception_id"
+          size="small"
+          pagination={false}
+          dataSource={evidence.date_exceptions}
+          scroll={{ x: 900 }}
+          columns={[
+            { title: '日期', dataIndex: 'service_date', width: 130 },
+            { title: '例外类型', dataIndex: 'exception_kind', width: 150, render: dateExceptionKindLabel },
+            { title: '覆盖时间', key: 'window', width: 190, render: (_: unknown, item) => item.exception_kind === 'closed' ? '全天关闭' : `${minuteLabel(item.start_minute)} – ${minuteLabel(item.end_minute)}` },
+            { title: '最晚入园', dataIndex: 'last_entry_minute', width: 120, render: minuteLabel },
+            { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
+            { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}>{item.source_record_id}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+          ]}
+          locale={{ emptyText: '没有日期例外记录' }}
+        />
+      </Space>
+    </Card>
+  )
+}
+
+function minuteLabel(value: number | null): string {
+  if (value === null) return '未设置'
+  const dayOffset = Math.floor(value / 1440)
+  const minute = value % 1440
+  const time = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+  return dayOffset > 0 ? `次日 ${time} (+${dayOffset * 1440})` : time
+}
+
+function weekdayLabel(value: number): string {
+  return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][value - 1] ?? `星期${value}`
+}
+
+function timeRuleKindLabel(value: string): string {
+  return ({ opening_hours: '开放时间', fixed_session: '固定场次', last_entry: '最晚入园规则' } as Record<string, string>)[value] ?? value
+}
+
+function dateExceptionKindLabel(value: string): string {
+  return ({ closed: '临时关闭', open_override: '开放覆盖', session_override: '场次覆盖' } as Record<string, string>)[value] ?? value
 }
 
 function reviewStatusLabel(value: string): string {

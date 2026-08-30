@@ -157,8 +157,54 @@ export type PlaceRevisionEvidence = {
   sources: PlaceEvidenceSource[]
   geometries: PlaceGeometryEvidence[]
   access_points: PlaceAccessPointEvidence[]
+  time_rules: PlaceTimeRuleEvidence[]
+  closures: PlaceClosureEvidence[]
+  date_exceptions: PlaceDateExceptionEvidence[]
   projection: PlaceProjectionEvidence | null
   missing_source_record_ids: string[]
+}
+
+export type PlaceTimeRuleEvidence = {
+  time_rule_id: string
+  rule_kind: string
+  weekdays: number[]
+  start_minute: number | null
+  end_minute: number | null
+  last_entry_minute: number | null
+  valid_from: string | null
+  valid_to: string | null
+  source_record_id: string
+  source_record_valid: boolean
+  review_status: string
+  active: boolean
+  created_at: string
+  reviewed_at: string | null
+}
+
+export type PlaceClosureEvidence = {
+  closure_id: string
+  weekday: number
+  source_record_id: string
+  source_record_valid: boolean
+  review_status: string
+  active: boolean
+  created_at: string
+  reviewed_at: string | null
+}
+
+export type PlaceDateExceptionEvidence = {
+  date_exception_id: string
+  service_date: string
+  exception_kind: string
+  start_minute: number | null
+  end_minute: number | null
+  last_entry_minute: number | null
+  source_record_id: string
+  source_record_valid: boolean
+  review_status: string
+  active: boolean
+  created_at: string
+  reviewed_at: string | null
 }
 
 export type PlaceGeometryInput = {

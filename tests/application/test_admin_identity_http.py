@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
 
@@ -32,10 +32,13 @@ from travel_agent.infrastructure.database.admin_identity import (
 )
 from travel_agent.infrastructure.database.place_catalog import (
     PlaceAccessPointRow,
+    PlaceClosureRow,
+    PlaceDateExceptionRow,
     PlaceGeometryRow,
     PlaceRevisionRow,
     PlaceRow,
     PlaceSourceRecordRow,
+    PlaceTimeRuleRow,
     SolverPlaceProjectionRow,
 )
 from travel_agent.infrastructure.database.place_review import PlaceReviewDecisionRow
@@ -841,6 +844,52 @@ def test_revision_evidence_is_revision_scoped_and_exposes_projection_endpoints(
             )
         )
         session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="time-rule-evidence",
+                place_revision_id="revision-evidence",
+                rule_kind="opening_hours",
+                weekdays=[1, 2, 3, 4, 5, 6, 7],
+                start_minute=9 * 60,
+                end_minute=17 * 60 + 30,
+                last_entry_minute=16 * 60 + 30,
+                valid_from=date(2026, 1, 1),
+                valid_to=date(2026, 12, 31),
+                source_record_id="source-evidence",
+                review_status="candidate",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
+        session.add(
+            PlaceClosureRow(
+                closure_id="closure-evidence",
+                place_revision_id="revision-evidence",
+                weekday=1,
+                source_record_id="source-evidence",
+                review_status="candidate",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
+        session.add(
+            PlaceDateExceptionRow(
+                date_exception_id="date-exception-evidence",
+                place_revision_id="revision-evidence",
+                service_date=date(2026, 10, 1),
+                exception_kind="open_override",
+                start_minute=8 * 60,
+                end_minute=18 * 60,
+                last_entry_minute=17 * 60,
+                source_record_id="source-evidence",
+                review_status="candidate",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
+        session.add(
             PlaceAccessPointRow(
                 access_point_id="access-cross-place",
                 place_revision_id="revision-evidence",
@@ -932,6 +981,12 @@ def test_revision_evidence_is_revision_scoped_and_exposes_projection_endpoints(
     )
     assert valid_access_point["lat"] == pytest.approx(30.25)
     assert valid_access_point["source_record_valid"] is True
+    assert body["time_rules"][0]["time_rule_id"] == "time-rule-evidence"
+    assert body["time_rules"][0]["source_record_valid"] is True
+    assert body["closures"][0]["weekday"] == 1
+    assert body["closures"][0]["source_record_valid"] is True
+    assert body["date_exceptions"][0]["service_date"] == "2026-10-01"
+    assert body["date_exceptions"][0]["source_record_valid"] is True
     cross_access_point = next(
         item for item in body["access_points"] if item["access_point_id"] == "access-cross-place"
     )

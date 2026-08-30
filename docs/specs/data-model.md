@@ -192,6 +192,7 @@ places
 - `PlaceSourceRecord` 强制绑定 source、registry/dictionary ID 与规范化 SHA-256、来源 URL、采集方式、来源决策和目标阶段；conditional 来源在领域构造阶段即拒绝 `target_stage=published`；
 - `PlaceRevision` 使用 `(place_id, revision_number)` 唯一约束，保存名称、类型、几何类型、时长范围、内部步行、体力、室内外、适用时段、人群、雨天适配、来源闭包和 candidate/human_verified/published/retired 生命周期；
 - 几何、访问点、时间规则、闭馆日和日期例外分别持久化，访问点坐标使用 `DECIMAL(10,7)`，跨午夜分钟值允许到 2880；
+- O05 Revision evidence 只读装配已覆盖 `place_time_rules`、`place_closures` 和 `place_date_exceptions`：三类记录严格按 `place_revision_id` 加载，其来源纳入当前 Place 的依赖闭包，并逐项暴露来源有效性、审核状态、active 状态和审核时间；当前尚未开放时间证据写入、逐项审核或指定日期解析预览；
 - `PlaceRelation` 表达 contains/part_of/overlaps/same_experience，并保存 pending/resolved/not_required 裁决状态；互斥组与成员使用独立表和唯一约束；
 - `SolverPlaceProjection` 在同一 `data_snapshot_version` 内约束 solver node ID 唯一、PlaceRevision 唯一，保存显式到达/离开访问点、时长范围、solver payload 和稳定 SHA-256；
 - 仓储拒绝直接插入 published Revision 或 projection；唯一发布入口加载 Place、Revision、来源、几何、访问点、时间和关系依赖闭包，执行 fail-closed 门禁后在同一事务中更新 Revision 与 projection 状态。
@@ -897,7 +898,7 @@ And 不生成 published research snapshot
 
 ## 16. OM1 管理端数据模型（身份与审计底座已实现）
 
-本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；`0009_place_revision_review_flags` 已追加实现候选 Revision 数据质量/审核标记；`0010_place_revision_version` 已追加 Revision 子资源写入所需的乐观锁版本；16.3 发布批次仍待 R0.2-07 通过新迁移追加。0001–0009 未被改写。
+本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；`0009_place_revision_review_flags` 已追加实现候选 Revision 数据质量/审核标记；`0010_place_revision_version` 已追加 Revision 子资源写入所需的乐观锁版本。O04 写入/逐项审核和 O05 时间证据只读装配复用现有 0006 事实表，不新增空壳迁移；16.3 发布批次仍待 R0.2-07 通过新迁移追加。0001–0009 未被改写。
 
 ### 16.1 管理身份
 

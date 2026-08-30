@@ -6,9 +6,12 @@ from dataclasses import dataclass
 
 from .entities import (
     PlaceAccessPoint,
+    PlaceClosure,
+    PlaceDateException,
     PlaceGeometry,
     PlaceRevision,
     PlaceSourceRecord,
+    PlaceTimeRule,
     SolverPlaceProjection,
 )
 
@@ -26,5 +29,8 @@ class PlaceRevisionEvidence:
     source_records: tuple[PlaceSourceRecord, ...]
     geometries: tuple[PlaceGeometry, ...]
     access_points: tuple[PlaceAccessPoint, ...]
+    time_rules: tuple[PlaceTimeRule, ...]
+    closures: tuple[PlaceClosure, ...]
+    date_exceptions: tuple[PlaceDateException, ...]
     projection: SolverPlaceProjection | None
     missing_source_record_ids: tuple[str, ...] = ()

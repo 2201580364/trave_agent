@@ -633,12 +633,42 @@ class SqlAlchemyPlaceCatalogRepository:
         )
         geometries = tuple(_geometry_from_row(row) for row in geometry_rows)
         access_points = tuple(_access_point_from_row(row) for row in access_point_rows)
+        time_rules = tuple(
+            _time_rule_from_row(row)
+            for row in self._session.scalars(
+                select(PlaceTimeRuleRow)
+                .where(PlaceTimeRuleRow.place_revision_id == place_revision_id)
+                .order_by(PlaceTimeRuleRow.created_at, PlaceTimeRuleRow.time_rule_id)
+            )
+        )
+        closures = tuple(
+            _closure_from_row(row)
+            for row in self._session.scalars(
+                select(PlaceClosureRow)
+                .where(PlaceClosureRow.place_revision_id == place_revision_id)
+                .order_by(PlaceClosureRow.weekday, PlaceClosureRow.closure_id)
+            )
+        )
+        date_exceptions = tuple(
+            _date_exception_from_row(row)
+            for row in self._session.scalars(
+                select(PlaceDateExceptionRow)
+                .where(PlaceDateExceptionRow.place_revision_id == place_revision_id)
+                .order_by(
+                    PlaceDateExceptionRow.service_date,
+                    PlaceDateExceptionRow.date_exception_id,
+                )
+            )
+        )
         referenced_source_ids = tuple(
             dict.fromkeys(
                 (
                     *revision.source_record_ids,
                     *(geometry.source_record_id for geometry in geometries),
                     *(point.source_record_id for point in access_points),
+                    *(rule.source_record_id for rule in time_rules),
+                    *(closure.source_record_id for closure in closures),
+                    *(exception.source_record_id for exception in date_exceptions),
                 )
             )
         )
@@ -670,6 +700,9 @@ class SqlAlchemyPlaceCatalogRepository:
             source_records=source_records,
             geometries=geometries,
             access_points=access_points,
+            time_rules=time_rules,
+            closures=closures,
+            date_exceptions=date_exceptions,
             projection=self.get_projection_for_revision(place_revision_id),
             missing_source_record_ids=tuple(
                 source_id for source_id in referenced_source_ids if source_id not in source_by_id
@@ -1036,6 +1069,19 @@ def _closure_values(value: PlaceClosure) -> dict[str, Any]:
     }
 
 
+def _closure_from_row(row: PlaceClosureRow) -> PlaceClosure:
+    return PlaceClosure(
+        row.closure_id,
+        row.place_revision_id,
+        row.weekday,
+        row.source_record_id,
+        row.review_status,
+        row.active,
+        datetime.fromisoformat(row.created_at),
+        datetime.fromisoformat(row.reviewed_at) if row.reviewed_at else None,
+    )
+
+
 def _date_exception_values(value: PlaceDateException) -> dict[str, Any]:
     return {
         "date_exception_id": value.date_exception_id,
@@ -1051,6 +1097,23 @@ def _date_exception_values(value: PlaceDateException) -> dict[str, Any]:
         "created_at": value.created_at.isoformat(),
         "reviewed_at": _iso(value.reviewed_at),
     }
+
+
+def _date_exception_from_row(row: PlaceDateExceptionRow) -> PlaceDateException:
+    return PlaceDateException(
+        row.date_exception_id,
+        row.place_revision_id,
+        row.service_date,
+        row.exception_kind,
+        row.start_minute,
+        row.end_minute,
+        row.last_entry_minute,
+        row.source_record_id,
+        row.review_status,
+        row.active,
+        datetime.fromisoformat(row.created_at),
+        datetime.fromisoformat(row.reviewed_at) if row.reviewed_at else None,
+    )
 
 
 def _relation_values(value: PlaceRelation) -> dict[str, Any]:
