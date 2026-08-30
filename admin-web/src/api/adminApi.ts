@@ -115,6 +115,10 @@ export class AdminApi {
 
   getDashboardSummary(): Promise<DashboardSummary> { return this.request('/dashboard-summary') }
 
+  resolvePlaceRelation(revisionId: string, relationId: string, input: { expected_revision_version: number; resolution_status: string; decision_note?: string | null; operation_intent_id: string; reason_code: string }): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/relations/${encodeURIComponent(relationId)}/resolve`, { method: 'POST', body: JSON.stringify(input) })
+  }
+
   createGeometry(revisionId: string, input: PlaceGeometryInput): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/geometries`, {
       method: 'POST', body: JSON.stringify(input),

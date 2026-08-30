@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 
@@ -327,6 +327,7 @@ export function RevisionDetailsPage() {
             onChanged={load}
             onError={setError}
           />
+          <RelationEvidenceCard api={api} evidence={evidence} revision={revision} canEdit={hasPermission('place:candidate:write')} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} />
 
           <Card title="发布阻断摘要">
             {blockers.length === 0 ? (
@@ -597,6 +598,54 @@ function EvidenceCard({
       </Modal>
     </Card>
   )
+}
+
+function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onSuccess, onError }: {
+  api: ReturnType<typeof useAdminSession>['api']
+  evidence: PlaceRevisionEvidence | null
+  revision: PlaceRevision
+  canEdit: boolean
+  onChanged: () => Promise<void>
+  onSuccess: (text: string) => void
+  onError: (message: string) => void
+}) {
+  const [editing, setEditing] = useState<PlaceRelationEvidence | null>(null)
+  const [status, setStatus] = useState('resolved')
+  const [note, setNote] = useState('')
+  const [working, setWorking] = useState(false)
+  const relations = evidence?.relations ?? []
+  const save = async () => {
+    if (!editing) return
+    setWorking(true)
+    try {
+      await api.resolvePlaceRelation(revision.place_revision_id, editing.relation_id, {
+        expected_revision_version: revision.revision_version,
+        resolution_status: status,
+        decision_note: note || null,
+        operation_intent_id: `relation-resolution-${crypto.randomUUID()}`,
+        reason_code: 'RELATION_RESOLUTION_UPDATED',
+      })
+      setEditing(null)
+      await onChanged()
+      onSuccess('关系裁决已保存，Revision 需重新送审')
+    } catch (reason) { onError(adminErrorMessage(reason)) } finally { setWorking(false) }
+  }
+  return <Card title="地点关系与裁决（O07）">
+    <Table<PlaceRelationEvidence> rowKey="relation_id" dataSource={relations} pagination={false} locale={{ emptyText: '当前 Place 暂无关系证据' }} columns={[
+      { title: '关系类型', dataIndex: 'relation_type' },
+      { title: '目标 Place', render: (_: unknown, item: PlaceRelationEvidence) => `${item.from_place_id} → ${item.to_place_id}` },
+      { title: '审核', dataIndex: 'review_status' },
+      { title: '裁决', dataIndex: 'resolution_status' },
+      { title: '来源', dataIndex: 'source_record_id' },
+      ...(canEdit ? [{ title: '操作', render: (_: unknown, item: PlaceRelationEvidence) => <Button size="small" onClick={() => { setEditing(item); setStatus(item.resolution_status); setNote(item.decision_note ?? '') }}>裁决</Button> }] : []),
+    ]} />
+    <Modal title="关系裁决" open={editing !== null} onOk={() => void save()} onCancel={() => setEditing(null)} confirmLoading={working}>
+      <Space orientation="vertical" style={{ width: '100%' }}>
+        <Select value={status} onChange={setStatus} options={[{ value: 'resolved', label: '已裁决' }, { value: 'not_required', label: '无需裁决' }, { value: 'pending', label: '待处理' }]} />
+        <Input.TextArea value={note} onChange={(event) => setNote(event.target.value)} placeholder="裁决说明（已裁决时必填）" rows={4} />
+      </Space>
+    </Modal>
+  </Card>
 }
 
 function TimeEvidenceCard({

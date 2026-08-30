@@ -1209,6 +1209,7 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 100 个与单项决定相同的 payload。批量采用逐项独立提交语义：响应分别返回 `succeeded` 与
 `failed`，失败项包含 `task_id`、`error_code` 和消息；不会把部分成功伪装为原子全成功。
 admin-web 审核队列提供勾选、统一决定、理由输入和逐项结果提示；失败项不会从用户视图中静默消失。
+admin-web Revision 详情页提供关系列表及 resolution 裁决入口，提交后按 Revision 版本刷新并提示重新送审。
 
 O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{relation_id}/resolve`
 需要 `place:candidate:write`，携带 `expected_revision_version`、`resolution_status`、可选
