@@ -475,7 +475,7 @@ def build_admin_router(
                 str,
                 Path(
                     pattern=(
-                        "^(geometry|access_point|time_rule|closure|date_exception)$"
+                        "^(geometry|access_point|time_rule|closure|date_exception|relation)$"
                     )
                 ),
             ],

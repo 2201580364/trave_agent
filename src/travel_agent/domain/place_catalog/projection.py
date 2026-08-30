@@ -139,6 +139,7 @@ def evaluate_projection_publication(
                 *(geometry.source_record_id for geometry in context.geometries),
                 *(point.source_record_id for point in context.access_points),
                 *(rule.source_record_id for rule in context.time_rules),
+                *(relation.source_record_id for relation in context.relations),
             )
         )
     )

@@ -1281,4 +1281,6 @@ Revision 级 reviewer approve 会重新计算来源依赖闭包；若同一 `sou
 `conflicts_resolved=false`，以 `review_revision_not_approvable` 拒绝，防止仅靠客户端标记绕过
 来源冲突门禁。裁决后仍需重新送审。
 Revision evidence 现在同时返回 `relations[]`，按当前 Place 的关系依赖稳定排序，包含关系类型、
-来源有效性、逐项审核状态和 `resolution_status`；关系裁决写入仍属于 O07。
+来源有效性、逐项审核状态和 `resolution_status`。逐项 evidence review 的 `evidence_kind`
+支持 `relation`；关系审核沿用 candidate、active、幂等和审计约束。`overlaps`/`same_experience`
+且 `resolution_status=pending` 的关系仍会阻断 Projection 发布，关系裁决写入仍属于 O07 后续切片。

@@ -669,6 +669,7 @@ class SqlAlchemyPlaceCatalogRepository:
                 PlaceDateExceptionRow,
                 PlaceDateExceptionRow.date_exception_id,
             ),
+            "relation": (PlaceRelationRow, PlaceRelationRow.relation_id),
         }.get(evidence_kind)
         table, key = table_and_key if table_and_key is not None else (None, None)
         if table is None or key is None or review_status not in {"human_verified", "rejected"}:
@@ -838,6 +839,7 @@ class SqlAlchemyPlaceCatalogRepository:
                     *(rule.source_record_id for rule in time_rules),
                     *(closure.source_record_id for closure in closures),
                     *(exception.source_record_id for exception in date_exceptions),
+                    *(relation.source_record_id for relation in relations),
                 )
             )
         )

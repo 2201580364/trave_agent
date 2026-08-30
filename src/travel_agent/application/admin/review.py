@@ -1834,6 +1834,7 @@ class PlaceReviewWorkflowService:
                         *evidence.time_rules,
                         *evidence.closures,
                         *evidence.date_exceptions,
+                        *evidence.relations,
                     )
                 ):
                     self._reject(
