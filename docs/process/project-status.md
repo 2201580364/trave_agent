@@ -13,7 +13,9 @@
 
 ## 术语
 
-### 2026-08-30 续接进度（O05 指定日期解析预览）
+### 2026-08-31 续接进度（OM1 审核与发布工作台收口）
+
+本轮已完成 OM1 审核与发布工作台的大模块验收：管理首页动态摘要、审核队列批量操作、Revision 关系裁决入口和发布中心均在 Google Chrome 中验证；未发现控制台 warn/error。验收报告见 `docs/test/reports/g7-r0.2-05-02-om1-workbench-chrome-2026-08-31.md`。当前适合提交 OM1 工作台阶段性成果，下一阶段进入 O09/研究快照批次治理。
 
 `G7-R0.2-05-02` 正在实施：O05 时间证据已完成 candidate CRUD、逐项审核和指定日期解析预览纵向切片；O01 管理首页已接入真实 Revision/审核任务聚合；O06 已完成来源冲突只读聚合、candidate 裁决写入及 reviewer approve 门禁联动；O07 已将 PlaceRelation 纳入 Revision evidence、来源依赖闭包和逐项 reviewer 审核。解析由后端按已核验证据稳定计算，日期例外优先于周规则并返回固定 reason codes；前端仅展示结果。O07 关系 resolution 裁决写入和批量审核仍待后续推进。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
 

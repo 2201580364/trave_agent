@@ -16,7 +16,10 @@ export function PublicationsPage() {
     setLoading(true); setError(null)
     try {
       const result = await api.listCandidates('human_verified', 100)
-      const checked = await Promise.all(result.items.map(async (revision) => ({ revision, check: await api.checkPlaceRevisionPublication(revision.place_revision_id) })))
+      const checked = await Promise.all(result.items.map(async (revision) => {
+        try { return { revision, check: await api.checkPlaceRevisionPublication(revision.place_revision_id) } }
+        catch { return { revision, check: { revision_id: revision.place_revision_id, publishable: false, reason_codes: ['PROJECTION_DEPENDENCY_MISSING'] } } }
+      }))
       setItems(checked.map(({ revision, check }) => ({ ...revision, check })))
     } catch (reason) { setError(adminErrorMessage(reason)) } finally { setLoading(false) }
   }, [api])

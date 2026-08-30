@@ -1137,7 +1137,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点为 sessions、current session、me、admin-actors 的创建/列表/角色变更、audit-events 只读查询，以及 R0.2-05-02 的 candidates、place-revisions、Revision evidence、review-tasks/decisions 审核闭环；地点 Revision 创建、candidate 编辑、O04 几何/访问点与 O05 时间证据写入/逐项审核、发布门检查和 Projection 级发布入口已可调用。O05 指定日期解析预览、O06 来源、O07 关系子资源和独立 research snapshot/批次发布仍属于后续切片。
+当前已实现端点包括管理身份/RBAC/审计、candidates、place-revisions、Revision evidence、review-tasks/decisions、O04/O05/O06/O07 证据与裁决、批量审核、publication check 和 Projection 发布入口；独立 research snapshot/批次发布仍属于后续切片。
 
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
