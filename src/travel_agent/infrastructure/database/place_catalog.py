@@ -726,6 +726,18 @@ class SqlAlchemyPlaceCatalogRepository:
     def add_relation(self, relation: PlaceRelation) -> None:
         self._add(PlaceRelationRow(**_relation_values(relation)), "relation already exists")
 
+    def update_relation(self, relation: PlaceRelation, *, revision_id: str, expected_revision_version: int) -> PlaceRevision:
+        self._bump_revision(revision_id, expected_revision_version)
+        result = self._session.execute(
+            update(PlaceRelationRow)
+            .where(PlaceRelationRow.relation_id == relation.relation_id)
+            .values(resolution_status=relation.resolution_status, decision_note=relation.decision_note,
+                    review_status="pending", reviewed_at=None)
+        )
+        if result.rowcount != 1:
+            raise ValueError("place relation not found")
+        return self._require_revision(revision_id)
+
     def add_exclusion_group(self, group: SelectionExclusionGroup) -> None:
         self._add(
             SelectionExclusionGroupRow(**_exclusion_group_values(group)),

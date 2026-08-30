@@ -1203,6 +1203,11 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 
 ### O06 来源冲突只读面
 
+O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{relation_id}/resolve`
+需要 `place:candidate:write`，携带 `expected_revision_version`、`resolution_status`、可选
+`decision_note`、`operation_intent_id` 和审计理由。仅允许当前 Place 的 active 关系；成功后
+递增 Revision 版本、重置关系审核状态并要求重新送审。`resolved` 必须提供裁决说明。
+
 `GET /api/v1/admin/place-revisions/{revision_id}/source-conflicts` 需要
 `place:candidate:read`，按 `source_id` 聚合当前 Revision 依赖闭包中的来源记录；
 当同一来源存在不同内容指纹时返回冲突记录及 `resolved` 状态。该接口只读，来源裁决

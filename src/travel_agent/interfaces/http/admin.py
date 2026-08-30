@@ -192,6 +192,15 @@ class ResolveSourceConflictsInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+class ResolveRelationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision_version: int = Field(gt=0)
+    resolution_status: str = Field(pattern="^(resolved|not_required|pending)$")
+    decision_note: str | None = Field(default=None, max_length=500)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
 
 class RetirePlaceEvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -455,6 +464,20 @@ def build_admin_router(
                 resolved=payload.resolved, operation_intent_id=payload.operation_intent_id,
                 reason_code=payload.reason_code, reason_text=payload.reason_text,
                 request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/relations/{relation_id}/resolve")
+        def resolve_place_relation(
+            revision_id: str, relation_id: str, payload: ResolveRelationInput, request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.resolve_relation(
+                current, revision_id=revision_id, relation_id=relation_id,
+                expected_revision_version=payload.expected_revision_version,
+                resolution_status=payload.resolution_status, decision_note=payload.decision_note,
+                operation_intent_id=payload.operation_intent_id, reason_code=payload.reason_code,
+                reason_text=payload.reason_text, request_id=request.state.request_id,
             )
             return _revision_response(revision)
 

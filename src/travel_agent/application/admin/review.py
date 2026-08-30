@@ -228,6 +228,46 @@ class PlaceReviewWorkflowService:
             uow.commit()
             return updated
 
+    def resolve_relation(self, principal: AdminPrincipal, *, revision_id: str, relation_id: str,
+                         expected_revision_version: int, resolution_status: str,
+                         decision_note: str | None, operation_intent_id: str, reason_code: str,
+                         reason_text: str | None, request_id: str) -> PlaceRevision:
+        self._require(principal, "place:candidate:write")
+        if resolution_status not in {"resolved", "not_required", "pending"}:
+            raise ValueError("invalid relation resolution status")
+        if resolution_status == "resolved" and not decision_note:
+            raise ValueError("resolved relation requires decision note")
+        reason_text = self._validate_reason(reason_code, reason_text)
+        digest = _digest({"revision_id": revision_id, "relation_id": relation_id,
+                          "expected_revision_version": expected_revision_version,
+                          "resolution_status": resolution_status, "decision_note": decision_note,
+                          "reason_code": reason_code, "reason_text": reason_text})
+        now = self._clock.now()
+        with self._uow_factory() as uow:
+            existing = self._replay(uow, operation_intent_id, digest)
+            if existing is not None:
+                revision = uow.reviews.get_revision(existing.target_id)
+                if revision is None: raise ResourceNotFoundError
+                return revision
+            actor = self._actor(uow, principal)
+            revision = uow.reviews.get_revision(revision_id)
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if revision is None or evidence is None: raise ResourceNotFoundError
+            if revision.lifecycle_status != "candidate": raise ReviewRevisionNotCandidateError
+            relation = next((item for item in evidence.relations if item.relation_id == relation_id and item.active), None)
+            if relation is None or relation.from_place_id != revision.place_id: raise ResourceNotFoundError
+            updated_relation = replace(relation, resolution_status=resolution_status, decision_note=decision_note,
+                                       review_status="pending", reviewed_at=None)
+            updated = uow.catalog.update_relation(updated_relation, revision_id=revision_id, expected_revision_version=expected_revision_version)
+            uow.audits.add(self._event(actor, action="PLACE_RELATION_RESOLUTION_UPDATED",
+                                        target_type="place_relation", target_id=relation_id,
+                                        target_revision=str(updated.revision_number), before_digest=_evidence_digest(relation),
+                                        after_digest=_evidence_digest(updated_relation), reason_code=reason_code,
+                                        reason_text=reason_text, request_id=request_id,
+                                        operation_intent_id=operation_intent_id, operation_digest=digest))
+            uow.commit()
+            return updated
+
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
