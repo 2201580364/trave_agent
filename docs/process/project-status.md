@@ -8,7 +8,7 @@
 
 ### 2026-08-30 续接进度（O05 指定日期解析预览）
 
-`G7-R0.2-05-02` 正在实施：O05 时间证据已完成 candidate CRUD、逐项审核和指定日期解析预览纵向切片；O01 管理首页已接入真实 Revision/审核任务聚合；O06 已加入来源冲突只读聚合接口。解析由后端按已核验证据稳定计算，日期例外优先于周规则并返回固定 reason codes；前端仅展示结果。O06 来源裁决写入、O07 关系和批量审核仍待后续推进。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
+`G7-R0.2-05-02` 正在实施：O05 时间证据已完成 candidate CRUD、逐项审核和指定日期解析预览纵向切片；O01 管理首页已接入真实 Revision/审核任务聚合；O06 已完成来源冲突只读聚合与 candidate 裁决写入。解析由后端按已核验证据稳定计算，日期例外优先于周规则并返回固定 reason codes；前端仅展示结果。O06 reviewer 审核联动、O07 关系和批量审核仍待后续推进。本机 SQLite 已迁移到 `0010_place_revision_version`，服务器 MySQL/Redis 未连接。
 
 本轮 O04 只读证据收口（2026-08-30）：发布上下文现在会收集 Revision、Geometry、AccessPoint 和 TimeRule 的完整来源依赖闭包，并校验来源与当前 Place 的归属；跨 Place 的 active 来源稳定返回 `SOURCE_RECORD_PLACE_MISMATCH`，缺失或 inactive 来源仍返回 `MISSING_SOURCE_RECORD`。证据接口只返回当前 Place 的来源摘要，几何和访问点逐行提供 `source_record_valid`，Projection 按当前 Revision/Place 过滤并以 `projection_id` 稳定排序。来源 URL 已覆盖用户信息、fragment、credential-like 查询参数、非法端口和 IPv6 方括号边界。O03 Revision 基础详情与 O04 Evidence 已独立加载，Evidence 暂时不可用时不会清空基础事实或审核操作。Google Chrome 管理会话和 O04 页面已完成可视化复核，控制台新增 warn/error 为 0。
 
@@ -743,9 +743,9 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 边界：指定日期解析预览尚未接入；解析必须由后端按正式开放时间规则完成，前端不能自行覆盖日期例外或固定场次冲突。
 - 验证结果：完整后端测试 352/352 通过；admin-web typecheck、Vitest 8/8、production build 通过；相关 Python Ruff 和 `git diff --check` 通过。
 - Chrome 验收：从 72 条候选清单进入“西湖音乐喷泉表演” Revision，O05 卡片、三类空状态、O03/O04/O05 分区和更新后的边界文案均符合预期，控制台新增 warn/error 为 0；未通过 SQL 手工制造时间数据。详见 `docs/test/reports/g7-r0.2-05-02-o05-time-evidence-chrome-2026-08-30.md`。
-- 当前进度：O05 时间证据写入、reviewer 逐项审核、指定日期解析预览、O01 管理首页待办摘要和 O06 来源冲突只读面已完成，达到可提交状态。
+- 当前进度：O05 时间证据写入、reviewer 逐项审核、指定日期解析预览、O01 管理首页待办摘要、O06 来源冲突只读面和 candidate 裁决写入已完成，达到可提交状态。
 - 遗留问题：O05 指定日期解析预览，O01、O06、O07、发布中心和批量审核仍属于后续节点；SQLite datetime adapter 警告和全仓历史 Ruff 不属于本轮阻断。
-- 下一步：提交本轮 O01/O05/O06 改动；随后实现 O06 来源冲突裁决写入与审核闭环。
+- 下一步：提交本轮 O01/O05/O06 改动；随后补充 O06 reviewer 逐项审核联动，再进入 O07 关系裁决。
 
 | 顺序 | 阶段 | 内容 | 当前状态 |
 |---|---|---|---|

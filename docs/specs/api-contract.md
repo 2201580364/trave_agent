@@ -1208,6 +1208,12 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 当同一来源存在不同内容指纹时返回冲突记录及 `resolved` 状态。该接口只读，来源裁决
 仍须通过后续 O06 写入工作流完成，不能由前端自行推断或修改 `conflicts_resolved`。
 
+`POST /api/v1/admin/place-revisions/{revision_id}/source-conflicts/resolve` 需要
+`place:candidate:write`，请求携带 `expected_revision_number`、`expected_revision_version`、
+`resolved`、`operation_intent_id` 和审计理由。服务端仅允许 candidate Revision，成功后原子
+递增 Revision 版本并记录 `PLACE_SOURCE_CONFLICTS_RESOLVED` 审计；重复 intent 可重放，版本
+冲突和非 candidate 均拒绝。该动作不会直接修改来源记录，Revision 仍须重新送审。
+
 ### 15.3 管理写入通用字段
 
 ```json

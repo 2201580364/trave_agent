@@ -183,6 +183,15 @@ class PlaceDateExceptionInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+class ResolveSourceConflictsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision_number: int = Field(gt=0)
+    expected_revision_version: int = Field(gt=0)
+    resolved: bool
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
 
 class RetirePlaceEvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -433,6 +442,21 @@ def build_admin_router(
                     for item in conflicts
                 ],
             }
+
+        @router.post("/place-revisions/{revision_id}/source-conflicts/resolve")
+        def resolve_place_source_conflicts(
+            revision_id: str, payload: ResolveSourceConflictsInput, request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.resolve_source_conflicts(
+                current, revision_id=revision_id,
+                expected_revision_number=payload.expected_revision_number,
+                expected_revision_version=payload.expected_revision_version,
+                resolved=payload.resolved, operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code, reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
 
         @router.get("/place-revisions/{revision_id}/time-preview")
         def preview_place_revision_time(

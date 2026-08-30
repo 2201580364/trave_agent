@@ -193,6 +193,41 @@ class PlaceReviewWorkflowService:
                 conflicts.append({"source_id": source_id, "records": tuple(records), "resolved": evidence.revision.conflicts_resolved})
         return tuple(conflicts)
 
+    def resolve_source_conflicts(self, principal: AdminPrincipal, *, revision_id: str,
+                                 expected_revision_number: int, expected_revision_version: int,
+                                 resolved: bool, operation_intent_id: str, reason_code: str,
+                                 reason_text: str | None, request_id: str) -> PlaceRevision:
+        self._require(principal, "place:candidate:write")
+        reason_text = self._validate_reason(reason_code, reason_text)
+        digest = _digest({"revision_id": revision_id, "expected_revision_number": expected_revision_number,
+                          "expected_revision_version": expected_revision_version, "resolved": resolved,
+                          "reason_code": reason_code, "reason_text": reason_text})
+        now = self._clock.now()
+        with self._uow_factory() as uow:
+            existing = self._replay(uow, operation_intent_id, digest)
+            if existing is not None:
+                revision = uow.reviews.get_revision(existing.target_id)
+                if revision is None: raise ResourceNotFoundError
+                return revision
+            actor = self._actor(uow, principal)
+            current = uow.reviews.get_revision(revision_id)
+            if current is None: raise ResourceNotFoundError
+            if current.lifecycle_status != "candidate": raise ReviewRevisionNotCandidateError
+            if current.revision_number != expected_revision_number: raise ReviewTaskConflictError
+            if current.revision_version != expected_revision_version: raise PlaceRevisionVersionConflictError
+            updated = replace(current, conflicts_resolved=resolved, solver_eligible=False,
+                              reviewed_at=None, published_at=None, revision_version=current.revision_version + 1)
+            uow.reviews.update_revision(updated, expected_revision_number=expected_revision_number,
+                                        expected_revision_version=expected_revision_version)
+            uow.audits.add(self._event(actor, action="PLACE_SOURCE_CONFLICTS_RESOLVED",
+                                        target_type="place_revision", target_id=revision_id,
+                                        target_revision=str(updated.revision_number),
+                                        before_digest=_revision_digest(current), after_digest=_revision_digest(updated),
+                                        reason_code=reason_code, reason_text=reason_text, request_id=request_id,
+                                        operation_intent_id=operation_intent_id, operation_digest=digest))
+            uow.commit()
+            return updated
+
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
