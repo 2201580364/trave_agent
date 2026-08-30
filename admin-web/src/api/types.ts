@@ -164,6 +164,17 @@ export type PlaceRevisionEvidence = {
   missing_source_record_ids: string[]
 }
 
+export type PlaceTimePreview = {
+  revision_id: string
+  service_date: string
+  open: boolean
+  windows: Array<{ start_minute: number | null; end_minute: number | null; last_entry_minute: number | null }>
+  fixed_sessions: Array<{ time_rule_id: string; start_minute: number; end_minute: number; last_entry_minute: number | null }>
+  reason_codes: string[]
+  applied_exception_ids: string[]
+  rule_ids: string[]
+}
+
 export type PlaceTimeRuleEvidence = {
   time_rule_id: string
   rule_kind: string

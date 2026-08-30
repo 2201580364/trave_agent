@@ -1188,8 +1188,18 @@ O05 时间证据写入同样仅允许 candidate Revision：`POST/PATCH/DELETE` �
 软停用均携带 `expected_revision_version`、`operation_intent_id` 和审计理由，原子递增
 Revision 版本并清除求解/审核资格。逐项审核端点的 `evidence_kind` 现在支持
 `time_rule`、`closure`、`date_exception`；同 intent 重放返回当前 Revision，不同载荷返回
+
 `409 admin_operation_intent_conflict`。Revision 级 approve 同时检查所有 active 的
 Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_verified`。
+
+### O05 指定日期解析预览
+
+`GET /api/v1/admin/place-revisions/{revision_id}/time-preview?service_date=YYYY-MM-DD`
+需要 `place:candidate:read`。接口只读且可重复，不改变 Revision、证据、审核或审计状态。
+解析仅使用 active 且 `human_verified` 的时间证据；日期例外优先于周规则，例外关闭优先返回
+关闭结果，日期例外可以覆盖周闭馆。响应包含 `open`、`windows`、`fixed_sessions`、
+`applied_exception_ids`、`rule_ids` 和稳定排序的 `reason_codes`。分钟值大于等于 1440
+表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。
 
 ### 15.3 管理写入通用字段
 

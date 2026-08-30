@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 
@@ -627,6 +627,9 @@ function TimeEvidenceCard({
   const [modal, setModal] = useState<'time_rule' | 'closure' | 'date_exception' | null>(null)
   const [editing, setEditing] = useState<PlaceTimeRuleEvidence | PlaceClosureEvidence | PlaceDateExceptionEvidence | null>(null)
   const [saving, setSaving] = useState(false)
+  const [previewDate, setPreviewDate] = useState('')
+  const [preview, setPreview] = useState<PlaceTimePreview | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [form] = Form.useForm()
 
   const openEditor = (
@@ -745,6 +748,13 @@ function TimeEvidenceCard({
       setSaving(false)
     }
   }
+  const runPreview = async () => {
+    if (!previewDate) return
+    setPreviewLoading(true)
+    try { setPreview(await api.previewPlaceRevisionTime(revision.place_revision_id, previewDate)) }
+    catch (reason) { onError(adminErrorMessage(reason)) }
+    finally { setPreviewLoading(false) }
+  }
   if (loading) return <Card title="开放时间与固定场次（O05）" loading />
   if (error !== null || evidence === null) {
     return (
@@ -765,8 +775,19 @@ function TimeEvidenceCard({
           showIcon
           type="info"
           title="时间证据严格绑定当前 Revision"
-          description="编辑会递增 Revision 版本并清除既有审核/求解资格；逐项核验要求先建立开放审核任务。指定日期解析预览仍将在下一切片接入。"
+          description="编辑会递增 Revision 版本并清除既有审核/求解资格；逐项核验要求先建立开放审核任务。解析预览由后端按已核验证据计算。"
         />
+        <Space wrap>
+          <Input type="date" value={previewDate} onChange={(event) => setPreviewDate(event.target.value)} />
+          <Button onClick={() => void runPreview()} loading={previewLoading} disabled={!previewDate}>解析预览</Button>
+        </Space>
+        {preview && <Card size="small" title={`${preview.service_date}：${preview.open ? '开放' : '闭馆'}`}>
+          <Space orientation="vertical">
+            <Typography.Text>时间窗口：{preview.windows.length ? preview.windows.map((window) => `${window.start_minute ?? '-'}–${window.end_minute ?? '-'}（末入 ${window.last_entry_minute ?? '-'}）`).join('；') : '无'}</Typography.Text>
+            <Typography.Text>固定场次：{preview.fixed_sessions.length ? preview.fixed_sessions.map((session) => `${session.start_minute}–${session.end_minute}`).join('；') : '无'}</Typography.Text>
+            <Typography.Text>解析码：{preview.reason_codes.length ? preview.reason_codes.join('、') : '无'}</Typography.Text>
+          </Space>
+        </Card>}
         <Space style={{ width: '100%', justifyContent: 'space-between' }}><Typography.Title level={5} style={{ margin: 0 }}>周规则与固定场次</Typography.Title>{editable && <Button size="small" icon={<PlusOutlined />} onClick={() => openEditor('time_rule')}>新增</Button>}</Space>
         <Table<PlaceTimeRuleEvidence>
           rowKey="time_rule_id"

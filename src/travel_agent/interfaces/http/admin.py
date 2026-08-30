@@ -407,6 +407,16 @@ def build_admin_router(
             )
             return _revision_evidence_response(evidence)
 
+        @router.get("/place-revisions/{revision_id}/time-preview")
+        def preview_place_revision_time(
+            revision_id: str,
+            service_date: date = Query(...),
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            return review_workflow.preview_time(
+                current, revision_id=revision_id, service_date=service_date
+            )
+
         @router.post("/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review")
         def review_place_evidence(
             revision_id: str,

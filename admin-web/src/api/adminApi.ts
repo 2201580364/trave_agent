@@ -21,6 +21,7 @@ import type {
   PlaceTimeRuleInput,
   RetirePlaceEvidenceInput,
   PublicationCheck,
+  PlaceTimePreview,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -104,6 +105,11 @@ export class AdminApi {
 
   getPlaceRevisionEvidence(revisionId: string): Promise<PlaceRevisionEvidence> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/evidence`)
+  }
+
+  previewPlaceRevisionTime(revisionId: string, serviceDate: string): Promise<PlaceTimePreview> {
+    const query = new URLSearchParams({ service_date: serviceDate })
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-preview?${query}`)
   }
 
   createGeometry(revisionId: string, input: PlaceGeometryInput): Promise<PlaceRevision> {
