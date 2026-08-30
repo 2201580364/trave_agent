@@ -6,9 +6,9 @@
 
 ## 术语
 
-### 2026-08-30 续接进度
+### 2026-08-30 续接进度（Revision 版本化发布闭环补证）
 
-`G7-R0.2-05-02` 正在实施：追加 Alembic `0008_place_review_workflow`，新增 `PlaceReviewTask`/`PlaceReviewDecision` 不可变领域值对象，并完成送审、审核决定、Revision 状态联动、追加式审计、幂等重放和版本冲突语义。独立 `admin-web` 已接入 O08 审核队列首版、O02 候选地点清单首版和 O03 Revision 详情首版，可查看任务/决定历史、候选 Revision 基础事实并执行审核操作；本轮已导入 72 条 candidate Revision，补齐 O03 有数据详情的 Chrome 验收，并为候选清单增加前后端分页（服务端 `limit/offset/total`，前端按页请求）。O01 待办摘要及 O04–O07 的地图、时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0009_place_revision_review_flags`，服务器 MySQL/Redis 未连接。
+`G7-R0.2-05-02` 正在实施：审核工作流、Revision 版本化编辑与 Projection 级发布入口已经落地。独立 `admin-web` 已接入 O08 审核队列首版、O02 候选地点清单首版和 O03 Revision 详情首版，可查看任务/决定历史、候选 Revision 基础事实并执行送审、审核和发布操作；本轮完成了 Revision 版本化业务闭环验收：基线 Revision 进入 `human_verified`，新 Revision 经管理端新建、修改、重新送审、审核通过、publication check 后发布为新的 Projection，基线保持不变。Revision 3 已从已核验基线详情页点击“新建修订”开始，并由 Chrome 完成全路径操作。O01 待办摘要及 O04–O07 的地图、时间、来源和关系证据面仍待后续切片。本机 SQLite 已迁移到 `0009_place_revision_review_flags`，服务器 MySQL/Redis 未连接。
 
 | 术语 | 含义 |
 |---|---|
@@ -24,13 +24,13 @@
 ## 当前总状态
 
 - 更新时间：2026-08-30
-- 当前已提交基线：`ba97a3a feat(admin): add candidate revision workspace`；工作区仅有本轮 Chrome 验收发现的候选地点菜单文案修复，未包含凭证或密钥
+- 当前已提交基线：`ddfa92e feat(admin): add versioned place revision review and publication flow`；工作区有本轮 Revision 发布闭环验收报告和本状态文档同步，未包含凭证或密钥
 - 产品里程碑：`M1 — 行程骨架验证`
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
 - 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
 - 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。当前已形成 candidate→送审→驳回/通过闭环、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版和候选清单前后端分页；72 条数据均保持 `candidate` 且 `solver_eligible=false`，不通过 SQL 手工改状态，未审核依赖仍阻断发布。本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、有数据 Chrome 验收和候选分页，但 O01、O04–O07 证据面、72 个 candidate 批量审核、OD 扩容、不可变数据发布、应用部署和 dry run 仍未完成，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情首版、候选分页以及 Revision→重新审核→Projection 发布的业务闭环，并已补齐从 Chrome“新建修订”按钮开始的完整验收证据。当前仍缺 O01、O04–O07 证据面、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -73,7 +73,7 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | Gate 7 R0.2-04 候选清单与覆盖矩阵 | 完成 | 72 个 candidate、11 区域、9 类别、18 夜间/固定时段、28 室内/雨天、24 非点状候选、11 组未裁决关系线索、确定性覆盖矩阵、CLI 和 7 项测试 |
 | Gate 7 R0.2-05-01A 管理后端底座 | 完成 | 独立 AdminActor/Role/Session、scrypt、会话摘要、服务端 RBAC、管理员创建/角色乐观锁与幂等、追加式 AuditEvent、`/api/v1/admin` 和 Alembic 0007；6 项专项测试 |
 | Gate 7 R0.2-05-01B 管理 Web 壳与安全操作面 | 完成 | ADR-0020 独立 `admin-web/`、O00 登录/超时、O16 管理员与角色、最小 O15 审计只读；token 仅存 React 内存；`npm run typecheck/test/build` 通过，全量 pytest 通过 |
-| Gate 7 R0.2-05-02 地点审核工作台 P0 | 进行中 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情首版和有数据 Chrome 验收；O01/O04–O07 证据面和批量审核待完成 |
+| Gate 7 R0.2-05-02 地点审核工作台 P0 | 进行中 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情首版、Revision 版本化发布闭环和完整 Chrome 验收报告；O01/O04–O07 证据面和批量审核待完成 |
 
 最新稳定技术基线：全量 pytest 回归在同步 readiness 到 `0009_place_revision_review_flags` 后通过；admin-web `4/4` 测试、`tsc -b` 与 Vite 生产构建通过；R0.2-05-01A 管理身份/RBAC/审计专项、审核与候选专项通过。数据库 head/readiness 已升级为 `0009_place_revision_review_flags`。服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。全仓 Ruff/strict mypy 历史债仍未清零。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
@@ -165,9 +165,10 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - 新增 O03 Revision 详情首版：候选清单和审核队列均可跳转到独立详情页；按基础事实、体验/求解摘要、治理状态和发布阻断摘要分组展示，阻断判断只基于当前 API 字段，并明确标注 O04–O07 逐项证据尚未接入；
 - 补齐地点 Revision 首版版本化闭环：`POST /places/{place_id}/revisions` 从指定基线创建新的 candidate，`PATCH /place-revisions/{revision_id}` 仅允许编辑 candidate 并重置审核/求解资格，随后可重新送审；创建、编辑、发布均记录 reason、前后摘要和 operation digest，重复 intent 同载荷安全重放、不同载荷返回冲突；
 - 新增首版发布门检查与发布入口：`GET /place-revisions/{revision_id}/publication-checks` 返回稳定 `reason_codes`，`POST /place-revisions/{revision_id}/publications` 仅在 human_verified Revision、Projection 及其依赖闭包通过门禁后执行；门禁失败返回 `409 publication_gate_rejected` 和 `details.reason_codes`，不会改变 Revision/Projection 状态；当前能力仍是 Projection 级发布，不等同于 R0.2-07 的独立 research snapshot、城市当前指针、批次发布和回滚；
+- 新增 Revision 版本化发布 Chrome 验收报告 `docs/test/reports/g7-r0.2-05-02-revision-publication-chrome-2026-08-30.md`：基线 Revision 送审/通过、新 Revision 通过管理端“新建修订”按钮创建、修改、重新送审、审核通过、publication check 和 Projection 发布均有本地 SQLite/审计证据；报告明确区分路径 A（已有 `human_verified` 直接发布）与路径 B（新建 candidate→修改→重新审核→发布）；
 - 候选地点清单已支持服务端分页：`GET /api/v1/admin/candidates` 返回 `limit`、`offset`、`total`，数据库按稳定创建时间/ID 顺序执行 `LIMIT/OFFSET`；admin-web 默认每页 20 条，可切换 50/100 条并按页请求，刷新回到第一页；
-- 验证：审核与候选专项后端测试 `10/10`、相关数据库测试 `12/12`、admin-web typecheck、Vitest `4/4`、Vite production build、全量 pytest `344/344` 和 `git diff --check` 通过；Chrome 已完成管理员登录后的首页、管理员/角色、审计中心（展开/动作筛选）、审核工作台、候选清单、退出和受保护路由验收；修复候选地点菜单文案乱码并记录于 `docs/test/reports/g7-r0.2-05-02-admin-web-chrome-2026-08-30.md`；
-- 当前剩余：O01 待办摘要、O04 地图/访问点、O05 开放时间、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；Revision 差异视图、证据依赖复制策略和独立 research snapshot 仍属于后续切片；本轮 Chrome 已看到候选清单分页控件，但 API 重启后原登录会话失效，尚未在新会话中完成分页点击复核；本机不部署 MySQL/Redis。
+- 验证：审核与候选专项后端测试 `10/10`、相关数据库测试 `12/12`、admin-web typecheck、Vitest `4/4`、Vite production build、全量 pytest `344/344` 和 `git diff --check` 通过；Chrome 已完成管理员登录后的首页、管理员/角色、审计中心（展开/动作筛选）、审核工作台、候选清单、退出和受保护路由验收，并完成 Revision 版本化发布路径从编辑到发布的 Chrome 操作；
+- 当前剩余：O01 待办摘要、O04 地图/访问点、O05 开放时间、O06 来源冲突、O07 关系裁决及 72 个 candidate 批量审核仍未完成；Revision 差异视图、证据依赖复制策略和独立 research snapshot 仍属于后续切片；本机不部署 MySQL/Redis。
 
 ### A4：应用代码架构设计
 
