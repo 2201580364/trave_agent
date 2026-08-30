@@ -407,6 +407,33 @@ def build_admin_router(
             )
             return _revision_evidence_response(evidence)
 
+        @router.get("/place-revisions/{revision_id}/source-conflicts")
+        def list_place_source_conflicts(
+            revision_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            conflicts = review_workflow.list_source_conflicts(current, revision_id=revision_id)
+            return {
+                "revision_id": revision_id,
+                "items": [
+                    {
+                        "source_id": item["source_id"],
+                        "resolved": item["resolved"],
+                        "records": [
+                            {
+                                "source_record_id": record.source_record_id,
+                                "source_url": safe_source_url(record.source_url),
+                                "source_decision": record.source_decision,
+                                "status": record.status,
+                                "observed_at": record.observed_at.isoformat(),
+                            }
+                            for record in item["records"]
+                        ],
+                    }
+                    for item in conflicts
+                ],
+            }
+
         @router.get("/place-revisions/{revision_id}/time-preview")
         def preview_place_revision_time(
             revision_id: str,

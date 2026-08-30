@@ -25,6 +25,7 @@ from travel_agent.domain.place_catalog import (
     PlaceReviewTask,
     PlaceRevision,
     PlaceRevisionEvidence,
+    PlaceSourceRecord,
     PlaceTimeRule,
     ProjectionPublicationError,
     SolverPlaceProjection,
@@ -175,6 +176,22 @@ class PlaceReviewWorkflowService:
                 "review_tasks": tasks,
                 "recent_ready_tasks": tuple(recent),
             }
+
+    def list_source_conflicts(self, principal: AdminPrincipal, *, revision_id: str) -> tuple[dict[str, object], ...]:
+        self._require(principal, "place:candidate:read")
+        with self._uow_factory() as uow:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+        groups: dict[str, list[PlaceSourceRecord]] = {}
+        for record in evidence.source_records:
+            groups.setdefault(record.source_id, []).append(record)
+        conflicts = []
+        for source_id, records in sorted(groups.items()):
+            fingerprints = {record.content_sha256 or record.registry_sha256 for record in records}
+            if len(records) > 1 and len(fingerprints) > 1:
+                conflicts.append({"source_id": source_id, "records": tuple(records), "resolved": evidence.revision.conflicts_resolved})
+        return tuple(conflicts)
 
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
         self._require(principal, "place:candidate:read")

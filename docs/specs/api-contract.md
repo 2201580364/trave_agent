@@ -1201,6 +1201,13 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 `applied_exception_ids`、`rule_ids` 和稳定排序的 `reason_codes`。分钟值大于等于 1440
 表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。
 
+### O06 来源冲突只读面
+
+`GET /api/v1/admin/place-revisions/{revision_id}/source-conflicts` 需要
+`place:candidate:read`，按 `source_id` 聚合当前 Revision 依赖闭包中的来源记录；
+当同一来源存在不同内容指纹时返回冲突记录及 `resolved` 状态。该接口只读，来源裁决
+仍须通过后续 O06 写入工作流完成，不能由前端自行推断或修改 `conflicts_resolved`。
+
 ### 15.3 管理写入通用字段
 
 ```json
