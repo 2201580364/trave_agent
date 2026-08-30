@@ -1818,7 +1818,15 @@ class PlaceReviewWorkflowService:
                 raise ReviewRevisionNotApprovableError
             if decision_kind == "approve":
                 evidence = uow.catalog.load_revision_evidence(task.place_revision_id)
-                if evidence is None or any(
+                source_conflict = False
+                if evidence is not None:
+                    grouped: dict[str, set[str]] = {}
+                    for source in evidence.source_records:
+                        grouped.setdefault(source.source_id, set()).add(
+                            source.content_sha256 or source.registry_sha256
+                        )
+                    source_conflict = any(len(fingerprints) > 1 for fingerprints in grouped.values())
+                if evidence is None or source_conflict and not revision.conflicts_resolved or evidence is not None and any(
                     item.active and item.review_status != "human_verified"
                     for item in (
                         *evidence.geometries,

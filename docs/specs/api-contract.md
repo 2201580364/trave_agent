@@ -1277,3 +1277,6 @@ When 第一次已经成功
 Then 第二次返回同一发布结果
 And 不重复创建 Projection、快照或审计终态
 ```
+Revision 级 reviewer approve 会重新计算来源依赖闭包；若同一 `source_id` 存在不同内容指纹且
+`conflicts_resolved=false`，以 `review_revision_not_approvable` 拒绝，防止仅靠客户端标记绕过
+来源冲突门禁。裁决后仍需重新送审。
