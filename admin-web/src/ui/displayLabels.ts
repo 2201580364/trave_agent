@@ -72,13 +72,14 @@ const labels: Record<string, string> = {
 }
 
 const reasonLabels: Record<string, string> = {
-  MISSING_VERIFIED_ACCESS_POINT: '缺少已核验的访问点',
   PROJECTION_NOT_FOUND: '尚未准备求解投影',
+  PROJECTION_DEPENDENCY_MISSING: '求解投影依赖数据缺失',
   PROJECTION_ALREADY_EXISTS: '求解投影已存在',
   DURATION_NOT_COLLECTED: '建议时长尚未采集',
   MISSING_VERIFIED_GEOMETRY: '缺少已核验的地点几何',
   MISSING_VERIFIED_TIME_RULE: '缺少已核验的开放时间规则',
   SOURCE_RECORD_INVALID: '来源记录无效',
+  MISSING_SOURCE_RECORD: '缺少来源记录',
   REVISION_NOT_HUMAN_VERIFIED: '修订版本尚未完成人工核验',
   PLACE_NOT_ACTIVE: '地点当前未生效',
   READY_FOR_REVIEW: '已准备审核',
@@ -87,6 +88,27 @@ const reasonLabels: Record<string, string> = {
   EVIDENCE_APPROVED: '证据已通过核验',
   EVIDENCE_REJECTED: '证据已驳回',
   PUBLICATION_APPROVED: '发布已批准',
+  MISSING_VERIFIED_ACCESS_POINT: '缺少已核验的访问点',
+  MISSING_ARRIVAL_ACCESS_POINT: '缺少到达访问点',
+  MISSING_DEPARTURE_ACCESS_POINT: '缺少离开访问点',
+  ACCESS_POINT_NOT_HUMAN_VERIFIED: '访问点尚未人工核验',
+  ACCESS_POINT_REVISION_MISMATCH: '访问点不属于当前修订版本',
+  TIME_RULE_UNRESOLVED: '开放时间尚未核验',
+  FIXED_SESSION_AMBIGUOUS: '固定场次不明确',
+  FIXED_SESSION_REQUIRED: '演出地点需要固定场次规则',
+  SOURCE_CONFLICT_UNRESOLVED: '来源冲突尚未裁决',
+  SOURCE_RECORD_PLACE_MISMATCH: '来源记录不属于当前地点',
+  PLACE_NOT_SOLVER_ELIGIBLE: '修订版本尚未获得求解资格',
+  OVERLAPPING_SELECTION_UNRESOLVED: '重叠地点关系尚未裁决',
+  RELATION_REVIEW_REQUIRED: '地点关系尚未完成检查',
+  PROJECTION_NOT_ACTIVE: '求解投影未生效',
+  PROJECTION_HASH_MISMATCH: '求解投影完整性校验失败',
+  PROJECTION_DURATION_MISMATCH: '求解投影时长与修订版本不一致',
+  PROJECTION_REVISION_MISMATCH: '求解投影不属于当前修订版本',
+  PROJECTION_PLACE_MISMATCH: '求解投影不属于当前地点',
+  PROJECTION_PLACE_KIND_MISMATCH: '求解投影地点类型不一致',
+  PROJECTION_GEOMETRY_KIND_MISMATCH: '求解投影几何类型不一致',
+  UNSUPPORTED_PLACE_KIND: '地点类型暂不支持求解',
 }
 
 function label(value: string | null | undefined, fallback = '未识别') {
@@ -102,6 +124,10 @@ export function reviewStatusLabel(value: string | null | undefined) { return lab
 export function sourceDecisionLabel(value: string | null | undefined) { return label(value) }
 export function relationTypeLabel(value: string | null | undefined) { return label(value) }
 export function relationResolutionLabel(value: string | null | undefined) { return label(value) }
+
+export function relationReviewStatusLabel(value: string | null | undefined) {
+  return ({ pending: '待完成关系检查', no_relations: '已确认无关系', not_required: '无需单独确认' } as Record<string, string>)[value ?? ''] ?? '未识别'
+}
 export function timeRuleKindLabel(value: string | null | undefined) { return label(value) }
 export function dateExceptionKindLabel(value: string | null | undefined) { return label(value) }
 export function indoorOutdoorLabel(value: string | null | undefined) { return label(value) }

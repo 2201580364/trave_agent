@@ -122,6 +122,7 @@ class PlaceRevisionRow(Base):
     reviewed_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     published_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     review_flags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
+    relation_review_status: Mapped[str] = mapped_column(String(24), nullable=False, default="not_required")
 
 
 class PlaceGeometryRow(Base):
@@ -697,6 +698,7 @@ class SqlAlchemyPlaceCatalogRepository:
         evidence_id: str,
         review_status: str,
         reviewed_at: datetime,
+        place_id: str | None = None,
     ) -> PlaceRevision:
         table_and_key = {
             "geometry": (PlaceGeometryRow, PlaceGeometryRow.geometry_id),
@@ -712,13 +714,20 @@ class SqlAlchemyPlaceCatalogRepository:
         table, key = table_and_key if table_and_key is not None else (None, None)
         if table is None or key is None or review_status not in {"human_verified", "rejected"}:
             raise ValueError("invalid evidence review")
-        result = self._session.execute(
-            update(table)
-            .where(
-                key == evidence_id,
-                table.place_revision_id == revision_id,
-                table.active.is_(True),
+        predicates = [key == evidence_id, table.active.is_(True)]
+        if evidence_kind == "relation":
+            if place_id is None:
+                raise ValueError("relation review requires place id")
+            predicates.append(
+                or_(
+                    PlaceRelationRow.from_place_id == place_id,
+                    PlaceRelationRow.to_place_id == place_id,
+                )
             )
+        else:
+            predicates.append(table.place_revision_id == revision_id)
+        result = self._session.execute(
+            update(table).where(*predicates)
             .values(
                 review_status=review_status,
                 reviewed_at=reviewed_at if review_status == "human_verified" else None,
@@ -1240,6 +1249,7 @@ def _revision_values(value: PlaceRevision) -> dict[str, Any]:
         "reviewed_at": _iso(value.reviewed_at),
         "published_at": _iso(value.published_at),
         "review_flags": list(value.review_flags),
+        "relation_review_status": value.relation_review_status,
     }
 
 
@@ -1274,6 +1284,7 @@ def _revision_from_row(row: PlaceRevisionRow) -> PlaceRevision:
         datetime.fromisoformat(row.published_at) if row.published_at else None,
         tuple(row.review_flags or ()),
         row.revision_version,
+        row.relation_review_status or "not_required",
     )
 
 

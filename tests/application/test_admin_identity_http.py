@@ -36,6 +36,7 @@ from travel_agent.infrastructure.database.place_catalog import (
     PlaceDateExceptionRow,
     PlaceGeometryRow,
     PlaceRevisionRow,
+    PlaceRelationRow,
     PlaceRow,
     PlaceSourceRecordRow,
     PlaceTimeRuleRow,
@@ -372,7 +373,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0011_research_snapshot_batches"
+    assert revision == "0012_relation_review_status"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -499,6 +500,156 @@ def _seed_human_verified_revision_with_evidence(
             created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
         ))
         session.commit()
+
+
+def test_time_preview_resolves_exceptions_closures_cross_midnight_and_sessions(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-time-preview")
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-time-preview")
+        assert revision is not None
+        revision.source_record_ids = []
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="preview-opening",
+                place_revision_id=revision.place_revision_id,
+                rule_kind="opening_hours",
+                weekdays=[1, 2, 3, 4, 5, 6, 7],
+                start_minute=9 * 60,
+                end_minute=17 * 60,
+                last_entry_minute=16 * 60,
+                valid_from=None,
+                valid_to=None,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="preview-fixed-1",
+                place_revision_id=revision.place_revision_id,
+                rule_kind="fixed_session",
+                weekdays=[2],
+                start_minute=23 * 60 + 30,
+                end_minute=25 * 60 + 30,
+                last_entry_minute=24 * 60 + 30,
+                valid_from=None,
+                valid_to=None,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="preview-fixed-2",
+                place_revision_id=revision.place_revision_id,
+                rule_kind="fixed_session",
+                weekdays=[2],
+                start_minute=26 * 60,
+                end_minute=27 * 60,
+                last_entry_minute=None,
+                valid_from=None,
+                valid_to=None,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceClosureRow(
+                closure_id="preview-monday-closure",
+                place_revision_id=revision.place_revision_id,
+                weekday=1,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceDateExceptionRow(
+                date_exception_id="preview-open-override",
+                place_revision_id=revision.place_revision_id,
+                service_date=date(2026, 9, 7),
+                exception_kind="open_override",
+                start_minute=10 * 60,
+                end_minute=18 * 60,
+                last_entry_minute=17 * 60,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.commit()
+
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    override = context.client.get(
+        "/api/v1/admin/place-revisions/revision-time-preview/time-preview",
+        params={"service_date": "2026-09-07"},
+        headers=headers,
+    )
+    assert override.status_code == 200
+    assert override.json()["open"] is True
+    assert override.json()["windows"] == [
+        {"start_minute": 600, "end_minute": 1080, "last_entry_minute": 1020}
+    ]
+    assert override.json()["applied_exception_ids"] == ["preview-open-override"]
+    assert override.json()["rule_ids"] == []
+    assert override.json()["reason_codes"] == ["PLACE_DATE_EXCEPTION_APPLIED"]
+
+    closed = context.client.get(
+        "/api/v1/admin/place-revisions/revision-time-preview/time-preview",
+        params={"service_date": "2026-09-14"},
+        headers=headers,
+    )
+    assert closed.status_code == 200
+    assert closed.json()["open"] is False
+    assert closed.json()["reason_codes"] == ["PLACE_WEEKLY_CLOSED"]
+
+    sessions = context.client.get(
+        "/api/v1/admin/place-revisions/revision-time-preview/time-preview",
+        params={"service_date": "2026-09-08"},
+        headers=headers,
+    )
+    assert sessions.status_code == 200
+    assert sessions.json()["open"] is True
+    assert sessions.json()["reason_codes"] == [
+        "CROSS_MIDNIGHT_WINDOW",
+        "FIXED_SESSION_AMBIGUOUS",
+    ]
+    assert [item["time_rule_id"] for item in sessions.json()["fixed_sessions"]] == [
+        "preview-fixed-1",
+        "preview-fixed-2",
+    ]
+
+    unmatched = context.client.get(
+        "/api/v1/admin/place-revisions/revision-time-preview/time-preview",
+        params={"service_date": "2026-09-13"},
+        headers=headers,
+    )
+    assert unmatched.status_code == 200
+    assert unmatched.json()["open"] is True
+    assert unmatched.json()["windows"][0]["start_minute"] == 540
+
+    unauthenticated = context.client.get(
+        "/api/v1/admin/place-revisions/revision-time-preview/time-preview",
+        params={"service_date": "2026-09-07"},
+    )
+    assert unauthenticated.status_code == 401
 
 
 def test_projection_preparation_api_is_verified_idempotent_and_does_not_publish(
@@ -647,6 +798,13 @@ def test_place_review_submit_approve_and_audit_are_one_workflow(
     assert task["status"] == "ready_for_review"
     assert task["version"] == 1
 
+    loaded = context.client.get(
+        f"/api/v1/admin/review-tasks/{task['review_task_id']}", headers=headers
+    )
+    assert loaded.status_code == 200
+    assert loaded.json()["place_revision_id"] == "revision-1"
+    assert loaded.json()["status"] == "ready_for_review"
+
     replay = context.client.post(
         "/api/v1/admin/place-revisions/revision-1/review-tasks",
         headers=headers,
@@ -780,6 +938,31 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
                 reviewed_at=None,
             )
         )
+        session.add(
+            PlaceRow(
+                place_id="place-2",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at=NOW.isoformat(),
+                updated_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceRelationRow(
+                relation_id="relation-review",
+                from_place_id="place-1",
+                to_place_id="place-2",
+                relation_type="overlaps",
+                source_record_id="source-review",
+                review_status="candidate",
+                resolution_status="resolved",
+                decision_note="测试关系已裁决",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
         session.commit()
 
     _, root_headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
@@ -820,6 +1003,19 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
     )
     approved = context.client.post(path, headers=root_headers, json=payload)
     assert approved.status_code == 200
+    relation_payload = {
+        "operation_intent_id": "review-relation-1",
+        "review_status": "human_verified",
+        "reason_code": "EVIDENCE_APPROVED",
+    }
+    relation_path = (
+        "/api/v1/admin/place-revisions/revision-review-evidence/"
+        "evidence/relation/relation-review/review"
+    )
+    relation_approved = context.client.post(
+        relation_path, headers=root_headers, json=relation_payload
+    )
+    assert relation_approved.status_code == 200
     replay = context.client.post(path, headers=root_headers, json=payload)
     assert replay.status_code == 200
     conflict = context.client.post(
@@ -1626,6 +1822,62 @@ def test_revision_editing_creates_new_candidate_and_keeps_base_immutable(
     assert immutable.json()["error"]["code"] == "review_revision_not_candidate"
 
 
+def test_new_revision_copies_active_evidence_as_unverified_children(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-with-evidence")
+    with context.sessions() as session:
+        session.add(PlaceSourceRecordRow(
+            source_record_id="source-copy", place_id="place-1", source_id="manual",
+            registry_id="registry-v1", registry_sha256="a" * 64,
+            field_dictionary_id="fields-v1", field_dictionary_sha256="b" * 64,
+            source_url="https://example.test/source", collection_mode="manual_reference",
+            target_stage="staging", source_decision="approved", observed_at=NOW.isoformat(),
+            content_sha256="c" * 64, status="active", created_at=NOW.isoformat(),
+        ))
+        base = session.get(PlaceRevisionRow, "revision-with-evidence")
+        assert base is not None
+        base.source_record_ids = ["source-copy"]
+        session.add(PlaceGeometryRow(
+            geometry_id="geometry-copy", place_revision_id=base.place_revision_id,
+            geometry_kind="point", geometry={"type": "Point", "coordinates": [120.1, 30.2]},
+            source_record_id="source-copy", review_status="human_verified", active=True,
+            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
+        ))
+        session.add(PlaceAccessPointRow(
+            access_point_id="access-copy", place_revision_id=base.place_revision_id,
+            access_point_kind="visitor_entrance", name="主入口", lat=30.2, lng=120.1,
+            source_record_id="source-copy", review_status="human_verified", active=True,
+            fetched_at=NOW.isoformat(), reviewed_at=NOW.isoformat(), created_at=NOW.isoformat(),
+        ))
+        session.add(PlaceTimeRuleRow(
+            time_rule_id="time-copy", place_revision_id=base.place_revision_id,
+            rule_kind="opening_hours", weekdays=[1, 2, 3, 4, 5, 6, 7],
+            start_minute=540, end_minute=1020, last_entry_minute=990,
+            valid_from=None, valid_to=None, source_record_id="source-copy",
+            review_status="human_verified", active=True,
+            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
+        ))
+        session.commit()
+
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    response = context.client.post(
+        "/api/v1/admin/places/place-1/revisions", headers=headers,
+        json={"base_revision_id": "revision-with-evidence", "operation_intent_id": "copy-evidence-1", "reason_code": "PLACE_FACTS_REFRESH"},
+    )
+    assert response.status_code == 201, response.text
+    new_id = response.json()["place_revision_id"]
+    with context.sessions() as session:
+        geometries = tuple(session.scalars(select(PlaceGeometryRow).where(PlaceGeometryRow.place_revision_id == new_id)))
+        access_points = tuple(session.scalars(select(PlaceAccessPointRow).where(PlaceAccessPointRow.place_revision_id == new_id)))
+        time_rules = tuple(session.scalars(select(PlaceTimeRuleRow).where(PlaceTimeRuleRow.place_revision_id == new_id)))
+    assert len(geometries) == len(access_points) == len(time_rules) == 1
+    assert geometries[0].geometry_id != "geometry-copy"
+    assert access_points[0].access_point_id != "access-copy"
+    assert time_rules[0].time_rule_id != "time-copy"
+    assert geometries[0].review_status == access_points[0].review_status == time_rules[0].review_status == "candidate"
+    assert geometries[0].reviewed_at is None and access_points[0].reviewed_at is None and time_rules[0].reviewed_at is None
 def test_place_review_request_changes_keeps_candidate_and_rejects_stale_version(
     admin_context: AdminTestContext,
 ) -> None:

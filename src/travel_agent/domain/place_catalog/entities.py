@@ -167,6 +167,7 @@ class PlaceRevision:
     published_at: datetime | None = None
     review_flags: tuple[str, ...] = ()
     revision_version: int = 1
+    relation_review_status: str = "not_required"
 
     def __post_init__(self) -> None:
         _required(
@@ -204,6 +205,8 @@ class PlaceRevision:
             raise ValueError("place revision review flags must be unique")
         if self.revision_version <= 0:
             raise ValueError("place revision version must be positive")
+        if self.relation_review_status not in {"pending", "no_relations", "not_required"}:
+            raise ValueError("place relation review status is invalid")
         _aware(self.created_at, "place revision created_at")
         _aware(self.reviewed_at, "place revision reviewed_at", required=False)
         _aware(self.published_at, "place revision published_at", required=False)

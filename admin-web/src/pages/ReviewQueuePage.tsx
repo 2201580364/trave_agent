@@ -21,6 +21,7 @@ const statusLabels: Record<ReviewTaskStatus, string> = {
 
 export function ReviewQueuePage() {
   const { api } = useAdminSession()
+  const navigate = useNavigate()
   const [status, setStatus] = useState<ReviewTaskStatus | undefined>('ready_for_review')
   const [tasks, setTasks] = useState<ReviewTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,8 +76,24 @@ export function ReviewQueuePage() {
       { title: '修订版本', dataIndex: 'place_revision_id', width: 230, ellipsis: true },
       { title: '版本', dataIndex: 'version', width: 80 },
       { title: '更新时间', dataIndex: 'updated_at', width: 210, render: formatDateTime },
+      {
+        title: '审核地点',
+        key: 'place',
+        width: 170,
+        fixed: 'right' as const,
+        render: (_value: unknown, task: ReviewTask) => (
+          <Button
+            type="link"
+            icon={<FileSearchOutlined />}
+            onClick={() => navigate(`/candidates/${encodeURIComponent(task.place_revision_id)}?from=review&task=${encodeURIComponent(task.review_task_id)}`)}
+            style={{ paddingInline: 0 }}
+          >
+            查看地点详情
+          </Button>
+        ),
+      },
     ],
-    [],
+    [navigate],
   )
 
   return (
@@ -180,10 +197,10 @@ function ReviewTaskDetails({
       <Button
         type="link"
         icon={<FileSearchOutlined />}
-        onClick={() => navigate(`/candidates/${encodeURIComponent(task.place_revision_id)}`)}
+        onClick={() => navigate(`/candidates/${encodeURIComponent(task.place_revision_id)}?from=review&task=${encodeURIComponent(task.review_task_id)}`)}
         style={{ alignSelf: 'flex-start', paddingInline: 0 }}
       >
-        查看修订版本详情
+        查看地点与证据详情
       </Button>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
       {canDecide && (

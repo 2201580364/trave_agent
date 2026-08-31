@@ -233,6 +233,14 @@ class ResolveRelationInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+class ConfirmNoRelationsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision_number: int = Field(gt=0)
+    expected_revision_version: int = Field(gt=0)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
 
 class RetirePlaceEvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -510,6 +518,21 @@ def build_admin_router(
                 resolution_status=payload.resolution_status, decision_note=payload.decision_note,
                 operation_intent_id=payload.operation_intent_id, reason_code=payload.reason_code,
                 reason_text=payload.reason_text, request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/relations/confirm-none")
+        def confirm_no_place_relations(
+            revision_id: str, payload: ConfirmNoRelationsInput, request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.confirm_no_relations(
+                current, revision_id=revision_id,
+                expected_revision_number=payload.expected_revision_number,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code, reason_text=payload.reason_text,
+                request_id=request.state.request_id,
             )
             return _revision_response(revision)
 
@@ -1092,6 +1115,13 @@ def build_admin_router(
             )
             return _review_task_response(task)
 
+        @router.get("/review-tasks/{task_id}")
+        def get_review_task(
+            task_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            return _review_task_response(review_workflow.get_task(current, task_id=task_id))
+
         @router.post("/review-tasks/batch-decisions")
         def decide_place_review_batch(
             payload: BatchDecidePlaceReviewInput,
@@ -1215,6 +1245,7 @@ def _revision_response(revision: PlaceRevision) -> dict[str, object]:
         "reviewed_at": revision.reviewed_at.isoformat() if revision.reviewed_at else None,
         "published_at": revision.published_at.isoformat() if revision.published_at else None,
         "review_flags": list(revision.review_flags),
+        "relation_review_status": revision.relation_review_status,
     }
 
 

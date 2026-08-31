@@ -8,13 +8,14 @@ import {
   ReloadOutlined,
   SendOutlined,
   SafetyCertificateOutlined,
+  ExclamationCircleFilled,
 } from '@ant-design/icons'
-import { Alert, App as AntApp, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography } from 'antd'
+import { Alert, App as AntApp, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence } from '../api/types'
+import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence, ReviewTask, PublicationCheck, SourceConflict } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 import {
@@ -27,7 +28,9 @@ import {
   projectionStatusLabel,
   rainSuitabilityLabel,
   relationResolutionLabel,
+  relationReviewStatusLabel,
   relationTypeLabel,
+  reasonCodeLabel,
   reviewStatusLabel,
   sourceDecisionLabel,
   timeRuleKindLabel,
@@ -47,14 +50,26 @@ export function RevisionDetailsPage() {
   const { api, hasPermission } = useAdminSession()
   const { message: messageApi } = AntApp.useApp()
   const navigate = useNavigate()
+  const location = useLocation()
   const { revisionId } = useParams<{ revisionId: string }>()
+  const reviewQuery = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const reviewContext = reviewQuery.get('from') === 'review'
+  const reviewTaskId = reviewQuery.get('task')
+  const canCheckPublication = hasPermission('place:publication:check')
   const [revision, setRevision] = useState<PlaceRevision | null>(null)
   const [evidence, setEvidence] = useState<PlaceRevisionEvidence | null>(null)
+  const [reviewTask, setReviewTask] = useState<ReviewTask | null>(null)
+  const [sourceConflicts, setSourceConflicts] = useState<SourceConflict[]>([])
+  const [sourceConflictError, setSourceConflictError] = useState<string | null>(null)
+  const [publicationCheck, setPublicationCheck] = useState<PublicationCheck | null>(null)
+  const [publicationCheckError, setPublicationCheckError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [evidenceLoading, setEvidenceLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [evidenceError, setEvidenceError] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  const [resolveConflictOpen, setResolveConflictOpen] = useState(false)
+  const [resolveConflictNote, setResolveConflictNote] = useState('')
   const [working, setWorking] = useState(false)
   const [form] = Form.useForm()
 
@@ -68,6 +83,11 @@ export function RevisionDetailsPage() {
     setEvidenceLoading(true)
     setError(null)
     setEvidenceError(null)
+    setSourceConflictError(null)
+    setPublicationCheckError(null)
+    setSourceConflicts([])
+    setPublicationCheck(null)
+    setReviewTask(null)
 
     const revisionRequest = api.getPlaceRevision(revisionId)
       .then((nextRevision) => {
@@ -93,14 +113,58 @@ export function RevisionDetailsPage() {
         setEvidenceLoading(false)
       })
 
-    await Promise.all([revisionRequest, evidenceRequest])
-  }, [api, revisionId])
+    const reviewTaskRequest = reviewContext && reviewTaskId
+      ? api.getReviewTask(reviewTaskId)
+        .then((task) => {
+          if (task.place_revision_id !== revisionId) throw new Error('审核任务与修订版本不匹配')
+          setReviewTask(task)
+        })
+        .catch((reason: unknown) => setError(adminErrorMessage(reason)))
+      : Promise.resolve()
+
+    const sourceConflictRequest = typeof api.listSourceConflicts === 'function'
+      ? api.listSourceConflicts(revisionId)
+        .then((result) => setSourceConflicts(result.items))
+        .catch((reason: unknown) => setSourceConflictError(adminErrorMessage(reason)))
+      : Promise.resolve()
+
+    const publicationCheckRequest = canCheckPublication && typeof api.checkPlaceRevisionPublication === 'function'
+      ? api.checkPlaceRevisionPublication(revisionId)
+        .then((result) => setPublicationCheck(result))
+        .catch((reason: unknown) => setPublicationCheckError(adminErrorMessage(reason)))
+      : Promise.resolve()
+
+    await Promise.all([revisionRequest, evidenceRequest, reviewTaskRequest, sourceConflictRequest, publicationCheckRequest])
+  }, [api, canCheckPublication, revisionId, reviewContext, reviewTaskId])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const blockers = useMemo(() => (revision ? publicationBlockers(revision) : []), [revision])
+  const blockers = useMemo(
+    () => revision ? buildPublicationBlockers(revision, evidence, sourceConflicts, publicationCheck) : [],
+    [revision, evidence, sourceConflicts, publicationCheck],
+  )
+  const canReviewThisRevision = reviewContext && hasPermission('place:review:decide')
+  const reviewTaskOpen = reviewTask !== null && ['ready_for_review', 'in_review', 'changes_requested'].includes(reviewTask.status)
+
+  const decideReview = async (decisionKind: 'approve' | 'request_changes' | 'cancel') => {
+    if (!reviewTask) return
+    setWorking(true)
+    try {
+      await api.decidePlaceReview(reviewTask.review_task_id, {
+        expected_version: reviewTask.version,
+        decision_kind: decisionKind,
+        reason_code: decisionKind === 'approve' ? 'OM1_FACTS_VERIFIED' : decisionKind === 'request_changes' ? 'OM1_REVIEW_CHANGES' : 'OM1_REVIEW_CANCELLED',
+      })
+      messageApi.success(decisionKind === 'approve' ? '审核已通过' : decisionKind === 'request_changes' ? '已退回修改' : '审核任务已关闭')
+      await load()
+    } catch (reason) {
+      setError(adminErrorMessage(reason))
+    } finally {
+      setWorking(false)
+    }
+  }
 
   const createRevision = async () => {
     if (!revision) return
@@ -198,6 +262,29 @@ export function RevisionDetailsPage() {
     }
   }
 
+  const resolveSourceConflicts = async () => {
+    if (!revision || !resolveConflictNote.trim() || typeof api.resolveSourceConflicts !== 'function') return
+    setWorking(true)
+    try {
+      await api.resolveSourceConflicts(revision.place_revision_id, {
+        expected_revision_number: revision.revision_number,
+        expected_revision_version: revision.revision_version,
+        resolved: true,
+        operation_intent_id: `source-conflicts-resolve-${crypto.randomUUID()}`,
+        reason_code: 'SOURCE_CONFLICTS_REVIEWED',
+        reason_text: resolveConflictNote.trim(),
+      })
+      setResolveConflictOpen(false)
+      setResolveConflictNote('')
+      messageApi.success('来源冲突已标记为处理完成，修订版本需要重新送审')
+      await load()
+    } catch (reason) {
+      setError(adminErrorMessage(reason))
+    } finally {
+      setWorking(false)
+    }
+  }
+
   return (
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
@@ -208,15 +295,46 @@ export function RevisionDetailsPage() {
           </Typography.Paragraph>
         </div>
         <Space wrap>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/candidates')}>
-            返回候选地点
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(reviewContext ? '/review' : '/candidates')}>
+            {reviewContext ? '返回地点审核' : '返回候选地点'}
           </Button>
-          {revision && revision.lifecycle_status === 'candidate' &&
+          {canReviewThisRevision && reviewTaskOpen && (
+            <Space.Compact id="review-actions">
+              <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => void decideReview('approve')} loading={working}>
+                审核通过
+              </Button>
+              <Button icon={<EditOutlined />} onClick={() => void decideReview('request_changes')} loading={working}>
+                退回修改
+              </Button>
+              <Button danger onClick={() => void decideReview('cancel')} loading={working}>
+                关闭任务
+              </Button>
+            </Space.Compact>
+          )}
+          {!reviewContext && revision && revision.lifecycle_status === 'candidate' &&
             (hasPermission('place:candidate:write') ||
               hasPermission('place:review:request')) && (
             <Space.Compact>
               {hasPermission('place:candidate:write') && (
-                <Button icon={<EditOutlined />} onClick={() => { form.setFieldsValue({ canonical_name: revision.canonical_name, address: revision.address, duration_recommended: revision.duration_recommended }); setEditOpen(true) }}>
+              <Button icon={<EditOutlined />} onClick={() => { form.setFieldsValue({
+                canonical_name: revision.canonical_name,
+                aliases: revision.aliases,
+                place_kind: revision.place_kind,
+                category: revision.category,
+                admin_area: revision.admin_area,
+                address: revision.address,
+                geometry_kind: revision.geometry_kind,
+                duration_min: revision.duration_min,
+                duration_recommended: revision.duration_recommended,
+                duration_max: revision.duration_max,
+                internal_travel_min: revision.internal_travel_min,
+                energy_level: revision.energy_level,
+                indoor_outdoor: revision.indoor_outdoor,
+                suitable_periods: revision.suitable_periods,
+                audience_tags: revision.audience_tags,
+                rain_suitability: revision.rain_suitability,
+                is_always_open: revision.is_always_open,
+              }); setEditOpen(true) }}>
                   编辑候选
                 </Button>
               )}
@@ -320,60 +438,226 @@ export function RevisionDetailsPage() {
             </Descriptions>
           </Card>
 
-          <EvidenceCard
+          <VerificationSummaryCard evidence={evidence} revision={revision} />
+
+          <div id="o04-evidence"><EvidenceCard
             api={api}
             evidence={evidence}
             loading={evidenceLoading}
             error={evidenceError}
             revision={revision}
             canEdit={hasPermission('place:candidate:write')}
-            canReview={hasPermission('place:review:decide')}
+            canReview={canReviewThisRevision}
             onSuccess={(text) => messageApi.success(text)}
             onChanged={load}
             onError={setError}
-          />
-          <TimeEvidenceCard
+          /></div>
+          <div id="o05-evidence"><TimeEvidenceCard
             api={api}
             evidence={evidence}
             loading={evidenceLoading}
             error={evidenceError}
             revision={revision}
             canEdit={hasPermission('place:candidate:write')}
-            canReview={hasPermission('place:review:decide')}
+            canReview={canReviewThisRevision}
             onSuccess={(text) => messageApi.success(text)}
             onChanged={load}
             onError={setError}
-          />
-          <RelationEvidenceCard api={api} evidence={evidence} revision={revision} canEdit={hasPermission('place:candidate:write')} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} />
+          /></div>
+          <div id="o07-evidence"><RelationEvidenceCard api={api} evidence={evidence} revision={revision} canEdit={hasPermission('place:candidate:write')} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} /></div>
+          <div id="o06-source-conflicts"><SourceConflictCard
+            conflicts={sourceConflicts}
+            loading={loading}
+            error={sourceConflictError}
+            unresolved={!revision.conflicts_resolved}
+            canResolve={revision.lifecycle_status === 'candidate' && hasPermission('place:candidate:write')}
+            onResolve={() => { setResolveConflictNote(''); setResolveConflictOpen(true) }}
+          /></div>
 
           <Card title="发布阻断摘要">
             {blockers.length === 0 ? (
-              <Alert showIcon type="success" icon={<CheckCircleOutlined />} title="当前修订版本没有从详情字段识别出的阻断项" />
+              <Alert showIcon type="success" icon={<CheckCircleOutlined />} title={publicationCheck?.publishable === false ? '当前仍有发布门禁原因，请查看下方明细' : '当前修订版本没有识别出的阻断项'} />
             ) : (
               <Space orientation="vertical" style={{ width: '100%' }}>
                 <Alert showIcon type="warning" title={`当前有 ${blockers.length} 项需要处理`} />
                 {blockers.map((blocker) => (
-                  <Typography.Text key={blocker} type="secondary">
-                    <CloseCircleOutlined /> {blocker}
-                  </Typography.Text>
+                  <div key={blocker.code} className="publication-blocker-item">
+                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+                      <Typography.Text strong><CloseCircleOutlined style={{ color: '#cf1322' }} /> {blocker.title}</Typography.Text>
+                      <Typography.Text type="secondary">{blocker.description}</Typography.Text>
+                      {blocker.actionLabel && blocker.target && <Button size="small" type="link" onClick={() => document.getElementById(blocker.target!)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>{blocker.actionLabel}</Button>}
+                    </Space>
+                  </div>
                 ))}
             </Space>
             )}
+            {publicationCheckError && <Alert showIcon type="info" title="发布门禁暂时无法读取" description={publicationCheckError} />}
+            {publicationCheck && publicationCheck.reason_codes.length > 0 && (
+              <Alert
+                showIcon
+                type="warning"
+                title="发布门禁检查结果"
+                description={<Space wrap>{publicationCheck.reason_codes.map((code) => <Tag key={code} color="warning">{reasonCodeLabel(code)}</Tag>)}</Space>}
+                style={{ marginTop: 12 }}
+              />
+            )}
             <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-              本摘要仍只基于当前修订版本返回字段；O04 几何/访问点与 O05 时间证据已在上方展示，来源冲突和关系裁决将在 O06–O07 页面接入后显示。
+              每个阻断项都对应一个证据区域。数据编辑员处理证据或来源冲突后需要重新送审；审核员完成逐项核验并通过修订版本审核；发布员再准备求解投影、通过发布门禁并发布新快照。
             </Typography.Paragraph>
           </Card>
         </>
       )}
       {revision === null && loading && <Card loading />}
-      <Modal title="编辑候选修订版本" open={editOpen} onOk={() => void saveEdit()} onCancel={() => setEditOpen(false)} confirmLoading={working}>
+      <Modal
+        title="编辑候选修订版本"
+        open={editOpen}
+        onOk={() => void saveEdit()}
+        onCancel={() => setEditOpen(false)}
+        confirmLoading={working}
+        width={760}
+        className="revision-edit-modal"
+        destroyOnHidden
+      >
         <Form form={form} layout="vertical">
-          <Form.Item name="canonical_name" label="规范名称" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="address" label="地址"><Input /></Form.Item>
-          <Form.Item name="duration_recommended" label="建议时长（分钟）" rules={[{ required: true, type: 'number', min: 1, message: '建议时长至少为 1 分钟' }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
+          <section className="revision-edit-section">
+            <Typography.Title level={5}>基础信息</Typography.Title>
+            <div className="revision-edit-grid">
+              <Form.Item name="canonical_name" label="规范名称" rules={[{ required: true }]}><Input /></Form.Item>
+              <Form.Item name="place_kind" label="地点类型" rules={[{ required: true }]}><Select options={[
+                ['attraction', '景点'], ['scenic_area', '景区'], ['neighborhood', '街区'],
+                ['walking_route', '步行路线'], ['market', '市集'], ['show', '演出/固定场次'], ['experience', '体验'],
+              ].map(([value, label]) => ({ value, label }))} /></Form.Item>
+              <Form.Item name="aliases" label="别名"><Select mode="tags" tokenSeparators={[',', '，']} placeholder="可输入多个别名" /></Form.Item>
+              <Form.Item name="category" label="分类" rules={[{ required: true }]}><Input /></Form.Item>
+              <Form.Item name="admin_area" label="所属区域" rules={[{ required: true }]}><Input /></Form.Item>
+              <Form.Item name="geometry_kind" label="几何类型" rules={[{ required: true }]}><Select options={[{ value: 'point', label: '点' }, { value: 'area', label: '区域' }, { value: 'route', label: '路线' }]} /></Form.Item>
+              <Form.Item name="address" label="地址" className="revision-edit-wide"><Input /></Form.Item>
+            </div>
+          </section>
+
+          <section className="revision-edit-section">
+            <Typography.Title level={5}>游览与求解</Typography.Title>
+            <div className="revision-edit-grid revision-edit-duration-grid">
+              <Form.Item name="duration_min" label="最短时长（分钟）" rules={[{ required: true, type: 'number', min: 0 }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="duration_recommended" label="建议时长（分钟）" rules={[{ required: true, type: 'number', min: 1, message: '建议时长至少为 1 分钟' }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="duration_max" label="最长时长（分钟）" rules={[{ required: true, type: 'number', min: 0 }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="internal_travel_min" label="内部移动时长（分钟）" rules={[{ required: true, type: 'number', min: 0 }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="energy_level" label="体力等级" rules={[{ required: true, type: 'number', min: 1, max: 5 }]}><InputNumber min={1} max={5} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="is_always_open" label="全天开放" valuePropName="checked"><Switch /></Form.Item>
+            </div>
+            <Typography.Text type="secondary">建议时长必须位于最短和最长时长之间；求解器会优先采用建议时长，并在时间窗不足时按区间进行调整。</Typography.Text>
+          </section>
+
+          <section className="revision-edit-section">
+            <Typography.Title level={5}>体验标签</Typography.Title>
+            <div className="revision-edit-grid">
+              <Form.Item name="indoor_outdoor" label="室内/室外" rules={[{ required: true }]}><Select options={[{ value: 'indoor', label: '室内' }, { value: 'outdoor', label: '室外' }, { value: 'mixed', label: '室内外兼有' }]} /></Form.Item>
+              <Form.Item name="rain_suitability" label="雨天适配" rules={[{ required: true }]}><Select options={[{ value: 'suitable', label: '适合' }, { value: 'conditional', label: '有条件通过' }, { value: 'unsuitable', label: '不适合' }]} /></Form.Item>
+              <Form.Item name="suitable_periods" label="适用时段"><Select mode="multiple" options={[{ value: 'morning', label: '上午' }, { value: 'afternoon', label: '下午' }, { value: 'evening', label: '晚上' }]} /></Form.Item>
+              <Form.Item name="audience_tags" label="适合人群"><Select mode="tags" tokenSeparators={[',', '，']} placeholder="可输入多个标签" /></Form.Item>
+            </div>
+          </section>
         </Form>
       </Modal>
+      <Modal
+        title="处理来源冲突"
+        open={resolveConflictOpen}
+        onOk={() => void resolveSourceConflicts()}
+        onCancel={() => setResolveConflictOpen(false)}
+        confirmLoading={working}
+        okButtonProps={{ disabled: !resolveConflictNote.trim() }}
+      >
+        <Typography.Paragraph type="secondary">
+          请先在 O06 区域核对每条来源记录，再填写裁决依据。提交后会递增修订版本并清除当前审核/求解资格，需要重新送审。
+        </Typography.Paragraph>
+        <Input.TextArea value={resolveConflictNote} onChange={(event) => setResolveConflictNote(event.target.value)} placeholder="例如：以景区官方公告为准，第三方记录为旧版本" rows={4} maxLength={500} showCount />
+      </Modal>
     </Space>
+  )
+}
+
+function SourceConflictCard({
+  conflicts,
+  loading,
+  error,
+  unresolved,
+  canResolve,
+  onResolve,
+}: {
+  conflicts: SourceConflict[]
+  loading: boolean
+  error: string | null
+  unresolved: boolean
+  canResolve: boolean
+  onResolve: () => void
+}) {
+  return (
+    <Card title="来源冲突与裁决（O06）">
+      {loading ? <Card loading size="small" /> : error ? (
+        <Alert showIcon type="warning" title="来源冲突暂不可用" description={error} />
+      ) : conflicts.length === 0 ? (
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+          <Alert showIcon type={unresolved ? 'warning' : 'success'} title={unresolved ? '尚未确认来源冲突检查结果' : '当前没有检测到来源内容冲突'} description={unresolved ? '系统按来源标识和内容指纹分组检查，目前没有发现具体冲突，但仍需要数据编辑员确认本次检查结果并完成裁决。' : '系统按来源标识和内容指纹分组检查；没有冲突时无需额外裁决。'} />
+          {unresolved && canResolve && <Button type="primary" onClick={onResolve}>确认无冲突并完成裁决</Button>}
+          {unresolved && !canResolve && <Typography.Text type="secondary">当前账号只有查看权限，请由数据编辑员确认来源冲突检查结果。</Typography.Text>}
+        </Space>
+      ) : (
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+          <Alert
+            showIcon
+            type={conflicts.every((item) => item.resolved) ? 'success' : 'warning'}
+            title={conflicts.every((item) => item.resolved) ? '来源冲突已完成裁决' : `检测到 ${conflicts.length} 组来源冲突`}
+            description="同一来源标识下存在不同内容版本。请逐组核对来源 URL、观察时间和来源决策，再确认处理结果。"
+          />
+          {conflicts.map((conflict) => (
+            <Card key={conflict.source_id} size="small" type="inner" title={<Space><span>来源组：{conflict.source_id}</span>{conflict.resolved ? <Tag color="success">已处理</Tag> : <Tag color="warning">待处理</Tag>}</Space>}>
+              <Table
+                rowKey="source_record_id"
+                size="small"
+                pagination={false}
+                dataSource={conflict.records}
+                columns={[
+                  { title: '来源记录', dataIndex: 'source_record_id', ellipsis: true },
+                  { title: '来源地址', dataIndex: 'source_url', ellipsis: true },
+                  { title: '来源决策', dataIndex: 'source_decision', render: (value: string) => sourceDecisionLabel(value) },
+                  { title: '观察时间', dataIndex: 'observed_at', render: (value: string) => formatDateTime(value) },
+                  { title: '状态', dataIndex: 'status', render: (value: string) => reviewStatusLabel(value) },
+                ]}
+                scroll={{ x: 760 }}
+              />
+            </Card>
+          ))}
+          {!conflicts.every((item) => item.resolved) && canResolve && <Button type="primary" onClick={onResolve}>标记冲突已处理</Button>}
+          {!conflicts.every((item) => item.resolved) && !canResolve && <Typography.Text type="secondary">当前账号只有查看权限，请由数据编辑员处理冲突后再继续审核。</Typography.Text>}
+        </Space>
+      )}
+    </Card>
+  )
+}
+
+function VerificationSummaryCard({ evidence, revision }: { evidence: PlaceRevisionEvidence | null; revision: PlaceRevision }) {
+  if (!evidence) return null
+  const groups = [
+    { label: '地图与访问点（O04）', target: 'o04-evidence', items: [...evidence.geometries, ...evidence.access_points] },
+    { label: '开放时间（O05）', target: 'o05-evidence', items: [...evidence.time_rules, ...evidence.closures, ...evidence.date_exceptions] },
+    { label: '关系裁决（O07）', target: 'o07-evidence', items: evidence.relations ?? [] },
+  ]
+  return (
+    <Card title="人工核验进度">
+      <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+        先看这张清单，再进入具体区域处理；只有“已核验”的有效证据才会计入求解器资格。系统不会因为表格中存在记录就默认它已核验。
+      </Typography.Paragraph>
+      <Space wrap>
+        {groups.map((group) => {
+          const active = group.items.filter((item) => item.active)
+          const verified = active.filter((item) => item.review_status === 'human_verified').length
+          return <Button key={group.target} size="small" onClick={() => document.getElementById(group.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            {group.label}：{verified}/{active.length} 已核验
+          </Button>
+        })}
+        <Tag color={revision.solver_eligible ? 'success' : 'warning'}>{revision.solver_eligible ? '已具备求解资格' : '尚未具备求解资格'}</Tag>
+      </Space>
+    </Card>
   )
 }
 
@@ -406,8 +690,18 @@ function EvidenceCard({
   const [editing, setEditing] = useState<PlaceGeometryEvidence | PlaceAccessPointEvidence | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm()
-  const openGeometry = (item?: PlaceGeometryEvidence) => { setEditing(item ?? null); form.setFieldsValue(item ? { geometry_kind: item.geometry_kind, geometry: JSON.stringify(item.geometry), source_record_id: item.source_record_id } : { geometry_kind: revision.geometry_kind }); setModal('geometry') }
-  const openAccess = (item?: PlaceAccessPointEvidence) => { setEditing(item ?? null); form.setFieldsValue(item ? item : {}); setModal('access') }
+  const openGeometry = (item?: PlaceGeometryEvidence) => {
+    setEditing(item ?? null)
+    form.resetFields()
+    form.setFieldsValue(item ? { geometry_kind: item.geometry_kind, geometry: JSON.stringify(item.geometry), source_record_id: item.source_record_id } : { geometry_kind: revision.geometry_kind, source_record_id: evidence?.sources[0]?.source_record_id })
+    setModal('geometry')
+  }
+  const openAccess = (item?: PlaceAccessPointEvidence) => {
+    setEditing(item ?? null)
+    form.resetFields()
+    form.setFieldsValue(item ? item : { access_point_kind: 'visitor_entrance', source_record_id: evidence?.sources[0]?.source_record_id })
+    setModal('access')
+  }
   const saveEvidence = async () => {
     setSaving(true)
     try {
@@ -448,9 +742,14 @@ function EvidenceCard({
   }
 
   const projection = evidence.projection
+  const sourceOptions = evidence.sources.map((source) => ({
+    value: source.source_record_id,
+    label: `${source.source_id} · ${source.source_record_id}`,
+  }))
   return (
     <Card title="地图、几何与访问点（O04）">
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <InstructionHint text="几何是地点本体的地图形状；访问点是游客真正到达或离开的入口/出口；来源记录是证明该事实的采集记录。来源只能选择当前地点已有的有效记录，不能随意填写编号。" />
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
           <Descriptions.Item label="来源证据">
             {evidence.sources.length > 0
@@ -464,13 +763,13 @@ function EvidenceCard({
           </Descriptions.Item>
           <Descriptions.Item label="几何记录数">{evidence.geometries.length}</Descriptions.Item>
           <Descriptions.Item label="访问点记录数">{evidence.access_points.length}</Descriptions.Item>
-          <Descriptions.Item label="求解投影">
+          <Descriptions.Item label="求解投影（发布后使用）">
             {projection ? `${projection.projection_id} · ${projectionStatusLabel(projection.status)}` : '未准备'}
           </Descriptions.Item>
-          <Descriptions.Item label="到达端点">
+          <Descriptions.Item label="到达端点（游客进入）">
             {projection ? projection.arrival_access_point_id : '未选择'}
           </Descriptions.Item>
-          <Descriptions.Item label="离开端点">
+          <Descriptions.Item label="离开端点（游客离开）">
             {projection ? projection.departure_access_point_id : '未选择'}
           </Descriptions.Item>
         </Descriptions>
@@ -555,7 +854,6 @@ function EvidenceCard({
               width: 150,
               render: (value: string) => accessPointKindLabel(value),
             },
-            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', render: (_: unknown, item: PlaceAccessPointEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openAccess(item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('access', item.access_point_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('access_point', item.access_point_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('access_point', item.access_point_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
             {
               title: '坐标',
               key: 'coordinate',
@@ -594,6 +892,7 @@ function EvidenceCard({
                 </Space>
               ),
             },
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceAccessPointEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openAccess(item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('access', item.access_point_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('access_point', item.access_point_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('access_point', item.access_point_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '当前没有访问点证据' }}
         />
@@ -608,9 +907,39 @@ function EvidenceCard({
           />
         )}
       </Space>
-      <Modal title={modal === 'geometry' ? '几何证据' : '访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => setModal(null)} confirmLoading={saving} destroyOnHidden>
+      <Modal title={modal === 'geometry' ? '新增/编辑几何证据' : '新增/编辑访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => setModal(null)} confirmLoading={saving} destroyOnHidden>
         <Form form={form} layout="vertical">
-          {modal === 'geometry' ? <><Form.Item name="geometry_kind" label="几何类型" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="geometry" label="GeoJSON" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item><Form.Item name="source_record_id" label="来源记录 ID" rules={[{ required: true }]}><Input /></Form.Item></> : <><Form.Item name="access_point_kind" label="用途" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="lat" label="纬度" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item><Form.Item name="lng" label="经度" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item><Form.Item name="source_record_id" label="来源记录 ID" rules={[{ required: true }]}><Input /></Form.Item></>}
+          {modal === 'geometry' ? <>
+            <Form.Item name="geometry_kind" label={<FieldLabel label="几何类型" hint="点状景点选“点”；景区/街区边界选“区域”；步行路线选“路线”。" />} rules={[{ required: true }]}>
+              <Select options={[{ value: 'point', label: '点（地点代表点）' }, { value: 'area', label: '区域（边界或范围）' }, { value: 'route', label: '路线（起终点或轨迹）' }]} />
+            </Form.Item>
+            <Form.Item name="geometry" label={<FieldLabel label="图形数据（GeoJSON）" hint={'请输入合法 GeoJSON 对象，例如点：{"type":"Point","coordinates":[120.15,30.25]}。坐标顺序必须是经度、纬度。'} />} rules={[{ required: true }]}>
+              <Input.TextArea rows={5} placeholder={'{"type":"Point","coordinates":[120.15,30.25]}'} />
+            </Form.Item>
+            <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="选择证明这条几何数据的来源；来源详情可在上方来源证据中查看。" />} rules={[{ required: true }]}>
+              <Select showSearch optionFilterProp="label" options={sourceOptions} placeholder="选择当前地点的有效来源" />
+            </Form.Item>
+          </> : <>
+            <Form.Item name="access_point_kind" label={<FieldLabel label="访问点用途" hint="访问点是游客实际进出的端点，不是地点本体中心点。" />} rules={[{ required: true, message: '请选择访问点用途' }]}>
+              <Select options={[
+                { value: 'visitor_entrance', label: '游客入口（到达）' },
+                { value: 'visitor_exit', label: '游客出口（离开）' },
+                { value: 'route_start', label: '路线起点' },
+                { value: 'route_end', label: '路线终点' },
+                { value: 'performance_location', label: '演出地点' },
+                { value: 'meeting_point', label: '集合点' },
+                { value: 'area_representative', label: '区域代表点' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="name" label={<FieldLabel label="访问点名称" hint="填写地图或现场可识别的入口/出口名称，例如“灵隐寺进口”。" />} rules={[{ required: true }]}><Input /></Form.Item>
+            <Space style={{ width: '100%' }}>
+              <Form.Item name="lat" label={<FieldLabel label="纬度" hint="纬度范围为 -90 至 90。" />} rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="lng" label={<FieldLabel label="经度" hint="经度范围为 -180 至 180。" />} rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item>
+            </Space>
+            <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="选择证明这个入口坐标的来源；不要填高德 POI ID 或内部编号。" />} rules={[{ required: true }]}>
+              <Select showSearch optionFilterProp="label" options={sourceOptions} placeholder="选择当前地点的有效来源" />
+            </Form.Item>
+          </>}
         </Form>
       </Modal>
     </Card>
@@ -631,6 +960,7 @@ function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onS
   const [note, setNote] = useState('')
   const [working, setWorking] = useState(false)
   const relations = evidence?.relations ?? []
+  const [confirmingNone, setConfirmingNone] = useState(false)
   const save = async () => {
     if (!editing) return
     setWorking(true)
@@ -647,14 +977,31 @@ function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onS
       onSuccess('关系裁决已保存，修订版本需重新送审')
     } catch (reason) { onError(adminErrorMessage(reason)) } finally { setWorking(false) }
   }
+  const confirmNone = async () => {
+    setConfirmingNone(true)
+    try {
+      await api.confirmNoPlaceRelations(revision.place_revision_id, {
+        expected_revision_number: revision.revision_number,
+        expected_revision_version: revision.revision_version,
+        operation_intent_id: `relation-review-none-${crypto.randomUUID()}`,
+        reason_code: 'RELATION_REVIEW_CONFIRMED_NONE',
+      })
+      await onChanged()
+      onSuccess('已记录当前地点无需要裁决的关系，修订版本需重新送审')
+    } catch (reason) { onError(adminErrorMessage(reason)) } finally { setConfirmingNone(false) }
+  }
   return <Card title="地点关系与裁决（O07）">
+    <InstructionHint text="关系记录由系统根据地点归一与去重线索自动发现，不在此处手工新增。存在关系时请逐条裁决；没有关系记录时，数据编辑员需要确认“已检查，无关系”，该结论会写入当前修订版本并保留审计记录。" />
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <Alert showIcon type={revision.relation_review_status === 'no_relations' || relations.length > 0 ? 'success' : 'warning'} title={`关系检查：${relationReviewStatusLabel(revision.relation_review_status)}`} description={relations.length > 0 ? '系统已发现关系记录，请确认每条记录的关系类型和裁决状态。' : revision.relation_review_status === 'no_relations' ? '本次修订已记录当前地点没有需要裁决的关系。' : canEdit ? '当前没有关系记录。请确认本次检查完成，系统会保留操作人和时间。' : '当前账号只有查看权限，请由数据编辑员确认“无关系”。'} />
+      {relations.length === 0 && canEdit && (revision.relation_review_status ?? 'pending') !== 'no_relations' && <Button type="primary" onClick={() => void confirmNone()} loading={confirmingNone}>确认无关系</Button>}
     <Table<PlaceRelationEvidence> rowKey="relation_id" dataSource={relations} pagination={false} locale={{ emptyText: '当前地点暂无关系证据' }} columns={[
       { title: '关系类型', dataIndex: 'relation_type', render: relationTypeLabel },
       { title: '目标地点', render: (_: unknown, item: PlaceRelationEvidence) => `${item.from_place_id} → ${item.to_place_id}` },
       { title: '审核', dataIndex: 'review_status', render: reviewStatusLabel },
       { title: '裁决', dataIndex: 'resolution_status', render: relationResolutionLabel },
       { title: '来源', dataIndex: 'source_record_id' },
-      ...(canEdit ? [{ title: '操作', render: (_: unknown, item: PlaceRelationEvidence) => <Button size="small" onClick={() => { setEditing(item); setStatus(item.resolution_status); setNote(item.decision_note ?? '') }}>裁决</Button> }] : []),
+      ...(canEdit ? [{ title: '操作', key: 'actions', width: 110, render: (_: unknown, item: PlaceRelationEvidence) => <Button size="small" onClick={() => { setEditing(item); setStatus(item.resolution_status); setNote(item.decision_note ?? '') }}>裁决</Button> }] : []),
     ]} />
     <Modal title="关系裁决" open={editing !== null} onOk={() => void save()} onCancel={() => setEditing(null)} confirmLoading={working}>
       <Space orientation="vertical" style={{ width: '100%' }}>
@@ -662,6 +1009,7 @@ function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onS
         <Input.TextArea value={note} onChange={(event) => setNote(event.target.value)} placeholder="裁决说明（已裁决时必填）" rows={4} />
       </Space>
     </Modal>
+    </Space>
   </Card>
 }
 
@@ -825,7 +1173,7 @@ function TimeEvidenceCard({
   if (error !== null || evidence === null) {
     return (
       <Card title="开放时间与固定场次（O05）">
-        <Alert
+            <Alert
           showIcon
           type="warning"
           title="O05 时间证据暂不可用"
@@ -843,6 +1191,14 @@ function TimeEvidenceCard({
           title="时间证据严格绑定当前修订版本"
           description="编辑会递增修订版本并清除既有审核/求解资格；逐项核验要求先建立开放审核任务。解析预览由后端按已核验证据计算。"
         />
+        {revision.place_kind === 'show' && (
+          <Alert
+            showIcon
+            type="warning"
+            title="演出地点必须使用固定场次规则"
+            description="开放时间只能说明可营业时段；演出、灯光秀等地点还需要明确的开始时间和结束时间，并将规则类型设置为“固定场次”。"
+          />
+        )}
         <Space wrap>
           <Input type="date" value={previewDate} onChange={(event) => setPreviewDate(event.target.value)} />
           <Button onClick={() => void runPreview()} loading={previewLoading} disabled={!previewDate}>解析预览</Button>
@@ -914,17 +1270,17 @@ function TimeEvidenceCard({
             <MinuteFields />
             <Form.Item name="valid_from" label="有效期开始"><Input placeholder="YYYY-MM-DD" /></Form.Item>
             <Form.Item name="valid_to" label="有效期结束"><Input placeholder="YYYY-MM-DD" /></Form.Item>
-            <SourceRecordField />
+            <SourceRecordField sources={evidence.sources} />
           </>}
           {modal === 'closure' && <>
             <Form.Item name="weekday" label="闭馆星期" rules={[{ required: true }]}><Select options={weekdayOptions()} /></Form.Item>
-            <SourceRecordField />
+            <SourceRecordField sources={evidence.sources} />
           </>}
           {modal === 'date_exception' && <>
             <Form.Item name="service_date" label="例外日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
             <Form.Item name="exception_kind" label="例外类型" rules={[{ required: true }]}><Select options={[{ value: 'closed', label: '临时关闭' }, { value: 'open_override', label: '开放覆盖' }, { value: 'session_override', label: '场次覆盖' }]} /></Form.Item>
             <MinuteFields />
-            <SourceRecordField />
+            <SourceRecordField sources={evidence.sources} />
           </>}
         </Form>
       </Modal>
@@ -942,15 +1298,24 @@ function minuteLabel(value: number | null): string {
 
 function MinuteFields() {
   return <>
-    <Alert showIcon type="info" title="时间使用 0–2880 分钟" description="例如 09:30 = 570；跨午夜后的次日 00:30 = 1470。临时关闭无需填写时间。" />
-    <Form.Item name="start_minute" label="开始分钟"><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
-    <Form.Item name="end_minute" label="结束分钟"><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
-    <Form.Item name="last_entry_minute" label="最晚入园分钟"><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
+    <Form.Item name="start_minute" label={<FieldLabel label="开始时间（分钟）" hint="当天 09:30 填 570；跨午夜次日 00:30 填 1470。范围 0–2880。" />}><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
+    <Form.Item name="end_minute" label={<FieldLabel label="结束时间（分钟）" hint="与开始时间相同的分钟表示；结束值必须晚于开始值。" />}><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
+    <Form.Item name="last_entry_minute" label={<FieldLabel label="最晚入园时间（分钟）" hint="游客最晚允许进入的时间；没有限制时可留空。" />}><InputNumber min={0} max={2880} style={{ width: '100%' }} /></Form.Item>
   </>
 }
 
-function SourceRecordField() {
-  return <Form.Item name="source_record_id" label="来源记录 ID" rules={[{ required: true }]}><Input /></Form.Item>
+function SourceRecordField({ sources = [] }: { sources?: PlaceRevisionEvidence['sources'] }) {
+  return <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="只能选择当前地点的有效来源记录；来源 URL、观察时间和采集方式请在来源证据区域核对。" />} rules={[{ required: true }]}>
+    <Select showSearch optionFilterProp="label" options={sources.map((source) => ({ value: source.source_record_id, label: `${source.source_id} · ${source.source_record_id}` }))} placeholder="选择当前地点的有效来源" />
+  </Form.Item>
+}
+
+function FieldLabel({ label, hint }: { label: string; hint: string }) {
+  return <span>{label} <Tooltip title={hint}><ExclamationCircleFilled style={{ color: '#d89614', cursor: 'help' }} aria-label={`${label}填写提示`} /></Tooltip></span>
+}
+
+function InstructionHint({ text }: { text: string }) {
+  return <Tooltip title={text}><ExclamationCircleFilled style={{ color: '#d89614', fontSize: 17, cursor: 'help' }} aria-label="填写提示" /></Tooltip>
 }
 
 function weekdayOptions() {
@@ -985,13 +1350,98 @@ function projectionRole(
   return roles.length > 0 ? roles.join(' / ') : '未选择'
 }
 
-function publicationBlockers(revision: PlaceRevision): string[] {
-  const blockers: string[] = []
-  if (revision.lifecycle_status === 'candidate') blockers.push('尚未完成人工核验，当前仍为候选状态')
-  if (revision.source_record_ids.length === 0) blockers.push('缺少来源记录')
-  if (!revision.conflicts_resolved) blockers.push('存在未完成裁决的冲突')
-  if (!revision.solver_eligible) blockers.push('当前修订版本尚不满足求解器使用条件')
-  return blockers
+type PublicationBlocker = {
+  code: string
+  title: string
+  description: string
+  actionLabel?: string
+  target?: 'review-actions' | 'o04-evidence' | 'o05-evidence' | 'o06-source-conflicts' | 'o07-evidence'
+}
+
+function buildPublicationBlockers(
+  revision: PlaceRevision,
+  evidence: PlaceRevisionEvidence | null,
+  sourceConflicts: SourceConflict[],
+  publicationCheck: PublicationCheck | null,
+): PublicationBlocker[] {
+  const codes: string[] = []
+  if (revision.lifecycle_status === 'candidate') codes.push('REVISION_NOT_HUMAN_VERIFIED')
+  if (revision.source_record_ids.length === 0) codes.push('MISSING_SOURCE_RECORD')
+  if (!revision.conflicts_resolved || sourceConflicts.some((item) => !item.resolved)) codes.push('SOURCE_CONFLICT_UNRESOLVED')
+
+  const validSourceIds = new Set((evidence?.sources ?? []).filter((item) => item.status === 'active').map((item) => item.source_record_id))
+  if (evidence) {
+    const verifiedGeometry = evidence.geometries.some((item) => item.active && item.review_status === 'human_verified' && item.geometry_kind === revision.geometry_kind && validSourceIds.has(item.source_record_id))
+    const verifiedAccessPoint = evidence.access_points.some((item) => item.active && item.review_status === 'human_verified' && validSourceIds.has(item.source_record_id))
+    const verifiedTimeRules = evidence.time_rules.filter((item) => item.active && item.review_status === 'human_verified' && validSourceIds.has(item.source_record_id))
+    const verifiedTimeRule = revision.is_always_open || verifiedTimeRules.length > 0
+    if (!verifiedGeometry) codes.push('MISSING_VERIFIED_GEOMETRY')
+    if (!verifiedAccessPoint) codes.push('MISSING_VERIFIED_ACCESS_POINT')
+    if (!verifiedTimeRule) codes.push('TIME_RULE_UNRESOLVED')
+    if (revision.place_kind === 'show' && verifiedTimeRules.filter((item) => item.rule_kind === 'fixed_session').length === 0) codes.push('FIXED_SESSION_REQUIRED')
+    if (evidence.relations?.some((item) => item.active && ['overlaps', 'same_experience'].includes(item.relation_type) && item.resolution_status === 'pending')) codes.push('OVERLAPPING_SELECTION_UNRESOLVED')
+    if ((evidence.relations ?? []).filter((item) => item.active).length === 0 && revision.relation_review_status === 'pending') codes.push('RELATION_REVIEW_REQUIRED')
+  }
+  if (!revision.solver_eligible) codes.push('PLACE_NOT_SOLVER_ELIGIBLE')
+  if (publicationCheck && !publicationCheck.publishable) codes.push(...publicationCheck.reason_codes)
+
+  const uniqueCodes = [...new Set(codes)]
+  return uniqueCodes.map((code): PublicationBlocker => {
+    if (code === 'REVISION_NOT_HUMAN_VERIFIED') return {
+      code, title: '尚未完成人工核验',
+      description: '当前仍是候选修订版本。数据编辑员先补齐证据并送审，审核员逐项核验后点击“审核通过”。',
+      actionLabel: '查看审核操作', target: 'review-actions',
+    }
+    if (code === 'MISSING_SOURCE_RECORD' || code === 'SOURCE_RECORD_INVALID' || code === 'SOURCE_RECORD_PLACE_MISMATCH') return {
+      code, title: reasonCodeLabel(code),
+      description: '求解器只接受当前地点仍生效的来源记录。请在 O04/O05 证据中选择有效来源，并核对来源地址、观察时间和状态。',
+      actionLabel: '查看证据与来源', target: 'o04-evidence',
+    }
+    if (code === 'SOURCE_CONFLICT_UNRESOLVED') return {
+      code, title: '存在未完成裁决的来源冲突',
+      description: sourceConflicts.some((item) => !item.resolved)
+        ? `检测到 ${sourceConflicts.filter((item) => !item.resolved).length} 组来源内容不一致。请打开 O06 查看每条来源记录，核对后由数据编辑员标记处理完成。`
+        : '当前修订版本尚未完成来源冲突状态确认。请打开 O06 刷新并核对来源记录；如确认没有冲突，由数据编辑员标记处理完成。',
+      actionLabel: '查看来源冲突（O06）', target: 'o06-source-conflicts',
+    }
+    if (code === 'MISSING_VERIFIED_GEOMETRY' || code === 'MISSING_VERIFIED_ACCESS_POINT' || code === 'MISSING_ARRIVAL_ACCESS_POINT' || code === 'MISSING_DEPARTURE_ACCESS_POINT' || code === 'ACCESS_POINT_NOT_HUMAN_VERIFIED' || code === 'ACCESS_POINT_REVISION_MISMATCH') return {
+      code, title: reasonCodeLabel(code),
+      description: code.includes('ACCESS') || code.includes('ARRIVAL') || code.includes('DEPARTURE')
+        ? '至少需要一个当前修订版本下、来源有效且已人工核验的访问点，供系统确定游客到达和离开端点。'
+        : '需要一条与地点几何类型一致、来源有效且已人工核验的几何记录。',
+      actionLabel: '查看地图与访问点（O04）', target: 'o04-evidence',
+    }
+    if (code === 'FIXED_SESSION_REQUIRED') return {
+      code, title: reasonCodeLabel(code),
+      description: '该地点类型是演出/固定场次。当前已有开放时间记录，但求解器需要明确的“固定场次”规则；请在 O05 编辑现有规则或新建修订版本后，将规则类型改为固定场次，并重新送审。',
+      actionLabel: '处理固定场次（O05）', target: 'o05-evidence',
+    }
+    if (code === 'TIME_RULE_UNRESOLVED' || code === 'MISSING_VERIFIED_TIME_RULE' || code === 'FIXED_SESSION_AMBIGUOUS') return {
+      code, title: reasonCodeLabel(code),
+      description: revision.is_always_open
+        ? '当前标记为全天开放；请在 O05 核对该事实是否有来源支持。'
+        : `当前读取到 ${evidence?.time_rules.filter((item) => item.active).length ?? 0} 条有效开放时间规则，其中 ${evidence?.time_rules.filter((item) => item.active && item.review_status === 'human_verified').length ?? 0} 条已人工核验。需要至少一条当前有效来源支持、并已人工核验的规则；固定场次地点还必须只有一条明确场次。`,
+      actionLabel: '查看开放时间（O05）', target: 'o05-evidence',
+    }
+    if (code === 'OVERLAPPING_SELECTION_UNRESOLVED') return {
+      code, title: reasonCodeLabel(code),
+      description: '存在“重叠”或“同一体验”关系尚未裁决。请在 O07 选择已裁决或无需裁决，并填写裁决说明。',
+      actionLabel: '查看关系裁决（O07）', target: 'o07-evidence',
+    }
+    if (code === 'RELATION_REVIEW_REQUIRED') return {
+      code, title: reasonCodeLabel(code),
+      description: '当前没有系统发现的关系记录，但 O07 尚未登记检查结论。请进入 O07，由数据编辑员确认“无关系”；如发现关系，应补录后逐条裁决。',
+      actionLabel: '处理关系检查（O07）', target: 'o07-evidence',
+    }
+    if (code === 'PLACE_NOT_SOLVER_ELIGIBLE' || code === 'REVISION_NOT_HUMAN_VERIFIED') return {
+      code, title: '当前修订版本尚不满足求解器使用条件',
+      description: '求解资格不是手工勾选项，而是证据核验、冲突裁决和修订审核通过后的结果。请按上方具体阻断项处理，完成后重新送审或重新准备求解投影。',
+    }
+    return {
+      code, title: reasonCodeLabel(code),
+      description: '该项由发布门禁检查发现，请按对应证据区域核对并刷新页面。',
+    }
+  })
 }
 
 function formatOptionalDateTime(value: string | null): string {

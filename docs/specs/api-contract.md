@@ -1136,10 +1136,11 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/candidates` | editor/reviewer/publisher/viewer | 查询候选和覆盖维度 |
 | `POST /api/v1/admin/candidates` | data_editor | 创建最小候选，不伪造 human_verified |
 | `GET /api/v1/admin/places/{place_id}` | editor/reviewer/publisher/viewer | 查询 Place、当前 Revision 和依赖摘要 |
-| `POST /api/v1/admin/places/{place_id}/revisions` | data_editor | 基于指定 Revision 创建 candidate Revision |
+| `POST /api/v1/admin/places/{place_id}/revisions` | data_editor | 基于指定 Revision 创建 candidate Revision；复制基线当前有效的 O04/O05 子证据并重置为待核验，Projection 不复制 |
 | `PATCH /api/v1/admin/place-revisions/{revision_id}` | data_editor | 以 expected version 编辑 candidate |
 | `POST /api/v1/admin/place-revisions/{revision_id}/review-tasks` | data_editor | 创建/重提审核任务；需 operation intent 和 reason code |
 | `GET /api/v1/admin/review-tasks` | data_reviewer | 查询待审核队列 |
+| `GET /api/v1/admin/review-tasks/{task_id}` | data_reviewer | 查询单个审核任务，供审核详情页加载 Revision 级审核上下文 |
 | `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve、request_changes 或 cancel；写 ReviewDecision 并使用 expected version |
 | `GET /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | 查询追加式决定历史 |
 | `GET /api/v1/admin/place-revisions/{revision_id}/evidence` | editor/reviewer/publisher/viewer | 查询 Revision 绑定的几何、访问点、时间规则、闭馆日、日期例外、来源摘要和 Projection 端点；只读，不跨 Revision 推断 |
@@ -1182,7 +1183,7 @@ O04 几何与访问点写入（仅 candidate Revision）使用以下 Revision-sc
 | `POST /api/v1/admin/place-revisions/{revision_id}/access-points` | data_editor | 新增 candidate AccessPoint |
 | `PATCH /api/v1/admin/place-revisions/{revision_id}/access-points/{access_point_id}` | data_editor | 编辑 AccessPoint 并回到 candidate review status |
 | `DELETE /api/v1/admin/place-revisions/{revision_id}/access-points/{access_point_id}` | data_editor | 软停用 AccessPoint，不物理删除 |
-| `POST /api/v1/admin/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review` | data_reviewer | 对 active Geometry/AccessPoint 逐项通过或驳回 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review` | data_reviewer | 对 active Geometry、AccessPoint、TimeRule、Closure、DateException、Relation 逐项通过或驳回 |
 
 所有写入请求必须携带 `expected_revision_version`、`operation_intent_id`、稳定大写
 `reason_code` 和可选非敏感 `reason_text`。服务端在同一事务中校验 Revision 仍为
@@ -1192,13 +1193,19 @@ O04 几何与访问点写入（仅 candidate Revision）使用以下 Revision-sc
 `409 admin_operation_intent_conflict`。Geometry/AccessPoint 变更不会自动进入
 `human_verified`，必须重新送审并由 reviewer 决定；published Revision 始终只读。
 
-逐项审核请求使用 `review_status=human_verified|rejected`，并携带
+人工核验分为证据级和 Revision 级两个层级。逐项审核请求使用 `review_status=human_verified|rejected`，并携带
 `operation_intent_id`、`reason_code` 和可选 `reason_text`。只有
 `place:review:decide` 权限可以执行，且只允许处理 candidate Revision 下仍 active
-的 Geometry/AccessPoint，并要求该 Revision 已存在开放的 review task。通过时写入
+的 active 证据，并要求该 Revision 已存在开放的 review task。通过时写入
 `reviewed_at`，驳回时清空该时间；审核操作不替代 Revision 级 review task。Revision
-级 approve 会检查全部 active Geometry/AccessPoint 均为 `human_verified`，否则以
+级 approve 会检查全部 active Geometry、AccessPoint、TimeRule、Closure、DateException 和 Relation 均为 `human_verified`，否则以
 `review_revision_not_approvable` 拒绝，不能跳过逐项核验直接进入 `human_verified`。
+
+送审接口只创建或重用 `ready_for_review` 开放任务，不代表完整门禁已经通过。Revision
+级决定接口使用 `decision_kind=approve|request_changes|cancel`；只有 `approve` 在事务内
+同时写入 ReviewDecision、关闭任务并将 candidate Revision 置为 `human_verified`。
+`request_changes` 会将任务置为 `changes_requested`，编辑者修改后必须以新 Revision 版本
+重新送审，不能复用旧版本的证据通过结论。
 
 O05 时间证据写入同样仅允许 candidate Revision：`POST/PATCH/DELETE` 分别作用于
 `/time-rules/{time_rule_id}`、`/closures/{closure_id}` 和
@@ -1217,7 +1224,8 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 解析仅使用 active 且 `human_verified` 的时间证据；日期例外优先于周规则，例外关闭优先返回
 关闭结果，日期例外可以覆盖周闭馆。响应包含 `open`、`windows`、`fixed_sessions`、
 `applied_exception_ids`、`rule_ids` 和稳定排序的 `reason_codes`。分钟值大于等于 1440
-表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。
+表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；演出地点没有已核验固定场次时返回
+`FIXED_SESSION_REQUIRED`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。
 
 ### O06 来源冲突只读面
 
@@ -1230,6 +1238,11 @@ admin-web 审核队列提供勾选、统一决定、理由输入和逐项结果�
 admin-web Revision 详情页提供关系列表及 resolution 裁决入口，提交后按 Revision 版本刷新并提示重新送审。
 
 O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{relation_id}/resolve`
+
+当当前地点没有任何关系记录时，数据编辑员通过
+`POST /api/v1/admin/place-revisions/{revision_id}/relations/confirm-none` 登记本次修订已完成关系检查。
+请求必须携带 `expected_revision_number`、`expected_revision_version`、`operation_intent_id` 和 `reason_code`。
+该操作递增修订版本、清除审核/求解资格并写入审计；reviewer 仅可查看，不能代替数据编辑员确认。
 需要 `place:candidate:write`，携带 `expected_revision_version`、`resolution_status`、可选
 `decision_note`、`operation_intent_id` 和审计理由。仅允许当前 Place 的 active 关系；成功后
 递增 Revision 版本、重置关系审核状态并要求重新送审。`resolved` 必须提供裁决说明。

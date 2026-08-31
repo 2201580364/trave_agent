@@ -25,6 +25,7 @@ import type {
   DashboardSummary,
   PublicationBatch,
   ResearchSnapshot,
+  SourceConflictResponse,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -36,6 +37,7 @@ export class AdminApiError extends Error {
     message: string,
     readonly requestId?: string,
     readonly details?: Record<string, unknown>,
+    readonly fieldErrors?: Array<{ field?: string; code?: string; message?: string }>,
   ) {
     super(message)
     this.name = 'AdminApiError'
@@ -119,6 +121,10 @@ export class AdminApi {
 
   resolvePlaceRelation(revisionId: string, relationId: string, input: { expected_revision_version: number; resolution_status: string; decision_note?: string | null; operation_intent_id: string; reason_code: string }): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/relations/${encodeURIComponent(relationId)}/resolve`, { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  confirmNoPlaceRelations(revisionId: string, input: { expected_revision_number: number; expected_revision_version: number; operation_intent_id: string; reason_code: string; reason_text?: string | null }): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/relations/confirm-none`, { method: 'POST', body: JSON.stringify(input) })
   }
 
   createGeometry(revisionId: string, input: PlaceGeometryInput): Promise<PlaceRevision> {
@@ -248,6 +254,27 @@ export class AdminApi {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/publication-checks`)
   }
 
+  listSourceConflicts(revisionId: string): Promise<SourceConflictResponse> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/source-conflicts`)
+  }
+
+  resolveSourceConflicts(
+    revisionId: string,
+    input: {
+      expected_revision_number: number
+      expected_revision_version: number
+      resolved: boolean
+      operation_intent_id: string
+      reason_code: string
+      reason_text?: string
+    },
+  ): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/source-conflicts/resolve`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  }
+
   preparePlaceRevisionProjection(
     revisionId: string,
     input: { data_snapshot_version: string; solver_node_id?: number; operation_intent_id: string; reason_code: string; reason_text?: string },
@@ -315,6 +342,10 @@ export class AdminApi {
     return this.request(`/review-tasks/${encodeURIComponent(taskId)}/decisions`)
   }
 
+  getReviewTask(taskId: string): Promise<ReviewTask> {
+    return this.request(`/review-tasks/${encodeURIComponent(taskId)}`)
+  }
+
   private async request<T>(
     path: string,
     init: RequestInit & { authenticated?: boolean } = {},
@@ -351,6 +382,7 @@ export class AdminApi {
       body.error?.message ?? `管理请求失败（HTTP ${response.status}）`,
       body.error?.request_id ?? response.headers.get('X-Request-ID') ?? undefined,
       body.error?.details,
+      body.error?.field_errors,
     )
   }
 }

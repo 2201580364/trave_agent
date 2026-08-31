@@ -21,6 +21,7 @@ from travel_agent.domain.place_catalog import (
     PlaceClosure,
     PlaceDateException,
     PlaceGeometry,
+    PlaceRelation,
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
@@ -287,6 +288,51 @@ class PlaceReviewWorkflowService:
             uow.commit()
             return updated
 
+    def confirm_no_relations(self, principal: AdminPrincipal, *, revision_id: str,
+                             expected_revision_number: int, expected_revision_version: int,
+                             operation_intent_id: str, reason_code: str,
+                             reason_text: str | None, request_id: str) -> PlaceRevision:
+        """Record that this revision was checked and has no relation evidence to裁决."""
+        self._require(principal, "place:candidate:write")
+        reason_text = self._validate_reason(reason_code, reason_text)
+        digest = _digest({"revision_id": revision_id, "expected_revision_number": expected_revision_number,
+                          "expected_revision_version": expected_revision_version,
+                          "reason_code": reason_code, "reason_text": reason_text})
+        now = self._clock.now()
+        with self._uow_factory() as uow:
+            existing = self._replay(uow, operation_intent_id, digest)
+            if existing is not None:
+                revision = uow.reviews.get_revision(existing.target_id)
+                if revision is None:
+                    raise ResourceNotFoundError
+                return revision
+            actor = self._actor(uow, principal)
+            current = uow.reviews.get_revision(revision_id)
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if current is None or evidence is None:
+                raise ResourceNotFoundError
+            if current.lifecycle_status != "candidate":
+                raise ReviewRevisionNotCandidateError
+            if current.revision_number != expected_revision_number:
+                raise ReviewTaskConflictError
+            if current.revision_version != expected_revision_version:
+                raise PlaceRevisionVersionConflictError
+            if any(item.active for item in evidence.relations):
+                raise ValueError("当前存在关系记录，请逐条完成关系裁决")
+            updated = replace(current, relation_review_status="no_relations", solver_eligible=False,
+                              conflicts_resolved=False, reviewed_at=None, published_at=None,
+                              revision_version=current.revision_version + 1)
+            uow.reviews.update_revision(updated, expected_revision_number=expected_revision_number,
+                                        expected_revision_version=expected_revision_version)
+            uow.audits.add(self._event(actor, action="PLACE_RELATION_REVIEW_CONFIRMED_NONE",
+                                        target_type="place_revision", target_id=revision_id,
+                                        target_revision=str(updated.revision_number),
+                                        before_digest=_revision_digest(current), after_digest=_revision_digest(updated),
+                                        reason_code=reason_code, reason_text=reason_text, request_id=request_id,
+                                        operation_intent_id=operation_intent_id, operation_digest=digest))
+            uow.commit()
+            return updated
+
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
@@ -384,6 +430,13 @@ class PlaceReviewWorkflowService:
             if item.start_minute is not None and item.end_minute is not None:
                 sessions.append({"time_rule_id": item.time_rule_id, "start_minute": item.start_minute,
                                  "end_minute": item.end_minute, "last_entry_minute": item.last_entry_minute})
+        if any(
+            minute >= 1440
+            for session in sessions
+            for minute in (session["start_minute"], session["end_minute"], session["last_entry_minute"])
+            if isinstance(minute, int)
+        ) and "CROSS_MIDNIGHT_WINDOW" not in reasons:
+            reasons.append("CROSS_MIDNIGHT_WINDOW")
         if len(sessions) > 1:
             reasons.append("FIXED_SESSION_AMBIGUOUS")
         return {"revision_id": revision_id, "service_date": service_date.isoformat(), "open": True,
@@ -1356,6 +1409,8 @@ class PlaceReviewWorkflowService:
                 if evidence_kind == "closure"
                 else evidence.date_exceptions
                 if evidence_kind == "date_exception"
+                else evidence.relations
+                if evidence_kind == "relation"
                 else ()
             )
             current = next(
@@ -1375,6 +1430,7 @@ class PlaceReviewWorkflowService:
                     evidence_id=evidence_id,
                     review_status=review_status,
                     reviewed_at=now,
+                    place_id=revision.place_id,
                 )
             except ValueError as exc:
                 if "not found" in str(exc):
@@ -1454,9 +1510,76 @@ class PlaceReviewWorkflowService:
                 reviewed_at=None,
                 published_at=None,
                 revision_version=1,
+                relation_review_status="pending",
                 created_at=now,
             )
             uow.reviews.add_revision(revision)
+            # A new revision inherits the currently active evidence as a new,
+            # unverified copy.  Child rows are revision-scoped, so merely
+            # copying the parent row would leave the editor with an empty
+            # evidence set and force needless re-entry of unchanged facts.
+            evidence = uow.catalog.load_revision_evidence(base_revision_id)
+            if evidence is not None:
+                for item in evidence.geometries:
+                    if item.active:
+                        uow.catalog.add_geometry(
+                            replace(
+                                item,
+                                geometry_id=self._ids.new_id("geometry"),
+                                place_revision_id=revision.place_revision_id,
+                                review_status="candidate",
+                                reviewed_at=None,
+                                created_at=now,
+                            )
+                        )
+                for item in evidence.access_points:
+                    if item.active:
+                        uow.catalog.add_access_point(
+                            replace(
+                                item,
+                                access_point_id=self._ids.new_id("access_point"),
+                                place_revision_id=revision.place_revision_id,
+                                review_status="candidate",
+                                reviewed_at=None,
+                                created_at=now,
+                            )
+                        )
+                for item in evidence.time_rules:
+                    if item.active:
+                        uow.catalog.add_time_rule(
+                            replace(
+                                item,
+                                time_rule_id=self._ids.new_id("time_rule"),
+                                place_revision_id=revision.place_revision_id,
+                                review_status="candidate",
+                                reviewed_at=None,
+                                created_at=now,
+                            )
+                        )
+                for item in evidence.closures:
+                    if item.active:
+                        uow.catalog.add_closure(
+                            replace(
+                                item,
+                                closure_id=self._ids.new_id("closure"),
+                                place_revision_id=revision.place_revision_id,
+                                review_status="candidate",
+                                reviewed_at=None,
+                                created_at=now,
+                            )
+                        )
+                for item in evidence.date_exceptions:
+                    if item.active:
+                        uow.catalog.add_date_exception(
+                            replace(
+                                item,
+                                date_exception_id=self._ids.new_id("date_exception"),
+                                place_revision_id=revision.place_revision_id,
+                                review_status="candidate",
+                                reviewed_at=None,
+                                created_at=now,
+                            )
+                        )
             uow.audits.add(
                 self._event(
                     actor,
@@ -1585,6 +1708,7 @@ class PlaceReviewWorkflowService:
                 reviewed_at=None,
                 published_at=None,
                 revision_version=current.revision_version + 1,
+                relation_review_status="pending",
             )
             uow.reviews.update_revision(
                 updated,
@@ -1960,6 +2084,14 @@ class PlaceReviewWorkflowService:
             if uow.reviews.get_task(task_id) is None:
                 raise ReviewTaskNotFoundError
             return uow.reviews.list_decisions(task_id)
+
+    def get_task(self, principal: AdminPrincipal, *, task_id: str) -> PlaceReviewTask:
+        self._require(principal, "place:review:read")
+        with self._uow_factory() as uow:
+            task = uow.reviews.get_task(task_id)
+            if task is None:
+                raise ReviewTaskNotFoundError
+            return task
 
     def submit(
         self,
@@ -2444,6 +2576,7 @@ def _revision_digest(revision: PlaceRevision) -> str:
             "place_revision_id": revision.place_revision_id,
             "revision_number": revision.revision_number,
             "revision_version": revision.revision_version,
+            "relation_review_status": revision.relation_review_status,
             "lifecycle_status": revision.lifecycle_status,
             "canonical_name": revision.canonical_name,
         }
@@ -2468,7 +2601,8 @@ def _evidence_digest(
     | PlaceAccessPoint
     | PlaceTimeRule
     | PlaceClosure
-    | PlaceDateException,
+    | PlaceDateException
+    | PlaceRelation,
 ) -> str:
     evidence_id = next(
         getattr(value, name)
@@ -2478,6 +2612,7 @@ def _evidence_digest(
             "time_rule_id",
             "closure_id",
             "date_exception_id",
+            "relation_id",
         )
         if hasattr(value, name)
     )

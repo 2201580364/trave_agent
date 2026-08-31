@@ -193,7 +193,7 @@ places
 - `PlaceRevision` 使用 `(place_id, revision_number)` 唯一约束，保存名称、类型、几何类型、时长范围、内部步行、体力、室内外、适用时段、人群、雨天适配、来源闭包和 candidate/human_verified/published/retired 生命周期；
 - 几何、访问点、时间规则、闭馆日和日期例外分别持久化，访问点坐标使用 `DECIMAL(10,7)`，跨午夜分钟值允许到 2880；
 - O05 Revision evidence 已覆盖 `place_time_rules`、`place_closures` 和 `place_date_exceptions`：三类记录严格按 `place_revision_id` 加载，其来源纳入当前 Place 的依赖闭包，并逐项暴露来源有效性、审核状态、active 状态和审核时间；candidate CRUD、软停用、重新启用和 reviewer 逐项审核已开放，指定日期解析预览仍待后续切片；
-- `PlaceRelation` 表达 contains/part_of/overlaps/same_experience，并保存 pending/resolved/not_required 裁决状态；互斥组与成员使用独立表和唯一约束；
+- `PlaceRelation` 表达 contains/part_of/overlaps/same_experience，并保存 pending/resolved/not_required 裁决状态；互斥组与成员使用独立表和唯一约束。`PlaceRevision.relation_review_status` 记录本次修订是否已完成关系检查：`pending`、`no_relations`；历史修订默认 `not_required` 以保持向后兼容。无关系时必须通过 O07 确认接口登记 `no_relations`，不得伪造关系行；
 - `SolverPlaceProjection` 在同一 `data_snapshot_version` 内约束 solver node ID 唯一、PlaceRevision 唯一，保存显式到达/离开访问点、时长范围、solver payload 和稳定 SHA-256；
 - 仓储拒绝直接插入 published Revision 或 projection；唯一发布入口加载 Place、Revision、来源、几何、访问点、时间和关系依赖闭包，执行 fail-closed 门禁后在同一事务中更新 Revision 与 projection 状态。
 

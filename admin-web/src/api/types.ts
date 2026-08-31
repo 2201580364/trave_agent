@@ -144,12 +144,32 @@ export type PlaceRevision = {
   reviewed_at: string | null
   published_at: string | null
   review_flags: string[]
+  relation_review_status?: 'pending' | 'no_relations' | 'not_required'
 }
 
 export type PublicationCheck = {
   revision_id: string
   publishable: boolean
   reason_codes: string[]
+}
+
+export type SourceConflictRecord = {
+  source_record_id: string
+  source_url: string
+  source_decision: string
+  status: string
+  observed_at: string
+}
+
+export type SourceConflict = {
+  source_id: string
+  resolved: boolean
+  records: SourceConflictRecord[]
+}
+
+export type SourceConflictResponse = {
+  revision_id: string
+  items: SourceConflict[]
 }
 
 export type PublicationBatchItem = {
@@ -398,6 +418,7 @@ export type ApiErrorBody = {
     code?: string
     message?: string
     details?: Record<string, unknown>
+    field_errors?: Array<{ field?: string; code?: string; message?: string }>
     request_id?: string
   }
 }

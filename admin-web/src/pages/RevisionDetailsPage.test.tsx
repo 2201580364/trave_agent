@@ -1,16 +1,20 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import type { PlaceRevision, PlaceRevisionEvidence } from '../api/types'
+import type { PlaceRevision, PlaceRevisionEvidence, ReviewTask } from '../api/types'
 import { RevisionDetailsPage } from './RevisionDetailsPage'
 
 const mocks = vi.hoisted(() => ({
   api: {
     getPlaceRevision: vi.fn(),
     getPlaceRevisionEvidence: vi.fn(),
+    getReviewTask: vi.fn(),
+    listSourceConflicts: vi.fn(),
+    checkPlaceRevisionPublication: vi.fn(),
   },
   permissions: new Set<string>(),
   navigate: vi.fn(),
+  location: { search: '' },
 }))
 
 vi.mock('../auth/AdminSessionProvider', () => ({
@@ -23,6 +27,7 @@ vi.mock('../auth/AdminSessionProvider', () => ({
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mocks.navigate,
   useParams: () => ({ revisionId: 'revision-1' }),
+  useLocation: () => mocks.location,
 }))
 
 const revision: PlaceRevision = {
@@ -117,9 +122,23 @@ const timeEvidence: PlaceRevisionEvidence = {
 }
 
 describe('RevisionDetailsPage', () => {
+  const openReviewTask: ReviewTask = {
+    review_task_id: 'task-1',
+    place_revision_id: 'revision-1',
+    status: 'ready_for_review',
+    assigned_reviewer_id: null,
+    version: 1,
+    created_by: 'editor-1',
+    created_at: '2026-08-30T00:00:00Z',
+    updated_at: '2026-08-30T00:00:00Z',
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.api.listSourceConflicts.mockResolvedValue({ revision_id: 'revision-1', items: [] })
+    mocks.api.checkPlaceRevisionPublication.mockResolvedValue({ revision_id: 'revision-1', publishable: true, reason_codes: [] })
     mocks.permissions.clear()
+    mocks.location.search = ''
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       unobserve() {}
@@ -174,8 +193,10 @@ describe('RevisionDetailsPage', () => {
   it('shows O05 edit and reviewer actions only when the administrator has permissions', async () => {
     mocks.permissions.add('place:candidate:write')
     mocks.permissions.add('place:review:decide')
+    mocks.location.search = '?from=review&task=task-1'
     mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
     mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce(timeEvidence)
+    mocks.api.getReviewTask.mockResolvedValueOnce(openReviewTask)
 
     render(<RevisionDetailsPage />)
 
@@ -186,5 +207,50 @@ describe('RevisionDetailsPage', () => {
       .map((button) => button.textContent?.replace(/\s/g, ''))
     expect(buttonLabels.filter((label) => label === '通过')).toHaveLength(2)
     expect(buttonLabels.filter((label) => label === '驳回')).toHaveLength(2)
+    expect(screen.getByText('审核通过')).toBeTruthy()
+    expect(screen.getByText('退回修改')).toBeTruthy()
+    expect(screen.getByText('返回地点审核')).toBeTruthy()
+    expect(screen.queryByText('编辑候选')).toBeNull()
+    expect(screen.queryByText('送审')).toBeNull()
+  })
+
+  it('hides reviewer actions and keeps the candidate return path outside review context', async () => {
+    mocks.permissions.add('place:candidate:write')
+    mocks.permissions.add('place:review:decide')
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce(timeEvidence)
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('开放时间与固定场次（O05）')).toBeTruthy())
+
+    expect(screen.getByText('返回候选地点')).toBeTruthy()
+    expect(screen.getByText('编辑候选')).toBeTruthy()
+    expect(screen.queryByText('审核通过')).toBeNull()
+    expect(screen.queryByText('退回修改')).toBeNull()
+    expect(screen.queryByText('关闭任务')).toBeNull()
+    expect(screen.queryAllByText('通过')).toHaveLength(0)
+    expect(mocks.api.getReviewTask).not.toHaveBeenCalled()
+  })
+
+  it('explains source conflicts and solver prerequisites with actionable locations', async () => {
+    const blockedRevision = { ...revision, solver_eligible: false, conflicts_resolved: false }
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(blockedRevision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({ ...timeEvidence, geometries: [], access_points: [], time_rules: [] })
+    mocks.api.listSourceConflicts.mockResolvedValueOnce({
+      revision_id: 'revision-1',
+      items: [{ source_id: 'official-site', resolved: false, records: [{ source_record_id: 'source-1', source_url: 'https://example.test', source_decision: 'pending', status: 'active', observed_at: '2026-08-30T00:00:00Z' }, { source_record_id: 'source-2', source_url: 'https://example.test/old', source_decision: 'rejected', status: 'active', observed_at: '2026-08-29T00:00:00Z' }] }],
+    })
+    mocks.api.checkPlaceRevisionPublication.mockResolvedValueOnce({ revision_id: 'revision-1', publishable: false, reason_codes: ['MISSING_VERIFIED_GEOMETRY', 'SOURCE_CONFLICT_UNRESOLVED'] })
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('来源冲突与裁决（O06）')).toBeTruthy())
+    expect(screen.getByText('检测到 1 组来源冲突')).toBeTruthy()
+    expect(screen.getByText('存在未完成裁决的来源冲突')).toBeTruthy()
+    expect(screen.getByText('缺少已核验的地点几何')).toBeTruthy()
+    expect(screen.getByText('查看来源冲突（O06）')).toBeTruthy()
+    expect(screen.getAllByText('查看地图与访问点（O04）').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: '开放时间（O05）：0/1 已核验' })).toBeTruthy()
   })
 })

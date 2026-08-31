@@ -20,7 +20,15 @@ export function adminErrorMessage(error: unknown): string {
     const baseMessage = error.code === 'publication_gate_rejected'
       ? '发布门禁未通过，请先补齐依赖证据。'
       : (ERROR_MESSAGES[error.code] ?? '操作未完成，请检查输入和当前状态。')
-    const message = baseMessage + reasonCodes
+    const fieldErrors = error.fieldErrors && error.fieldErrors.length > 0
+      ? `（字段：${error.fieldErrors.map((item) => {
+        if (typeof item !== 'object' || item === null) return String(item)
+        const field = 'field' in item ? String(item.field) : '未知字段'
+        const detail = 'message' in item ? String(item.message) : '值无效'
+        return `${field}：${detail}`
+      }).join('；')}）`
+      : ''
+    const message = baseMessage + reasonCodes + fieldErrors
     return error.requestId ? `${message}（请求 ${error.requestId}）` : message
   }
   return '管理服务暂时不可用，请稍后重试。'

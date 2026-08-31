@@ -13,7 +13,7 @@
 ## 操作契约
 
 1. `POST /api/v1/admin/places/{place_id}/revisions` 接收 `base_revision_id`、`operation_intent_id` 和 reason 字段，从指定基线创建 `revision_number + 1` 的 `candidate`。基线 Revision、其审核时间和发布状态不改变。
-2. `PATCH /api/v1/admin/place-revisions/{revision_id}` 必须携带 `expected_revision_number`，且目标必须是 `candidate`。编辑后清除 `reviewed_at`、`published_at`、`solver_eligible` 和 `conflicts_resolved`，因此编辑后的版本必须重新送审。
+2. `PATCH /api/v1/admin/place-revisions/{revision_id}` 必须携带 `expected_revision_number`，且目标必须是 `candidate`。编辑后清除 `reviewed_at`、`published_at`、`solver_eligible`、`conflicts_resolved`，并将 `relation_review_status` 重置为 `pending`，因此编辑后的版本必须重新完成 O07 检查并送审。
 3. `POST /api/v1/admin/place-revisions/{revision_id}/review-tasks` 与审核决定接口复用现有审核事务和审计规则。审核通过后 Revision 进入 `human_verified`，并保留完整决定历史。
 4. `GET /api/v1/admin/place-revisions/{revision_id}/publication-checks` 返回 `{publishable, reason_codes}`。`POST /api/v1/admin/place-revisions/{revision_id}/publications` 只有在依赖闭包通过时才允许执行。
 
@@ -30,4 +30,4 @@
 
 以下能力仍属于 `R0.2-07`：独立 research snapshot 实体、内容哈希、城市当前快照指针、批次发布、批次逐项结果、旧快照退役和失败回滚。
 
-新建 Revision 默认只复制 Revision 事实，不复制几何、访问点、时间规则、闭馆例外、关系或 Projection 证据。发布检查会明确报告缺失依赖；证据继承必须由 O04-O07 显式设计，禁止隐式共享旧 Revision 外键。
+新建 Revision 会复制基线 Revision 当前仍有效的几何、访问点、时间规则、闭馆日和日期例外证据，并为子记录生成新的 Revision 作用域 ID；复制后的证据统一重置为待核验，已停用证据不会重新生效。地点关系记录是 Place 级关系，不复制外键，但会在新 Revision 的证据视图中按当前 Place 重新加载。Projection 不复制，必须在新 Revision 完成审核后重新准备。发布检查仍会明确报告缺失依赖，禁止通过共享旧 Revision 外键绕过重新审核。

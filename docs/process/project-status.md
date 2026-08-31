@@ -11,7 +11,97 @@
 
 跨里程碑稳定路线、阶段依赖和完成定义见 [项目完整路线图](project-roadmap.md)；本文件保留每轮执行账本和最新续接点。
 
+### 2026-09-01 续接进度（演出地点开放规则门禁语义修复）
+
+复核 `place_revision_e59759e1f65648498d2bd41745fdc316` 时确认：该地点类型为“演出/固定场次”，当前存在 1 条来源有效且已人工核验的 `opening_hours` 规则，但没有 `fixed_session` 规则。此前发布门禁将此情况错误返回为 `TIME_RULE_UNRESOLVED`，容易让审核员误以为开放时间核验失效。
+
+现新增稳定原因码 `FIXED_SESSION_REQUIRED`：演出、灯光秀等地点必须提供明确开始/结束时间的固定场次；普通开放时间已核验不会替代固定场次。管理端 O05 对演出地点增加明确提醒，发布阻断摘要提供“处理固定场次（O05）”入口，并说明需要编辑规则或新建修订版本后重新送审。更新 ADR-0018、API 契约和中文原因码映射，新增求解门禁回归测试。
+
+同时保留 O05 人工核验进度总览，显示有效记录数与已核验记录数，避免“有记录”和“满足地点类型要求”被混淆。当前 API 对该 Revision 返回 `FIXED_SESSION_REQUIRED` 与 `PLACE_NOT_SOLVER_ELIGIBLE`，其中前者是本次问题的直接原因。
+
+验证结果：后端全量 pytest `376/376`、admin-web Vitest `16/16`、TypeScript typecheck、production build、`git diff --check` 均通过；本地 API 已重启并实测返回新原因码。浏览器当前已登录并可打开管理端，但本轮未通过浏览器提交任何修订数据；登录后视觉验收仍需确认 O05 固定场次提示和阻断摘要入口。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（发布阻断摘要结构化与来源冲突处理入口）
+
+修复 Revision 详情页“发布阻断摘要”只显示笼统文案、无法定位和处理的问题。页面加载修订版本时同步读取来源冲突和发布门禁检查结果：阻断项现在按“原因、影响、处理建议、证据区域入口”展示，并将缺少几何、访问点、开放时间、来源记录、关系裁决、人工核验和求解资格等条件映射到 O04/O05/O06/O07 或审核操作区。发布门禁原因码统一通过中文标签展示，不再把内部代码直接暴露给审核用户。
+
+新增 O06 来源冲突卡片，展示来源组、来源记录、来源地址、来源决策、观察时间和状态；数据编辑员可填写裁决依据并通过现有并发控制接口标记冲突已处理，reviewer 仅可查看。即使系统没有发现具体冲突，仍提供“确认无冲突并完成裁决”入口，避免 `conflicts_resolved=false` 造成无处理路径的发布阻断。处理后明确提示修订版本会递增、审核/求解资格会清除、需要重新送审。更新管理 API 类型与封装，补充来源冲突查询/处理请求测试。
+
+验证结果：后端全量 pytest 通过；admin-web Vitest `16/16`、TypeScript typecheck、production build、`git diff --check` 通过。站内浏览器已确认当前管理端登录页可访问，但因管理员密码属于敏感凭证，本轮未代填登录，未完成登录后真实 candidate 的视觉验收；待用户在管理端登录后复核阻断卡片和 O06 处理入口。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，完整能力域尚未提交。
+
+### 2026-08-31 续接进度（O05 状态可解释性与核验路径简化）
+
+针对用户看到“开放时间尚未核验”但认为页面已有已核验规则的问题，核对当前 URL 对应 Revision `place_revision_e59759e1f65648498d2bd41745fdc316` 的真实 API/SQLite 数据：当前版本为 `candidate`，O05 有 1 条开放时间规则但其 `review_status=candidate`，并非 `human_verified`；发布检查同时返回“尚未准备求解投影”。页面阻断说明现显示“当前读取到 N 条有效规则，其中 M 条已人工核验”，避免把记录存在误认为已完成核验。
+
+为降低人工核验复杂度，Revision 详情新增“人工核验进度”总览，按 O04/O05/O07 显示“已核验/有效记录总数”，点击即可定位到对应区域；求解资格仍由证据核验、来源冲突/关系裁决和 Revision 级审核自动计算，不增加人工勾选项。原有逐项审核按钮和权限边界保持不变。
+
+验证结果：admin-web Vitest `16/16`、TypeScript typecheck、production build、`git diff --check` 通过；未代填管理员密码，尚未完成登录后 Chrome/站内浏览器视觉验收。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，本能力域继续与前述阻断摘要改动合并，暂不提交。
+
+### 2026-08-31 续接进度（Revision 证据继承与审核字段引导修复）
+
+修复新建 Revision 只复制主记录、导致 Geometry/AccessPoint/TimeRule/Closure/DateException 全部为空的问题：现在新建 Revision 会复制基线 Revision 当前仍有效的子证据，为每条子证据生成新的 revision-scoped ID，并将审核状态重置为 `candidate`、清空 `reviewed_at`；已停用证据不会重新生效，旧 Revision 与审核记录保持不可变。新增后端回归测试验证证据数量、ID 隔离和重新核验门禁。
+
+同步优化管理端证据录入：Geometry 类型改为中文下拉并提供 GeoJSON 示例及经纬度顺序说明；AccessPoint 用途改为入口/出口/路线/演出地点等中文选项；来源记录改为当前地点有效来源下拉，避免审核人手填内部 ID；时间字段改为“开始/结束/最晚入园时间（分钟）”并补充换算说明；O04/O07 增加“几何、访问点、来源、求解投影端点、关系裁决”的非开发人员操作口径。关系区明确由归一/去重线索生成，当前页面负责裁决，不要求 reviewer 凭空创建关系。
+
+验证结果：后端全量 pytest 通过，新增 `test_new_revision_copies_active_evidence_as_unverified_children` 通过；admin-web typecheck、production build 通过；站内浏览器已确认 O04 新增表单显示中文字段说明、GeoJSON 示例、访问点用途下拉、来源下拉和 O07 关系裁决提示。Chrome 控制通道本轮未连接，需后续 Chrome 可用时补做正式浏览器报告。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（证据填写提示收敛为悬停图标）
+
+根据审核人员反馈，将 O04/O05/O07 表单中始终展开的长说明改为字段标签旁黄色“!”提示图标，鼠标悬停后显示填写规则、示例和验证口径；保留错误校验和必要状态告警，不再让帮助文字挤压表单。管理端 typecheck 和 production build 均通过。站内浏览器页面刷新后因内存会话回到登录页，本轮未重新输入管理员密码，未完成登录后的悬停交互截图；待 Chrome/管理会话可用时补做正式可视化验收。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（访问点新增 422 前置校验修复）
+
+定位并修复访问点新增接口 `POST /api/v1/admin/place-revisions/{revision_id}/access-points` 的常见 422 触发路径：新增表单此前未将“访问点用途”标记为必填，且打开新增弹窗时没有默认用途，用户未选择用途会把空值提交到后端。现在新增访问点默认选择“游客入口”，用途字段增加前端必填校验和中文错误提示；后端原有 Pydantic 与领域校验保持不变，仍拒绝非法用途、坐标、来源和版本号。打开几何/访问点弹窗时同步清理上一次表单残留值。
+
+验证结果：admin-web Vitest `14/14`、typecheck、production build 和 `git diff --check` 通过；API 服务已重启并保持就绪。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（访问点 422 复现与前端错误可见性修复）
+
+使用当前本地 SQLite 和 `.env` 管理员会话复现访问点接口：完整载荷可正常返回 `200`；此前页面 `422` 的原因是访问点用途或来源字段未实际选中时提交了空值。新增访问点现在默认带入“游客入口”和当前地点第一条有效来源，并对用途增加必填校验；管理 API 错误对象同步保留 `field_errors`，前端会把具体字段和校验消息展示出来，不再只显示笼统的“提交内容未通过校验”。为复现创建的临时访问点已通过正式停用接口清理。
+
+验证结果：admin-web Vitest `14/14`、typecheck、production build、后端全量 pytest 和 `git diff --check` 通过；API `/health/ready` 正常。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
 ## 术语
+
+### 2026-08-31 续接进度（候选编辑弹窗布局优化）
+
+优化“编辑候选修订版本”弹窗的长表单展示：弹窗固定宽度并限制内容区高度，表单内容独立滚动；字段按“基础信息 / 游览与求解 / 体验标签”分组，桌面端采用双列布局，最短/建议/最长时长在同一组中并排展示，移动端自动切换为单列。底部取消/确定操作保持可见，避免长页面遮挡操作入口。
+
+验证结果：admin-web Vitest `14/14`、TypeScript typecheck、production build、`git diff --check` 通过。Google Chrome 已打开实际编辑弹窗复核，确认分组、滚动区域、时长三列和底部操作按钮均正常；未改变后端字段、求解器契约或审核权限边界。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（O05 指定日期解析预览回归收口）
+
+补齐 O05 指定日期解析预览的 HTTP 回归覆盖，并修正跨午夜固定场次未返回 `CROSS_MIDNIGHT_WINDOW` 的实现缺口。测试覆盖日期例外优先于周规则、日期例外关闭、周闭馆、跨午夜窗口、多个固定场次歧义、无匹配日期规则和未登录访问；接口保持只读，不改变 Revision、证据、审核或审计状态。
+
+验证结果：后端全量 pytest `375/375`、admin-web Vitest `14/14`、TypeScript typecheck、production build、`git diff --check` 通过。Google Chrome 已复核 O05 页面入口和禁用状态；当前演示 Revision 的时间规则仍为候选/来源不完整，按门禁禁用解析按钮，未通过 SQL 或前端状态伪造可解析数据。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（审核详情编辑边界与时长区间表单）
+
+修复审核上下文中的操作边界：从 O08 审核队列进入 Revision 详情时，隐藏“编辑候选”和“送审”，仅保留 reviewer 的审核操作；从候选地点普通入口进入时继续按 `place:candidate:write` / `place:review:request` 展示编辑和送审。
+
+评审并确认建议时长不新增字段或迁移：`PlaceRevision`、`SolverPlaceProjection` 和求解器现有契约已经使用 `duration_min ≤ duration_recommended ≤ duration_max`。管理端编辑表单现完整暴露最短、建议、最长时长及其他可编辑地点事实；求解器仍优先使用 `duration_recommended`，并在时间窗不足时依据区间和既有 60% 软阈值处理。服务端继续执行区间不变量、版本校验、审计和重新送审门禁。
+
+验证结果：后端管理接口测试通过；admin-web Vitest `14/14`、TypeScript typecheck、production build、`git diff --check` 通过。Google Chrome 已复核审核入口不显示编辑/送审、显示审核操作；普通候选入口显示编辑/送审且打开完整字段表单。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（审核详情上下文与操作入口修复）
+
+修复审核队列进入 Revision 详情后的两个流程缺口：审核队列导航现在携带 `from=review&task={task_id}` 上下文；Revision 详情页识别该上下文后，返回按钮改为“返回地点审核”，并加载对应审核任务，提供 Revision 级“审核通过 / 退回修改 / 关闭任务”操作。Geometry、AccessPoint、TimeRule、Closure、DateException、Relation 的证据级审核按钮也仅在审核上下文且当前管理员具备 reviewer 权限时显示；从候选地点等普通入口进入时不显示审核操作，避免误操作。
+
+新增 `GET /api/v1/admin/review-tasks/{task_id}` 用于详情页加载任务上下文；同步更新 API 契约、交互流程和前端回归测试。admin-web Vitest `14/14`、TypeScript typecheck、production build、`git diff --check` 通过。Google Chrome 已复核：从 O08 点击“查看地点详情”进入 `candidates/revision-hz-cand-008?from=review&task=...`，页面显示“返回地点审核”；当前任务若处于可审核状态则显示审核按钮；从候选清单普通入口进入时显示“返回候选地点”且不显示审核操作，地点详情请求和证据区域正常。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，未提交。
+
+### 2026-08-31 续接进度（审核队列地点详情入口修复）
+
+发现审核队列表格仅展示审核任务编号和 Revision 编号，地点详情入口只隐藏在展开行中，不利于 reviewer 定位被审核地点。本轮在 O08 审核队列表格新增固定的“查看地点详情”操作，直接跳转到对应 Revision 详情页；展开行原有入口同步改为“查看地点与证据详情”，继续保留审核决定历史和 Revision 级决定操作。审核人现在可以从任务列表直接进入地点基础事实、地图/访问点、开放时间、来源冲突、关系裁决和证据审核页面。
+
+新增 `ReviewQueuePage` 回归测试覆盖按钮跳转路径。admin-web Vitest `13/13`、TypeScript typecheck 和 `git diff --check` 通过；后端未改动。本轮已在 Google Chrome 真实审核队列复核：表格显示“审核地点 → 查看地点详情”，点击后进入 `http://127.0.0.1:5173/candidates/revision-hz-cand-008`，页面显示地点名称“西湖音乐喷泉表演”、基础事实与 O04/O05/O07 证据区。当前仍处于 M1 后段 / Gate 7 / OM1 / G7-R0.2-07，真实 candidate 审核与研究快照闭环仍未完成，不自动提交。
+
+### 2026-08-31 续接进度（人工核验操作路径重梳）
+
+本轮以当前代码为准重新梳理 OM1 人工核验闭环，新增[《人工核验操作路径》](../product/人工核验操作路径.md)。手册明确了 `data_editor`、`data_reviewer`、`data_publisher` 和 `research_viewer` 的边界，区分 Revision 生命周期与审核任务状态，并按“候选准备 → O04 地图/访问点 → O05 时间证据 → O06 来源冲突 → O07 关系裁决 → 送审 → reviewer 逐项证据核验 → Revision 级通过/退回 → Projection 准备 → publication check → 批次发布/研究快照”给出可执行顺序。
+
+同步修订管理端功能模块设计 V1.2、交互流程与状态机、API 契约：送审只创建或重用开放任务，不代表已满足通过门禁；逐项审核支持 Geometry、AccessPoint、TimeRule、Closure、DateException、Relation；`human_verified` 只能由 reviewer 的 Revision 级 `approve` 事务产生；编辑证据、来源裁决或关系裁决后必须以新版本重新送审。另修复关系证据审核在应用层未分派、持久化层错误使用 Revision 外键的问题，并补充关系逐项审核回归测试；未改变数据库现有数据和权限模型。
+
+验证：后端 pytest `367/367` 通过；admin-web Vitest `12/12`、TypeScript typecheck、production build、`git diff --check` 通过。Chrome 本轮未改 UI 代码，后续真实 candidate 的逐项审核和发布批次成功路径仍需在浏览器中回归。当前仍处于 M1 后段 / Gate 7 / OM1，O09 及真实 candidate 研究快照闭环保持阶段性完成，暂不自动提交。
 
 ### 2026-08-31 续接进度（Projection 准备管理 API 收口）
 
@@ -859,3 +949,6 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 下一步：
 - ...
 ```
+## O07 关系检查闭环（本轮）
+
+已补齐地点关系与裁决的“无关系”正式闭环：新增修订级 `relation_review_status` 和迁移 `0012_relation_review_status`；新建/编辑候选进入待检查状态，数据编辑员可在无关系记录时确认“无关系”，操作带并发版本、幂等意图和审计，reviewer 只读。已有关系仍须逐条裁决。发布门禁会对待检查且无关系记录的修订返回 `RELATION_REVIEW_REQUIRED`。O06 页面明确冲突由系统自动发现、由数据编辑员处理；所有证据表格的操作列统一置于最右侧。

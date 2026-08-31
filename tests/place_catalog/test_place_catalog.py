@@ -315,6 +315,22 @@ def test_show_with_multiple_fixed_sessions_is_rejected() -> None:
     assert "FIXED_SESSION_AMBIGUOUS" in evaluate_projection_publication(context)
 
 
+def test_show_with_only_opening_hours_requires_a_fixed_session() -> None:
+    revision = replace(_revision(), place_kind="show")
+    projection = replace(_projection(), place_kind="show")
+    projection = replace(projection, projection_hash=canonical_projection_sha256(projection))
+    context = replace(
+        _context(projection=projection),
+        revision=revision,
+        time_rules=(replace(_time_rule("opening-hours"), rule_kind="opening_hours"),),
+    )
+
+    reasons = evaluate_projection_publication(context)
+
+    assert "FIXED_SESSION_REQUIRED" in reasons
+    assert "TIME_RULE_UNRESOLVED" not in reasons
+
+
 def test_sqlalchemy_catalog_persists_and_only_gate_can_publish(tmp_path: Path) -> None:
     database = tmp_path / "catalog.db"
     engine = create_engine(f"sqlite:///{database}")

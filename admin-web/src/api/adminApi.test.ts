@@ -153,4 +153,29 @@ describe('AdminApi', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('/place-revisions/revision-1/projection-preparations')
     expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
   })
+
+  it('loads and resolves revision source conflicts with optimistic concurrency fields', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ revision_id: 'revision-1', items: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ place_revision_id: 'revision-1' }), { status: 200 }))
+    const api = new AdminApi(() => 'editor-token', vi.fn())
+
+    await api.listSourceConflicts('revision-1')
+    await api.resolveSourceConflicts('revision-1', {
+      expected_revision_number: 2,
+      expected_revision_version: 4,
+      resolved: true,
+      operation_intent_id: 'conflict-resolve-1',
+      reason_code: 'SOURCE_CONFLICTS_REVIEWED',
+      reason_text: '以官方公告为准',
+    })
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/place-revisions/revision-1/source-conflicts')
+    expect(fetchMock.mock.calls[1][0]).toContain('/place-revisions/revision-1/source-conflicts/resolve')
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({
+      expected_revision_number: 2,
+      expected_revision_version: 4,
+      resolved: true,
+    })
+  })
 })

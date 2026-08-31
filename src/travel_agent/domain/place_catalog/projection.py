@@ -207,7 +207,11 @@ def evaluate_projection_publication(
     fixed_sessions = [rule for rule in verified_rules if rule.rule_kind == "fixed_session"]
     if revision.place_kind == "show":
         if not fixed_sessions:
-            reasons.add("TIME_RULE_UNRESOLVED")
+            # A show is scheduled around a concrete session, not a generic
+            # opening-hours window. Keep this reason distinct so operators
+            # can correct the rule kind instead of chasing a false missing
+            # verification warning.
+            reasons.add("FIXED_SESSION_REQUIRED")
         elif len(fixed_sessions) != 1:
             reasons.add("FIXED_SESSION_AMBIGUOUS")
 
@@ -220,6 +224,11 @@ def evaluate_projection_publication(
         for relation in context.relations
     ):
         reasons.add("OVERLAPPING_SELECTION_UNRESOLVED")
+    if (
+        revision.relation_review_status == "pending"
+        and not any(relation.active for relation in context.relations)
+    ):
+        reasons.add("RELATION_REVIEW_REQUIRED")
     if canonical_projection_sha256(projection) != projection.projection_hash:
         reasons.add("PROJECTION_HASH_MISMATCH")
 
