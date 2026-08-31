@@ -129,7 +129,6 @@ def _import_candidate(
             content_sha256=None,
             status="active",
             created_at=observed_at,
-            review_flags=tuple(str(item) for item in candidate["review_flags"]),
         )
     )
     repository.add_revision(

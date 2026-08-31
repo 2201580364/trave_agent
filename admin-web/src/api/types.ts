@@ -152,6 +152,36 @@ export type PublicationCheck = {
   reason_codes: string[]
 }
 
+export type PublicationBatchItem = {
+  batch_item_id: string
+  place_revision_id: string
+  status: 'pending' | 'publishable' | 'blocked' | 'published' | 'failed'
+  reason_codes: string[]
+  projection_id: string | null
+  published_at: string | null
+}
+
+export type PublicationBatch = {
+  batch_id: string
+  city_id: string
+  operation_intent_id: string
+  status: 'preview' | 'executing' | 'published' | 'partial_failed' | 'failed'
+  snapshot_id: string | null
+  created_at: string
+  items: PublicationBatchItem[]
+}
+
+export type ResearchSnapshot = {
+  snapshot_id: string
+  data_snapshot_version: string
+  city_id: string
+  content_sha256: string
+  source_batch_id: string
+  created_at: string
+  status: 'published'
+  payload?: Record<string, unknown>
+}
+
 export type PlaceRevisionEvidence = {
   revision: PlaceRevision
   sources: PlaceEvidenceSource[]

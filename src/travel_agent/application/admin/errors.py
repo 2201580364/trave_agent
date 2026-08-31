@@ -94,3 +94,15 @@ class PublicationGateRejectedError(ApplicationError):
             "place revision cannot be published until all publication gates pass",
             {"reason_codes": normalized},
         )
+
+
+class ProjectionPreparationRejectedError(ApplicationError):
+    """A verified revision cannot yet produce a usable solver projection."""
+
+    def __init__(self, reason_codes: tuple[str, ...]) -> None:
+        normalized = tuple(sorted(set(reason_codes)))
+        super().__init__(
+            "projection_preparation_rejected",
+            "Projection 准备未完成，请先补齐所需证据。",
+            {"reason_codes": normalized},
+        )

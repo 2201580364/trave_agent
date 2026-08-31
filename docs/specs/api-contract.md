@@ -1,9 +1,9 @@
 # M1 用户 API 与 OM1 管理 API 契约
 
-- 文档版本：V2.7
-- 日期：2026-08-29
+- 文档版本：V2.8
+- 日期：2026-08-31
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理身份、会话、管理员创建/角色管理、只读审计查询和独立 `/api/v1/admin` 底座已实现，地点审核与发布端点仍待后续工作包实现
+- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理身份、地点审核、发布门禁与 O09 批次/研究快照 API 已实现并进入 Chrome 验收
 - 上游：功能模块 V3.5、管理端功能 V1.0、UI V1.4、交互 V1.4、应用代码架构 V1.3、ADR-0005、ADR-0009、ADR-0018、ADR-0019
 - API 前缀：用户端 `/api/v1`；管理端 `/api/v1/admin`
 
@@ -177,6 +177,22 @@ od_basis: gaode | approximate
 | GET | `/trips/{trip_id}/revisions` | 当前 Trip 的只读修订历史 | 是 |
 
 M1 不提供 `/regenerate`。用户修改条件时更新或创建草稿，再提交新的 generation intent。
+
+## 12. O09 管理端研究快照批次
+
+批次发布只允许管理员调用，且不绕过单 Projection 的 publication check。预览阶段不会改变 Revision 或 Projection 状态；执行阶段逐项发布可发布项，阻断或异常项保留在批次结果中。
+
+### 12.1 POST `/api/v1/admin/publication-batches/previews`
+
+请求包含 `city_id`、`place_revision_ids`（1–500 项）、`operation_intent_id`、`reason_code` 和可选 `reason_text`。响应返回 `batch_id`、逐项 `status`（`publishable|blocked`）与稳定 `reason_codes`。相同 operation intent 和载荷重放返回相同批次；载荷变化返回 `admin_operation_intent_conflict`。
+
+### 12.2 POST `/api/v1/admin/publication-batches/{batch_id}/execute`
+
+执行只处理预览中可发布或仍待处理的项。每项记录 `published|blocked|failed`、Projection ID、发布时间和原因。批次状态为 `published`（全部成功）、`partial_failed`（部分成功）或 `failed`（无成功项）。成功项生成 `ResearchSnapshot`，其 `content_sha256` 和规范化 `payload` 永久不可变；重复执行使用相同 operation intent 时返回原结果，不创建第二个快照。
+
+### 12.3 GET `/api/v1/admin/research-snapshots` 与 `/{snapshot_id}`
+
+快照列表支持 `city_id`、`limit`、`offset`，详情额外返回完整不可变 payload。快照版本由城市和内容 hash 确定，同一内容不能生成多个版本；接口不提供更新或删除操作。
 
 ## 5. 匿名会话
 
@@ -1128,16 +1144,18 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | 查询追加式决定历史 |
 | `GET /api/v1/admin/place-revisions/{revision_id}/evidence` | editor/reviewer/publisher/viewer | 查询 Revision 绑定的几何、访问点、时间规则、闭馆日、日期例外、来源摘要和 Projection 端点；只读，不跨 Revision 推断 |
 | `GET /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/projection-preparations` | data_publisher | 从 human_verified Revision 生成 candidate Projection；记录门禁结果但不发布。`solver_node_id` 可省略，由服务端按 `data_snapshot_version` 分配快照内唯一节点号 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/publications` | data_publisher | 通过 publication intent 调用发布用例 |
-| `POST /api/v1/admin/publication-batches` | data_publisher | 创建批次预览/执行，不隐藏逐项失败 |
+| `POST /api/v1/admin/publication-batches/previews` | data_publisher | 创建批次预览，不隐藏逐项失败 |
+| `POST /api/v1/admin/publication-batches/{batch_id}/execute` | data_publisher | 执行已预览批次，逐项记录发布结果并生成不可变快照 |
 | `GET /api/v1/admin/research-snapshots` | publisher/viewer | 查询不可变研究快照和质量报告 |
-| `POST /api/v1/admin/research-snapshots` | data_publisher | 从明确 published 集合创建快照 |
+| `GET /api/v1/admin/research-snapshots/{snapshot_id}` | publisher/viewer | 查询单个不可变研究快照详情 |
 | `POST /api/v1/admin/places/{place_id}/retirements` | data_publisher | 退役当前发布版本，不物理删除历史 |
 | `GET /api/v1/admin/audit-events` | admin_security/受权只读角色 | 只读查询结构化管理审计 |
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
 
-当前已实现端点包括管理身份/RBAC/审计、candidates、place-revisions、Revision evidence、review-tasks/decisions、O04/O05/O06/O07 证据与裁决、批量审核、publication check 和 Projection 发布入口；独立 research snapshot/批次发布仍属于后续切片。
+当前已实现端点包括管理身份/RBAC/审计、candidates、place-revisions、Revision evidence、review-tasks/decisions、O04/O05/O06/O07 证据与裁决、批量审核、publication check、candidate Projection 准备、Projection 发布入口以及 O09 publication batch preview/execute 和 research snapshot 列表/详情；真实 candidate 审核数据下的 UI 勾选成功路径仍待回归。
 
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 

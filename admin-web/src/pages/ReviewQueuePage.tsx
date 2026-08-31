@@ -7,15 +7,16 @@ import { adminErrorMessage } from '../api/errorMessages'
 import type { ReviewDecision, ReviewTask, ReviewTaskStatus } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
+import { reasonCodeLabel, reviewStatusLabel } from '../ui/displayLabels'
 
 const PAGE_SIZE = 50
 const statusLabels: Record<ReviewTaskStatus, string> = {
-  draft: '草稿',
-  ready_for_review: '待审核',
-  in_review: '审核中',
-  changes_requested: '待修改',
-  approved: '已通过',
-  closed: '已关闭',
+  draft: reviewStatusLabel('draft'),
+  ready_for_review: reviewStatusLabel('ready_for_review'),
+  in_review: reviewStatusLabel('in_review'),
+  changes_requested: reviewStatusLabel('changes_requested'),
+  approved: reviewStatusLabel('approved'),
+  closed: reviewStatusLabel('closed'),
 }
 
 export function ReviewQueuePage() {
@@ -71,7 +72,7 @@ export function ReviewQueuePage() {
         ),
       },
       { title: '审核任务', dataIndex: 'review_task_id', width: 230, ellipsis: true },
-      { title: 'Revision', dataIndex: 'place_revision_id', width: 230, ellipsis: true },
+      { title: '修订版本', dataIndex: 'place_revision_id', width: 230, ellipsis: true },
       { title: '版本', dataIndex: 'version', width: 80 },
       { title: '更新时间', dataIndex: 'updated_at', width: 210, render: formatDateTime },
     ],
@@ -173,7 +174,7 @@ function ReviewTaskDetails({
     <Space orientation="vertical" style={{ width: '100%' }}>
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
         <Descriptions.Item label="创建人">{task.created_by}</Descriptions.Item>
-        <Descriptions.Item label="Revision">{task.place_revision_id}</Descriptions.Item>
+        <Descriptions.Item label="修订版本">{task.place_revision_id}</Descriptions.Item>
         <Descriptions.Item label="版本">{task.version}</Descriptions.Item>
       </Descriptions>
       <Button
@@ -182,7 +183,7 @@ function ReviewTaskDetails({
         onClick={() => navigate(`/candidates/${encodeURIComponent(task.place_revision_id)}`)}
         style={{ alignSelf: 'flex-start', paddingInline: 0 }}
       >
-        查看 Revision 详情
+        查看修订版本详情
       </Button>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
       {canDecide && (
@@ -205,9 +206,9 @@ function ReviewTaskDetails({
         pagination={false}
         dataSource={decisions}
         columns={[
-          { title: '决定', dataIndex: 'decision_kind' },
+          { title: '决定', dataIndex: 'decision_kind', render: reviewStatusLabel },
           { title: '角色', dataIndex: 'actor_role' },
-          { title: '理由', dataIndex: 'reason_code' },
+          { title: '理由', dataIndex: 'reason_code', render: reasonCodeLabel },
           { title: '时间', dataIndex: 'created_at', render: formatDateTime },
         ]}
       />

@@ -35,6 +35,9 @@ from travel_agent.domain.place_catalog import (
     PlaceTimeRule,
     ProjectionPublicationContext,
     ProjectionPublicationError,
+    PublicationBatch,
+    PublicationBatchItem,
+    ResearchSnapshot,
     SelectionExclusionGroup,
     SelectionExclusionMember,
     SolverPlaceProjection,
@@ -259,6 +262,41 @@ class PlaceRelationRow(Base):
     active: Mapped[bool] = mapped_column(Boolean, index=True)
     created_at: Mapped[str] = mapped_column(String(40))
     reviewed_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+
+class PublicationBatchRow(Base):
+    __tablename__ = "publication_batches"
+    batch_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    city_id: Mapped[str] = mapped_column(String(64), index=True)
+    operation_intent_id: Mapped[str] = mapped_column(String(64), unique=True)
+    created_by: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), index=True)
+    snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(40))
+
+
+class PublicationBatchItemRow(Base):
+    __tablename__ = "publication_batch_items"
+    batch_item_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    batch_id: Mapped[str] = mapped_column(ForeignKey("publication_batches.batch_id"), index=True)
+    place_revision_id: Mapped[str] = mapped_column(ForeignKey("place_revisions.place_revision_id"), index=True)
+    status: Mapped[str] = mapped_column(String(24))
+    reason_codes: Mapped[list[str]] = mapped_column(JSON)
+    projection_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    published_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    __table_args__ = (UniqueConstraint("batch_id", "place_revision_id", name="uq_publication_batch_revision"), MYSQL_TABLE_ARGS)
+
+
+class ResearchSnapshotRow(Base):
+    __tablename__ = "research_snapshots"
+    snapshot_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data_snapshot_version: Mapped[str] = mapped_column(String(80), unique=True)
+    city_id: Mapped[str] = mapped_column(String(64), index=True)
+    content_sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    source_batch_id: Mapped[str] = mapped_column(ForeignKey("publication_batches.batch_id"), index=True)
+    snapshot_payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(24))
 
 
 class SelectionExclusionGroupRow(Base):
@@ -726,6 +764,83 @@ class SqlAlchemyPlaceCatalogRepository:
     def add_relation(self, relation: PlaceRelation) -> None:
         self._add(PlaceRelationRow(**_relation_values(relation)), "relation already exists")
 
+    def add_publication_batch(self, batch: PublicationBatch) -> None:
+        self._add(PublicationBatchRow(batch_id=batch.batch_id, city_id=batch.city_id,
+                                      operation_intent_id=batch.operation_intent_id,
+                                      created_by=batch.created_by, status=batch.status,
+                                      snapshot_id=batch.snapshot_id,
+                                      created_at=batch.created_at.isoformat()), "publication batch already exists")
+
+    def update_publication_batch(self, batch: PublicationBatch) -> None:
+        row = self._session.get(PublicationBatchRow, batch.batch_id)
+        if row is None:
+            raise ValueError("publication batch does not exist")
+        row.city_id = batch.city_id
+        row.operation_intent_id = batch.operation_intent_id
+        row.created_by = batch.created_by
+        row.status = batch.status
+        row.snapshot_id = batch.snapshot_id
+        row.created_at = batch.created_at.isoformat()
+        self._session.flush()
+
+    def add_publication_batch_item(self, item: PublicationBatchItem) -> None:
+        self._add(PublicationBatchItemRow(
+            batch_item_id=item.batch_item_id,
+            batch_id=item.batch_id,
+            place_revision_id=item.place_revision_id,
+            status=item.status,
+            reason_codes=list(item.reason_codes),
+            projection_id=item.projection_id,
+            published_at=_iso(item.published_at),
+        ), "publication batch item already exists")
+
+    def list_publication_batch_items(self, batch_id: str) -> tuple[PublicationBatchItem, ...]:
+        rows = self._session.scalars(
+            select(PublicationBatchItemRow)
+            .where(PublicationBatchItemRow.batch_id == batch_id)
+            .order_by(PublicationBatchItemRow.place_revision_id.asc(), PublicationBatchItemRow.batch_item_id.asc())
+        )
+        return tuple(_publication_batch_item_from_row(row) for row in rows)
+
+    def update_publication_batch_item(self, item: PublicationBatchItem) -> None:
+        row = self._session.get(PublicationBatchItemRow, item.batch_item_id)
+        if row is None:
+            raise ValueError("publication batch item does not exist")
+        row.batch_id = item.batch_id
+        row.place_revision_id = item.place_revision_id
+        row.status = item.status
+        row.reason_codes = list(item.reason_codes)
+        row.projection_id = item.projection_id
+        row.published_at = _iso(item.published_at)
+        self._session.flush()
+
+    def add_research_snapshot(self, snapshot: ResearchSnapshot) -> None:
+        self._add(ResearchSnapshotRow(snapshot_id=snapshot.snapshot_id,
+                                      data_snapshot_version=snapshot.data_snapshot_version,
+                                      city_id=snapshot.city_id, content_sha256=snapshot.content_sha256,
+                                      source_batch_id=snapshot.source_batch_id,
+                                      snapshot_payload=snapshot.snapshot_payload,
+                                      created_at=snapshot.created_at.isoformat(), status=snapshot.status),
+                  "research snapshot already exists")
+
+    def get_publication_batch(self, batch_id: str) -> PublicationBatch | None:
+        row = self._session.get(PublicationBatchRow, batch_id)
+        return _publication_batch_from_row(row) if row is not None else None
+
+    def get_research_snapshot(self, snapshot_id: str) -> ResearchSnapshot | None:
+        row = self._session.get(ResearchSnapshotRow, snapshot_id)
+        return _research_snapshot_from_row(row) if row is not None else None
+
+    def list_research_snapshots(self, *, city_id: str | None = None, limit: int = 50, offset: int = 0) -> tuple[ResearchSnapshot, ...]:
+        statement = select(ResearchSnapshotRow)
+        if city_id is not None:
+            statement = statement.where(ResearchSnapshotRow.city_id == city_id)
+        rows = self._session.scalars(
+            statement.order_by(ResearchSnapshotRow.created_at.desc(), ResearchSnapshotRow.snapshot_id.asc())
+            .limit(limit).offset(offset)
+        )
+        return tuple(_research_snapshot_from_row(row) for row in rows)
+
     def update_relation(self, relation: PlaceRelation, *, revision_id: str, expected_revision_version: int) -> PlaceRevision:
         self._bump_revision(revision_id, expected_revision_version)
         result = self._session.execute(
@@ -786,6 +901,28 @@ class SqlAlchemyPlaceCatalogRepository:
             .limit(1)
         )
         return _projection_from_row(row) if row is not None else None
+
+    def next_solver_node_id(self, data_snapshot_version: str, *, minimum: int = 1) -> int:
+        """Return the smallest positive node id not used in this snapshot.
+
+        Node identity is snapshot-scoped.  Allocation lives beside persistence so
+        callers cannot accidentally derive IDs from revision order or place names.
+        """
+        if minimum <= 0:
+            raise ValueError("minimum solver node id must be positive")
+        used = {
+            value
+            for value in self._session.scalars(
+                select(SolverPlaceProjectionRow.solver_node_id).where(
+                    SolverPlaceProjectionRow.data_snapshot_version == data_snapshot_version
+                )
+            )
+            if value > 0
+        }
+        candidate = minimum
+        while candidate in used:
+            candidate += 1
+        return candidate
 
     def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None:
         """Load O04 evidence without requiring a prepared Projection."""
@@ -1314,6 +1451,26 @@ def _relation_values(value: PlaceRelation) -> dict[str, Any]:
         "created_at": value.created_at.isoformat(),
         "reviewed_at": _iso(value.reviewed_at),
     }
+
+def _publication_batch_from_row(row: PublicationBatchRow) -> PublicationBatch:
+    return PublicationBatch(row.batch_id, row.city_id, row.operation_intent_id, row.created_by,
+                             datetime.fromisoformat(row.created_at), row.status, row.snapshot_id)
+
+def _publication_batch_item_from_row(row: PublicationBatchItemRow) -> PublicationBatchItem:
+    return PublicationBatchItem(
+        row.batch_item_id,
+        row.batch_id,
+        row.place_revision_id,
+        row.status,
+        tuple(row.reason_codes or ()),
+        row.projection_id,
+        datetime.fromisoformat(row.published_at) if row.published_at else None,
+    )
+
+def _research_snapshot_from_row(row: ResearchSnapshotRow) -> ResearchSnapshot:
+    return ResearchSnapshot(row.snapshot_id, row.data_snapshot_version, row.city_id,
+                            row.content_sha256, row.source_batch_id, row.snapshot_payload,
+                            datetime.fromisoformat(row.created_at), row.status)
 
 
 def _relation_from_row(row: PlaceRelationRow) -> PlaceRelation:

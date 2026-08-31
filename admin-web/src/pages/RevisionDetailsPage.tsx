@@ -17,23 +17,21 @@ import { adminErrorMessage } from '../api/errorMessages'
 import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
-
-const lifecycleLabels: Record<PlaceRevision['lifecycle_status'], string> = {
-  candidate: '候选',
-  human_verified: '人工已核验',
-  published: '已发布',
-  retired: '已退役',
-}
-
-const placeKindLabels: Record<string, string> = {
-  attraction: '景点',
-  scenic_area: '景区',
-  neighborhood: '街区',
-  walking_route: '步行路线',
-  market: '市集',
-  show: '演出/固定场次',
-  experience: '体验',
-}
+import {
+  accessPointKindLabel,
+  dateExceptionKindLabel,
+  geometryKindLabel,
+  indoorOutdoorLabel,
+  lifecycleStatusLabel,
+  placeKindLabel,
+  projectionStatusLabel,
+  rainSuitabilityLabel,
+  relationResolutionLabel,
+  relationTypeLabel,
+  reviewStatusLabel,
+  sourceDecisionLabel,
+  timeRuleKindLabel,
+} from '../ui/displayLabels'
 
 const reviewFlagLabels: Record<string, string> = {
   NAME_REQUIRES_HUMAN_VERIFICATION: '名称待人工核验',
@@ -62,7 +60,7 @@ export function RevisionDetailsPage() {
 
   const load = useCallback(async () => {
     if (!revisionId) {
-      setError('缺少 Revision ID')
+      setError('缺少修订版本编号')
       setLoading(false)
       return
     }
@@ -113,7 +111,7 @@ export function RevisionDetailsPage() {
         operation_intent_id: `revision-create-${crypto.randomUUID()}`,
         reason_code: 'PLACE_FACTS_REFRESH',
       })
-      messageApi.success(`已创建 Revision ${created.revision_number}`)
+      messageApi.success(`已创建修订版本 ${created.revision_number}`)
       navigate(`/candidates/${encodeURIComponent(created.place_revision_id)}`)
     } catch (reason) {
       setError(adminErrorMessage(reason))
@@ -135,7 +133,7 @@ export function RevisionDetailsPage() {
       })
       setRevision(updated)
       setEditOpen(false)
-      messageApi.success('Revision 已保存，需重新送审')
+      messageApi.success('修订版本已保存，需要重新送审')
     } catch (reason) {
       if (!isFormValidationError(reason)) setError(adminErrorMessage(reason))
     } finally {
@@ -182,11 +180,29 @@ export function RevisionDetailsPage() {
     }
   }
 
+  const prepareProjection = async () => {
+    if (!revision) return
+    setWorking(true)
+    try {
+      const result = await api.preparePlaceRevisionProjection(revision.place_revision_id, {
+        data_snapshot_version: 'hangzhou-research-candidate-v1',
+        operation_intent_id: `projection-prepare-${crypto.randomUUID()}`,
+        reason_code: 'PROJECTION_PREPARED',
+      })
+      await load()
+      messageApi.success(result.gate_reason_codes.length ? `求解投影已生成，但仍有 ${result.gate_reason_codes.length} 项发布门禁阻断` : '求解投影已生成，可进入发布批次')
+    } catch (reason) {
+      setError(adminErrorMessage(reason))
+    } finally {
+      setWorking(false)
+    }
+  }
+
   return (
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
         <div>
-          <Typography.Title level={2}>Revision 详情</Typography.Title>
+          <Typography.Title level={2}>修订版本详情</Typography.Title>
           <Typography.Paragraph type="secondary">
             O03：核对候选地点的业务事实、生命周期和当前发布阻断摘要。
           </Typography.Paragraph>
@@ -213,9 +229,10 @@ export function RevisionDetailsPage() {
           )}
           {revision && revision.lifecycle_status === 'human_verified' &&
             hasPermission('place:publication:write') && (
-            <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => void publish()} loading={working}>
-              发布新快照
-            </Button>
+            <Space.Compact>
+              {evidence?.projection === null && <Button icon={<SafetyCertificateOutlined />} onClick={() => void prepareProjection()} loading={working}>准备求解投影</Button>}
+              <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => void publish()} loading={working}>发布新快照</Button>
+            </Space.Compact>
           )}
           {revision && revision.lifecycle_status !== 'candidate' &&
             hasPermission('place:candidate:write') && (
@@ -239,12 +256,12 @@ export function RevisionDetailsPage() {
                   {revision.canonical_name}
                 </Typography.Title>
                 <Tag color={revision.lifecycle_status === 'human_verified' ? 'success' : 'processing'}>
-                  {lifecycleLabels[revision.lifecycle_status]}
+                  {lifecycleStatusLabel(revision.lifecycle_status)}
                 </Tag>
-                <Tag>Revision {revision.revision_number}</Tag>
+                <Tag>修订版本 {revision.revision_number}</Tag>
               </Space>
               <Typography.Text type="secondary">
-                {revision.place_revision_id} · Place {revision.place_id}
+                {revision.place_revision_id} · 地点 {revision.place_id}
               </Typography.Text>
             </Space>
           </Card>
@@ -254,10 +271,10 @@ export function RevisionDetailsPage() {
               <Descriptions.Item label="规范名称">{revision.canonical_name}</Descriptions.Item>
               <Descriptions.Item label="别名">{revision.aliases.join('、') || '未提供'}</Descriptions.Item>
               <Descriptions.Item label="区域">{revision.admin_area}</Descriptions.Item>
-              <Descriptions.Item label="类型">{placeKindLabels[revision.place_kind] ?? revision.place_kind}</Descriptions.Item>
+              <Descriptions.Item label="类型">{placeKindLabel(revision.place_kind)}</Descriptions.Item>
               <Descriptions.Item label="分类">{revision.category}</Descriptions.Item>
               <Descriptions.Item label="地址">{revision.address ?? '未提供'}</Descriptions.Item>
-              <Descriptions.Item label="几何类型">{revision.geometry_kind}</Descriptions.Item>
+              <Descriptions.Item label="几何类型">{geometryKindLabel(revision.geometry_kind)}</Descriptions.Item>
               <Descriptions.Item label="来源记录数">{revision.source_record_ids.length}</Descriptions.Item>
               <Descriptions.Item label="创建时间">{formatDateTime(revision.created_at)}</Descriptions.Item>
             </Descriptions>
@@ -272,10 +289,10 @@ export function RevisionDetailsPage() {
               </Descriptions.Item>
               <Descriptions.Item label="内部移动">{revision.internal_travel_min} 分钟</Descriptions.Item>
               <Descriptions.Item label="体力等级">{revision.energy_level} / 5</Descriptions.Item>
-              <Descriptions.Item label="室内/室外">{revision.indoor_outdoor}</Descriptions.Item>
-              <Descriptions.Item label="适用时段">{revision.suitable_periods.join('、') || '未提供'}</Descriptions.Item>
+              <Descriptions.Item label="室内/室外">{indoorOutdoorLabel(revision.indoor_outdoor)}</Descriptions.Item>
+              <Descriptions.Item label="适用时段">{revision.suitable_periods.map((value) => ({ morning: '上午', afternoon: '下午', evening: '晚上' }[value] ?? '其他')).join('、') || '未提供'}</Descriptions.Item>
               <Descriptions.Item label="适合人群">{revision.audience_tags.join('、') || '未提供'}</Descriptions.Item>
-              <Descriptions.Item label="雨天适配">{revision.rain_suitability}</Descriptions.Item>
+              <Descriptions.Item label="雨天适配">{rainSuitabilityLabel(revision.rain_suitability)}</Descriptions.Item>
               <Descriptions.Item label="全天开放">{revision.is_always_open ? '是' : '否'}</Descriptions.Item>
               <Descriptions.Item label="求解器可用">
                 {revision.solver_eligible ? <Tag color="success">可用</Tag> : <Tag color="error">不可用</Tag>}
@@ -284,7 +301,7 @@ export function RevisionDetailsPage() {
                 {revision.review_flags.length > 0
                   ? revision.review_flags.map((flag) => (
                       <Tag key={flag} color="warning">
-                        {reviewFlagLabels[flag] ?? flag}
+                        {reviewFlagLabels[flag] ?? '待核验项'}
                       </Tag>
                     ))
                   : '无'}
@@ -294,12 +311,12 @@ export function RevisionDetailsPage() {
 
           <Card title="治理状态">
             <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
-              <Descriptions.Item label="当前生命周期">{lifecycleLabels[revision.lifecycle_status]}</Descriptions.Item>
+              <Descriptions.Item label="当前生命周期">{lifecycleStatusLabel(revision.lifecycle_status)}</Descriptions.Item>
               <Descriptions.Item label="冲突裁决">{revision.conflicts_resolved ? '已完成' : '待处理'}</Descriptions.Item>
               <Descriptions.Item label="人工核验时间">{formatOptionalDateTime(revision.reviewed_at)}</Descriptions.Item>
               <Descriptions.Item label="发布时间">{formatOptionalDateTime(revision.published_at)}</Descriptions.Item>
-              <Descriptions.Item label="Revision ID">{revision.place_revision_id}</Descriptions.Item>
-              <Descriptions.Item label="Place ID">{revision.place_id}</Descriptions.Item>
+              <Descriptions.Item label="修订版本编号">{revision.place_revision_id}</Descriptions.Item>
+              <Descriptions.Item label="地点编号">{revision.place_id}</Descriptions.Item>
             </Descriptions>
           </Card>
 
@@ -331,7 +348,7 @@ export function RevisionDetailsPage() {
 
           <Card title="发布阻断摘要">
             {blockers.length === 0 ? (
-              <Alert showIcon type="success" icon={<CheckCircleOutlined />} title="当前 Revision 没有从详情字段识别出的阻断项" />
+              <Alert showIcon type="success" icon={<CheckCircleOutlined />} title="当前修订版本没有从详情字段识别出的阻断项" />
             ) : (
               <Space orientation="vertical" style={{ width: '100%' }}>
                 <Alert showIcon type="warning" title={`当前有 ${blockers.length} 项需要处理`} />
@@ -343,17 +360,17 @@ export function RevisionDetailsPage() {
             </Space>
             )}
             <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-              本摘要仍只基于当前 Revision API 返回字段；O04 几何/访问点与 O05 时间证据已在上方展示，来源冲突和关系裁决将在 O06–O07 页面接入后显示。
+              本摘要仍只基于当前修订版本返回字段；O04 几何/访问点与 O05 时间证据已在上方展示，来源冲突和关系裁决将在 O06–O07 页面接入后显示。
             </Typography.Paragraph>
           </Card>
         </>
       )}
       {revision === null && loading && <Card loading />}
-      <Modal title="编辑 candidate Revision" open={editOpen} onOk={() => void saveEdit()} onCancel={() => setEditOpen(false)} confirmLoading={working}>
+      <Modal title="编辑候选修订版本" open={editOpen} onOk={() => void saveEdit()} onCancel={() => setEditOpen(false)} confirmLoading={working}>
         <Form form={form} layout="vertical">
           <Form.Item name="canonical_name" label="规范名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="address" label="地址"><Input /></Form.Item>
-          <Form.Item name="duration_recommended" label="建议时长（分钟）" rules={[{ required: true, type: 'number', min: 0 }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="duration_recommended" label="建议时长（分钟）" rules={[{ required: true, type: 'number', min: 1, message: '建议时长至少为 1 分钟' }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
         </Form>
       </Modal>
     </Space>
@@ -403,7 +420,7 @@ function EvidenceCard({
         const input: PlaceAccessPointInput = { ...base, access_point_kind: values.access_point_kind, name: values.name, lat: values.lat, lng: values.lng, source_record_id: values.source_record_id }
         if (editing) await api.updateAccessPoint(revision.place_revision_id, (editing as PlaceAccessPointEvidence).access_point_id, input); else await api.createAccessPoint(revision.place_revision_id, input)
       }
-      setModal(null); await onChanged(); onSuccess('证据已保存，Revision 需重新送审')
+      setModal(null); await onChanged(); onSuccess('证据已保存，修订版本需重新送审')
     } catch (reason) { if (!isFormValidationError(reason)) onError(adminErrorMessage(reason)) } finally { setSaving(false) }
   }
   const review = async (kind: 'geometry' | 'access_point', id: string, status: 'human_verified' | 'rejected') => {
@@ -412,7 +429,7 @@ function EvidenceCard({
   }
   const retire = async (kind: 'geometry' | 'access', id: string) => {
     setSaving(true)
-    try { const input = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-retire-${crypto.randomUUID()}`, reason_code: 'EVIDENCE_RETIRED' }; if (kind === 'geometry') await api.retireGeometry(revision.place_revision_id, id, input); else await api.retireAccessPoint(revision.place_revision_id, id, input); await onChanged(); onSuccess('证据已停用，Revision 需重新送审') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+    try { const input = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-retire-${crypto.randomUUID()}`, reason_code: 'EVIDENCE_RETIRED' }; if (kind === 'geometry') await api.retireGeometry(revision.place_revision_id, id, input); else await api.retireAccessPoint(revision.place_revision_id, id, input); await onChanged(); onSuccess('证据已停用，修订版本需重新送审') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
   }
   if (loading) return <Card title="地图、几何与访问点（O04）" loading />
   if (error !== null) {
@@ -425,7 +442,7 @@ function EvidenceCard({
   if (evidence === null) {
     return (
       <Card title="地图、几何与访问点（O04）">
-        <Alert showIcon type="warning" title="当前 Revision 没有可读取的 O04 证据" />
+        <Alert showIcon type="warning" title="当前修订版本没有可读取的 O04 证据" />
       </Card>
     )
   }
@@ -439,7 +456,7 @@ function EvidenceCard({
             {evidence.sources.length > 0
               ? evidence.sources.map((source) => (
                   <Tag key={source.source_record_id}>
-                    {source.source_id} · {source.source_decision}
+                    {source.source_id} · {sourceDecisionLabel(source.source_decision)}
                     {source.source_url_redacted ? ' · URL 已脱敏' : ''}
                   </Tag>
                 ))
@@ -447,8 +464,8 @@ function EvidenceCard({
           </Descriptions.Item>
           <Descriptions.Item label="几何记录数">{evidence.geometries.length}</Descriptions.Item>
           <Descriptions.Item label="访问点记录数">{evidence.access_points.length}</Descriptions.Item>
-          <Descriptions.Item label="Projection">
-            {projection ? `${projection.projection_id} · ${projection.status}` : '未准备'}
+          <Descriptions.Item label="求解投影">
+            {projection ? `${projection.projection_id} · ${projectionStatusLabel(projection.status)}` : '未准备'}
           </Descriptions.Item>
           <Descriptions.Item label="到达端点">
             {projection ? projection.arrival_access_point_id : '未选择'}
@@ -463,7 +480,7 @@ function EvidenceCard({
             showIcon
             type="warning"
             title="来源证据不完整"
-            description={`以下来源记录缺失或不属于当前 Place：${evidence.missing_source_record_ids.join('、')}`}
+              description={`以下来源记录缺失或不属于当前地点：${evidence.missing_source_record_ids.join('、')}`}
           />
         )}
 
@@ -475,7 +492,7 @@ function EvidenceCard({
           dataSource={evidence.geometries}
           scroll={{ x: 900 }}
           columns={[
-            { title: '类型', dataIndex: 'geometry_kind', width: 110 },
+            { title: '类型', dataIndex: 'geometry_kind', width: 110, render: geometryKindLabel },
             {
               title: '状态',
               dataIndex: 'review_status',
@@ -546,7 +563,7 @@ function EvidenceCard({
               render: (_: unknown, item) => `${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}`,
             },
             {
-              title: 'Projection 端点',
+              title: '求解投影端点',
               key: 'projection_role',
               width: 170,
               render: (_: unknown, item) => projectionRole(item.access_point_id, projection),
@@ -582,12 +599,12 @@ function EvidenceCard({
         />
 
         {projection === null ? (
-          <Alert showIcon type="info" title="尚未准备 Solver Projection，访问点不会被自动选作求解端点" />
+          <Alert showIcon type="info" title="尚未准备求解投影，访问点不会被自动选作求解端点" />
         ) : (
           <Alert
             showIcon
             type="info"
-            title={`Projection 已明确绑定到达端点 ${projection.arrival_access_point_id} 和离开端点 ${projection.departure_access_point_id}`}
+            title={`求解投影已明确绑定到达端点 ${projection.arrival_access_point_id} 和离开端点 ${projection.departure_access_point_id}`}
           />
         )}
       </Space>
@@ -627,15 +644,15 @@ function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onS
       })
       setEditing(null)
       await onChanged()
-      onSuccess('关系裁决已保存，Revision 需重新送审')
+      onSuccess('关系裁决已保存，修订版本需重新送审')
     } catch (reason) { onError(adminErrorMessage(reason)) } finally { setWorking(false) }
   }
   return <Card title="地点关系与裁决（O07）">
-    <Table<PlaceRelationEvidence> rowKey="relation_id" dataSource={relations} pagination={false} locale={{ emptyText: '当前 Place 暂无关系证据' }} columns={[
-      { title: '关系类型', dataIndex: 'relation_type' },
-      { title: '目标 Place', render: (_: unknown, item: PlaceRelationEvidence) => `${item.from_place_id} → ${item.to_place_id}` },
-      { title: '审核', dataIndex: 'review_status' },
-      { title: '裁决', dataIndex: 'resolution_status' },
+    <Table<PlaceRelationEvidence> rowKey="relation_id" dataSource={relations} pagination={false} locale={{ emptyText: '当前地点暂无关系证据' }} columns={[
+      { title: '关系类型', dataIndex: 'relation_type', render: relationTypeLabel },
+      { title: '目标地点', render: (_: unknown, item: PlaceRelationEvidence) => `${item.from_place_id} → ${item.to_place_id}` },
+      { title: '审核', dataIndex: 'review_status', render: reviewStatusLabel },
+      { title: '裁决', dataIndex: 'resolution_status', render: relationResolutionLabel },
       { title: '来源', dataIndex: 'source_record_id' },
       ...(canEdit ? [{ title: '操作', render: (_: unknown, item: PlaceRelationEvidence) => <Button size="small" onClick={() => { setEditing(item); setStatus(item.resolution_status); setNote(item.decision_note ?? '') }}>裁决</Button> }] : []),
     ]} />
@@ -746,7 +763,7 @@ function TimeEvidenceCard({
       }
       setModal(null)
       await onChanged()
-      onSuccess('时间证据已保存，Revision 需重新送审')
+      onSuccess('时间证据已保存，修订版本需重新送审')
     } catch (reason) {
       if (!isFormValidationError(reason)) onError(adminErrorMessage(reason))
     } finally {
@@ -790,7 +807,7 @@ function TimeEvidenceCard({
       else if (kind === 'closure') await api.retireClosure(revision.place_revision_id, id, input)
       else await api.retireDateException(revision.place_revision_id, id, input)
       await onChanged()
-      onSuccess('时间证据已停用，Revision 需重新送审')
+      onSuccess('时间证据已停用，修订版本需重新送审')
     } catch (reason) {
       onError(adminErrorMessage(reason))
     } finally {
@@ -812,7 +829,7 @@ function TimeEvidenceCard({
           showIcon
           type="warning"
           title="O05 时间证据暂不可用"
-          description={error ?? '当前 Revision 没有可读取的时间证据'}
+            description={error ?? '当前修订版本没有可读取的时间证据'}
         />
       </Card>
     )
@@ -823,8 +840,8 @@ function TimeEvidenceCard({
         <Alert
           showIcon
           type="info"
-          title="时间证据严格绑定当前 Revision"
-          description="编辑会递增 Revision 版本并清除既有审核/求解资格；逐项核验要求先建立开放审核任务。解析预览由后端按已核验证据计算。"
+          title="时间证据严格绑定当前修订版本"
+          description="编辑会递增修订版本并清除既有审核/求解资格；逐项核验要求先建立开放审核任务。解析预览由后端按已核验证据计算。"
         />
         <Space wrap>
           <Input type="date" value={previewDate} onChange={(event) => setPreviewDate(event.target.value)} />
@@ -951,40 +968,10 @@ function weekdayLabel(value: number): string {
   return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][value - 1] ?? `星期${value}`
 }
 
-function timeRuleKindLabel(value: string): string {
-  return ({ opening_hours: '开放时间', fixed_session: '固定场次', last_entry: '最晚入园规则' } as Record<string, string>)[value] ?? value
-}
-
-function dateExceptionKindLabel(value: string): string {
-  return ({ closed: '临时关闭', open_override: '开放覆盖', session_override: '场次覆盖' } as Record<string, string>)[value] ?? value
-}
-
-function reviewStatusLabel(value: string): string {
-  const labels: Record<string, string> = {
-    candidate: '候选',
-    human_verified: '人工已核验',
-    rejected: '已驳回',
-  }
-  return labels[value] ?? value
-}
-
 function reviewStatusColor(value: string): string | undefined {
   if (value === 'human_verified') return 'success'
   if (value === 'rejected') return 'error'
   return undefined
-}
-
-function accessPointKindLabel(value: string): string {
-  const labels: Record<string, string> = {
-    visitor_entrance: '游客入口',
-    visitor_exit: '游客出口',
-    route_start: '路线起点',
-    route_end: '路线终点',
-    performance_location: '演出位置',
-    meeting_point: '集合点',
-    area_representative: '区域代表点',
-  }
-  return labels[value] ?? value
 }
 
 function projectionRole(
@@ -1000,10 +987,10 @@ function projectionRole(
 
 function publicationBlockers(revision: PlaceRevision): string[] {
   const blockers: string[] = []
-  if (revision.lifecycle_status === 'candidate') blockers.push('尚未完成人工核验，生命周期仍为 candidate')
+  if (revision.lifecycle_status === 'candidate') blockers.push('尚未完成人工核验，当前仍为候选状态')
   if (revision.source_record_ids.length === 0) blockers.push('缺少来源记录')
   if (!revision.conflicts_resolved) blockers.push('存在未完成裁决的冲突')
-  if (!revision.solver_eligible) blockers.push('当前 Revision 尚不满足求解器使用条件')
+  if (!revision.solver_eligible) blockers.push('当前修订版本尚不满足求解器使用条件')
   return blockers
 }
 

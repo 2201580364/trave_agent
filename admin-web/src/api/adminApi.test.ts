@@ -128,4 +128,29 @@ describe('AdminApi', () => {
       reason_code: 'EVIDENCE_APPROVED',
     })
   })
+
+  it('uses separate operation intents for publication batch preview and execution', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ batch_id: 'batch-1', items: [] }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ batch: { batch_id: 'batch-1' }, snapshot: null, reused: false }), { status: 200 }))
+    const api = new AdminApi(() => 'publisher-token', vi.fn())
+    await api.previewPublicationBatch({ city_id: 'hangzhou', place_revision_ids: ['revision-1'], operation_intent_id: 'preview-1', reason_code: 'BATCH_PREVIEW' })
+    await api.executePublicationBatch('batch-1', { operation_intent_id: 'execute-1', reason_code: 'BATCH_EXECUTE' })
+    expect(fetchMock.mock.calls[0][0]).toContain('/publication-batches/previews')
+    expect(fetchMock.mock.calls[1][0]).toContain('/publication-batches/batch-1/execute')
+  })
+
+  it('prepares a candidate projection through the revision-scoped endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ projection_id: 'projection-1', gate_reason_codes: [] }), { status: 200 }))
+    const api = new AdminApi(() => 'publisher-token', vi.fn())
+    await api.preparePlaceRevisionProjection('revision-1', {
+      data_snapshot_version: 'hangzhou-research-candidate-v1',
+      solver_node_id: 1001,
+      operation_intent_id: 'projection-prepare-1',
+      reason_code: 'PROJECTION_PREPARED',
+    })
+    expect(fetchMock.mock.calls[0][0]).toContain('/place-revisions/revision-1/projection-preparations')
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+  })
 })

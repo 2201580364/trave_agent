@@ -13,7 +13,35 @@
 
 ## 术语
 
+### 2026-08-31 续接进度（Projection 准备管理 API 收口）
+
+随后补齐批量 Projection 节点分配边界：`prepare_candidate_projections.py` 不再按输入列表序号直接生成节点号，而是按 `data_snapshot_version` 查询已占用 ID，并为当前批次保留临时已分配集合；增量执行和 dry-run 均不会复用已有节点。仓储协议新增带最小起始值的快照内节点分配方法，并加入已有 ID/不同快照回归测试。
+
+本轮完成 O09 Projection 准备能力的工程收口：管理 API 新增 HTTP 集成覆盖，验证 `human_verified + 完整证据` 可创建 `candidate` Projection、重复 operation intent 返回同一结果、缺少 `place:publication:write` 返回 403、candidate Revision 稳定返回 `review_revision_not_approvable`，且准备动作不会直接发布。通过门禁的 Projection 会在重新计算哈希后写入 `solver_payload.data_verified=true`。
+
+修正 `solver_node_id` 分配边界：管理端不再由 Revision 编号拼接节点号，前端省略该字段，由持久化仓储在 `data_snapshot_version` 范围内分配最小可用正整数，避免不同 Place/Revision 之间冲突；脚本支持显式起始号但始终跳过已占用节点。后端全量 pytest 已通过，当前为 `363/363`；admin-web Vitest `10/10`、typecheck、production build、compileall 和 `git diff --check` 均通过。
+
+Chrome 实例已恢复并完成本轮真实页面复核：管理员登录、发布中心、`browser-e2e-base` Revision 详情和“准备 Projection”阻断路径均正常，页面明确展示 `MISSING_VERIFIED_ACCESS_POINT`。截图发现该既有浏览器 fixture 的规范名称、区域和地址显示为问号，属于测试数据编码遗留，正式研究数据不得沿用。真实 candidate 的“准备 Projection → 勾选 → 预览 → 执行 → ResearchSnapshot”成功链路仍因缺少完整审核数据而未完成；当前 O09 继续标记为阶段性完成，不建议提交本大模块。
+
 ### 2026-08-31 续接进度（OM1 审核与发布工作台收口）
+
+本轮续接完成候选目录导入的可执行验证：修复 `scripts/import_candidate_revisions.py` 中向 `PlaceSourceRecord` 传入非法 `review_flags` 字段的问题，并新增首次导入、重复导入和 dry-run 自动化覆盖。全新 SQLite + Alembic head 上实测首次导入 `72/0`，重复运行 `0/72`；72 条 Revision 均保持 `candidate` 且 `solver_eligible=false`，没有通过脚本越过审核或发布门禁。后端全量测试更新为 `355/355`，admin-web Vitest 更新为 `9/9`，类型检查、构建、编译和 Ruff 均通过。
+
+本轮继续实现 Projection 准备流水线：新增 `scripts/prepare_candidate_projections.py`，只接受 `human_verified` Revision，依据已审核访问点/事实字段生成 `candidate` SolverPlaceProjection，计算稳定 projection hash，并执行完整 publication gate 将阻断原因写入 Projection；缺失访问点、非 human_verified Revision 等单条异常会逐项输出并继续处理，支持 `--dry-run`，不会直接发布或改变 Revision 生命周期。新增 5 项专项测试后，全量后端 pytest 更新为 `360/360`。
+
+本轮将 Projection 准备接入管理闭环：新增 `POST /api/v1/admin/place-revisions/{revision_id}/projection-preparations`，由 `data_publisher` 权限控制，写入追加式 `SOLVER_PROJECTION_PREPARED` 审计事件；admin-web Revision 详情在 human_verified 且尚无 Projection 时显示“准备 Projection”操作，生成后仍需进入发布中心批次流程。管理端 API 测试与构建通过，未改变直接发布必须经过 `publish_projection` 的边界。
+
+此前 Chrome 续测曾确认登录、发布中心、`PROJECTION_NOT_FOUND` 阻断、无可发布项时的禁用状态和既有研究快照历史均正常，控制台无新增 warn/error。当前数据库虽然已有 72 条 candidate，但没有同时满足 `human_verified + candidate Projection + publication check 通过` 的待发布数据，因此仍不能通过 UI 勾选路径制造成功结果；成功批次只能继续使用已有合法 published Projection 的管理 API 回放。下一步是通过正式管理审核与 Projection 生成流程准备一条真实可发布 candidate，再在 Chrome 实例可用时完成“勾选 → 预览 → 执行 → 快照历史”全链路回归。
+
+O09 已完成批次发布的后端与管理端首版实现：PublicationBatch/Item 支持逐项 publication-check、部分失败记录、执行幂等和 operation intent 冲突；成功项生成确定性内容 hash 及不可变 ResearchSnapshot，提供批次预览/执行和快照列表/详情 API，发布中心已接入勾选、预览、执行和快照历史。Projection 准备流水线已补齐 candidate 生成边界，但自动化与 Chrome 验收仍只覆盖阻断/既有 published 数据路径，当前只剩真实 candidate 审核数据下的 UI 勾选路径回归和大模块状态收口，暂不标记 O09 完成或提交。
+
+O09 本轮验证已完成：全量后端 pytest `360/360`、admin-web typecheck/Vitest `10/10`/production build、Chrome 登录/发布中心/阻断项/快照历史/控制台门禁均通过。Chrome 报告见 `docs/test/reports/g7-r0.2-07-o09-research-snapshot-chrome-2026-08-31.md`。由于本地没有带 candidate Projection 的待发布 human_verified Revision，Chrome 页面没有可勾选项；成功批次使用已有合法 published Projection 通过管理 API 执行，未用 SQL 制造审核或发布状态。Projection 准备 API 和 Revision 详情入口已接入，但待通过正式审核和 Projection 生成流程准备真实 candidate 后补 UI“勾选→预览→执行”回归，再收口 O09。
+
+O09 启动准备：确认现有代码尚无 PublicationBatch/ResearchSnapshot 持久化模型，已新增 `docs/product/O09研究快照批次发布设计.md` 明确其与单 Projection 发布的边界。下一阶段先追加迁移与不可变快照仓储，再实现批次预览/执行 API 和管理端页面；在此之前不宣称研究快照已发布。
+
+O09 数据库基础已开始落地：新增 Alembic `0011_research_snapshot_batches`，包含 publication_batches、publication_batch_items 和 research_snapshots 三张表，并将 readiness/Gate7 数据库版本基线同步到 0011。该切片尚未完成快照仓储、批次 API、管理端页面和 Chrome 验收，因此不作为大模块提交点。
+
+本轮继续完成 O09 SQLAlchemy 元数据映射：三张批次/快照表已加入统一 `Base`，与迁移字段和唯一约束保持一致；批次应用服务、批次 API、管理端批次操作和 Chrome 验收仍未完成。
 
 本轮已完成 OM1 审核与发布工作台的大模块验收：管理首页动态摘要、审核队列批量操作、Revision 关系裁决入口和发布中心均在 Google Chrome 中验证；未发现控制台 warn/error。验收报告见 `docs/test/reports/g7-r0.2-05-02-om1-workbench-chrome-2026-08-31.md`。当前适合提交 OM1 工作台阶段性成果，下一阶段进入 O09/研究快照批次治理。
 
@@ -34,14 +62,14 @@
 
 ## 当前总状态
 
-- 更新时间：2026-08-30
-- 当前已提交基线：`0055dfc feat(admin): add revision evidence editing workflow`；工作区为 O05 时间证据只读切片，未包含凭证或密钥
+- 更新时间：2026-08-31
+- 当前已提交基线：`0055dfc feat(admin): add revision evidence editing workflow`；工作区包含 O09 批次/快照实现与验收材料，未包含凭证或密钥
 - 产品里程碑：`M1 — 行程骨架验证`
 - 里程碑判断：当前是 M1 后段，首个技术纵向切片 A6 已收口，但 M1 MVP 尚未经过 Gate 7 专家/用户验证，也尚未进入 M2
 - 证据 Gate：Gate 6 求解器技术验证已通过；Gate 7 已进入 R0 验证准备，尚未招募或收集真实专家/用户证据
-- 当前阶段：`Gate 7 — G7-R0.2-05-02 OM1 地点审核工作台 P0（当前节点）`
-- 当前任务：在已完成的管理身份/API/RBAC/审计后端底座和独立 admin-web 安全操作面之上，完成 O01–O08 地点审核工作台 P0。O04 Geometry/AccessPoint 与 O05 时间证据 candidate 写入、软停用、逐项 reviewer 审核和发布门禁依赖已完成；当前收口 O05 的指定日期解析预览。72 条研究数据不得通过 SQL 手工改状态，未审核依赖继续阻断发布；本机继续禁止部署或启动 Redis/MySQL 服务
-- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A 和 R0.2-05-01B 已完成；R0.2-05-02 已完成审核工作流核心、O08 队列首版、O02 候选清单首版、O03 Revision 详情、O04/O05 写入与逐项审核、候选分页以及 Revision→重新审核→Projection 发布业务闭环。O05 指定日期解析预览仍待完成；仍缺 O01、O06–O07、72 个 candidate 批量审核、OD 扩容、独立 research snapshot 发布、应用部署和 dry run，不能宣称 OM1、Gate 7、M1 MVP 或稳定生产已完成
+- 当前阶段：`Gate 7 — G7-R0.2-07 O09 研究快照批次发布治理（当前节点）`
+- 当前任务：完成 O09 真实 candidate 数据下的批次预览、逐项发布、不可变 ResearchSnapshot、管理端操作和 Chrome 验收；先通过正式 reviewer 与 Projection 准备流水线形成可发布数据；72 条研究数据不得通过 SQL 手工改状态，未审核依赖继续阻断发布；本机继续禁止部署或启动 Redis/MySQL 服务
+- 总体判断：A6-9.1 至 A6-9.4、G7-R0.1、R0.2-01～04、R0.2-05-01A、R0.2-05-01B、R0.2-05-02 和 OM1 审核工作台已阶段性完成；O09 批次/快照代码、候选导入与 Projection 准备流水线、自动化和 Chrome 首版验收已完成，待真实 candidate 审核数据下补 UI 勾选路径后收口。仍缺真实 candidate 批量审核、完整 Projection 生成结果、OD 扩容、服务器部署和 dry run，不能宣称 Gate 7、M1 MVP 或稳定生产已完成
 
 M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复、“替换景点→完整重求解→新 Revision”、“我的行程→最新恢复→历史只读回看”、“当前 Revision→安全计划分享→公开查看→参考复制”和“当前 Revision→整体/节点结构化反馈”均已完成工程实现与真实 Chrome 验收；到离交通、节奏/同行人群、景点筛选仍是首切片简化实现。M1 产品收口主队列工程完成 4/4；必须先准备并执行 Gate 7，不能仅凭工程完成直接跳转 M2。
 
@@ -84,9 +112,9 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 | Gate 7 R0.2-04 候选清单与覆盖矩阵 | 完成 | 72 个 candidate、11 区域、9 类别、18 夜间/固定时段、28 室内/雨天、24 非点状候选、11 组未裁决关系线索、确定性覆盖矩阵、CLI 和 7 项测试 |
 | Gate 7 R0.2-05-01A 管理后端底座 | 完成 | 独立 AdminActor/Role/Session、scrypt、会话摘要、服务端 RBAC、管理员创建/角色乐观锁与幂等、追加式 AuditEvent、`/api/v1/admin` 和 Alembic 0007；6 项专项测试 |
 | Gate 7 R0.2-05-01B 管理 Web 壳与安全操作面 | 完成 | ADR-0020 独立 `admin-web/`、O00 登录/超时、O16 管理员与角色、最小 O15 审计只读；token 仅存 React 内存；`npm run typecheck/test/build` 通过，全量 pytest 通过 |
-| Gate 7 R0.2-05-02 地点审核工作台 P0 | 进行中 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情、O04/O05 写入与逐项审核、跨 Place 来源发布门禁、Revision 版本化发布闭环和 Chrome 验收；O01、O05 指定日期预览、O06–O07 证据面和批量审核待完成 |
+| Gate 7 R0.2-05-02 地点审核工作台 P0 | 已阶段性完成 | `0008_place_review_workflow`、`0009_place_revision_review_flags`、72 条 candidate 导入、O08 审核队列首版、O02 候选地点清单首版（前后端分页）、O03 Revision 详情、O04/O05 写入与逐项审核、跨 Place 来源发布门禁、Revision 版本化发布闭环、O09 发布中心首版和 Chrome 验收；真实 candidate 批量审核/Projection 生成后的 UI 勾选回归仍属于 R0.2-07 |
 
-最新稳定技术基线：上一轮全量 pytest `349/349` 通过；本轮已完成迁移链升级到 `0010_place_revision_version`，O04 新增测试仍待补齐。数据库 head/readiness 目标为 `0010_place_revision_version`，服务器真实 MySQL 仍保持 0002，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。全仓 Ruff 仍有 37 项历史风格债（迁移、spike 和既有测试/求解器文件），strict mypy 历史债仍未清零；本轮已修改文件的 Ruff 仍需在实现完成后复跑。以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
+最新稳定技术基线：当前全量 pytest `360/360`、admin-web Vitest `9/9`、typecheck、production build、compileall 和本轮范围 Ruff 均通过；数据库迁移链已升级到 `0011_research_snapshot_batches`，readiness 目标同步为该版本，服务器真实 MySQL 仍保持既有基线，未在本轮连接或迁移。普通匿名 token 无法访问管理 API；密码使用 scrypt，管理 token 只存 SHA-256；角色变化使旧会话失效；最后一个 admin_security 不可移除；管理审计与每日分级文件日志分离。Gate 6、A6、R0.2-02～04 的既有证据与 72 个 candidate 哈希均未改写。全仓 Ruff 和 strict mypy 仍有历史债务；以上仍只是工程和验证准备证据，不证明 H3/H11 已被专家或用户证实。
 
 状态口径：求解器**核心实现已阶段性完成**，不是永久冻结；M1 对外契约、约束语义和默认参数均已稳定并版本化。允许继续进行缺陷修复、内部重构、性能优化和基于真实验证的后续演进，但契约行为变化必须按 ADR-0009/ADR-0011 评审并升级相应版本。
 
@@ -786,6 +814,16 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 → 保存本次结果并提交结构化整体/节点反馈
 ```
 
+## 本轮更新（2026-08-31，管理端编辑与中文展示收口）
+
+- 当前节点：M1 / Gate 7 / G7-R0.2-07，管理侧 OM1；本轮属于 O09 发布治理的管理端可用性修复，不宣称 O09 完整完成。
+- 已完成：修复未采集时长标记（`1/1/1`）导致的建议时长编辑 422；仅填写建议时长时建立有效区间并移除“时长未采集”标记，已有真实区间仍执行最短/建议/最长约束并返回可理解的中文错误。
+- 已完成：新增统一管理端展示映射层，候选列表、修订详情、O04/O05/O07、审核队列、发布中心、审计对象和门禁原因统一中文展示；API 和数据库内部枚举保持英文。
+- 验证结果：后端 pytest 367/367 通过；admin-web Vitest 12/12、TypeScript typecheck、production build、`git diff --check` 通过。
+- Chrome 验收：使用 Google Chrome 登录管理端，打开西湖音乐喷泉表演候选详情，提交建议时长 60 分钟后页面显示保存结果；刷新后显示 60 分钟区间。页面业务状态、类型、关系、投影和门禁原因未再显示英文枚举；编号和 GeoJSON 原始数据保留为可追溯标识。
+- 当前风险：旧的浏览器夹具中仍有问号乱码文本；它属于既有 fixture 编码遗留，不是本轮展示映射问题。O09 真实 candidate “勾选→批次预览→执行”仍需正式审核与 Projection 门禁完成后回归。
+- 下一步：继续准备真实 candidate 的 reviewer 逐项审核和发布批次 UI 回归；完成一个完整管理能力域后再判断提交，不自动 commit。
+
 ## 明确未完成
 
 - FastAPI HTTP v1、匿名会话和组合根已完成首切片；真实 MySQL 已部署并通过持久化/恢复验收，但 FastAPI/Taro 尚未作为外网生产服务启动，域名/TLS、反向代理和应用进程安全加固仍未完成；
@@ -801,8 +839,8 @@ M1 产品闭环核对：杭州单城入口、一键生成、结果保存/恢复�
 - M2 节点旅行小记、媒体和旅程回顾仅完成产品设计，尚未实现；
 - M3 景点评分、讨论区、内容治理和行中动态服务仅完成产品功能骨架，尚未进入详细 PRD 或实现；
 - M4 自动游记、旅行档案和长期偏好仅完成产品功能骨架，尚未进入详细 PRD 或实现；
-- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计以及 O00/O15/O16、O02/O03/O04/O05 admin-web 安全操作面已实现，O04 几何/访问点和 O05 时间证据 candidate 写入、编辑、软停用及逐项 reviewer approve/reject 已完成；O01、O05 指定日期预览、O06–O07 和发布中心仍未实现；
-- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-01B 管理 Web 安全操作面已完成；R0.2-05-02 中 O04/O05 写入与逐项审核已完成。杭州批量 human_verified、O05 指定日期预览、O06–O07、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
+- OM1–OM4 管理侧路线、OM1 P0 功能/UI/交互/API/数据逻辑设计已完成；OM1 管理身份、RBAC、管理审计、O00/O15/O16、O02/O03/O04/O05 和 O09 发布中心 admin-web 安全操作面已实现，O09 批次预览/执行、逐项门禁、不可变研究快照已通过 API/Chrome 首版验收；真实 candidate 批量审核数据下的勾选路径回归、O05 指定日期预览、服务器正式部署仍未完成；
+- Gate 7 R0.1 研究环境锁定机制、R0.2-01 地点/投影 ADR、R0.2-02 来源治理、R0.2-03 通用地点物理模型/发布门禁和 R0.2-05-02 管理 Web 审核工作台已阶段性完成；O09 批次/快照首版已实现并完成 Chrome 首版验收。杭州批量 human_verified、真实 candidate UI 勾选回归、O05 指定日期预览、按需 OD 子图、服务器数据库迁移、H5/admin-web/HTTPS 正式部署、内部 dry run 和首个 locked manifest 尚未实现，外部专家/用户证据、H3 结论和 M1 MVP 均未完成。
 
 ## 每轮结束更新模板
 

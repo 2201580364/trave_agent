@@ -23,6 +23,8 @@ import type {
   PublicationCheck,
   PlaceTimePreview,
   DashboardSummary,
+  PublicationBatch,
+  ResearchSnapshot,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -246,6 +248,16 @@ export class AdminApi {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/publication-checks`)
   }
 
+  preparePlaceRevisionProjection(
+    revisionId: string,
+    input: { data_snapshot_version: string; solver_node_id?: number; operation_intent_id: string; reason_code: string; reason_text?: string },
+  ): Promise<{ projection_id: string; place_revision_id: string; status: string; projection_hash: string; gate_reason_codes: string[] }> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/projection-preparations`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  }
+
   publishPlaceRevision(
     revisionId: string,
     input: { operation_intent_id: string; reason_code: string; reason_text?: string },
@@ -254,6 +266,24 @@ export class AdminApi {
       method: 'POST',
       body: JSON.stringify(input),
     })
+  }
+
+  previewPublicationBatch(input: { city_id: string; place_revision_ids: string[]; operation_intent_id: string; reason_code: string; reason_text?: string }): Promise<PublicationBatch> {
+    return this.request('/publication-batches/previews', { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  executePublicationBatch(batchId: string, input: { operation_intent_id: string; reason_code: string; reason_text?: string }): Promise<{ batch: PublicationBatch; snapshot: ResearchSnapshot | null; reused: boolean }> {
+    return this.request(`/publication-batches/${encodeURIComponent(batchId)}/execute`, { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  listResearchSnapshots(cityId?: string, limit = 50, offset = 0): Promise<PageResponse<ResearchSnapshot>> {
+    const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    if (cityId) query.set('city_id', cityId)
+    return this.request(`/research-snapshots?${query}`)
+  }
+
+  getResearchSnapshot(snapshotId: string): Promise<ResearchSnapshot> {
+    return this.request(`/research-snapshots/${encodeURIComponent(snapshotId)}`)
   }
 
   decidePlaceReview(

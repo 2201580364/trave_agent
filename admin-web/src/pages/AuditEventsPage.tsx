@@ -19,6 +19,7 @@ import { adminErrorMessage } from '../api/errorMessages'
 import type { AdminAuditEvent, AdminAuditResult, AuditEventFilters } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
+import { auditTargetTypeLabel, reasonCodeLabel } from '../ui/displayLabels'
 
 const PAGE_SIZE = 50
 
@@ -133,13 +134,13 @@ export function AuditEventsPage() {
         title: '目标',
         key: 'target',
         width: 260,
-        render: (_, event) => `${event.target_type} / ${event.target_id}`,
+        render: (_, event) => `${auditTargetTypeLabel(event.target_type)} / ${event.target_id}`,
       },
       {
         title: '理由代码',
         dataIndex: 'reason_code',
         width: 220,
-        render: (value: string) => <Typography.Text code>{value}</Typography.Text>,
+        render: (value: string) => <Typography.Text>{reasonCodeLabel(value)}</Typography.Text>,
       },
       {
         title: '请求 ID',
@@ -244,14 +245,14 @@ function AuditDetails({ event }: { event: AdminAuditEvent }) {
     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
       <Descriptions.Item label="审计事件 ID">{event.audit_event_id}</Descriptions.Item>
       <Descriptions.Item label="操作者角色">{event.actor_role}</Descriptions.Item>
-      <Descriptions.Item label="目标 Revision">{event.target_revision ?? '—'}</Descriptions.Item>
+      <Descriptions.Item label="目标修订版本">{event.target_revision ?? '—'}</Descriptions.Item>
       <Descriptions.Item label="操作意图 ID">{event.operation_intent_id ?? '—'}</Descriptions.Item>
       <Descriptions.Item label="错误代码">{event.error_code ?? '—'}</Descriptions.Item>
       <Descriptions.Item label="理由说明">{event.reason_text ?? '—'}</Descriptions.Item>
-      <Descriptions.Item label="Before digest">
+      <Descriptions.Item label="变更前摘要">
         <Digest value={event.before_digest} />
       </Descriptions.Item>
-      <Descriptions.Item label="After digest">
+      <Descriptions.Item label="变更后摘要">
         <Digest value={event.after_digest} />
       </Descriptions.Item>
     </Descriptions>

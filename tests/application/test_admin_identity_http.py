@@ -372,7 +372,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0010_place_revision_version"
+    assert revision == "0011_research_snapshot_batches"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -449,6 +449,180 @@ def _seed_candidate_revision(context: AdminTestContext, revision_id: str = "revi
             )
         )
         session.commit()
+
+
+def _seed_human_verified_revision_with_evidence(
+    context: AdminTestContext, revision_id: str = "revision-projection"
+) -> None:
+    """Seed the smallest fully verified catalog graph for projection API tests."""
+    with context.sessions() as session:
+        session.add(PlaceRow(
+            place_id="place-projection", city_id="hangzhou", status="active",
+            merged_into_place_id=None, created_at=NOW.isoformat(), updated_at=NOW.isoformat(),
+        ))
+        session.add(PlaceSourceRecordRow(
+            source_record_id="source-projection", place_id="place-projection",
+            source_id="test-registry", registry_id="v1", registry_sha256="a" * 64,
+            field_dictionary_id="fields-v1", field_dictionary_sha256="b" * 64,
+            source_url="https://example.test/place", collection_mode="manual_reference",
+            target_stage="published", source_decision="approved", observed_at=NOW.isoformat(),
+            content_sha256="c" * 64, status="active", created_at=NOW.isoformat(),
+        ))
+        session.add(PlaceRevisionRow(
+            place_revision_id=revision_id, place_id="place-projection", revision_number=1,
+            lifecycle_status="human_verified", canonical_name="Verified Place", aliases=[],
+            place_kind="attraction", category="museum", admin_area="West Lake", address="杭州",
+            geometry_kind="point", duration_min=30, duration_recommended=60, duration_max=90,
+            internal_travel_min=0, energy_level=2, indoor_outdoor="indoor",
+            suitable_periods=["morning", "afternoon"], audience_tags=[], rain_suitability="suitable",
+            is_always_open=False, solver_eligible=True, conflicts_resolved=True,
+            source_record_ids=["source-projection"], created_at=NOW.isoformat(),
+            reviewed_at=NOW.isoformat(), published_at=None,
+        ))
+        session.add(PlaceGeometryRow(
+            geometry_id="geometry-projection", place_revision_id=revision_id, geometry_kind="point",
+            geometry={"type": "Point", "coordinates": [120.15, 30.25]},
+            source_record_id="source-projection", review_status="human_verified", active=True,
+            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
+        ))
+        session.add(PlaceAccessPointRow(
+            access_point_id="access-projection", place_revision_id=revision_id,
+            access_point_kind="visitor_entrance", name="主入口", lat=30.25, lng=120.15,
+            source_record_id="source-projection", review_status="human_verified", active=True,
+            fetched_at=NOW.isoformat(), reviewed_at=NOW.isoformat(), created_at=NOW.isoformat(),
+        ))
+        session.add(PlaceTimeRuleRow(
+            time_rule_id="time-projection", place_revision_id=revision_id, rule_kind="opening_hours",
+            weekdays=[1, 2, 3, 4, 5, 6, 7], start_minute=540, end_minute=1020,
+            last_entry_minute=990, valid_from=date(2026, 1, 1), valid_to=None,
+            source_record_id="source-projection", review_status="human_verified", active=True,
+            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
+        ))
+        session.commit()
+
+
+def test_projection_preparation_api_is_verified_idempotent_and_does_not_publish(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_human_verified_revision_with_evidence(context)
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    payload = {
+        "data_snapshot_version": "hangzhou-research-candidate-v1",
+        "operation_intent_id": "projection-prepare-http-1",
+        "reason_code": "PROJECTION_PREPARED",
+    }
+    response = context.client.post(
+        "/api/v1/admin/place-revisions/revision-projection/projection-preparations",
+        headers=headers,
+        json=payload,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "candidate"
+    assert body["gate_reason_codes"] == []
+    assert body["projection_hash"]
+    with context.sessions() as session:
+        prepared = session.get(SolverPlaceProjectionRow, body["projection_id"])
+    assert prepared is not None
+    assert prepared.status == "candidate"
+    assert prepared.solver_node_id == 1
+
+    replay = context.client.post(
+        "/api/v1/admin/place-revisions/revision-projection/projection-preparations",
+        headers=headers,
+        json=payload,
+    )
+    assert replay.status_code == 200
+    assert replay.json()["projection_id"] == body["projection_id"]
+
+    with context.sessions() as session:
+        projection = session.get(SolverPlaceProjectionRow, body["projection_id"])
+    assert projection is not None
+    assert projection.status == "candidate"
+
+
+def test_projection_preparation_api_enforces_permission_and_revision_state(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_human_verified_revision_with_evidence(context, "revision-projection-auth")
+    _, root_headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    created = context.client.post(
+        "/api/v1/admin/admin-actors",
+        headers=root_headers,
+        json={
+            "operation_intent_id": "projection-editor-create",
+            "login_name": "projection.editor",
+            "initial_password": EDITOR_PASSWORD,
+            "role_keys": ["data_editor"],
+            "reason_code": "TEST_ACCOUNT",
+        },
+    )
+    assert created.status_code == 201
+    _, editor_headers = _login(context.client, "projection.editor", EDITOR_PASSWORD)
+    denied = context.client.post(
+        "/api/v1/admin/place-revisions/revision-projection-auth/projection-preparations",
+        headers=editor_headers,
+        json={"data_snapshot_version": "snapshot", "operation_intent_id": "denied", "reason_code": "TEST"},
+    )
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "admin_permission_denied"
+
+    _seed_candidate_revision(context, "revision-projection-candidate")
+    blocked = context.client.post(
+        "/api/v1/admin/place-revisions/revision-projection-candidate/projection-preparations",
+        headers=root_headers,
+        json={"data_snapshot_version": "snapshot", "operation_intent_id": "candidate", "reason_code": "TEST"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "review_revision_not_approvable"
+
+
+def test_publication_batch_preview_and_failed_execution_are_auditable(
+    admin_context: AdminTestContext,
+) -> None:
+    _seed_candidate_revision(admin_context, "revision-batch-blocked")
+    _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    preview = admin_context.client.post(
+        "/api/v1/admin/publication-batches/previews",
+        headers=headers,
+        json={
+            "city_id": "hangzhou",
+            "place_revision_ids": ["revision-batch-blocked"],
+            "operation_intent_id": "batch-preview-blocked-1",
+            "reason_code": "PUBLICATION_BATCH_PREVIEW",
+        },
+    )
+    assert preview.status_code == 201
+    body = preview.json()
+    assert body["status"] == "preview"
+    assert body["items"][0]["status"] == "blocked"
+    assert body["items"][0]["reason_codes"] == ["PROJECTION_NOT_FOUND"]
+    batch_id = body["batch_id"]
+
+    execution = admin_context.client.post(
+        f"/api/v1/admin/publication-batches/{batch_id}/execute",
+        headers=headers,
+        json={
+            "operation_intent_id": "batch-execute-blocked-1",
+            "reason_code": "PUBLICATION_BATCH_EXECUTE",
+        },
+    )
+    assert execution.status_code == 200
+    assert execution.json()["snapshot"] is None
+    assert execution.json()["batch"]["status"] == "failed"
+
+    replay = admin_context.client.post(
+        f"/api/v1/admin/publication-batches/{batch_id}/execute",
+        headers=headers,
+        json={
+            "operation_intent_id": "batch-execute-blocked-1",
+            "reason_code": "PUBLICATION_BATCH_EXECUTE",
+        },
+    )
+    assert replay.status_code == 200
+    assert replay.json()["reused"] is True
 
 
 def test_place_review_submit_approve_and_audit_are_one_workflow(
@@ -1529,3 +1703,41 @@ def test_review_rejects_non_candidate_revision_and_audits_rejection(
     )
     assert rejected.status_code == 409
     assert rejected.json()["error"]["code"] == "review_revision_not_candidate"
+
+
+def test_editing_uncollected_candidate_recommended_duration_establishes_valid_range(
+    admin_context: AdminTestContext,
+) -> None:
+    with admin_context.sessions() as session:
+        session.add(PlaceRow(
+            place_id="place-duration", city_id="hangzhou", status="active",
+            merged_into_place_id=None, created_at=NOW.isoformat(), updated_at=NOW.isoformat(),
+        ))
+        session.add(PlaceRevisionRow(
+            place_revision_id="revision-duration", place_id="place-duration", revision_number=1,
+            lifecycle_status="candidate", canonical_name="待采集时长地点", aliases=[],
+            place_kind="attraction", category="museum", admin_area="西湖区", address=None,
+            geometry_kind="point", duration_min=1, duration_recommended=1, duration_max=1,
+            internal_travel_min=0, energy_level=2, indoor_outdoor="indoor",
+            suitable_periods=["morning"], audience_tags=[], rain_suitability="suitable",
+            is_always_open=False, solver_eligible=False, conflicts_resolved=False,
+            source_record_ids=["source-duration"], created_at=NOW.isoformat(),
+            reviewed_at=None, published_at=None,
+            review_flags=["DURATION_NOT_COLLECTED"],
+        ))
+        session.commit()
+    _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    response = admin_context.client.patch(
+        "/api/v1/admin/place-revisions/revision-duration",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "operation_intent_id": "update-duration-only",
+            "reason_code": "PLACE_FACTS_EDITED",
+            "duration_recommended": 60,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["duration_min"], body["duration_recommended"], body["duration_max"]) == (60, 60, 60)
+    assert "DURATION_NOT_COLLECTED" not in body["review_flags"]

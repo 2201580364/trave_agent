@@ -24,8 +24,8 @@ import { ErrorNotice } from '../components/ErrorNotice'
 import { HighRiskConfirm } from '../components/HighRiskConfirm'
 
 const ROLE_CATALOG = [
-  { key: 'data_editor', label: '数据编辑', description: '候选与 Revision 编辑、送审' },
-  { key: 'data_reviewer', label: '数据审核', description: 'Revision 审核决定' },
+  { key: 'data_editor', label: '数据编辑', description: '候选地点与修订版本编辑、送审' },
+  { key: 'data_reviewer', label: '数据审核', description: '修订版本审核决定' },
   { key: 'data_publisher', label: '数据发布', description: '发布门与研究快照' },
   { key: 'research_viewer', label: '研究只读', description: '研究快照只读访问' },
   { key: 'admin_security', label: '安全管理', description: '管理员、角色与审计' },
@@ -203,7 +203,7 @@ export function AdminActorsPage() {
           <Space size={[4, 4]} wrap>
             {roles.map((role) => (
               <Tag key={role} color={role === 'admin_security' ? 'gold' : 'default'}>
-                {ROLE_LABELS[role] ?? role}
+                {ROLE_LABELS[role] ?? '未识别角色'}
               </Tag>
             ))}
           </Space>

@@ -426,6 +426,69 @@ class PlaceRelation:
 
 
 @dataclass(frozen=True, slots=True)
+class ResearchSnapshot:
+    snapshot_id: str
+    data_snapshot_version: str
+    city_id: str
+    content_sha256: str
+    source_batch_id: str
+    snapshot_payload: dict[str, Any]
+    created_at: datetime
+    status: str = "published"
+
+    def __post_init__(self) -> None:
+        _required(self.snapshot_id, self.data_snapshot_version, self.city_id, self.source_batch_id)
+        _sha256(self.content_sha256, "research snapshot content_sha256")
+        if self.status != "published":
+            raise ValueError("research snapshot status is invalid")
+        if not isinstance(self.snapshot_payload, dict):
+            raise ValueError("research snapshot payload must be an object")
+        _aware(self.created_at, "research snapshot created_at")
+
+
+@dataclass(frozen=True, slots=True)
+class PublicationBatch:
+    batch_id: str
+    city_id: str
+    operation_intent_id: str
+    created_by: str
+    created_at: datetime
+    status: str = "preview"
+    snapshot_id: str | None = None
+
+    def __post_init__(self) -> None:
+        _required(self.batch_id, self.city_id, self.operation_intent_id, self.created_by)
+        if self.status not in {"preview", "executing", "published", "partial_failed", "failed"}:
+            raise ValueError("publication batch status is invalid")
+        _aware(self.created_at, "publication batch created_at")
+        if self.status == "published" and not self.snapshot_id:
+            raise ValueError("published publication batch requires snapshot_id")
+
+
+@dataclass(frozen=True, slots=True)
+class PublicationBatchItem:
+    batch_item_id: str
+    batch_id: str
+    place_revision_id: str
+    status: str
+    reason_codes: tuple[str, ...] = ()
+    projection_id: str | None = None
+    published_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _required(self.batch_item_id, self.batch_id, self.place_revision_id)
+        if self.status not in {"pending", "publishable", "blocked", "published", "failed"}:
+            raise ValueError("publication batch item status is invalid")
+        if len(self.reason_codes) != len(set(self.reason_codes)):
+            raise ValueError("publication batch item reason codes must be unique")
+        if self.status == "published" and not self.projection_id:
+            raise ValueError("published batch item requires projection_id")
+        if self.status == "published" and self.published_at is None:
+            raise ValueError("published batch item requires published_at")
+        _aware(self.published_at, "publication batch item published_at", required=False)
+
+
+@dataclass(frozen=True, slots=True)
 class SelectionExclusionGroup:
     exclusion_group_id: str
     city_id: str

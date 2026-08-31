@@ -7,6 +7,7 @@ import { adminErrorMessage } from '../api/errorMessages'
 import type { PlaceRevision } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
+import { indoorOutdoorLabel, lifecycleStatusLabel, placeKindLabel, rainSuitabilityLabel } from '../ui/displayLabels'
 
 const PAGE_SIZE = 20
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
@@ -53,7 +54,7 @@ export function CandidatesPage() {
     () => [
       { title: '名称', dataIndex: 'canonical_name', width: 220, ellipsis: true },
       { title: '区域', dataIndex: 'admin_area', width: 150 },
-      { title: '类型', dataIndex: 'place_kind', width: 130 },
+      { title: '类型', dataIndex: 'place_kind', width: 130, render: placeKindLabel },
       {
         title: '建议时长',
         dataIndex: 'duration_recommended',
@@ -65,7 +66,7 @@ export function CandidatesPage() {
         title: '状态',
         dataIndex: 'lifecycle_status',
         width: 120,
-        render: (v: PlaceRevision['lifecycle_status']) => <Tag>{v}</Tag>,
+        render: (v: PlaceRevision['lifecycle_status']) => <Tag>{lifecycleStatusLabel(v)}</Tag>,
       },
       { title: '创建时间', dataIndex: 'created_at', width: 210, render: formatDateTime },
       {
@@ -92,7 +93,7 @@ export function CandidatesPage() {
         <div>
           <Typography.Title level={2}>候选地点清单</Typography.Title>
           <Typography.Paragraph type="secondary">
-            O02：只读查看 candidate Revision 的基础事实，审核和发布必须通过对应工作流。
+            O02：查看候选修订版本的基础事实；审核和发布必须通过对应工作流。
           </Typography.Paragraph>
         </div>
         <Space wrap>
@@ -123,7 +124,7 @@ export function CandidatesPage() {
           }}
           scroll={{ x: 1080 }}
           expandable={{ expandedRowRender: (revision) => <RevisionDetails revision={revision} /> }}
-          locale={{ emptyText: '当前没有 candidate Revision' }}
+          locale={{ emptyText: '当前没有候选修订版本' }}
         />
       </Card>
     </Space>
@@ -133,16 +134,16 @@ export function CandidatesPage() {
 function RevisionDetails({ revision }: { revision: PlaceRevision }) {
   return (
     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
-      <Descriptions.Item label="Revision ID">{revision.place_revision_id}</Descriptions.Item>
-      <Descriptions.Item label="Place ID">{revision.place_id}</Descriptions.Item>
+      <Descriptions.Item label="修订版本编号">{revision.place_revision_id}</Descriptions.Item>
+      <Descriptions.Item label="地点编号">{revision.place_id}</Descriptions.Item>
       <Descriptions.Item label="地址">{revision.address ?? '未提供'}</Descriptions.Item>
       <Descriptions.Item label="游览范围">
         {revision.review_flags.includes('DURATION_NOT_COLLECTED')
           ? '未采集'
           : `${revision.duration_min} - ${revision.duration_max} 分钟`}
       </Descriptions.Item>
-      <Descriptions.Item label="室内/室外">{revision.indoor_outdoor}</Descriptions.Item>
-      <Descriptions.Item label="雨天适配">{revision.rain_suitability}</Descriptions.Item>
+      <Descriptions.Item label="室内/室外">{indoorOutdoorLabel(revision.indoor_outdoor)}</Descriptions.Item>
+      <Descriptions.Item label="雨天适配">{rainSuitabilityLabel(revision.rain_suitability)}</Descriptions.Item>
       <Descriptions.Item label="来源记录数">{revision.source_record_ids.length}</Descriptions.Item>
       <Descriptions.Item label="冲突已裁决">{revision.conflicts_resolved ? '是' : '否'}</Descriptions.Item>
       <Descriptions.Item label="求解器可用">{revision.solver_eligible ? '是' : '否'}</Descriptions.Item>

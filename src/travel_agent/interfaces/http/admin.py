@@ -99,7 +99,7 @@ class UpdatePlaceRevisionInput(BaseModel):
     address: str | None = Field(default=None, max_length=300)
     geometry_kind: str | None = Field(default=None, min_length=1, max_length=20)
     duration_min: int | None = Field(default=None, ge=0)
-    duration_recommended: int | None = Field(default=None, ge=0)
+    duration_recommended: int | None = Field(default=None, ge=1)
     duration_max: int | None = Field(default=None, ge=0)
     internal_travel_min: int | None = Field(default=None, ge=0)
     energy_level: int | None = Field(default=None, ge=0, le=5)
@@ -113,6 +113,34 @@ class UpdatePlaceRevisionInput(BaseModel):
 class PublishPlaceRevisionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PreviewPublicationBatchInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    city_id: str = Field(min_length=1, max_length=64)
+    place_revision_ids: tuple[str, ...] = Field(min_length=1, max_length=500)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class ExecutePublicationBatchInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class PrepareProjectionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    data_snapshot_version: str = Field(min_length=1, max_length=80)
+    solver_node_id: int | None = Field(default=None, gt=0)
     operation_intent_id: str = Field(min_length=1, max_length=64)
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
@@ -893,6 +921,80 @@ def build_admin_router(
                 ),
             }
 
+        @router.post("/place-revisions/{revision_id}/projection-preparations")
+        def prepare_place_revision_projection(
+            revision_id: str,
+            payload: PrepareProjectionInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            projection = review_workflow.prepare_projection(
+                current,
+                revision_id=revision_id,
+                data_snapshot_version=payload.data_snapshot_version,
+                solver_node_id=payload.solver_node_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return {
+                "projection_id": projection.projection_id,
+                "place_revision_id": projection.place_revision_id,
+                "status": projection.status,
+                "projection_hash": projection.projection_hash,
+                "gate_reason_codes": list(projection.gate_reason_codes),
+            }
+
+        @router.post("/publication-batches/previews", status_code=status.HTTP_201_CREATED)
+        def preview_publication_batch(
+            payload: PreviewPublicationBatchInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            return review_workflow.preview_publication_batch(
+                current,
+                city_id=payload.city_id,
+                revision_ids=payload.place_revision_ids,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+
+        @router.post("/publication-batches/{batch_id}/execute")
+        def execute_publication_batch(
+            batch_id: str,
+            payload: ExecutePublicationBatchInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            return review_workflow.execute_publication_batch(
+                current,
+                batch_id=batch_id,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+
+        @router.get("/research-snapshots")
+        def list_research_snapshots(
+            current: AdminPrincipal = principal_dependency,
+            city_id: str | None = Query(default=None, max_length=64),
+            limit: int = Query(default=50, ge=1, le=100),
+            offset: int = Query(default=0, ge=0),
+        ) -> dict[str, object]:
+            snapshots = review_workflow.list_research_snapshots(current, city_id=city_id, limit=limit, offset=offset)
+            return {"items": [_snapshot_api_response(item, include_payload=False) for item in snapshots], "limit": limit, "offset": offset}
+
+        @router.get("/research-snapshots/{snapshot_id}")
+        def get_research_snapshot(
+            snapshot_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            return _snapshot_api_response(review_workflow.get_research_snapshot(current, snapshot_id=snapshot_id), include_payload=True)
+
         @router.get("/candidates")
         def list_candidates(
             current: AdminPrincipal = principal_dependency,
@@ -1018,6 +1120,21 @@ def build_admin_router(
             }
 
     return router
+
+
+def _snapshot_api_response(snapshot, *, include_payload: bool) -> dict[str, object]:
+    response = {
+        "snapshot_id": snapshot.snapshot_id,
+        "data_snapshot_version": snapshot.data_snapshot_version,
+        "city_id": snapshot.city_id,
+        "content_sha256": snapshot.content_sha256,
+        "source_batch_id": snapshot.source_batch_id,
+        "created_at": snapshot.created_at.isoformat(),
+        "status": snapshot.status,
+    }
+    if include_payload:
+        response["payload"] = snapshot.snapshot_payload
+    return response
 
 
 def _actor_response(actor: AdminActor) -> dict[str, object]:

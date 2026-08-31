@@ -62,7 +62,7 @@ export function AdminLayout() {
           <Space size="small" wrap>
             <Tag color="green">受控研究环境</Tag>
             <Tag>M1 / OM1</Tag>
-            <Typography.Text type="secondary">杭州 · candidate 数据阶段</Typography.Text>
+            <Typography.Text type="secondary">杭州 · 候选数据阶段</Typography.Text>
           </Space>
           <Space size="middle" wrap>
             <Typography.Text>{principal?.login_name}</Typography.Text>
