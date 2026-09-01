@@ -19,13 +19,19 @@ import { adminErrorMessage } from '../api/errorMessages'
 import type { AdminAuditEvent, AdminAuditResult, AuditEventFilters } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
-import { auditTargetTypeLabel, reasonCodeLabel } from '../ui/displayLabels'
+import {
+  adminRoleLabel,
+  auditActionLabel,
+  auditActionOptions,
+  auditTargetTypeLabel,
+  reasonCodeLabel,
+} from '../ui/displayLabels'
 
 const PAGE_SIZE = 50
 
 type FilterFields = {
   keyword?: string
-  actor_id?: string
+  actor_login_name?: string
   target_type?: string
   target_id?: string
   action?: string
@@ -46,6 +52,7 @@ export function AuditEventsPage() {
     return {
       keyword: searchParams.get('keyword') || undefined,
       actor_id: searchParams.get('actor_id') || undefined,
+      actor_login_name: searchParams.get('actor_login_name') || undefined,
       target_type: searchParams.get('target_type') || undefined,
       target_id: searchParams.get('target_id') || undefined,
       action: searchParams.get('action') || undefined,
@@ -75,7 +82,7 @@ export function AuditEventsPage() {
   useEffect(() => {
     form.setFieldsValue({
       keyword: filters.keyword,
-      actor_id: filters.actor_id,
+      actor_login_name: filters.actor_login_name,
       target_type: filters.target_type,
       target_id: filters.target_id,
       action: filters.action,
@@ -125,15 +132,16 @@ export function AuditEventsPage() {
       },
       {
         title: '操作者',
-        dataIndex: 'actor_id',
+        dataIndex: 'actor_login_name',
         width: 180,
         ellipsis: true,
+        render: (value: string | null) => value ?? '未知或已停用账号',
       },
       {
         title: '动作',
         dataIndex: 'action',
         width: 230,
-        render: (value: string) => <Typography.Text code>{value}</Typography.Text>,
+        render: (value: string) => auditActionLabel(value),
       },
       {
         title: '目标',
@@ -181,13 +189,20 @@ export function AuditEventsPage() {
           onFinish={applyFilters}
         >
           <Form.Item name="keyword" label="关键字">
-            <Input allowClear placeholder="操作者、动作、目标、理由、请求编号" style={{ width: 280 }} />
+            <Input allowClear placeholder="账号、目标、理由、请求编号" style={{ width: 280 }} />
           </Form.Item>
-          <Form.Item name="actor_id" label="操作者">
-            <Input allowClear placeholder="actor_id" />
+          <Form.Item name="actor_login_name" label="操作者账号">
+            <Input allowClear placeholder="管理员登录账号" />
           </Form.Item>
           <Form.Item name="action" label="动作">
-            <Input allowClear placeholder="ADMIN_…" />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="选择具体动作"
+              style={{ width: 220 }}
+              options={auditActionOptions}
+            />
           </Form.Item>
           <Form.Item name="target_type" label="目标类型">
             <Input allowClear />
@@ -252,7 +267,12 @@ function AuditDetails({ event }: { event: AdminAuditEvent }) {
   return (
     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
       <Descriptions.Item label="审计事件 ID">{event.audit_event_id}</Descriptions.Item>
-      <Descriptions.Item label="操作者角色">{event.actor_role}</Descriptions.Item>
+      <Descriptions.Item label="操作者账号">
+        {event.actor_login_name ?? '未知或已停用账号'}
+      </Descriptions.Item>
+      <Descriptions.Item label="操作者角色">{adminRoleLabel(event.actor_role)}</Descriptions.Item>
+      <Descriptions.Item label="操作者内部编号">{event.actor_id}</Descriptions.Item>
+      <Descriptions.Item label="动作编码">{event.action}</Descriptions.Item>
       <Descriptions.Item label="目标修订版本">{event.target_revision ?? '—'}</Descriptions.Item>
       <Descriptions.Item label="操作意图 ID">{event.operation_intent_id ?? '—'}</Descriptions.Item>
       <Descriptions.Item label="错误代码">{event.error_code ?? '—'}</Descriptions.Item>
@@ -260,7 +280,7 @@ function AuditDetails({ event }: { event: AdminAuditEvent }) {
       <Descriptions.Item label="变更前摘要">
         <Digest value={event.before_digest} />
       </Descriptions.Item>
-      <Descriptions.Item label="变更后摘要">
+      <Descriptions.Item label="变更后摘要" span="filled">
         <Digest value={event.after_digest} />
       </Descriptions.Item>
     </Descriptions>

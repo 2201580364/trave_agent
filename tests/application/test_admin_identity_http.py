@@ -16,7 +16,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
+from travel_agent.application.admin import (
+    AdminIdentityService,
+    GovernedSourceCatalog,
+    PlaceReviewWorkflowService,
+)
 from travel_agent.application.admin.service import verify_admin_password
 from travel_agent.infrastructure.database import (
     AnonymousIdentityService,
@@ -113,7 +117,15 @@ def admin_context(tmp_path: Path) -> Iterator[AdminTestContext]:
         identity,
         admin_identity=service,
         review_workflow=PlaceReviewWorkflowService(
-            lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
+            lambda: SqlAlchemyAdminUnitOfWork(sessions),
+            clock,
+            ids,
+            GovernedSourceCatalog.from_files(
+                Path(__file__).resolve().parents[2]
+                / "data/governance/hangzhou-source-registry-v1.json",
+                Path(__file__).resolve().parents[2]
+                / "data/governance/place-collection-field-dictionary-v1.json",
+            ),
         ),
     )
     with TestClient(create_app(container)) as client:
@@ -318,6 +330,7 @@ def test_last_security_role_is_protected_and_rejected_attempt_is_audited(
     )
     assert audit.status_code == 200
     event = audit.json()["items"][0]
+    assert event["actor_login_name"] == ROOT_LOGIN
     assert event["operation_intent_id"] == "op-remove-last-security"
     assert event["request_id"] == "req-remove-last-security"
     assert event["error_code"] == "admin_role_safety_violation"
@@ -929,6 +942,152 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     assert missing.json()["error"]["code"] == "resource_not_found"
 
 
+def test_place_source_records_are_governed_versioned_audited_and_reference_safe(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-source-maintenance")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    channels = context.client.get("/api/v1/admin/source-channels", headers=headers)
+    assert channels.status_code == 200
+    channel_ids = {item["source_id"] for item in channels.json()["items"]}
+    assert "hangzhou-westlake-admin-public-web" in channel_ids
+    assert "gaode-web-service" in channel_ids
+    assert "qweather-developer-service" not in channel_ids
+
+    payload = {
+        "expected_revision_version": 1,
+        "source_id": "hangzhou-westlake-admin-public-web",
+        "source_url": "https://westlake.hangzhou.gov.cn/art/2026/8/29/example.html",
+        "collection_mode": "manual_reference",
+        "observed_at": NOW.isoformat(),
+        "content_sha256": "C" * 64,
+        "operation_intent_id": "source-create-1",
+        "reason_code": "PLACE_SOURCE_RECORD_ADDED",
+        "reason_text": "支持地点开放时间与位置核验",
+    }
+    created = context.client.post(
+        "/api/v1/admin/place-revisions/revision-source-maintenance/source-records",
+        headers=headers,
+        json=payload,
+    )
+    assert created.status_code == 201
+    assert created.json()["revision_version"] == 2
+    assert created.json()["conflicts_resolved"] is False
+    assert created.json()["solver_eligible"] is False
+    source_record_id = created.json()["source_record_ids"][0]
+
+    replay = context.client.post(
+        "/api/v1/admin/place-revisions/revision-source-maintenance/source-records",
+        headers=headers,
+        json=payload,
+    )
+    assert replay.status_code == 201
+    assert replay.json()["source_record_ids"] == [source_record_id]
+
+    evidence = context.client.get(
+        "/api/v1/admin/place-revisions/revision-source-maintenance/evidence",
+        headers=headers,
+    ).json()
+    source = evidence["sources"][0]
+    assert source["attached_to_revision"] is True
+    assert source["content_sha256"] == "c" * 64
+    with context.sessions() as session:
+        row = session.get(PlaceSourceRecordRow, source_record_id)
+        assert row is not None
+        assert row.registry_id == "hangzhou-m1-source-registry-v1"
+        assert len(row.registry_sha256) == 64
+        assert row.field_dictionary_id == "m1-place-collection-fields-v1"
+        assert len(row.field_dictionary_sha256) == 64
+        assert row.target_stage == "staging"
+        assert row.source_decision == "conditional"
+
+    invalid = context.client.post(
+        "/api/v1/admin/place-revisions/revision-source-maintenance/source-records",
+        headers=headers,
+        json={
+            **payload,
+            "expected_revision_version": 2,
+            "source_id": "gaode-web-service",
+            "source_url": "https://restapi.amap.com/v3/place/text?key=must-not-leak",
+            "collection_mode": "api",
+            "operation_intent_id": "source-create-sensitive",
+        },
+    )
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["code"] == "source_record_validation_failed"
+    assert "must-not-leak" not in invalid.text
+
+    geometry = context.client.post(
+        "/api/v1/admin/place-revisions/revision-source-maintenance/geometries",
+        headers=headers,
+        json={
+            "expected_revision_version": 2,
+            "geometry_kind": "point",
+            "geometry": {"type": "Point", "coordinates": [120.15, 30.25]},
+            "source_record_id": source_record_id,
+            "operation_intent_id": "source-geometry-create",
+            "reason_code": "EVIDENCE_CREATED",
+        },
+    )
+    assert geometry.status_code == 200
+    blocked = context.client.request(
+        "DELETE",
+        f"/api/v1/admin/place-revisions/revision-source-maintenance/source-records/{source_record_id}",
+        headers=headers,
+        json={
+            "expected_revision_version": 3,
+            "operation_intent_id": "source-detach-blocked",
+            "reason_code": "PLACE_SOURCE_RECORD_REMOVED",
+        },
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "source_record_in_use"
+    assert blocked.json()["error"]["details"]["references"] == ["地点几何"]
+
+    geometry_id = context.client.get(
+        "/api/v1/admin/place-revisions/revision-source-maintenance/evidence",
+        headers=headers,
+    ).json()["geometries"][0]["geometry_id"]
+    retired = context.client.request(
+        "DELETE",
+        f"/api/v1/admin/place-revisions/revision-source-maintenance/geometries/{geometry_id}",
+        headers=headers,
+        json={
+            "expected_revision_version": 3,
+            "operation_intent_id": "source-geometry-retire",
+            "reason_code": "EVIDENCE_RETIRED",
+        },
+    )
+    assert retired.status_code == 200
+    detached = context.client.request(
+        "DELETE",
+        f"/api/v1/admin/place-revisions/revision-source-maintenance/source-records/{source_record_id}",
+        headers=headers,
+        json={
+            "expected_revision_version": 4,
+            "operation_intent_id": "source-detach-1",
+            "reason_code": "PLACE_SOURCE_RECORD_REMOVED",
+        },
+    )
+    assert detached.status_code == 200
+    assert detached.json()["revision_version"] == 5
+    assert detached.json()["source_record_ids"] == []
+    with context.sessions() as session:
+        assert session.get(PlaceSourceRecordRow, source_record_id) is not None
+        actions = tuple(
+            session.scalars(
+                select(AdminAuditEventRow.action).where(
+                    AdminAuditEventRow.action.in_(
+                        ("PLACE_SOURCE_RECORD_CREATED", "PLACE_SOURCE_RECORD_DETACHED")
+                    )
+                )
+            )
+        )
+    assert actions == ("PLACE_SOURCE_RECORD_CREATED", "PLACE_SOURCE_RECORD_DETACHED")
+
+
 def test_admin_place_and_audit_searches_filter_before_pagination(
     admin_context: AdminTestContext,
 ) -> None:
@@ -1039,6 +1198,39 @@ def test_admin_place_and_audit_searches_filter_before_pagination(
     assert audit_results.status_code == 200
     assert audit_results.json()["total"] == 1
     assert audit_results.json()["items"][0]["action"] == "ADMIN_ACTOR_CREATE"
+    assert audit_results.json()["items"][0]["actor_login_name"] == ROOT_LOGIN
+
+    audit_by_login = context.client.get(
+        "/api/v1/admin/audit-events",
+        headers=headers,
+        params={
+            "actor_login_name": "root.ad",
+            "action": "ADMIN_ACTOR_CREATE",
+            "limit": 1,
+            "offset": 0,
+        },
+    )
+    assert audit_by_login.status_code == 200
+    assert audit_by_login.json()["total"] == 1
+    assert audit_by_login.json()["items"][0]["actor_login_name"] == ROOT_LOGIN
+
+    audit_by_login_keyword = context.client.get(
+        "/api/v1/admin/audit-events",
+        headers=headers,
+        params={"keyword": ROOT_LOGIN, "limit": 1, "offset": 0},
+    )
+    assert audit_by_login_keyword.status_code == 200
+    assert audit_by_login_keyword.json()["total"] >= 1
+    assert audit_by_login_keyword.json()["items"][0]["actor_login_name"] == ROOT_LOGIN
+
+    missing_actor_audits = context.client.get(
+        "/api/v1/admin/audit-events",
+        headers=headers,
+        params={"actor_login_name": "missing.admin", "limit": 1, "offset": 0},
+    )
+    assert missing_actor_audits.status_code == 200
+    assert missing_actor_audits.json()["items"] == []
+    assert missing_actor_audits.json()["total"] == 0
 
 
 def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(

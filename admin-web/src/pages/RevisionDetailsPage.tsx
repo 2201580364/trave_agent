@@ -15,11 +15,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence, ReviewTask, PublicationCheck, SourceConflict } from '../api/types'
+import type { CreatePlaceSourceRecordInput, PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceEvidenceSource, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence, ReviewTask, PublicationCheck, SourceChannel, SourceConflict } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 import {
   accessPointKindLabel,
+  collectionModeLabel,
   dateExceptionKindLabel,
   geometryKindLabel,
   indoorOutdoorLabel,
@@ -34,6 +35,7 @@ import {
   reviewFlagLabel,
   reviewStatusLabel,
   sourceDecisionLabel,
+  sourceKindLabel,
   timeRuleKindLabel,
 } from '../ui/displayLabels'
 
@@ -122,6 +124,7 @@ export function RevisionDetailsPage() {
   const [evidence, setEvidence] = useState<PlaceRevisionEvidence | null>(null)
   const [reviewTask, setReviewTask] = useState<ReviewTask | null>(null)
   const [sourceConflicts, setSourceConflicts] = useState<SourceConflict[]>([])
+  const [sourceChannels, setSourceChannels] = useState<SourceChannel[]>([])
   const [sourceConflictError, setSourceConflictError] = useState<string | null>(null)
   const [publicationCheck, setPublicationCheck] = useState<PublicationCheck | null>(null)
   const [publicationCheckError, setPublicationCheckError] = useState<string | null>(null)
@@ -196,7 +199,13 @@ export function RevisionDetailsPage() {
         .catch((reason: unknown) => setPublicationCheckError(adminErrorMessage(reason)))
       : Promise.resolve()
 
-    await Promise.all([revisionRequest, evidenceRequest, reviewTaskRequest, sourceConflictRequest, publicationCheckRequest])
+    const sourceChannelsRequest = typeof api.listSourceChannels === 'function'
+      ? api.listSourceChannels()
+        .then((result) => setSourceChannels(result.items))
+        .catch(() => setSourceChannels([]))
+      : Promise.resolve()
+
+    await Promise.all([revisionRequest, evidenceRequest, reviewTaskRequest, sourceConflictRequest, publicationCheckRequest, sourceChannelsRequest])
   }, [api, canCheckPublication, revisionId, reviewContext, reviewTaskId])
 
   useEffect(() => {
@@ -477,7 +486,7 @@ export function RevisionDetailsPage() {
               <Descriptions.Item label="求解器可用">
                 {revision.solver_eligible ? <Tag color="success">可用</Tag> : <Tag color="error">不可用</Tag>}
               </Descriptions.Item>
-              <Descriptions.Item label="待核验项" span={3}>
+              <Descriptions.Item label="待核验项">
                 {revision.review_flags.length > 0
                   ? revision.review_flags.map((flag) => (
                       <Tag key={flag} color="warning">
@@ -502,12 +511,24 @@ export function RevisionDetailsPage() {
 
           <VerificationSummaryCard evidence={evidence} revision={revision} />
 
+          <div id="source-evidence"><SourceEvidenceCard
+            api={api}
+            evidence={evidence}
+            revision={revision}
+            sourceChannels={sourceChannels}
+            canEdit={!reviewContext && hasPermission('place:candidate:write')}
+            onChanged={load}
+            onSuccess={(text) => messageApi.success(text)}
+            onError={setError}
+          /></div>
+
           <div id="o04-evidence"><EvidenceCard
             api={api}
             evidence={evidence}
             loading={evidenceLoading}
             error={evidenceError}
             revision={revision}
+            sourceChannels={sourceChannels}
             canEdit={hasPermission('place:candidate:write')}
             canReview={canReviewThisRevision}
             onSuccess={(text) => messageApi.success(text)}
@@ -520,13 +541,14 @@ export function RevisionDetailsPage() {
             loading={evidenceLoading}
             error={evidenceError}
             revision={revision}
+            sourceChannels={sourceChannels}
             canEdit={hasPermission('place:candidate:write')}
             canReview={canReviewThisRevision}
             onSuccess={(text) => messageApi.success(text)}
             onChanged={load}
             onError={setError}
           /></div>
-          <div id="o07-evidence"><RelationEvidenceCard api={api} evidence={evidence} revision={revision} canEdit={hasPermission('place:candidate:write')} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} /></div>
+          <div id="o07-evidence"><RelationEvidenceCard api={api} evidence={evidence} revision={revision} sourceChannels={sourceChannels} canEdit={hasPermission('place:candidate:write')} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} /></div>
           <div id="o06-source-conflicts"><SourceConflictCard
             conflicts={sourceConflicts}
             loading={loading}
@@ -725,12 +747,159 @@ function VerificationSummaryCard({ evidence, revision }: { evidence: PlaceRevisi
   )
 }
 
+type SourceRecordFormValues = {
+  source_id: string
+  source_url: string
+  collection_mode: string
+  observed_at: string
+  content_sha256?: string
+  reason_text?: string
+}
+
+function SourceEvidenceCard({ api, evidence, revision, sourceChannels, canEdit, onChanged, onSuccess, onError }: {
+  api: ReturnType<typeof useAdminSession>['api']
+  evidence: PlaceRevisionEvidence | null
+  revision: PlaceRevision
+  sourceChannels: SourceChannel[]
+  canEdit: boolean
+  onChanged: () => Promise<void>
+  onSuccess: (text: string) => void
+  onError: (message: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm<SourceRecordFormValues>()
+  const selectedSourceId = Form.useWatch('source_id', form)
+  const selectedChannel = sourceChannels.find((item) => item.source_id === selectedSourceId)
+  const editable = revision.lifecycle_status === 'candidate' && canEdit
+
+  const openCreate = () => {
+    const first = sourceChannels[0]
+    form.setFieldsValue({
+      source_id: first?.source_id,
+      collection_mode: first?.collection_modes[0],
+      observed_at: localDateTimeValue(new Date()),
+      source_url: '',
+      content_sha256: undefined,
+      reason_text: undefined,
+    })
+    setOpen(true)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const values = await form.validateFields()
+      const input: CreatePlaceSourceRecordInput = {
+        expected_revision_version: revision.revision_version,
+        source_id: values.source_id,
+        source_url: values.source_url.trim(),
+        collection_mode: values.collection_mode,
+        observed_at: new Date(values.observed_at).toISOString(),
+        content_sha256: values.content_sha256?.trim() || undefined,
+        operation_intent_id: `source-record-create-${crypto.randomUUID()}`,
+        reason_code: 'PLACE_SOURCE_RECORD_ADDED',
+        reason_text: values.reason_text?.trim() || undefined,
+      }
+      await api.createSourceRecord(revision.place_revision_id, input)
+      setOpen(false)
+      await onChanged()
+      onSuccess('来源记录已新增并关联当前修订版本，需要重新确认冲突并送审')
+    } catch (reason) {
+      if (!isFormValidationError(reason)) onError(adminErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const detach = (source: PlaceEvidenceSource) => {
+    const references = sourceRecordReferences(evidence, source.source_record_id)
+    if (references.length > 0) return
+    Modal.confirm({
+      title: '从当前修订移除来源记录？',
+      content: '来源记录本身会保留用于历史追溯，只解除与当前修订版本的关联。移除后需要重新确认冲突并送审。',
+      okText: '确认移除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setSaving(true)
+        try {
+          await api.detachSourceRecord(revision.place_revision_id, source.source_record_id, {
+            expected_revision_version: revision.revision_version,
+            operation_intent_id: `source-record-detach-${crypto.randomUUID()}`,
+            reason_code: 'PLACE_SOURCE_RECORD_REMOVED',
+          })
+          await onChanged()
+          onSuccess('来源记录已从当前修订移除，历史记录仍保留')
+        } catch (reason) {
+          onError(adminErrorMessage(reason))
+        } finally {
+          setSaving(false)
+        }
+      },
+    })
+  }
+
+  return <Card title="来源证据">
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <Space style={{ width: '100%', justifyContent: 'space-between' }} align="start">
+        <Typography.Paragraph type="secondary" style={{ margin: 0, maxWidth: 900 }}>
+          来源记录用于证明名称、坐标、开放时间等事实来自哪里。请选择系统已审核的来源渠道，并填写实际查看的具体页面；不要填写搜索结果页、网站首页或带密钥的接口请求地址。
+        </Typography.Paragraph>
+        {editable && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate} disabled={sourceChannels.length === 0}>新增来源记录</Button>}
+      </Space>
+      {sourceChannels.length === 0 && editable && <Alert type="warning" showIcon title="来源渠道暂不可用，请刷新页面后重试" />}
+      <Table<PlaceEvidenceSource>
+        rowKey="source_record_id"
+        size="small"
+        pagination={false}
+        dataSource={evidence?.sources ?? []}
+        scroll={{ x: 1050 }}
+        columns={[
+          { title: '来源渠道', key: 'channel', width: 220, render: (_: unknown, item) => sourceRecordBusinessLabel(item, sourceChannels) },
+          { title: '渠道类型', key: 'kind', width: 140, render: (_: unknown, item) => sourceKindLabel(sourceChannels.find((channel) => channel.source_id === item.source_id)?.source_kind) },
+          { title: '来源决策', dataIndex: 'source_decision', width: 120, render: (value: string) => <Tag color={value === 'approved' ? 'success' : 'warning'}>{sourceDecisionLabel(value)}</Tag> },
+          { title: '采集方式', dataIndex: 'collection_mode', width: 130, render: collectionModeLabel },
+          { title: '具体来源地址', dataIndex: 'source_url', width: 300, ellipsis: true, render: (value: string) => <Tooltip title={value}><Typography.Link href={value} target="_blank" rel="noreferrer" ellipsis>{value}</Typography.Link></Tooltip> },
+          { title: '观察时间', dataIndex: 'observed_at', width: 190, render: formatDateTime },
+          { title: '使用情况', key: 'usage', width: 180, render: (_: unknown, item) => {
+            const references = sourceRecordReferences(evidence, item.source_record_id)
+            return references.length > 0 ? <Tooltip title={`正在支持：${references.join('、')}`}><Tag color="processing">被 {references.length} 类证据使用</Tag></Tooltip> : <Tag>尚未被子证据使用</Tag>
+          } },
+          ...(editable ? [{ title: '操作', key: 'actions', fixed: 'right' as const, width: 150, render: (_: unknown, item: PlaceEvidenceSource) => {
+            const references = sourceRecordReferences(evidence, item.source_record_id)
+            const attached = item.attached_to_revision ?? revision.source_record_ids.includes(item.source_record_id)
+            return attached ? <Tooltip title={references.length > 0 ? `请先把这些证据改用其他来源：${references.join('、')}` : '只解除当前修订关联，历史来源记录不会删除'}><span><Button size="small" danger disabled={references.length > 0 || saving} onClick={() => detach(item)}>从当前修订移除</Button></span></Tooltip> : <Tag>仅历史追溯</Tag>
+          } }] : []),
+        ]}
+        locale={{ emptyText: '当前修订版本尚未关联来源记录' }}
+      />
+    </Space>
+    <Modal title="新增来源记录" open={open} onOk={() => void save()} onCancel={() => setOpen(false)} confirmLoading={saving} okText="确认新增" cancelText="取消" forceRender>
+      <Form form={form} layout="vertical">
+        <Form.Item name="source_id" label={<FieldLabel label="来源渠道" hint="这里只能选择已通过系统治理审核、且允许支持地点事实的渠道。" />} rules={[{ required: true, message: '请选择来源渠道' }]}>
+          <Select showSearch optionFilterProp="label" options={sourceChannels.map((channel) => ({ value: channel.source_id, label: `${channel.display_name}（${sourceDecisionLabel(channel.decision)}）` }))} onChange={(value) => {
+            const channel = sourceChannels.find((item) => item.source_id === value)
+            form.setFieldValue('collection_mode', channel?.collection_modes[0])
+          }} />
+        </Form.Item>
+        {selectedChannel && <Alert type={selectedChannel.decision === 'approved' ? 'success' : 'warning'} showIcon title={`${selectedChannel.display_name}：${sourceDecisionLabel(selectedChannel.decision)}`} description={<Space orientation="vertical" size={2}>{selectedChannel.base_urls.map((url) => <Typography.Text key={url} type="secondary">允许地址：{url}</Typography.Text>)}{selectedChannel.conditions.slice(0, 2).map((condition) => <Typography.Text key={condition} type="secondary">• {condition}</Typography.Text>)}</Space>} style={{ marginBottom: 16 }} />}
+        <Form.Item name="source_url" label={<FieldLabel label="具体来源地址" hint="填写能直接看到该地点事实的 HTTPS 页面或已审核 API 文档地址；不能填写带 Key、token 或签名参数的请求地址。" />} rules={[{ required: true, message: '请输入具体来源地址' }, { type: 'url', message: '请输入完整网址' }, { pattern: /^https:\/\//i, message: '来源地址必须使用 HTTPS' }]}><Input placeholder="https://官方域名/具体页面" /></Form.Item>
+        <Form.Item name="observed_at" label={<FieldLabel label="观察时间" hint="填写你实际查看页面或获得接口结果的时间，不是页面文章的发布时间。" />} rules={[{ required: true, message: '请选择观察时间' }]}><Input type="datetime-local" /></Form.Item>
+        <Form.Item name="collection_mode" label={<FieldLabel label="采集方式" hint="人工在浏览器中核对页面选“人工查阅”；程序读取公开网页选“公开页面采集”；接口返回选“接口采集”。" />} rules={[{ required: true, message: '请选择采集方式' }]}><Select options={(selectedChannel?.collection_modes ?? []).map((value) => ({ value, label: collectionModeLabel(value) }))} /></Form.Item>
+        <Collapse ghost items={[{ key: 'advanced', label: '高级追溯信息（通常无需填写）', children: <><Form.Item name="content_sha256" label={<FieldLabel label="内容哈希" hint="仅在系统或采集工具已生成 64 位 SHA-256 时填写；人工审核员通常留空。" />} rules={[{ pattern: /^[0-9a-fA-F]{64}$/, message: '内容哈希必须是 64 位十六进制字符' }]}><Input placeholder="可留空" /></Form.Item><Form.Item name="reason_text" label="补充说明"><Input.TextArea rows={3} maxLength={500} placeholder="可填写该来源支持了哪些事实，避免复制网页全文" showCount /></Form.Item></> }]} />
+      </Form>
+    </Modal>
+  </Card>
+}
+
 function EvidenceCard({
   api,
   evidence,
   loading,
   error,
   revision,
+  sourceChannels,
   canEdit,
   canReview,
   onSuccess,
@@ -742,6 +911,7 @@ function EvidenceCard({
   loading: boolean
   error: string | null
   revision: PlaceRevision
+  sourceChannels: SourceChannel[]
   canEdit: boolean
   canReview: boolean
   onSuccess: (text: string) => void
@@ -809,7 +979,7 @@ function EvidenceCard({
   const projection = evidence.projection
   const sourceOptions = evidence.sources.map((source) => ({
     value: source.source_record_id,
-    label: `${source.source_id} · ${source.source_record_id}`,
+    label: sourceRecordBusinessLabel(source, sourceChannels),
   }))
   return (
     <Card title="地图、几何与访问点（O04）">
@@ -820,7 +990,7 @@ function EvidenceCard({
             {evidence.sources.length > 0
               ? evidence.sources.map((source) => (
                   <Tag key={source.source_record_id}>
-                    {source.source_id} · {sourceDecisionLabel(source.source_decision)}
+                    {sourceRecordBusinessLabel(source, sourceChannels)} · {sourceDecisionLabel(source.source_decision)}
                     {source.source_url_redacted ? ' · URL 已脱敏' : ''}
                   </Tag>
                 ))
@@ -884,8 +1054,8 @@ function EvidenceCard({
               width: 240,
               render: (_: unknown, item) => (
                 <Space size={4}>
-                  <Typography.Text ellipsis={{ tooltip: item.source_record_id }}>
-                    {item.source_record_id}
+                  <Typography.Text ellipsis={{ tooltip: `内部记录：${item.source_record_id}` }}>
+                    {sourceLabelById(evidence, item.source_record_id, sourceChannels)}
                   </Typography.Text>
                   <Tag color={item.source_record_valid ? 'success' : 'error'}>
                     {item.source_record_valid ? '有效' : '无效'}
@@ -948,8 +1118,8 @@ function EvidenceCard({
               width: 240,
               render: (_: unknown, item) => (
                 <Space size={4}>
-                  <Typography.Text ellipsis={{ tooltip: item.source_record_id }}>
-                    {item.source_record_id}
+                  <Typography.Text ellipsis={{ tooltip: `内部记录：${item.source_record_id}` }}>
+                    {sourceLabelById(evidence, item.source_record_id, sourceChannels)}
                   </Typography.Text>
                   <Tag color={item.source_record_valid ? 'success' : 'error'}>
                     {item.source_record_valid ? '有效' : '无效'}
@@ -1022,10 +1192,11 @@ function EvidenceCard({
   )
 }
 
-function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onSuccess, onError }: {
+function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit, onChanged, onSuccess, onError }: {
   api: ReturnType<typeof useAdminSession>['api']
   evidence: PlaceRevisionEvidence | null
   revision: PlaceRevision
+  sourceChannels: SourceChannel[]
   canEdit: boolean
   onChanged: () => Promise<void>
   onSuccess: (text: string) => void
@@ -1076,7 +1247,7 @@ function RelationEvidenceCard({ api, evidence, revision, canEdit, onChanged, onS
       { title: '目标地点', render: (_: unknown, item: PlaceRelationEvidence) => `${item.from_place_id} → ${item.to_place_id}` },
       { title: '审核', dataIndex: 'review_status', render: reviewStatusLabel },
       { title: '裁决', dataIndex: 'resolution_status', render: relationResolutionLabel },
-      { title: '来源', dataIndex: 'source_record_id' },
+      { title: '来源', dataIndex: 'source_record_id', render: (value: string) => sourceLabelById(evidence, value, sourceChannels) },
       ...(canEdit ? [{ title: '操作', key: 'actions', width: 110, render: (_: unknown, item: PlaceRelationEvidence) => <Button size="small" onClick={() => { setEditing(item); setStatus(item.resolution_status); setNote(item.decision_note ?? '') }}>裁决</Button> }] : []),
     ]} />
     <Modal title="关系裁决" open={editing !== null} onOk={() => void save()} onCancel={() => setEditing(null)} confirmLoading={working}>
@@ -1095,6 +1266,7 @@ function TimeEvidenceCard({
   loading,
   error,
   revision,
+  sourceChannels,
   canEdit,
   canReview,
   onSuccess,
@@ -1106,6 +1278,7 @@ function TimeEvidenceCard({
   loading: boolean
   error: string | null
   revision: PlaceRevision
+  sourceChannels: SourceChannel[]
   canEdit: boolean
   canReview: boolean
   onSuccess: (text: string) => void
@@ -1300,7 +1473,7 @@ function TimeEvidenceCard({
             { title: '最晚入园', dataIndex: 'last_entry_minute', width: 120, render: minuteLabel },
             { title: '有效期', key: 'validity', width: 220, render: (_: unknown, item) => `${item.valid_from ?? '不限'} – ${item.valid_to ?? '不限'}` },
             { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
-            { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}><Typography.Text>{item.source_record_id}</Typography.Text><Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+            { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}><Typography.Text>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}</Typography.Text><Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
             ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceTimeRuleEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('time_rule', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('time_rule', item.time_rule_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('time_rule', item.time_rule_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('time_rule', item.time_rule_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: evidence.revision.is_always_open ? '全天开放，无需周时间窗' : '尚未采集周规则或固定场次' }}
@@ -1314,7 +1487,7 @@ function TimeEvidenceCard({
           columns={[
             { title: '闭馆星期', dataIndex: 'weekday', render: weekdayLabel },
             { title: '状态', dataIndex: 'review_status', render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
-            { title: '来源', key: 'source', render: (_: unknown, item) => <Space size={4}>{item.source_record_id}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+            { title: '来源', key: 'source', render: (_: unknown, item) => <Space size={4}>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
             ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceClosureEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('closure', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('closure', item.closure_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('closure', item.closure_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('closure', item.closure_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '没有固定闭馆日记录' }}
@@ -1332,7 +1505,7 @@ function TimeEvidenceCard({
             { title: '覆盖时间', key: 'window', width: 190, render: (_: unknown, item) => item.exception_kind === 'closed' ? '全天关闭' : `${minuteLabel(item.start_minute)} – ${minuteLabel(item.end_minute)}` },
             { title: '最晚入园', dataIndex: 'last_entry_minute', width: 120, render: minuteLabel },
             { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
-            { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}>{item.source_record_id}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
+            { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
             ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceDateExceptionEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('date_exception', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('date_exception', item.date_exception_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('date_exception', item.date_exception_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('date_exception', item.date_exception_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '没有日期例外记录' }}
@@ -1346,17 +1519,17 @@ function TimeEvidenceCard({
             <MinuteFields />
             <Form.Item name="valid_from" label="有效期开始"><Input placeholder="YYYY-MM-DD" /></Form.Item>
             <Form.Item name="valid_to" label="有效期结束"><Input placeholder="YYYY-MM-DD" /></Form.Item>
-            <SourceRecordField sources={evidence.sources} />
+            <SourceRecordField sources={evidence.sources} sourceChannels={sourceChannels} />
           </>}
           {modal === 'closure' && <>
             <Form.Item name="weekday" label="闭馆星期" rules={[{ required: true }]}><Select options={weekdayOptions()} /></Form.Item>
-            <SourceRecordField sources={evidence.sources} />
+            <SourceRecordField sources={evidence.sources} sourceChannels={sourceChannels} />
           </>}
           {modal === 'date_exception' && <>
             <Form.Item name="service_date" label="例外日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
             <Form.Item name="exception_kind" label="例外类型" rules={[{ required: true }]}><Select options={[{ value: 'closed', label: '临时关闭' }, { value: 'open_override', label: '开放覆盖' }, { value: 'session_override', label: '场次覆盖' }]} /></Form.Item>
             <MinuteFields />
-            <SourceRecordField sources={evidence.sources} />
+            <SourceRecordField sources={evidence.sources} sourceChannels={sourceChannels} />
           </>}
         </Form>
       </Modal>
@@ -1380,9 +1553,9 @@ function MinuteFields() {
   </>
 }
 
-function SourceRecordField({ sources = [] }: { sources?: PlaceRevisionEvidence['sources'] }) {
+function SourceRecordField({ sources = [], sourceChannels }: { sources?: PlaceRevisionEvidence['sources']; sourceChannels: SourceChannel[] }) {
   return <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="只能选择当前地点的有效来源记录；来源 URL、观察时间和采集方式请在来源证据区域核对。" />} rules={[{ required: true }]}>
-    <Select showSearch optionFilterProp="label" options={sources.map((source) => ({ value: source.source_record_id, label: `${source.source_id} · ${source.source_record_id}` }))} placeholder="选择当前地点的有效来源" />
+    <Select showSearch optionFilterProp="label" options={sources.map((source) => ({ value: source.source_record_id, label: sourceRecordBusinessLabel(source, sourceChannels) }))} placeholder="选择当前地点的有效来源" />
   </Form.Item>
 }
 
@@ -1530,6 +1703,33 @@ function formatDateTime(value: string): string {
     timeStyle: 'medium',
     hour12: false,
   }).format(new Date(value))
+}
+
+function localDateTimeValue(value: Date): string {
+  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function sourceRecordBusinessLabel(source: PlaceEvidenceSource, sourceChannels: SourceChannel[]): string {
+  const channel = sourceChannels.find((item) => item.source_id === source.source_id)
+  return `${channel?.display_name ?? '已登记来源'} · ${new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(new Date(source.observed_at))}`
+}
+
+function sourceLabelById(evidence: PlaceRevisionEvidence | null, sourceRecordId: string, sourceChannels: SourceChannel[]): string {
+  const source = evidence?.sources.find((item) => item.source_record_id === sourceRecordId)
+  return source ? sourceRecordBusinessLabel(source, sourceChannels) : '来源记录不可用'
+}
+
+function sourceRecordReferences(evidence: PlaceRevisionEvidence | null, sourceRecordId: string): string[] {
+  if (!evidence) return []
+  const references: string[] = []
+  if (evidence.geometries.some((item) => item.active && item.source_record_id === sourceRecordId)) references.push('地点几何')
+  if (evidence.access_points.some((item) => item.active && item.source_record_id === sourceRecordId)) references.push('访问点')
+  if (evidence.time_rules.some((item) => item.active && item.source_record_id === sourceRecordId)) references.push('开放时间')
+  if (evidence.closures.some((item) => item.active && item.source_record_id === sourceRecordId)) references.push('固定闭馆日')
+  if (evidence.date_exceptions.some((item) => item.active && item.source_record_id === sourceRecordId)) references.push('日期例外')
+  if ((evidence.relations ?? []).some((item) => item.active && item.source_record_id === sourceRecordId)) references.push('地点关系')
+  return references
 }
 
 function isFormValidationError(value: unknown): boolean {

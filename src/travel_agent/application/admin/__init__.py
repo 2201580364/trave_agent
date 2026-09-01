@@ -14,8 +14,11 @@ from .errors import (
     ReviewRevisionNotCandidateError,
     ReviewTaskConflictError,
     ReviewTaskNotFoundError,
+    SourceRecordInUseError,
+    SourceRecordValidationError,
 )
 from .review import PlaceReviewWorkflowService
+from .sources import GovernedSourceCatalog, GovernedSourceChannel
 from .service import AdminIdentityService, AdminSession
 
 __all__ = [
@@ -34,5 +37,9 @@ __all__ = [
     "ReviewRevisionNotCandidateError",
     "ReviewTaskConflictError",
     "ReviewTaskNotFoundError",
+    "SourceRecordInUseError",
+    "SourceRecordValidationError",
+    "GovernedSourceCatalog",
+    "GovernedSourceChannel",
     "AdminSession",
 ]

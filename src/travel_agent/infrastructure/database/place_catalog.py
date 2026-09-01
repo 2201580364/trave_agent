@@ -393,6 +393,78 @@ class SqlAlchemyPlaceCatalogRepository:
             "place source record already exists",
         )
 
+    def create_source_record(
+        self,
+        record: PlaceSourceRecord,
+        *,
+        revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        revision_row = self._session.get(PlaceRevisionRow, revision_id)
+        if revision_row is None or revision_row.place_id != record.place_id:
+            raise ValueError("place revision not found")
+        self._bump_revision(revision_id, expected_revision_version)
+        self.add_source_record(record)
+        revision_row.source_record_ids = [
+            *revision_row.source_record_ids,
+            record.source_record_id,
+        ]
+        self._session.flush()
+        return self._require_revision(revision_id)
+
+    def detach_source_record(
+        self,
+        source_record_id: str,
+        *,
+        revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        revision_row = self._session.get(PlaceRevisionRow, revision_id)
+        if revision_row is None or source_record_id not in revision_row.source_record_ids:
+            raise ValueError("source record is not attached to revision")
+        if self.source_record_references(source_record_id, revision_id=revision_id):
+            raise ValueError("source record is still in use")
+        self._bump_revision(revision_id, expected_revision_version)
+        revision_row.source_record_ids = [
+            item for item in revision_row.source_record_ids if item != source_record_id
+        ]
+        self._session.flush()
+        return self._require_revision(revision_id)
+
+    def source_record_references(
+        self, source_record_id: str, *, revision_id: str
+    ) -> tuple[str, ...]:
+        revision_row = self._session.get(PlaceRevisionRow, revision_id)
+        if revision_row is None:
+            raise ValueError("place revision not found")
+        checks = (
+            ("地点几何", PlaceGeometryRow, PlaceGeometryRow.place_revision_id == revision_id),
+            ("访问点", PlaceAccessPointRow, PlaceAccessPointRow.place_revision_id == revision_id),
+            ("开放时间", PlaceTimeRuleRow, PlaceTimeRuleRow.place_revision_id == revision_id),
+            ("固定闭馆日", PlaceClosureRow, PlaceClosureRow.place_revision_id == revision_id),
+            ("日期例外", PlaceDateExceptionRow, PlaceDateExceptionRow.place_revision_id == revision_id),
+            (
+                "地点关系",
+                PlaceRelationRow,
+                or_(
+                    PlaceRelationRow.from_place_id == revision_row.place_id,
+                    PlaceRelationRow.to_place_id == revision_row.place_id,
+                ),
+            ),
+        )
+        references: list[str] = []
+        for label, table, scope in checks:
+            found = self._session.scalar(
+                select(table).where(
+                    scope,
+                    table.source_record_id == source_record_id,
+                    table.active.is_(True),
+                ).limit(1)
+            )
+            if found is not None:
+                references.append(label)
+        return tuple(references)
+
     def add_revision(self, revision: PlaceRevision) -> None:
         if revision.lifecycle_status == "published":
             raise ValueError("published revisions must use the publication gate")

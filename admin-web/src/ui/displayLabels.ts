@@ -136,6 +136,58 @@ const categoryLabels: Record<string, string> = {
   performing_arts: '演出演艺',
 }
 
+const auditActionLabels: Record<string, string> = {
+  ADMIN_ACTOR_BOOTSTRAPPED: '初始化首个管理员',
+  ADMIN_ACTOR_CREATE: '创建管理员账号',
+  ADMIN_ACTOR_ROLES_CHANGE: '修改管理员角色',
+  ADMIN_SESSION_CREATE: '管理员登录',
+  ADMIN_SESSION_REVOKE: '管理员退出登录',
+  PLACE_ACCESS_POINT_CREATED: '新增地点访问点',
+  PLACE_ACCESS_POINT_UPDATED: '修改地点访问点',
+  PLACE_ACCESS_POINT_RETIRED: '停用地点访问点',
+  PLACE_CLOSURE_CREATED: '新增固定闭馆日',
+  PLACE_CLOSURE_UPDATED: '修改固定闭馆日',
+  PLACE_CLOSURE_RETIRED: '停用固定闭馆日',
+  PLACE_DATE_EXCEPTION_CREATED: '新增日期例外',
+  PLACE_DATE_EXCEPTION_UPDATED: '修改日期例外',
+  PLACE_DATE_EXCEPTION_RETIRED: '停用日期例外',
+  PLACE_EVIDENCE_REVIEWED: '审核地点证据',
+  PLACE_GEOMETRY_CREATED: '新增地点几何',
+  PLACE_GEOMETRY_UPDATED: '修改地点几何',
+  PLACE_GEOMETRY_RETIRED: '停用地点几何',
+  PLACE_RELATION_RESOLUTION_UPDATED: '更新地点关系裁决',
+  PLACE_RELATION_REVIEW_CONFIRMED_NONE: '确认地点无关系',
+  PLACE_REVIEW_SUBMITTED: '提交地点审核',
+  PLACE_REVIEW_DECIDED: '作出地点审核决定',
+  PLACE_REVISION_CREATED: '新建地点修订版本',
+  PLACE_REVISION_UPDATED: '修改地点修订版本',
+  PLACE_REVISION_PUBLISHED: '发布地点修订版本',
+  PLACE_SOURCE_CONFLICTS_RESOLVED: '确认来源冲突处理结果',
+  PLACE_SOURCE_RECORD_CREATED: '新增地点来源记录',
+  PLACE_SOURCE_RECORD_DETACHED: '从当前修订移除来源记录',
+  PLACE_TIME_RULE_CREATED: '新增开放时间规则',
+  PLACE_TIME_RULE_UPDATED: '修改开放时间规则',
+  PLACE_TIME_RULE_RETIRED: '停用开放时间规则',
+  SOLVER_PROJECTION_PREPARED: '准备求解投影',
+  PUBLICATION_BATCH_PREVIEWED: '预览发布批次',
+  PUBLICATION_BATCH_EXECUTED: '执行发布批次',
+}
+
+const adminRoleLabels: Record<string, string> = {
+  data_editor: '数据编辑员',
+  data_reviewer: '数据审核员',
+  data_publisher: '数据发布员',
+  research_viewer: '研究查看员',
+  content_moderator: '内容审核员',
+  admin_security: '安全管理员',
+  authenticated_admin: '已登录管理员',
+}
+
+export const auditActionOptions = Object.entries(auditActionLabels).map(([value, label]) => ({
+  value,
+  label,
+}))
+
 function label(value: string | null | undefined, fallback = '未识别') {
   if (!value) return fallback
   return labels[value] ?? fallback
@@ -151,6 +203,12 @@ export function geometryKindLabel(value: string | null | undefined) { return lab
 export function accessPointKindLabel(value: string | null | undefined) { return label(value) }
 export function reviewStatusLabel(value: string | null | undefined) { return label(value) }
 export function sourceDecisionLabel(value: string | null | undefined) { return label(value) }
+export function collectionModeLabel(value: string | null | undefined) {
+  return ({ api: '接口采集', dataset_download: '数据集下载', manual_reference: '人工查阅', public_page_fetch: '公开页面采集' } as Record<string, string>)[value ?? ''] ?? '其他采集方式'
+}
+export function sourceKindLabel(value: string | null | undefined) {
+  return ({ government_public_site: '政府公开网站', official_operator_site: '官方运营方网站', open_data_portal: '开放数据平台', licensed_api: '已授权接口' } as Record<string, string>)[value ?? ''] ?? '其他来源渠道'
+}
 export function relationTypeLabel(value: string | null | undefined) { return label(value) }
 export function relationResolutionLabel(value: string | null | undefined) { return label(value) }
 
@@ -178,8 +236,11 @@ export function auditTargetTypeLabel(value: string | null | undefined) {
     place_closure: '地点闭馆规则',
     place_date_exception: '地点日期例外',
     place_relation: '地点关系',
+    place_source_record: '地点来源记录',
     review_task: '审核任务',
     admin_actor: '管理员账号',
+    admin_session: '管理员会话',
+    solver_projection: '求解投影',
     publication_batch: '发布批次',
     research_snapshot: '研究快照',
   }
@@ -189,4 +250,12 @@ export function auditTargetTypeLabel(value: string | null | undefined) {
 export function reasonCodeLabel(value: string | null | undefined) {
   if (!value) return '无'
   return reasonLabels[value] ?? '其他原因'
+}
+
+export function auditActionLabel(value: string | null | undefined) {
+  return auditActionLabels[value ?? ''] ?? '其他管理操作'
+}
+
+export function adminRoleLabel(value: string | null | undefined) {
+  return adminRoleLabels[value ?? ''] ?? '其他管理员角色'
 }

@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
     getReviewTask: vi.fn(),
     listSourceConflicts: vi.fn(),
     checkPlaceRevisionPublication: vi.fn(),
+    listSourceChannels: vi.fn(),
+    createSourceRecord: vi.fn(),
+    detachSourceRecord: vi.fn(),
   },
   permissions: new Set<string>(),
   navigate: vi.fn(),
@@ -137,6 +140,15 @@ describe('RevisionDetailsPage', () => {
     vi.clearAllMocks()
     mocks.api.listSourceConflicts.mockResolvedValue({ revision_id: 'revision-1', items: [] })
     mocks.api.checkPlaceRevisionPublication.mockResolvedValue({ revision_id: 'revision-1', publishable: true, reason_codes: [] })
+    mocks.api.listSourceChannels.mockResolvedValue({ items: [{
+      source_id: 'official-site',
+      display_name: '西湖景区官方网站',
+      source_kind: 'official_operator_site',
+      decision: 'conditional',
+      collection_modes: ['manual_reference'],
+      base_urls: ['https://example.test/'],
+      conditions: ['具体页面逐项登记'],
+    }] })
     mocks.permissions.clear()
     mocks.location.search = ''
     vi.stubGlobal('ResizeObserver', class {
@@ -274,4 +286,43 @@ describe('RevisionDetailsPage', () => {
     expect(screen.getByText(/无论当前是否已有普通开放时间/)).toBeTruthy()
     expect(screen.queryByText(/当前已有开放时间记录/)).toBeNull()
   })
+
+  it('presents source records with business labels and protects referenced records', async () => {
+    mocks.permissions.add('place:candidate:write')
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({
+      ...timeEvidence,
+      geometries: [{
+        geometry_id: 'geometry-1', geometry_kind: 'point', geometry: { type: 'Point', coordinates: [120.1, 30.2] },
+        source_record_id: 'source-1', source_record_valid: true, review_status: 'candidate', active: true,
+        created_at: '2026-08-30T00:00:00Z', reviewed_at: null,
+      }],
+    })
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getAllByText('来源证据').length).toBeGreaterThan(0))
+    expect(screen.getAllByText(/西湖景区官方网站/).length).toBeGreaterThan(0)
+    expect(screen.getByText('官方运营方网站')).toBeTruthy()
+    const removeButtons = screen.getAllByText('从当前修订移除').map((item) => item.closest('button')).filter(Boolean)
+    expect(removeButtons.length).toBeGreaterThan(0)
+    expect(removeButtons.every((button) => button?.hasAttribute('disabled'))).toBe(true)
+    expect(screen.queryByText('official-site · source-1')).toBeNull()
+  })
+
+  it('keeps source maintenance read-only in reviewer context', async () => {
+    mocks.permissions.add('place:candidate:write')
+    mocks.permissions.add('place:review:decide')
+    mocks.location.search = '?from=review&task=task-1'
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce(timeEvidence)
+    mocks.api.getReviewTask.mockResolvedValueOnce(openReviewTask)
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getAllByText('来源证据').length).toBeGreaterThan(0))
+    const buttonTexts = [...document.querySelectorAll('button')].map((button) => button.textContent?.trim())
+    expect(buttonTexts).not.toContain('新增来源记录')
+    expect(buttonTexts).not.toContain('从当前修订移除')
+  }, 10_000)
 })

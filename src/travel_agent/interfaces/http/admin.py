@@ -146,6 +146,31 @@ class PrepareProjectionInput(BaseModel):
     reason_text: str | None = Field(default=None, max_length=500)
 
 
+class CreatePlaceSourceRecordInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    source_id: str = Field(min_length=1, max_length=80)
+    source_url: str = Field(min_length=8, max_length=2048)
+    collection_mode: str = Field(
+        pattern="^(api|dataset_download|manual_reference|public_page_fetch)$"
+    )
+    observed_at: datetime
+    content_sha256: str | None = Field(default=None, pattern="^[0-9a-fA-F]{64}$")
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
+class DetachPlaceSourceRecordInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_version: int = Field(gt=0)
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
+
 class PlaceGeometryInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -385,6 +410,7 @@ def build_admin_router(
     def list_audit_events(
         current: AdminPrincipal = principal_dependency,
         actor_id: str | None = Query(default=None, max_length=64),
+        actor_login_name: str | None = Query(default=None, max_length=64),
         target_type: str | None = Query(default=None, max_length=64),
         target_id: str | None = Query(default=None, max_length=128),
         action: str | None = Query(default=None, max_length=80),
@@ -396,6 +422,7 @@ def build_admin_router(
         events = service.list_audit_events(
             current,
             actor_id=actor_id,
+            actor_login_name=actor_login_name,
             target_type=target_type,
             target_id=target_id,
             action=action,
@@ -404,13 +431,24 @@ def build_admin_router(
             limit=limit,
             offset=offset,
         )
+        actor_login_names = service.audit_actor_login_names(
+            current,
+            actor_ids=tuple(event.actor_id for event in events),
+        )
         return {
-            "items": [_audit_response(event) for event in events],
+            "items": [
+                _audit_response(
+                    event,
+                    actor_login_name=actor_login_names.get(event.actor_id),
+                )
+                for event in events
+            ],
             "limit": limit,
             "offset": offset,
             "total": service.count_audit_events(
                 current,
                 actor_id=actor_id,
+                actor_login_name=actor_login_name,
                 target_type=target_type,
                 target_id=target_id,
                 action=action,
@@ -420,6 +458,25 @@ def build_admin_router(
         }
 
     if review_workflow is not None:
+
+        @router.get("/source-channels")
+        def list_place_source_channels(
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            return {
+                "items": [
+                    {
+                        "source_id": channel.source_id,
+                        "display_name": channel.display_name,
+                        "source_kind": channel.source_kind,
+                        "decision": channel.decision,
+                        "collection_modes": list(channel.collection_modes),
+                        "base_urls": list(channel.base_urls),
+                        "conditions": list(channel.conditions),
+                    }
+                    for channel in review_workflow.list_source_channels(current)
+                ]
+            }
 
         @router.post("/places/{place_id}/revisions", status_code=status.HTTP_201_CREATED)
         def create_place_revision(
@@ -490,6 +547,54 @@ def build_admin_router(
                 current, revision_id=revision_id
             )
             return _revision_evidence_response(evidence)
+
+        @router.post(
+            "/place-revisions/{revision_id}/source-records",
+            status_code=status.HTTP_201_CREATED,
+        )
+        def create_place_source_record(
+            revision_id: str,
+            payload: CreatePlaceSourceRecordInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.create_source_record(
+                current,
+                revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                source_id=payload.source_id,
+                source_url=payload.source_url,
+                collection_mode=payload.collection_mode,
+                observed_at=payload.observed_at,
+                content_sha256=payload.content_sha256,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.delete(
+            "/place-revisions/{revision_id}/source-records/{source_record_id}"
+        )
+        def detach_place_source_record(
+            revision_id: str,
+            source_record_id: str,
+            payload: DetachPlaceSourceRecordInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.detach_source_record(
+                current,
+                revision_id=revision_id,
+                source_record_id=source_record_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
 
         @router.get("/place-revisions/{revision_id}/source-conflicts")
         def list_place_source_conflicts(
@@ -1248,10 +1353,15 @@ def _actor_response(actor: AdminActor) -> dict[str, object]:
     }
 
 
-def _audit_response(event: AdminAuditEvent) -> dict[str, object]:
+def _audit_response(
+    event: AdminAuditEvent,
+    *,
+    actor_login_name: str | None = None,
+) -> dict[str, object]:
     return {
         "audit_event_id": event.audit_event_id,
         "actor_id": event.actor_id,
+        "actor_login_name": actor_login_name,
         "actor_role": event.actor_role,
         "action": event.action,
         "target_type": event.target_type,
@@ -1352,6 +1462,10 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
                 "source_decision": source.source_decision,
                 "observed_at": source.observed_at.isoformat(),
                 "status": source.status,
+                "content_sha256": source.content_sha256,
+                "attached_to_revision": (
+                    source.source_record_id in evidence.revision.source_record_ids
+                ),
             }
             for source in evidence.source_records
         ],

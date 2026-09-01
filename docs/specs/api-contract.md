@@ -1144,6 +1144,9 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `POST /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | approve、request_changes 或 cancel；写 ReviewDecision 并使用 expected version |
 | `GET /api/v1/admin/review-tasks/{task_id}/decisions` | data_reviewer | 查询追加式决定历史 |
 | `GET /api/v1/admin/place-revisions/{revision_id}/evidence` | editor/reviewer/publisher/viewer | 查询 Revision 绑定的几何、访问点、时间规则、闭馆日、日期例外、来源摘要和 Projection 端点；只读，不跨 Revision 推断 |
+| `GET /api/v1/admin/source-channels` | editor/reviewer/publisher/viewer | 查询已通过治理审核、且允许支持地点事实的来源渠道；不返回 Registry/字典哈希等内部字段 |
+| `POST /api/v1/admin/place-revisions/{revision_id}/source-records` | data_editor | 为 candidate Revision 新增不可变来源记录并自动关联当前 Revision |
+| `DELETE /api/v1/admin/place-revisions/{revision_id}/source-records/{source_record_id}` | data_editor | 仅解除来源与当前 Revision 的关联，不删除全局历史记录；仍被 active 子证据引用时拒绝 |
 | `GET /api/v1/admin/place-revisions/{revision_id}/publication-checks` | data_publisher | 只读运行完整发布门并返回稳定拒绝码 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/projection-preparations` | data_publisher | 从 human_verified Revision 生成 candidate Projection；记录门禁结果但不发布。`solver_node_id` 可省略，由服务端按 `data_snapshot_version` 分配快照内唯一节点号 |
 | `POST /api/v1/admin/place-revisions/{revision_id}/publications` | data_publisher | 通过 publication intent 调用发布用例 |
@@ -1155,6 +1158,18 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/audit-events` | admin_security/受权只读角色 | 只读查询结构化管理审计 |
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
+
+`GET /api/v1/admin/audit-events` 支持 `actor_id`、`actor_login_name`、`target_type`、
+`target_id`、`action`、`result`、`keyword`、`limit` 和 `offset`。其中
+`actor_login_name` 面向管理端业务查询，按管理员登录账号模糊匹配；`keyword` 同时覆盖登录账号、
+内部操作者编号、动作码、目标、理由、请求编号和错误码。所有条件必须在数据库分页前应用，
+响应 `total` 是筛选后的准确总数。原有 `actor_id` 和稳定英文 `action` 参数继续兼容自动化或
+技术追溯调用。
+
+每个审计事件响应除稳定 `actor_id`、`actor_role` 和 `action` 外，新增
+`actor_login_name`；账号仍存在时返回其登录名，无法关联时返回 `null`。管理端主列表必须优先
+展示登录账号和中文动作说明，不直接展示内部编号或动作码；内部编号、动作码和摘要只放在展开的
+只读追溯区。动作中文化属于客户端展示映射，不得改写数据库中的稳定审计动作码。
 
 当前已实现端点包括管理身份/RBAC/审计、candidates、place-revisions、Revision evidence、review-tasks/decisions、O04/O05/O06/O07 证据与裁决、批量审核、publication check、candidate Projection 准备、Projection 发布入口以及 O09 publication batch preview/execute 和 research snapshot 列表/详情；真实 candidate 审核数据下的 UI 勾选成功路径仍待回归。
 
@@ -1176,6 +1191,50 @@ Place 的来源记录；几何、访问点、时间规则、闭馆日和日期�
 `source_record_valid` 逐行标识其来源是否为当前 Place 的 active 来源记录；错绑或缺失
 来源必须显示为 `false`，不能只依赖顶部汇总警告。时间分钟值允许 `0–2880`；大于等于
 1440 表示跨午夜后的次日时间，客户端必须明确显示“次日”，不能对 1440 取模后隐藏日期偏移。
+
+### Revision 来源记录维护
+
+来源渠道与来源记录分层治理：Source Registry 是系统级已审查渠道，只由来源治理流程维护；
+`PlaceSourceRecord` 是数据编辑员针对某个具体地点、具体页面和具体观察时间建立的不可变证据记录。
+普通地点编辑流程不得创建或修改 Source Registry，也不得直接填写 Registry ID、治理哈希、字段字典 ID、
+目标阶段、来源决策、来源记录 ID 或创建时间。
+
+`GET /api/v1/admin/source-channels` 只返回 `review_status=reviewed`、
+`decision=approved|conditional` 且至少允许一类 `place.*`、`access.*`、`time.*`、
+`experience.*`、`relation.*` 字段的渠道；只支持天气字段的渠道不得进入地点来源下拉。
+响应提供中文渠道名、渠道类型、允许采集方式、允许域名、条件和来源决策。
+
+新增来源记录请求固定包含：
+
+```json
+{
+  "expected_revision_version": 4,
+  "source_id": "hangzhou-westlake-admin-public-web",
+  "source_url": "https://westlake.hangzhou.gov.cn/.../具体页面.html",
+  "collection_mode": "manual_reference",
+  "observed_at": "2026-09-01T20:30:00+08:00",
+  "content_sha256": null,
+  "operation_intent_id": "uuid",
+  "reason_code": "PLACE_SOURCE_RECORD_ADDED",
+  "reason_text": "可选的非敏感说明"
+}
+```
+
+服务端必须校验：URL 使用 HTTPS、没有用户名/密码/fragment、没有 key/token/secret/password/signature
+等凭证查询参数、域名和路径属于选中渠道的 `base_urls`、采集方式属于该渠道允许集合。
+系统自动写入 `source_record_id`、Registry/字段字典 ID 和规范哈希、`target_stage=staging`、
+`source_decision`、`status=active` 与创建时间。conditional 渠道仍只能进入 staging。
+
+来源记录不可原地 PATCH。纠错流程固定为“新增替代来源 → 将几何/访问点/开放时间等子证据改用新来源
+→ 从当前 Revision 解除旧来源关联”。解除关联前必须检查当前 Revision 的 active Geometry、AccessPoint、
+TimeRule、Closure、DateException 和当前 Place 的 active Relation；仍有引用时返回
+`409 source_record_in_use`，`details.references` 给出中文引用类型。解除只修改 Revision 的
+`source_record_ids`，不删除或停用全局 `PlaceSourceRecord`，历史 Revision 和审计仍可追溯。
+
+新增和解除均只允许 candidate Revision，要求 `expected_revision_version` 和幂等
+`operation_intent_id`；成功后原子递增 Revision 版本，设置 `solver_eligible=false`、
+`conflicts_resolved=false`、`reviewed_at=null`，要求重新确认来源冲突和重新送审，并分别写入
+`PLACE_SOURCE_RECORD_CREATED`、`PLACE_SOURCE_RECORD_DETACHED` 审计。reviewer 上下文只读。
 
 O04 几何与访问点写入（仅 candidate Revision）使用以下 Revision-scoped 端点：
 
@@ -1294,9 +1353,11 @@ O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{
 | 409 | `review_revision_not_approvable` | Revision 当前状态不允许通过 |
 | 409 | `admin_operation_intent_conflict` | operation intent 已被其他审核载荷使用 |
 | 409 | `published_revision_immutable` | 试图原地修改 published Revision |
+| 409 | `source_record_in_use` | 来源仍被当前 Revision 的 active 子证据引用，必须先替换引用 |
 | 422 | `review_requirements_not_met` | 送审/通过所需依赖不完整 |
 | 409 | `publication_gate_rejected` | 发布依赖闭包失败；详情含稳定 reason codes |
 | 422 | `conditional_source_staging_only` | conditional 来源不能进入 published |
+| 422 | `source_record_validation_failed` | 来源渠道、URL、采集方式或治理边界校验失败 |
 | 422 | `overlap_resolution_required` | 地点重叠或互斥尚未裁决 |
 
 `publication_gate_rejected` 的 `details.reason_codes` 直接使用 PlaceCatalog 稳定拒绝码，不由前端将错误字符串猜成状态。

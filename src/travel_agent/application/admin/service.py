@@ -65,6 +65,8 @@ class AdminActorRepository(Protocol):
 
     def get_by_login(self, login_name: str) -> AdminActor | None: ...
 
+    def login_names_by_ids(self, actor_ids: tuple[str, ...]) -> dict[str, str]: ...
+
     def list(
         self,
         *,
@@ -115,6 +117,7 @@ class AdminAuditRepository(Protocol):
         self,
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -128,6 +131,7 @@ class AdminAuditRepository(Protocol):
         self,
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -619,6 +623,7 @@ class AdminIdentityService:
         principal: AdminPrincipal,
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -631,6 +636,7 @@ class AdminIdentityService:
         with self._uow_factory() as uow:
             return uow.audits.list(
                 actor_id=actor_id,
+                actor_login_name=_optional_query(actor_login_name),
                 target_type=target_type,
                 target_id=target_id,
                 action=action,
@@ -645,6 +651,7 @@ class AdminIdentityService:
         principal: AdminPrincipal,
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -655,12 +662,25 @@ class AdminIdentityService:
         with self._uow_factory() as uow:
             return uow.audits.count(
                 actor_id=actor_id,
+                actor_login_name=_optional_query(actor_login_name),
                 target_type=target_type,
                 target_id=target_id,
                 action=action,
                 result=result,
                 keyword=_optional_query(keyword),
             )
+
+    def audit_actor_login_names(
+        self,
+        principal: AdminPrincipal,
+        *,
+        actor_ids: tuple[str, ...],
+    ) -> dict[str, str]:
+        self.require_permission(principal, "admin:audit:read")
+        if not actor_ids:
+            return {}
+        with self._uow_factory() as uow:
+            return uow.actors.login_names_by_ids(actor_ids)
 
     @staticmethod
     def require_permission(principal: AdminPrincipal, permission: str) -> None:

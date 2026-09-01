@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
-from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
+from travel_agent.application.admin import (
+    AdminIdentityService,
+    GovernedSourceCatalog,
+    PlaceReviewWorkflowService,
+)
 from travel_agent.application.planning import ExecuteGenerationHandler
 from travel_agent.application.planning.ports import DataSnapshotVersionProvider
 from travel_agent.infrastructure.database import (
@@ -81,7 +86,15 @@ def build_http_app(
         lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
     )
     review_workflow = PlaceReviewWorkflowService(
-        lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
+        lambda: SqlAlchemyAdminUnitOfWork(sessions),
+        clock,
+        ids,
+        GovernedSourceCatalog.from_files(
+            Path(__file__).resolve().parents[4]
+            / "data/governance/hangzhou-source-registry-v1.json",
+            Path(__file__).resolve().parents[4]
+            / "data/governance/place-collection-field-dictionary-v1.json",
+        ),
     )
     if (
         settings.admin_bootstrap_login is not None

@@ -28,6 +28,8 @@ import type {
   PublicationBatch,
   ResearchSnapshot,
   SourceConflictResponse,
+  SourceChannel,
+  CreatePlaceSourceRecordInput,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -135,6 +137,26 @@ export class AdminApi {
 
   getPlaceRevisionEvidence(revisionId: string): Promise<PlaceRevisionEvidence> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/evidence`)
+  }
+
+  listSourceChannels(): Promise<{ items: SourceChannel[] }> {
+    return this.request('/source-channels')
+  }
+
+  createSourceRecord(revisionId: string, input: CreatePlaceSourceRecordInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/source-records`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  detachSourceRecord(
+    revisionId: string,
+    sourceRecordId: string,
+    input: { expected_revision_version: number; operation_intent_id: string; reason_code: string; reason_text?: string },
+  ): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/source-records/${encodeURIComponent(sourceRecordId)}`, {
+      method: 'DELETE', body: JSON.stringify(input),
+    })
   }
 
   previewPlaceRevisionTime(revisionId: string, serviceDate: string): Promise<PlaceTimePreview> {

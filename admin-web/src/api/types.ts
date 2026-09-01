@@ -33,6 +33,7 @@ export type AdminAuditResult = 'succeeded' | 'rejected' | 'failed'
 export type AdminAuditEvent = {
   audit_event_id: string
   actor_id: string
+  actor_login_name: string | null
   actor_role: string
   action: string
   target_type: string
@@ -76,6 +77,7 @@ export type ReplaceAdminRolesInput = {
 export type AuditEventFilters = {
   keyword?: string
   actor_id?: string
+  actor_login_name?: string
   target_type?: string
   target_id?: string
   action?: string
@@ -402,6 +404,28 @@ export type RetirePlaceEvidenceInput = {
 }
 export type ReviewPlaceEvidenceInput = { review_status: 'human_verified' | 'rejected'; operation_intent_id: string; reason_code: string; reason_text?: string }
 
+export type SourceChannel = {
+  source_id: string
+  display_name: string
+  source_kind: string
+  decision: 'approved' | 'conditional'
+  collection_modes: string[]
+  base_urls: string[]
+  conditions: string[]
+}
+
+export type CreatePlaceSourceRecordInput = {
+  expected_revision_version: number
+  source_id: string
+  source_url: string
+  collection_mode: string
+  observed_at: string
+  content_sha256?: string
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
 export type PlaceEvidenceSource = {
   source_record_id: string
   source_id: string
@@ -412,6 +436,8 @@ export type PlaceEvidenceSource = {
   source_decision: string
   observed_at: string
   status: string
+  content_sha256?: string | null
+  attached_to_revision?: boolean
 }
 
 export type PlaceGeometryEvidence = {

@@ -143,6 +143,17 @@ class SqlAlchemyAdminActorRepository:
         )
         return self._from_row(row) if row is not None else None
 
+    def login_names_by_ids(self, actor_ids: tuple[str, ...]) -> dict[str, str]:
+        unique_ids = tuple(dict.fromkeys(actor_ids))
+        if not unique_ids:
+            return {}
+        rows = self._session.execute(
+            select(AdminActorRow.admin_actor_id, AdminActorRow.login_name).where(
+                AdminActorRow.admin_actor_id.in_(unique_ids)
+            )
+        )
+        return {actor_id: login_name for actor_id, login_name in rows}
+
     def list(
         self,
         *,
@@ -413,6 +424,7 @@ class SqlAlchemyAdminAuditRepository:
         self,
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -423,6 +435,7 @@ class SqlAlchemyAdminAuditRepository:
     ) -> tuple[AdminAuditEvent, ...]:
         statement = self._filtered_statement(
             actor_id=actor_id,
+            actor_login_name=actor_login_name,
             target_type=target_type,
             target_id=target_id,
             action=action,
@@ -443,6 +456,7 @@ class SqlAlchemyAdminAuditRepository:
         self,
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -451,6 +465,7 @@ class SqlAlchemyAdminAuditRepository:
     ) -> int:
         statement = self._filtered_statement(
             actor_id=actor_id,
+            actor_login_name=actor_login_name,
             target_type=target_type,
             target_id=target_id,
             action=action,
@@ -464,6 +479,7 @@ class SqlAlchemyAdminAuditRepository:
     def _filtered_statement(
         *,
         actor_id: str | None,
+        actor_login_name: str | None,
         target_type: str | None,
         target_id: str | None,
         action: str | None,
@@ -476,6 +492,11 @@ class SqlAlchemyAdminAuditRepository:
             if count
             else select(AdminAuditEventRow)
         )
+        if actor_login_name is not None or keyword is not None:
+            statement = statement.join(
+                AdminActorRow,
+                AdminActorRow.admin_actor_id == AdminAuditEventRow.actor_id,
+            )
         filters = (
             (AdminAuditEventRow.actor_id, actor_id),
             (AdminAuditEventRow.target_type, target_type),
@@ -486,6 +507,10 @@ class SqlAlchemyAdminAuditRepository:
         for column, value in filters:
             if value is not None:
                 statement = statement.where(column == value)
+        if actor_login_name is not None:
+            statement = statement.where(
+                AdminActorRow.login_name.ilike(f"%{actor_login_name}%")
+            )
         if keyword is not None:
             pattern = f"%{keyword}%"
             statement = statement.where(
@@ -499,6 +524,7 @@ class SqlAlchemyAdminAuditRepository:
                     AdminAuditEventRow.reason_text.ilike(pattern),
                     AdminAuditEventRow.request_id.ilike(pattern),
                     AdminAuditEventRow.error_code.ilike(pattern),
+                    AdminActorRow.login_name.ilike(pattern),
                 )
             )
         return statement

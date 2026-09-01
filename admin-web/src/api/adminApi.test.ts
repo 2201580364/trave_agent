@@ -249,4 +249,39 @@ describe('AdminApi', () => {
       resolved: true,
     })
   })
+
+  it('creates and detaches immutable source records through revision-scoped endpoints', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ place_revision_id: 'revision-1' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ place_revision_id: 'revision-1' }), { status: 200 }))
+    const api = new AdminApi(() => 'editor-token', vi.fn())
+
+    await api.listSourceChannels()
+    await api.createSourceRecord('revision-1', {
+      expected_revision_version: 4,
+      source_id: 'hangzhou-westlake-admin-public-web',
+      source_url: 'https://westlake.hangzhou.gov.cn/art/example.html',
+      collection_mode: 'manual_reference',
+      observed_at: '2026-09-01T08:00:00+08:00',
+      operation_intent_id: 'source-create-1',
+      reason_code: 'PLACE_SOURCE_RECORD_ADDED',
+    })
+    await api.detachSourceRecord('revision-1', 'source-1', {
+      expected_revision_version: 5,
+      operation_intent_id: 'source-detach-1',
+      reason_code: 'PLACE_SOURCE_RECORD_REMOVED',
+    })
+
+    expect(fetchMock.mock.calls[0][0]).toContain('/source-channels')
+    expect(fetchMock.mock.calls[1][0]).toContain('/place-revisions/revision-1/source-records')
+    expect(fetchMock.mock.calls[1][1]?.method).toBe('POST')
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({
+      expected_revision_version: 4,
+      source_id: 'hangzhou-westlake-admin-public-web',
+      collection_mode: 'manual_reference',
+    })
+    expect(fetchMock.mock.calls[2][0]).toContain('/place-revisions/revision-1/source-records/source-1')
+    expect(fetchMock.mock.calls[2][1]?.method).toBe('DELETE')
+  })
 })

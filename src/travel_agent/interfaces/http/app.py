@@ -890,6 +890,8 @@ def _status_for(exc: ApplicationError) -> int:
         "place_revision_version_conflict": status.HTTP_409_CONFLICT,
         "publication_gate_rejected": status.HTTP_409_CONFLICT,
         "projection_preparation_rejected": status.HTTP_409_CONFLICT,
+        "source_record_in_use": status.HTTP_409_CONFLICT,
+        "source_record_validation_failed": status.HTTP_422_UNPROCESSABLE_ENTITY,
     }.get(exc.code, status.HTTP_400_BAD_REQUEST)
 
 

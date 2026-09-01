@@ -84,6 +84,20 @@ class PlaceRevisionVersionConflictError(ApplicationError):
         )
 
 
+class SourceRecordInUseError(ApplicationError):
+    def __init__(self, references: tuple[str, ...]) -> None:
+        super().__init__(
+            "source_record_in_use",
+            "当前来源仍被地点证据引用，请先把这些证据改用其他来源。",
+            {"references": references},
+        )
+
+
+class SourceRecordValidationError(ApplicationError):
+    def __init__(self, message: str) -> None:
+        super().__init__("source_record_validation_failed", message)
+
+
 class PublicationGateRejectedError(ApplicationError):
     """A revision/projection failed the stable publication gate."""
 
