@@ -268,7 +268,7 @@ export function AdminActorsPage() {
         </Space>
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
-      <Card>
+      <Card className="filter-card">
         <Form<AdminActorFilters>
           form={queryForm}
           layout="inline"

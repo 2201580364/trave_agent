@@ -106,7 +106,7 @@ export function CandidatesPage() {
         </Space>
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
-      <Card>
+      <Card className="filter-card">
         <PlaceListFilters
           value={filters}
           loading={loading}

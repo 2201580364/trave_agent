@@ -4,11 +4,14 @@ import {
   CloudUploadOutlined,
   DatabaseOutlined,
   DashboardOutlined,
+  EnvironmentOutlined,
+  ExperimentOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
-import { Button, Layout, Menu, Space, Tag, Typography } from 'antd'
+import { Avatar, Button, Layout, Menu, Space, Tag, Typography } from 'antd'
 import { useMemo } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
@@ -41,32 +44,55 @@ export function AdminLayout() {
     ],
     [hasPermission],
   )
+  const selectedKey = location.pathname.startsWith('/candidates/')
+    ? '/candidates'
+    : location.pathname
+  const currentLabel = menuItems.find((item) => item.key === selectedKey)?.label ?? '管理控制台'
 
   return (
     <Layout className="admin-shell">
       <Sider breakpoint="lg" collapsedWidth="0" theme="dark" className="admin-sider">
         <div className="admin-brand">
-          <SafetyCertificateOutlined />
-          <span>旅行助手管理台</span>
+          <span className="admin-brand-mark"><SafetyCertificateOutlined /></span>
+          <span className="admin-brand-copy">
+            <strong>旅行助手</strong>
+            <small>数据治理控制台</small>
+          </span>
         </div>
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[selectedKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
         />
+        <div className="admin-sider-footer">
+          <ExperimentOutlined />
+          <span>
+            <strong>OM1 受控环境</strong>
+            <small>操作全程记录审计</small>
+          </span>
+        </div>
       </Sider>
       <Layout>
         <Header className="admin-header">
-          <Space size="small" wrap>
-            <Tag color="green">受控研究环境</Tag>
-            <Tag>M1 / OM1</Tag>
-            <Typography.Text type="secondary">杭州 · 候选数据阶段</Typography.Text>
-          </Space>
-          <Space size="middle" wrap>
-            <Typography.Text>{principal?.login_name}</Typography.Text>
-            <Button icon={<LogoutOutlined />} onClick={() => void logout()}>
+          <div className="admin-header-context">
+            <Typography.Text type="secondary">管理工作台</Typography.Text>
+            <Typography.Text strong>{currentLabel}</Typography.Text>
+          </div>
+          <Space size="middle" className="admin-header-actions">
+            <Space size="small" className="admin-environment-meta">
+              <Tag icon={<EnvironmentOutlined />} color="cyan">杭州</Tag>
+              <Tag color="green">M1 / OM1</Tag>
+            </Space>
+            <span className="admin-account">
+              <Avatar size={34} icon={<UserOutlined />} />
+              <span>
+                <Typography.Text strong>{principal?.login_name}</Typography.Text>
+                <Typography.Text type="secondary">已登录管理员</Typography.Text>
+              </span>
+            </span>
+            <Button className="admin-logout" icon={<LogoutOutlined />} onClick={() => void logout()}>
               安全退出
             </Button>
           </Space>

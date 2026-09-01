@@ -36,6 +36,7 @@ export function PlaceListFilters({
     <Form<PlaceListFilterValues>
       form={form}
       layout="inline"
+      className="place-list-filters"
       onFinish={(fields) =>
         onSearch({
           keyword: fields.keyword?.trim() || undefined,

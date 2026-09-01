@@ -173,7 +173,7 @@ export function AuditEventsPage() {
         </Button>
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
-      <Card>
+      <Card className="filter-card">
         <Form<FilterFields>
           form={form}
           layout="inline"
