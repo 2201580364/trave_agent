@@ -10,7 +10,7 @@ import {
   SafetyCertificateOutlined,
   ExclamationCircleFilled,
 } from '@ant-design/icons'
-import { Alert, App as AntApp, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { Alert, App as AntApp, Button, Card, Collapse, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
@@ -44,6 +44,77 @@ const reviewFlagLabels: Record<string, string> = {
   TIME_RULES_NOT_COLLECTED: '开放时间未采集',
   DURATION_NOT_COLLECTED: '建议时长未采集',
   PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY: 'Provider 点位不是地点几何',
+}
+
+export type GeometryFormValues = {
+  geometry_kind: 'point' | 'area' | 'route'
+  geometry_lat?: number
+  geometry_lng?: number
+  geometry_coordinates?: string
+  source_record_id: string
+}
+
+export function geometryFormValues(item: PlaceGeometryEvidence | undefined, fallbackKind: string, sourceRecordId?: string): Partial<GeometryFormValues> {
+  if (!item) return { geometry_kind: fallbackKind as GeometryFormValues['geometry_kind'], source_record_id: sourceRecordId }
+  const payload = item.geometry as { type?: string; coordinates?: unknown; lat?: number; lng?: number }
+  const coordinates = payload.coordinates
+  if (item.geometry_kind === 'point') {
+    const point = Array.isArray(coordinates) && coordinates.length >= 2
+      ? coordinates
+      : [payload.lng, payload.lat]
+    return {
+      geometry_kind: 'point',
+      geometry_lng: typeof point[0] === 'number' ? point[0] : undefined,
+      geometry_lat: typeof point[1] === 'number' ? point[1] : undefined,
+      source_record_id: item.source_record_id,
+    }
+  }
+  const line = item.geometry_kind === 'area'
+    ? (Array.isArray(coordinates) && Array.isArray(coordinates[0]) ? coordinates[0] : coordinates)
+    : coordinates
+  const lines = Array.isArray(line)
+    ? line.filter((pair): pair is [number, number] => Array.isArray(pair) && pair.length >= 2 && typeof pair[0] === 'number' && typeof pair[1] === 'number').map((pair) => `${pair[0]}, ${pair[1]}`).join('\n')
+    : ''
+  return { geometry_kind: item.geometry_kind as GeometryFormValues['geometry_kind'], geometry_coordinates: lines, source_record_id: item.source_record_id }
+}
+
+export function geometryPayload(values: GeometryFormValues): Record<string, unknown> {
+  if (values.geometry_kind === 'point') {
+    if (typeof values.geometry_lng !== 'number' || typeof values.geometry_lat !== 'number') throw new Error('请填写完整的经度和纬度')
+    if (values.geometry_lng < -180 || values.geometry_lng > 180) throw new Error('请输入 -180 到 180 之间的经度')
+    if (values.geometry_lat < -90 || values.geometry_lat > 90) throw new Error('请输入 -90 到 90 之间的纬度')
+    return { type: 'Point', coordinates: [values.geometry_lng, values.geometry_lat] }
+  }
+  const points = (values.geometry_coordinates ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const pair = line.split(/[,，\s]+/).filter(Boolean).map(Number)
+    if (pair.length !== 2 || pair.some((value) => !Number.isFinite(value) || value < -180 || value > 180)) throw new Error('边界/路线坐标必须逐行填写“经度, 纬度”')
+    if (pair[1] < -90 || pair[1] > 90) throw new Error('纬度必须在 -90 到 90 之间')
+    return pair
+  })
+  const minimum = values.geometry_kind === 'area' ? 3 : 2
+  if (points.length < minimum) throw new Error(`${values.geometry_kind === 'area' ? '区域边界' : '路线轨迹'}至少需要 ${minimum} 个坐标点`)
+  if (values.geometry_kind === 'area' && (points[0][0] !== points.at(-1)?.[0] || points[0][1] !== points.at(-1)?.[1])) points.push(points[0])
+  return values.geometry_kind === 'area'
+    ? { type: 'Polygon', coordinates: [points] }
+    : { type: 'LineString', coordinates: points }
+}
+
+export function geometrySummary(value: Record<string, unknown>): string {
+  const type = typeof value.type === 'string' ? value.type : ''
+  const coordinates = value.coordinates
+  if (Array.isArray(coordinates) && coordinates.length >= 2 && (type === 'Point' || !type)) {
+    return `点位：经度 ${coordinates[0]}，纬度 ${coordinates[1]}`
+  }
+  if ((type === 'Point' || !type) && typeof value.lat === 'number' && typeof value.lng === 'number') {
+    return `点位：经度 ${value.lng}，纬度 ${value.lat}`
+  }
+  if (type === 'Polygon' && Array.isArray(coordinates) && Array.isArray(coordinates[0])) {
+    return `区域边界：${coordinates[0].length} 个坐标点`
+  }
+  if (type === 'LineString' && Array.isArray(coordinates)) {
+    return `路线轨迹：${coordinates.length} 个坐标点`
+  }
+  return '图形数据已保存（可在编辑中查看原始数据）'
 }
 
 export function RevisionDetailsPage() {
@@ -516,7 +587,7 @@ export function RevisionDetailsPage() {
         confirmLoading={working}
         width={760}
         className="revision-edit-modal"
-        destroyOnHidden
+        forceRender
       >
         <Form form={form} layout="vertical">
           <section className="revision-edit-section">
@@ -695,7 +766,7 @@ function EvidenceCard({
   const openGeometry = (item?: PlaceGeometryEvidence) => {
     setEditing(item ?? null)
     form.resetFields()
-    form.setFieldsValue(item ? { geometry_kind: item.geometry_kind, geometry: JSON.stringify(item.geometry), source_record_id: item.source_record_id } : { geometry_kind: revision.geometry_kind, source_record_id: evidence?.sources[0]?.source_record_id })
+    form.setFieldsValue(geometryFormValues(item, revision.geometry_kind, evidence?.sources[0]?.source_record_id))
     setModal('geometry')
   }
   const openAccess = (item?: PlaceAccessPointEvidence) => {
@@ -710,7 +781,8 @@ function EvidenceCard({
       const values = await form.validateFields()
       const base = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-${crypto.randomUUID()}`, reason_code: editing ? 'EVIDENCE_UPDATED' : 'EVIDENCE_CREATED' }
       if (modal === 'geometry') {
-        const input: PlaceGeometryInput = { ...base, geometry_kind: values.geometry_kind, geometry: JSON.parse(values.geometry), source_record_id: values.source_record_id }
+        const geometryValues = values as GeometryFormValues
+        const input: PlaceGeometryInput = { ...base, geometry_kind: geometryValues.geometry_kind, geometry: geometryPayload(geometryValues), source_record_id: geometryValues.source_record_id }
         if (editing) await api.updateGeometry(revision.place_revision_id, (editing as PlaceGeometryEvidence).geometry_id, input); else await api.createGeometry(revision.place_revision_id, input)
       } else {
         const input: PlaceAccessPointInput = { ...base, access_point_kind: values.access_point_kind, name: values.name, lat: values.lat, lng: values.lng, source_record_id: values.source_record_id }
@@ -811,7 +883,7 @@ function EvidenceCard({
               width: 390,
               render: (value: Record<string, unknown>) => (
                 <Typography.Text code style={{ wordBreak: 'break-all' }}>
-                  {JSON.stringify(value)}
+                  {geometrySummary(value)}
                 </Typography.Text>
               ),
             },
@@ -909,15 +981,26 @@ function EvidenceCard({
           />
         )}
       </Space>
-      <Modal title={modal === 'geometry' ? '新增/编辑几何证据' : '新增/编辑访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => setModal(null)} confirmLoading={saving} destroyOnHidden>
+      <Modal title={modal === 'geometry' ? '新增/编辑几何证据' : '新增/编辑访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => setModal(null)} confirmLoading={saving} forceRender>
         <Form form={form} layout="vertical">
           {modal === 'geometry' ? <>
             <Form.Item name="geometry_kind" label={<FieldLabel label="几何类型" hint="点状景点选“点”；景区/街区边界选“区域”；步行路线选“路线”。" />} rules={[{ required: true }]}>
               <Select options={[{ value: 'point', label: '点（地点代表点）' }, { value: 'area', label: '区域（边界或范围）' }, { value: 'route', label: '路线（起终点或轨迹）' }]} />
             </Form.Item>
-            <Form.Item name="geometry" label={<FieldLabel label="图形数据（GeoJSON）" hint={'请输入合法 GeoJSON 对象，例如点：{"type":"Point","coordinates":[120.15,30.25]}。坐标顺序必须是经度、纬度。'} />} rules={[{ required: true }]}>
-              <Input.TextArea rows={5} placeholder={'{"type":"Point","coordinates":[120.15,30.25]}'} />
+            <Form.Item noStyle shouldUpdate={(previous, current) => previous.geometry_kind !== current.geometry_kind}>
+              {({ getFieldValue }) => getFieldValue('geometry_kind') === 'point' ? <Space style={{ width: '100%' }} size="middle">
+                <Form.Item name="geometry_lng" label={<FieldLabel label="经度" hint="填写地图上的经度，范围 -180 至 180，例如 120.160970。" />} rules={[{ required: true, type: 'number', min: -180, max: 180, message: '请输入 -180 到 180 之间的经度' }]} style={{ flex: 1 }}>
+                  <InputNumber style={{ width: '100%' }} placeholder="120.160970" />
+                </Form.Item>
+                <Form.Item name="geometry_lat" label={<FieldLabel label="纬度" hint="填写地图上的纬度，范围 -90 至 90，例如 30.253778。" />} rules={[{ required: true, type: 'number', min: -90, max: 90, message: '请输入 -90 到 90 之间的纬度' }]} style={{ flex: 1 }}>
+                  <InputNumber style={{ width: '100%' }} placeholder="30.253778" />
+                </Form.Item>
+              </Space> : <Form.Item name="geometry_coordinates" label={<FieldLabel label={getFieldValue('geometry_kind') === 'area' ? '边界坐标点' : '路线坐标点'} hint={getFieldValue('geometry_kind') === 'area' ? '每行一个边界点，格式为“经度, 纬度”，至少 3 个点；系统会自动闭合边界。' : '每行一个轨迹点，格式为“经度, 纬度”，至少 2 个点；按行填写行进顺序。'} />} rules={[{ required: true, message: '请至少填写所需坐标点' }]}>
+                <Input.TextArea rows={5} placeholder={'例如：\n120.160970, 30.253778\n120.161200, 30.254100\n120.161500, 30.253900'} />
+              </Form.Item>}
             </Form.Item>
+            <Alert type="info" showIcon title="系统会根据上面的坐标自动生成标准图形数据，坐标顺序为“经度, 纬度”。审核员无需填写技术格式。" />
+            {editing && modal === 'geometry' && <Collapse ghost items={[{ key: 'raw', label: '查看原始图形数据（仅供追溯）', children: <Typography.Paragraph copyable={{ text: JSON.stringify((editing as PlaceGeometryEvidence).geometry, null, 2) }} code style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{JSON.stringify((editing as PlaceGeometryEvidence).geometry, null, 2)}</Typography.Paragraph> }]} />}
             <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="选择证明这条几何数据的来源；来源详情可在上方来源证据中查看。" />} rules={[{ required: true }]}>
               <Select showSearch optionFilterProp="label" options={sourceOptions} placeholder="选择当前地点的有效来源" />
             </Form.Item>

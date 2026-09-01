@@ -47,6 +47,17 @@ def main() -> int:
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     parser.add_argument("--dictionary", type=Path, default=DEFAULT_DICTIONARY)
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
+    parser.add_argument(
+        "--candidate-id",
+        action="append",
+        dest="candidate_ids",
+        help="import only this candidate ID; repeat for a controlled batch",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="import at most this many candidates after candidate-id filtering",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -55,12 +66,15 @@ def main() -> int:
     dictionary = _load(args.dictionary)
     validate_candidate_catalog(catalog, registry, dictionary)
 
+    selected = _select_candidates(
+        catalog["candidates"], candidate_ids=args.candidate_ids, limit=args.limit
+    )
     engine = create_engine(f"sqlite:///{args.database.resolve().as_posix()}")
     imported = 0
     skipped = 0
     with Session(engine) as session:
         repository = SqlAlchemyPlaceCatalogRepository(session)
-        for candidate in catalog["candidates"]:
+        for candidate in selected:
             revision_id = f"revision-{candidate['candidate_id']}"
             existing = session.get(PlaceRevisionRow, revision_id)
             if existing is not None:
@@ -81,6 +95,28 @@ def main() -> int:
             session.commit()
     print(f"candidate revisions: imported={imported}, skipped={skipped}, dry_run={args.dry_run}")
     return 0
+
+
+def _select_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    candidate_ids: list[str] | None,
+    limit: int | None,
+) -> list[dict[str, Any]]:
+    if limit is not None and limit < 1:
+        raise ValueError("--limit must be positive")
+    selected = candidates
+    if candidate_ids:
+        requested = set(candidate_ids)
+        selected = [item for item in candidates if item.get("candidate_id") in requested]
+        missing = requested - {str(item.get("candidate_id")) for item in selected}
+        if missing:
+            raise ValueError(f"unknown candidate IDs: {', '.join(sorted(missing))}")
+    if limit is not None:
+        selected = selected[:limit]
+    if not selected:
+        raise ValueError("candidate selection is empty")
+    return selected
 
 
 def _import_candidate(
