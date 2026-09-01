@@ -1160,6 +1160,10 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
+每个候选 `item` 同时返回只读 `review_readiness`，用于批量人工审核准备，不改变 Revision 或审核任务状态。准备度固定包含 `basic`、`source`、`geometry`、`access_point`、`time`、`relation` 六项；每项返回 `collected`、`verified`、`total` 和 `verified_count`。顶层返回 `completed_checks`、`verified_checks`、`missing_checks`、`pending_review_checks`、当前开放任务状态以及以下稳定状态：`needs_evidence`、`ready_for_review`、`under_review`、`changes_requested`、`ready_for_approval`；非 candidate Revision 返回其生命周期状态。
+
+准备度计算只接受当前 Place 的 active 来源支持。Provider 候选点不能冒充地点几何；访问点至少一条；非全天开放地点至少一条有效开放规则；`show` 必须恰好一条固定场次；active 闭馆日和日期例外必须逐项核验；存在关系时必须完成裁决并人工核验，无关系时必须登记完成关系检查。无开放审核任务时，即使六项已核验也只能返回 `ready_for_review`；`changes_requested` 优先于历史已核验结果；只有开放审核任务中六项均核验才返回 `ready_for_approval`。
+
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
 
 `GET /api/v1/admin/place-revisions/{revision_id}/evidence` 的 `sources` 只包含属于当前

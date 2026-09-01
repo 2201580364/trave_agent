@@ -1,5 +1,5 @@
 import { FileSearchOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -8,7 +8,7 @@ import type { PlaceListFilters as PlaceListFilterValues, PlaceRevision } from '.
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 import { PlaceListFilters } from '../components/PlaceListFilters'
-import { indoorOutdoorLabel, lifecycleStatusLabel, placeKindLabel, rainSuitabilityLabel } from '../ui/displayLabels'
+import { indoorOutdoorLabel, lifecycleStatusLabel, placeKindLabel, rainSuitabilityLabel, reviewFlagLabel } from '../ui/displayLabels'
 
 const PAGE_SIZE = 20
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
@@ -65,6 +65,12 @@ export function CandidatesPage() {
           revision.review_flags.includes('DURATION_NOT_COLLECTED') ? '未采集' : `${value} 分钟`,
       },
       {
+        title: '审核准备度',
+        key: 'review_readiness',
+        width: 180,
+        render: (_: unknown, revision: PlaceRevision) => <ReadinessSummary revision={revision} />,
+      },
+      {
         title: '状态',
         dataIndex: 'lifecycle_status',
         width: 120,
@@ -89,6 +95,12 @@ export function CandidatesPage() {
     [navigate],
   )
 
+  const readinessCounts = useMemo(() => ({
+    needsEvidence: items.filter((item) => item.review_readiness?.status === 'needs_evidence').length,
+    readyForReview: items.filter((item) => item.review_readiness?.status === 'ready_for_review').length,
+    inReview: items.filter((item) => ['under_review', 'changes_requested', 'ready_for_approval'].includes(item.review_readiness?.status ?? '')).length,
+  }), [items])
+
   return (
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       <div className="page-heading-row">
@@ -106,6 +118,12 @@ export function CandidatesPage() {
         </Space>
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
+      <Alert
+        showIcon
+        type={readinessCounts.needsEvidence > 0 ? 'warning' : 'success'}
+        title={`本页审核准备：待补录 ${readinessCounts.needsEvidence} 条，可送审 ${readinessCounts.readyForReview} 条，审核中/可通过 ${readinessCounts.inReview} 条`}
+        description="准备度按基础事实、来源、几何、访问点、开放时间和关系检查六项计算；它用于定位下一步，不会自动改变审核或发布状态。"
+      />
       <Card className="filter-card">
         <PlaceListFilters
           value={filters}
@@ -138,7 +156,7 @@ export function CandidatesPage() {
               setPageSize(nextPageSize)
             },
           }}
-          scroll={{ x: 1080 }}
+          scroll={{ x: 1260 }}
           expandable={{ expandedRowRender: (revision) => <RevisionDetails revision={revision} /> }}
           locale={{ emptyText: '当前没有候选修订版本' }}
         />
@@ -163,7 +181,16 @@ function RevisionDetails({ revision }: { revision: PlaceRevision }) {
       <Descriptions.Item label="来源记录数">{revision.source_record_ids.length}</Descriptions.Item>
       <Descriptions.Item label="冲突已裁决">{revision.conflicts_resolved ? '是' : '否'}</Descriptions.Item>
       <Descriptions.Item label="求解器可用">{revision.solver_eligible ? '是' : '否'}</Descriptions.Item>
-      <Descriptions.Item label="待核验项" span={3}>
+      <Descriptions.Item label="审核准备清单" span="filled">
+        {revision.review_readiness
+          ? <Space wrap>{revision.review_readiness.checks.map((check) => (
+              <Tag key={check.key} color={check.verified ? 'success' : check.collected ? 'processing' : 'warning'}>
+                {readinessCheckLabel(check.key)}：{check.verified ? '已核验' : check.collected ? '待审核' : '待补录'}
+              </Tag>
+            ))}</Space>
+          : '准备度暂不可用'}
+      </Descriptions.Item>
+      <Descriptions.Item label="待核验项" span="filled">
         {revision.review_flags.length > 0
           ? revision.review_flags.map((flag) => <Tag key={flag} color="warning">{reviewFlagLabel(flag)}</Tag>)
           : '无'}
@@ -172,17 +199,37 @@ function RevisionDetails({ revision }: { revision: PlaceRevision }) {
   )
 }
 
-function reviewFlagLabel(flag: string): string {
-  const labels: Record<string, string> = {
-    NAME_REQUIRES_HUMAN_VERIFICATION: '名称待人工核验',
-    CATEGORY_REQUIRES_HUMAN_VERIFICATION: '分类待人工核验',
-    GEOMETRY_UNVERIFIED: '几何待核验',
-    ACCESS_POINT_UNVERIFIED: '访问点待核验',
-    TIME_RULES_NOT_COLLECTED: '开放时间未采集',
-    DURATION_NOT_COLLECTED: '建议时长未采集',
-    PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY: 'Provider 点位不是地点几何',
+function ReadinessSummary({ revision }: { revision: PlaceRevision }) {
+  const readiness = revision.review_readiness
+  if (!readiness) return <Typography.Text type="secondary">暂不可用</Typography.Text>
+  const statusLabels: Record<string, { label: string; color: string }> = {
+    needs_evidence: { label: '待补录', color: 'warning' },
+    ready_for_review: { label: '可送审', color: 'success' },
+    under_review: { label: '审核中', color: 'processing' },
+    changes_requested: { label: '待修改', color: 'error' },
+    ready_for_approval: { label: '可审核通过', color: 'cyan' },
+    human_verified: { label: '已人工核验', color: 'success' },
+    published: { label: '已发布', color: 'success' },
+    retired: { label: '已停用', color: 'default' },
   }
-  return labels[flag] ?? flag
+  const display = statusLabels[readiness.status] ?? { label: readiness.status, color: 'default' }
+  return (
+    <Space size={4} wrap>
+      <Tag color={display.color}>{display.label}</Tag>
+      <Typography.Text type="secondary">{readiness.completed_checks}/{readiness.total_checks} 项已准备</Typography.Text>
+    </Space>
+  )
+}
+
+function readinessCheckLabel(key: string): string {
+  return ({
+    basic: '基础事实',
+    source: '来源与冲突',
+    geometry: '地点几何',
+    access_point: '访问点',
+    time: '开放时间',
+    relation: '关系检查',
+  } as Record<string, string>)[key] ?? key
 }
 
 function formatDateTime(value: string): string {

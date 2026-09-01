@@ -164,6 +164,26 @@ export type PlaceRevision = {
   published_at: string | null
   review_flags: string[]
   relation_review_status?: 'pending' | 'no_relations' | 'not_required'
+  review_readiness?: ReviewReadiness | null
+}
+
+export type ReviewReadinessCheck = {
+  key: 'basic' | 'source' | 'geometry' | 'access_point' | 'time' | 'relation'
+  collected: boolean
+  verified: boolean
+  total: number
+  verified_count: number
+}
+
+export type ReviewReadiness = {
+  status: 'needs_evidence' | 'ready_for_review' | 'under_review' | 'changes_requested' | 'ready_for_approval' | 'human_verified' | 'published' | 'retired'
+  completed_checks: number
+  verified_checks: number
+  total_checks: number
+  missing_checks: ReviewReadinessCheck['key'][]
+  pending_review_checks: ReviewReadinessCheck['key'][]
+  task_status: ReviewTaskStatus | null
+  checks: ReviewReadinessCheck[]
 }
 
 export type PublicationCheck = {

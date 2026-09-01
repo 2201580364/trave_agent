@@ -895,6 +895,16 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     assert candidates.status_code == 200
     assert candidates.json()["items"][0]["place_revision_id"] == "revision-candidates"
     assert candidates.json()["items"][0]["lifecycle_status"] == "candidate"
+    readiness = candidates.json()["items"][0]["review_readiness"]
+    assert readiness["status"] == "needs_evidence"
+    assert readiness["completed_checks"] == 2
+    assert readiness["total_checks"] == 6
+    assert readiness["missing_checks"] == [
+        "source",
+        "geometry",
+        "access_point",
+        "time",
+    ]
     assert candidates.json()["limit"] == 50
     assert candidates.json()["offset"] == 0
     assert candidates.json()["total"] == 1

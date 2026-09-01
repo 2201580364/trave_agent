@@ -253,4 +253,25 @@ describe('RevisionDetailsPage', () => {
     expect(screen.getAllByText('查看地图与访问点（O04）').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '开放时间（O05）：0/1 已核验' })).toBeTruthy()
   })
+
+  it('does not claim ordinary opening hours exist when a show has no time rules', async () => {
+    const showRevision = { ...revision, place_kind: 'show' }
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(showRevision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({
+      ...timeEvidence,
+      revision: showRevision,
+      time_rules: [],
+    })
+    mocks.api.checkPlaceRevisionPublication.mockResolvedValueOnce({
+      revision_id: 'revision-1',
+      publishable: false,
+      reason_codes: ['FIXED_SESSION_REQUIRED'],
+    })
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('演出地点需要固定场次规则')).toBeTruthy())
+    expect(screen.getByText(/无论当前是否已有普通开放时间/)).toBeTruthy()
+    expect(screen.queryByText(/当前已有开放时间记录/)).toBeNull()
+  })
 })

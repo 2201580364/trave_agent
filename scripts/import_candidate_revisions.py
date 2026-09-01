@@ -71,6 +71,7 @@ def main() -> int:
     )
     engine = create_engine(f"sqlite:///{args.database.resolve().as_posix()}")
     imported = 0
+    updated = 0
     skipped = 0
     with Session(engine) as session:
         repository = SqlAlchemyPlaceCatalogRepository(session)
@@ -78,8 +79,36 @@ def main() -> int:
             revision_id = f"revision-{candidate['candidate_id']}"
             existing = session.get(PlaceRevisionRow, revision_id)
             if existing is not None:
-                existing.review_flags = list(candidate["review_flags"])
-                skipped += 1
+                # Older imports created the 1/1/1 placeholder duration without
+                # carrying the catalog review flags and inherited the legacy
+                # ``not_required`` relation status.  Reconcile only pristine
+                # imports so rerunning this command never overwrites facts that
+                # an editor has already reviewed or changed.
+                pristine_import = (
+                    existing.lifecycle_status == "candidate"
+                    and existing.revision_number == 1
+                    and existing.revision_version == 1
+                    and existing.reviewed_at is None
+                    and existing.published_at is None
+                    and not existing.solver_eligible
+                    and (
+                        existing.duration_min,
+                        existing.duration_recommended,
+                        existing.duration_max,
+                    )
+                    == (1, 1, 1)
+                )
+                changed = False
+                if pristine_import and not existing.review_flags:
+                    existing.review_flags = list(candidate["review_flags"])
+                    changed = True
+                if pristine_import and existing.relation_review_status == "not_required":
+                    existing.relation_review_status = "pending"
+                    changed = True
+                if changed:
+                    updated += 1
+                else:
+                    skipped += 1
                 continue
             if not args.dry_run:
                 _import_candidate(
@@ -93,7 +122,10 @@ def main() -> int:
             imported += 1
         if not args.dry_run:
             session.commit()
-    print(f"candidate revisions: imported={imported}, skipped={skipped}, dry_run={args.dry_run}")
+    print(
+        "candidate revisions: "
+        f"imported={imported}, updated={updated}, skipped={skipped}, dry_run={args.dry_run}"
+    )
     return 0
 
 
@@ -194,6 +226,8 @@ def _import_candidate(
             conflicts_resolved=False,
             source_record_ids=(source_record_id,),
             created_at=observed_at,
+            review_flags=tuple(str(flag) for flag in candidate["review_flags"]),
+            relation_review_status="pending",
         )
     )
     location = provider["location"]

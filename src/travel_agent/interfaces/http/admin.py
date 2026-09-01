@@ -1070,8 +1070,18 @@ def build_admin_router(
                 admin_area=admin_area,
                 place_kind=place_kind,
             )
+            readiness = review_workflow.review_readiness_by_revision_ids(
+                current,
+                revision_ids=tuple(revision.place_revision_id for revision in revisions),
+            )
             return {
-                "items": [_revision_response(revision) for revision in revisions],
+                "items": [
+                    {
+                        **_revision_response(revision),
+                        "review_readiness": readiness.get(revision.place_revision_id),
+                    }
+                    for revision in revisions
+                ],
                 "limit": limit,
                 "offset": offset,
                 "total": total,

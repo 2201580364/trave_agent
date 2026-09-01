@@ -111,6 +111,19 @@ const reasonLabels: Record<string, string> = {
   UNSUPPORTED_PLACE_KIND: '地点类型暂不支持求解',
 }
 
+const reviewFlagLabels: Record<string, string> = {
+  NAME_REQUIRES_HUMAN_VERIFICATION: '名称待人工核验',
+  CATEGORY_REQUIRES_HUMAN_VERIFICATION: '分类待人工核验',
+  GEOMETRY_UNVERIFIED: '几何待核验',
+  ACCESS_POINT_UNVERIFIED: '访问点待核验',
+  TIME_RULES_NOT_COLLECTED: '开放时间未采集',
+  DURATION_NOT_COLLECTED: '建议时长未采集',
+  PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY: '地图候选点不是正式地点几何',
+  FIXED_TIME_OR_OPERATING_RULE_REQUIRED: '需要补充固定场次或营业时间',
+  PROVIDER_NAME_DIFFERS_FROM_CANDIDATE: '地图名称与候选名称不一致',
+  PROVIDER_NAME_SIGNALS_STATUS_RISK: '地图名称可能提示暂停或关闭',
+}
+
 const categoryLabels: Record<string, string> = {
   natural_scenery: '自然山水',
   historic_culture: '古镇人文',
@@ -148,6 +161,10 @@ export function timeRuleKindLabel(value: string | null | undefined) { return lab
 export function dateExceptionKindLabel(value: string | null | undefined) { return label(value) }
 export function indoorOutdoorLabel(value: string | null | undefined) { return label(value) }
 export function rainSuitabilityLabel(value: string | null | undefined) { return label(value) }
+export function reviewFlagLabel(value: string | null | undefined) {
+  if (!value) return '待核验项'
+  return reviewFlagLabels[value] ?? '其他待核验项'
+}
 export function projectionStatusLabel(value: string | null | undefined) { return label(value) }
 export function workflowReasonLabel(value: string | null | undefined) { return reasonLabels[value ?? ''] ?? '管理操作' }
 

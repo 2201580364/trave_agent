@@ -31,20 +31,11 @@ import {
   relationReviewStatusLabel,
   relationTypeLabel,
   reasonCodeLabel,
+  reviewFlagLabel,
   reviewStatusLabel,
   sourceDecisionLabel,
   timeRuleKindLabel,
 } from '../ui/displayLabels'
-
-const reviewFlagLabels: Record<string, string> = {
-  NAME_REQUIRES_HUMAN_VERIFICATION: '名称待人工核验',
-  CATEGORY_REQUIRES_HUMAN_VERIFICATION: '分类待人工核验',
-  GEOMETRY_UNVERIFIED: '几何待核验',
-  ACCESS_POINT_UNVERIFIED: '访问点待核验',
-  TIME_RULES_NOT_COLLECTED: '开放时间未采集',
-  DURATION_NOT_COLLECTED: '建议时长未采集',
-  PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY: 'Provider 点位不是地点几何',
-}
 
 export type GeometryFormValues = {
   geometry_kind: 'point' | 'area' | 'route'
@@ -490,7 +481,7 @@ export function RevisionDetailsPage() {
                 {revision.review_flags.length > 0
                   ? revision.review_flags.map((flag) => (
                       <Tag key={flag} color="warning">
-                        {reviewFlagLabels[flag] ?? '待核验项'}
+                        {reviewFlagLabel(flag)}
                       </Tag>
                     ))
                   : '无'}
@@ -1498,7 +1489,7 @@ function buildPublicationBlockers(
     }
     if (code === 'FIXED_SESSION_REQUIRED') return {
       code, title: reasonCodeLabel(code),
-      description: '该地点类型是演出/固定场次。当前已有开放时间记录，但求解器需要明确的“固定场次”规则；请在 O05 编辑现有规则或新建修订版本后，将规则类型改为固定场次，并重新送审。',
+      description: '该地点类型是演出/固定场次。无论当前是否已有普通开放时间，求解器都需要一条明确开始和结束时间的“固定场次”规则；请在 O05 新增或编辑规则，并重新送审。',
       actionLabel: '处理固定场次（O05）', target: 'o05-evidence',
     }
     if (code === 'TIME_RULE_UNRESOLVED' || code === 'MISSING_VERIFIED_TIME_RULE' || code === 'FIXED_SESSION_AMBIGUOUS') return {
