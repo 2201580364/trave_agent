@@ -24,6 +24,7 @@ import { auditTargetTypeLabel, reasonCodeLabel } from '../ui/displayLabels'
 const PAGE_SIZE = 50
 
 type FilterFields = {
+  keyword?: string
   actor_id?: string
   target_type?: string
   target_id?: string
@@ -38,10 +39,12 @@ export function AuditEventsPage() {
   const [events, setEvents] = useState<AdminAuditEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const filters = useMemo<AuditEventFilters>(() => {
     const result = searchParams.get('result')
     return {
+      keyword: searchParams.get('keyword') || undefined,
       actor_id: searchParams.get('actor_id') || undefined,
       target_type: searchParams.get('target_type') || undefined,
       target_id: searchParams.get('target_id') || undefined,
@@ -61,6 +64,7 @@ export function AuditEventsPage() {
     try {
       const response = await api.listAuditEvents(filters)
       setEvents(response.items)
+      setTotal(response.total ?? response.items.length)
     } catch (reason) {
       setError(adminErrorMessage(reason))
     } finally {
@@ -70,6 +74,7 @@ export function AuditEventsPage() {
 
   useEffect(() => {
     form.setFieldsValue({
+      keyword: filters.keyword,
       actor_id: filters.actor_id,
       target_type: filters.target_type,
       target_id: filters.target_id,
@@ -175,6 +180,9 @@ export function AuditEventsPage() {
           className="audit-filters"
           onFinish={applyFilters}
         >
+          <Form.Item name="keyword" label="关键字">
+            <Input allowClear placeholder="操作者、动作、目标、理由、请求编号" style={{ width: 280 }} />
+          </Form.Item>
           <Form.Item name="actor_id" label="操作者">
             <Input allowClear placeholder="actor_id" />
           </Form.Item>
@@ -221,14 +229,14 @@ export function AuditEventsPage() {
         />
         <div className="manual-pagination">
           <Typography.Text type="secondary">
-            第 {Math.floor(offset / PAGE_SIZE) + 1} 页 · 本页 {events.length} 条
+            第 {Math.floor(offset / PAGE_SIZE) + 1} 页 · 本页 {events.length} 条 · 共 {total} 条
           </Typography.Text>
           <Space>
             <Button disabled={offset === 0 || loading} onClick={() => movePage(offset - PAGE_SIZE)}>
               上一页
             </Button>
             <Button
-              disabled={events.length < PAGE_SIZE || loading}
+              disabled={offset + events.length >= total || loading}
               onClick={() => movePage(offset + PAGE_SIZE)}
             >
               下一页

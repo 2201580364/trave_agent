@@ -1,5 +1,6 @@
 import type {
   AdminActor,
+  AdminActorFilters,
   AdminAuditEvent,
   AdminLoginResponse,
   AdminMe,
@@ -12,6 +13,7 @@ import type {
   ReviewTask,
   ReviewTaskStatus,
   PlaceRevision,
+  PlaceListFilters,
   PlaceRevisionEvidence,
   ReviewPlaceEvidenceInput,
   PlaceGeometryInput,
@@ -66,8 +68,15 @@ export class AdminApi {
     return this.request('/me')
   }
 
-  listAdminActors(limit = 100, offset = 0): Promise<PageResponse<AdminActor>> {
+  listAdminActors(
+    limit = 100,
+    offset = 0,
+    filters: AdminActorFilters = {},
+  ): Promise<PageResponse<AdminActor>> {
     const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') query.set(key, String(value))
+    })
     return this.request(`/admin-actors?${query}`)
   }
 
@@ -93,14 +102,30 @@ export class AdminApi {
     return this.request(`/audit-events?${query}`)
   }
 
-  listReviewTasks(status?: ReviewTaskStatus, limit = 50, offset = 0): Promise<PageResponse<ReviewTask>> {
+  listReviewTasks(
+    status?: ReviewTaskStatus,
+    limit = 50,
+    offset = 0,
+    filters: PlaceListFilters = {},
+  ): Promise<PageResponse<ReviewTask>> {
     const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (status !== undefined) query.set('review_status', status)
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') query.set(key, String(value))
+    })
     return this.request(`/review-tasks?${query}`)
   }
 
-  listCandidates(status = 'candidate', limit = 50, offset = 0): Promise<PageResponse<PlaceRevision>> {
+  listCandidates(
+    status = 'candidate',
+    limit = 50,
+    offset = 0,
+    filters: PlaceListFilters = {},
+  ): Promise<PageResponse<PlaceRevision>> {
     const query = new URLSearchParams({ lifecycle_status: status, limit: String(limit), offset: String(offset) })
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') query.set(key, String(value))
+    })
     return this.request(`/candidates?${query}`)
   }
 

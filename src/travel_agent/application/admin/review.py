@@ -79,22 +79,54 @@ class ReviewRepository(Protocol):
     def get_open_task_for_revision(self, revision_id: str) -> PlaceReviewTask | None: ...
 
     def list_tasks(
-        self, *, status: str | None, limit: int, offset: int
+        self,
+        *,
+        status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        limit: int,
+        offset: int,
     ) -> tuple[PlaceReviewTask, ...]: ...
 
-    def count_tasks(self, *, status: str | None) -> int: ...
+    def count_tasks(
+        self,
+        *,
+        status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int: ...
 
     def list_decisions(self, task_id: str) -> tuple[PlaceReviewDecision, ...]: ...
 
     def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
 
+    def get_revisions(
+        self, revision_ids: tuple[str, ...]
+    ) -> tuple[PlaceRevision, ...]: ...
+
     def get_latest_revision(self, place_id: str) -> PlaceRevision | None: ...
 
     def list_revisions(
-        self, *, lifecycle_status: str | None, limit: int, offset: int
+        self,
+        *,
+        lifecycle_status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        limit: int,
+        offset: int,
     ) -> tuple[PlaceRevision, ...]: ...
 
-    def count_revisions(self, *, lifecycle_status: str | None) -> int: ...
+    def count_revisions(
+        self,
+        *,
+        lifecycle_status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int: ...
 
     def add_task(self, task: PlaceReviewTask) -> None: ...
 
@@ -154,11 +186,58 @@ class PlaceReviewWorkflowService:
         self._ids = ids
 
     def list_tasks(
-        self, principal: AdminPrincipal, *, status: str | None, limit: int, offset: int
+        self,
+        principal: AdminPrincipal,
+        *,
+        status: str | None,
+        limit: int,
+        offset: int,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
     ) -> tuple[PlaceReviewTask, ...]:
         self._require(principal, "place:review:read")
         with self._uow_factory() as uow:
-            return uow.reviews.list_tasks(status=status, limit=limit, offset=offset)
+            return uow.reviews.list_tasks(
+                status=status,
+                keyword=_optional_query(keyword),
+                admin_area=_optional_query(admin_area),
+                place_kind=_optional_query(place_kind),
+                limit=limit,
+                offset=offset,
+            )
+
+    def count_tasks(
+        self,
+        principal: AdminPrincipal,
+        *,
+        status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int:
+        self._require(principal, "place:review:read")
+        with self._uow_factory() as uow:
+            return uow.reviews.count_tasks(
+                status=status,
+                keyword=_optional_query(keyword),
+                admin_area=_optional_query(admin_area),
+                place_kind=_optional_query(place_kind),
+            )
+
+    def revisions_by_ids(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_ids: tuple[str, ...],
+    ) -> dict[str, PlaceRevision]:
+        self._require(principal, "place:review:read")
+        normalized = tuple(dict.fromkeys(revision_ids))
+        with self._uow_factory() as uow:
+            return {
+                revision.place_revision_id: revision
+                for revision in uow.reviews.get_revisions(normalized)
+            }
 
     def list_revisions(
         self,
@@ -167,19 +246,38 @@ class PlaceReviewWorkflowService:
         lifecycle_status: str | None,
         limit: int,
         offset: int,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
     ) -> tuple[PlaceRevision, ...]:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
             return uow.reviews.list_revisions(
                 lifecycle_status=lifecycle_status,
+                keyword=_optional_query(keyword),
+                admin_area=_optional_query(admin_area),
+                place_kind=_optional_query(place_kind),
                 limit=limit,
                 offset=offset,
             )
 
-    def count_revisions(self, principal: AdminPrincipal, *, lifecycle_status: str | None) -> int:
+    def count_revisions(
+        self,
+        principal: AdminPrincipal,
+        *,
+        lifecycle_status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
-            return uow.reviews.count_revisions(lifecycle_status=lifecycle_status)
+            return uow.reviews.count_revisions(
+                lifecycle_status=lifecycle_status,
+                keyword=_optional_query(keyword),
+                admin_area=_optional_query(admin_area),
+                place_kind=_optional_query(place_kind),
+            )
 
     def dashboard_summary(self, principal: AdminPrincipal) -> dict[str, object]:
         self._require(principal, "place:candidate:read")
@@ -190,7 +288,14 @@ class PlaceReviewWorkflowService:
             tasks: dict[str, int] = {}
             for task_status in ("ready_for_review", "in_review", "changes_requested", "approved", "closed"):
                 tasks[task_status] = uow.reviews.count_tasks(status=task_status)
-            recent = uow.reviews.list_tasks(status="ready_for_review", limit=5, offset=0)
+            recent = uow.reviews.list_tasks(
+                status="ready_for_review",
+                keyword=None,
+                admin_area=None,
+                place_kind=None,
+                limit=5,
+                offset=0,
+            )
             return {
                 "revisions": {"candidate": candidates, "human_verified": verified, "published": published},
                 "review_tasks": tasks,
@@ -2074,7 +2179,20 @@ class PlaceReviewWorkflowService:
     @staticmethod
     def _publication_batch_response(uow: ReviewUnitOfWork, batch: PublicationBatch) -> dict[str, object]:
         items = uow.catalog.list_publication_batch_items(batch.batch_id)
-        return {"batch_id": batch.batch_id, "city_id": batch.city_id, "operation_intent_id": batch.operation_intent_id, "status": batch.status, "snapshot_id": batch.snapshot_id, "created_at": batch.created_at.isoformat(), "items": [_batch_item_response(item) for item in items]}
+        return {
+            "batch_id": batch.batch_id,
+            "city_id": batch.city_id,
+            "operation_intent_id": batch.operation_intent_id,
+            "status": batch.status,
+            "snapshot_id": batch.snapshot_id,
+            "created_at": batch.created_at.isoformat(),
+            "items": [
+                _batch_item_response(
+                    item, uow.reviews.get_revision(item.place_revision_id)
+                )
+                for item in items
+            ],
+        }
 
     def list_decisions(
         self, principal: AdminPrincipal, *, task_id: str
@@ -2155,6 +2273,40 @@ class PlaceReviewWorkflowService:
                 raise ReviewRevisionNotCandidateError
             existing = uow.reviews.get_open_task_for_revision(place_revision_id)
             if existing is not None:
+                if existing.status == "changes_requested":
+                    reopened = replace(
+                        existing,
+                        status="ready_for_review",
+                        version=existing.version + 1,
+                        updated_at=now,
+                    )
+                    try:
+                        uow.reviews.advance_task(
+                            existing,
+                            expected_version=existing.version,
+                            status="ready_for_review",
+                            now=now,
+                        )
+                    except ValueError as exc:
+                        raise ReviewTaskConflictError from exc
+                    uow.audits.add(
+                        self._event(
+                            actor,
+                            action="PLACE_REVIEW_SUBMITTED",
+                            target_type="review_task",
+                            target_id=existing.review_task_id,
+                            target_revision=str(revision.revision_number),
+                            before_digest=_task_digest(existing),
+                            after_digest=_task_digest(reopened),
+                            reason_code=reason_code,
+                            reason_text=reason_text,
+                            request_id=request_id,
+                            operation_intent_id=operation_intent_id,
+                            operation_digest=operation_digest,
+                        )
+                    )
+                    uow.commit()
+                    return reopened
                 uow.audits.add(
                     self._event(
                         actor,
@@ -2559,6 +2711,11 @@ def _reviewer_role(role_keys: tuple[str, ...]) -> str:
     return "authenticated_admin"
 
 
+def _optional_query(value: str | None) -> str | None:
+    normalized = value.strip() if value else ""
+    return normalized or None
+
+
 def _task_digest(task: PlaceReviewTask) -> str:
     return _digest(
         {
@@ -2653,8 +2810,10 @@ def _projection_snapshot_payload(projection: SolverPlaceProjection) -> dict[str,
     }
 
 
-def _batch_item_response(item: PublicationBatchItem) -> dict[str, object]:
-    return {
+def _batch_item_response(
+    item: PublicationBatchItem, revision: PlaceRevision | None = None
+) -> dict[str, object]:
+    response: dict[str, object] = {
         "batch_item_id": item.batch_item_id,
         "place_revision_id": item.place_revision_id,
         "status": item.status,
@@ -2662,6 +2821,17 @@ def _batch_item_response(item: PublicationBatchItem) -> dict[str, object]:
         "projection_id": item.projection_id,
         "published_at": item.published_at.isoformat() if item.published_at else None,
     }
+    if revision is not None:
+        response.update(
+            {
+                "canonical_name": revision.canonical_name,
+                "admin_area": revision.admin_area,
+                "place_kind": revision.place_kind,
+                "category": revision.category,
+                "revision_number": revision.revision_number,
+            }
+        )
+    return response
 
 
 def _snapshot_response(snapshot: ResearchSnapshot | None) -> dict[str, object] | None:

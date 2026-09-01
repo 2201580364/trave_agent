@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { PlaceRevision } from '../api/types'
+import type { PlaceListFilters as PlaceListFilterValues, PlaceRevision } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
+import { PlaceListFilters } from '../components/PlaceListFilters'
 import { indoorOutdoorLabel, lifecycleStatusLabel, placeKindLabel, rainSuitabilityLabel } from '../ui/displayLabels'
 
 const PAGE_SIZE = 20
@@ -21,6 +22,7 @@ export function CandidatesPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const [total, setTotal] = useState(0)
+  const [filters, setFilters] = useState<PlaceListFilterValues>({})
 
   const load = useCallback(async (requestedPage: number, requestedPageSize: number) => {
     setLoading(true)
@@ -30,6 +32,7 @@ export function CandidatesPage() {
         'candidate',
         requestedPageSize,
         (requestedPage - 1) * requestedPageSize,
+        filters,
       )
       setItems(result.items)
       setTotal(result.total ?? result.items.length)
@@ -38,7 +41,7 @@ export function CandidatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [api, filters])
 
   useEffect(() => {
     void load(page, pageSize)
@@ -46,8 +49,7 @@ export function CandidatesPage() {
 
   const refresh = () => {
     setPage(1)
-    setPageSize(PAGE_SIZE)
-    void load(1, PAGE_SIZE)
+    void load(page, pageSize)
   }
 
   const columns = useMemo(
@@ -104,6 +106,20 @@ export function CandidatesPage() {
         </Space>
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
+      <Card>
+        <PlaceListFilters
+          value={filters}
+          loading={loading}
+          onSearch={(value) => {
+            setPage(1)
+            setFilters(value)
+          }}
+          onReset={() => {
+            setPage(1)
+            setFilters({})
+          }}
+        />
+      </Card>
       <Card>
         <Table<PlaceRevision>
           rowKey="place_revision_id"

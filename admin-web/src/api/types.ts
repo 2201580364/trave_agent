@@ -74,6 +74,7 @@ export type ReplaceAdminRolesInput = {
 }
 
 export type AuditEventFilters = {
+  keyword?: string
   actor_id?: string
   target_type?: string
   target_id?: string
@@ -100,6 +101,24 @@ export type ReviewTask = {
   created_by: string
   created_at: string
   updated_at: string
+  place_id?: string
+  revision_number?: number
+  canonical_name?: string
+  admin_area?: string
+  place_kind?: string
+  category?: string
+}
+
+export type PlaceListFilters = {
+  keyword?: string
+  admin_area?: string
+  place_kind?: string
+}
+
+export type AdminActorFilters = {
+  keyword?: string
+  actor_status?: AdminActorStatus
+  role_key?: string
 }
 
 export type ReviewDecision = {
@@ -179,6 +198,11 @@ export type PublicationBatchItem = {
   reason_codes: string[]
   projection_id: string | null
   published_at: string | null
+  canonical_name?: string
+  admin_area?: string
+  place_kind?: string
+  category?: string
+  revision_number?: number
 }
 
 export type PublicationBatch = {

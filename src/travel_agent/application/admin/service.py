@@ -65,7 +65,19 @@ class AdminActorRepository(Protocol):
 
     def get_by_login(self, login_name: str) -> AdminActor | None: ...
 
-    def list(self, *, limit: int, offset: int) -> tuple[AdminActor, ...]: ...
+    def list(
+        self,
+        *,
+        keyword: str | None,
+        status: str | None,
+        role_key: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[AdminActor, ...]: ...
+
+    def count_filtered(
+        self, *, keyword: str | None, status: str | None, role_key: str | None
+    ) -> int: ...
 
     def add(self, actor: AdminActor) -> None: ...
 
@@ -107,9 +119,21 @@ class AdminAuditRepository(Protocol):
         target_id: str | None,
         action: str | None,
         result: str | None,
+        keyword: str | None,
         limit: int,
         offset: int,
     ) -> tuple[AdminAuditEvent, ...]: ...
+
+    def count(
+        self,
+        *,
+        actor_id: str | None,
+        target_type: str | None,
+        target_id: str | None,
+        action: str | None,
+        result: str | None,
+        keyword: str | None,
+    ) -> int: ...
 
 
 class AdminUnitOfWork(Protocol):
@@ -320,11 +344,38 @@ class AdminIdentityService:
             uow.commit()
 
     def list_actors(
-        self, principal: AdminPrincipal, *, limit: int, offset: int
+        self,
+        principal: AdminPrincipal,
+        *,
+        keyword: str | None,
+        status: str | None,
+        role_key: str | None,
+        limit: int,
+        offset: int,
     ) -> tuple[AdminActor, ...]:
         self.require_permission(principal, "admin:actor:read")
         with self._uow_factory() as uow:
-            return uow.actors.list(limit=limit, offset=offset)
+            return uow.actors.list(
+                keyword=_optional_query(keyword),
+                status=status,
+                role_key=role_key,
+                limit=limit,
+                offset=offset,
+            )
+
+    def count_actors(
+        self,
+        principal: AdminPrincipal,
+        *,
+        keyword: str | None,
+        status: str | None,
+        role_key: str | None,
+    ) -> int:
+        self.require_permission(principal, "admin:actor:read")
+        with self._uow_factory() as uow:
+            return uow.actors.count_filtered(
+                keyword=_optional_query(keyword), status=status, role_key=role_key
+            )
 
     def create_actor(
         self,
@@ -572,6 +623,7 @@ class AdminIdentityService:
         target_id: str | None,
         action: str | None,
         result: str | None,
+        keyword: str | None,
         limit: int,
         offset: int,
     ) -> tuple[AdminAuditEvent, ...]:
@@ -583,8 +635,31 @@ class AdminIdentityService:
                 target_id=target_id,
                 action=action,
                 result=result,
+                keyword=_optional_query(keyword),
                 limit=limit,
                 offset=offset,
+            )
+
+    def count_audit_events(
+        self,
+        principal: AdminPrincipal,
+        *,
+        actor_id: str | None,
+        target_type: str | None,
+        target_id: str | None,
+        action: str | None,
+        result: str | None,
+        keyword: str | None,
+    ) -> int:
+        self.require_permission(principal, "admin:audit:read")
+        with self._uow_factory() as uow:
+            return uow.audits.count(
+                actor_id=actor_id,
+                target_type=target_type,
+                target_id=target_id,
+                action=action,
+                result=result,
+                keyword=_optional_query(keyword),
             )
 
     @staticmethod
@@ -733,6 +808,11 @@ def _representative_role(role_keys: tuple[str, ...]) -> str:
         if role_key in role_keys:
             return role_key
     return "authenticated_admin"
+
+
+def _optional_query(value: str | None) -> str | None:
+    normalized = value.strip() if value else ""
+    return normalized or None
 
 
 def _actor_digest(actor: AdminActor) -> str:

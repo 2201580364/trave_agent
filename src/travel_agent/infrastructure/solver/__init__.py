@@ -26,6 +26,10 @@ from .published_json import (
     JsonPublishedSolverDataProvider,
     published_snapshot_content_hash,
 )
+from .database_published import (
+    DatabasePublishedSnapshotVersionProvider,
+    DatabasePublishedSolverDataProvider,
+)
 
 __all__ = [
     "InMemoryPublishedSolverDataProvider",
@@ -48,4 +52,6 @@ __all__ = [
     "RedisGaodeRouteCache",
     "JsonPublishedSolverDataProvider",
     "published_snapshot_content_hash",
+    "DatabasePublishedSnapshotVersionProvider",
+    "DatabasePublishedSolverDataProvider",
 ]

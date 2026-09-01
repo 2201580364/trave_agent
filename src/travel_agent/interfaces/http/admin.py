@@ -319,14 +319,29 @@ def build_admin_router(
     @router.get("/admin-actors")
     def list_admin_actors(
         current: AdminPrincipal = principal_dependency,
+        keyword: str | None = Query(default=None, max_length=100),
+        actor_status: str | None = Query(
+            default=None, pattern="^(active|disabled|locked)$"
+        ),
+        role_key: str | None = Query(default=None, max_length=64),
         limit: int = Query(default=50, ge=1, le=100),
         offset: int = Query(default=0, ge=0),
     ) -> dict[str, object]:
-        actors = service.list_actors(current, limit=limit, offset=offset)
+        actors = service.list_actors(
+            current,
+            keyword=keyword,
+            status=actor_status,
+            role_key=role_key,
+            limit=limit,
+            offset=offset,
+        )
         return {
             "items": [_actor_response(actor) for actor in actors],
             "limit": limit,
             "offset": offset,
+            "total": service.count_actors(
+                current, keyword=keyword, status=actor_status, role_key=role_key
+            ),
         }
 
     @router.post("/admin-actors", status_code=status.HTTP_201_CREATED)
@@ -374,6 +389,7 @@ def build_admin_router(
         target_id: str | None = Query(default=None, max_length=128),
         action: str | None = Query(default=None, max_length=80),
         result: str | None = Query(default=None, pattern="^(succeeded|rejected|failed)$"),
+        keyword: str | None = Query(default=None, max_length=100),
         limit: int = Query(default=50, ge=1, le=100),
         offset: int = Query(default=0, ge=0),
     ) -> dict[str, object]:
@@ -384,6 +400,7 @@ def build_admin_router(
             target_id=target_id,
             action=action,
             result=result,
+            keyword=keyword,
             limit=limit,
             offset=offset,
         )
@@ -391,6 +408,15 @@ def build_admin_router(
             "items": [_audit_response(event) for event in events],
             "limit": limit,
             "offset": offset,
+            "total": service.count_audit_events(
+                current,
+                actor_id=actor_id,
+                target_type=target_type,
+                target_id=target_id,
+                action=action,
+                result=result,
+                keyword=keyword,
+            ),
         }
 
     if review_workflow is not None:
@@ -1022,18 +1048,27 @@ def build_admin_router(
         def list_candidates(
             current: AdminPrincipal = principal_dependency,
             lifecycle_status: str | None = Query(default="candidate", max_length=24),
+            keyword: str | None = Query(default=None, max_length=100),
+            admin_area: str | None = Query(default=None, max_length=120),
+            place_kind: str | None = Query(default=None, max_length=32),
             limit: int = Query(default=50, ge=1, le=100),
             offset: int = Query(default=0, ge=0),
         ) -> dict[str, object]:
             revisions = review_workflow.list_revisions(
                 current,
                 lifecycle_status=lifecycle_status,
+                keyword=keyword,
+                admin_area=admin_area,
+                place_kind=place_kind,
                 limit=limit,
                 offset=offset,
             )
             total = review_workflow.count_revisions(
                 current,
                 lifecycle_status=lifecycle_status,
+                keyword=keyword,
+                admin_area=admin_area,
+                place_kind=place_kind,
             )
             return {
                 "items": [_revision_response(revision) for revision in revisions],
@@ -1065,16 +1100,39 @@ def build_admin_router(
         def list_review_tasks(
             current: AdminPrincipal = principal_dependency,
             review_status: str | None = Query(default=None, max_length=32),
+            keyword: str | None = Query(default=None, max_length=100),
+            admin_area: str | None = Query(default=None, max_length=120),
+            place_kind: str | None = Query(default=None, max_length=32),
             limit: int = Query(default=50, ge=1, le=100),
             offset: int = Query(default=0, ge=0),
         ) -> dict[str, object]:
             tasks = review_workflow.list_tasks(
-                current, status=review_status, limit=limit, offset=offset
+                current,
+                status=review_status,
+                keyword=keyword,
+                admin_area=admin_area,
+                place_kind=place_kind,
+                limit=limit,
+                offset=offset,
+            )
+            revisions = review_workflow.revisions_by_ids(
+                current,
+                revision_ids=tuple(task.place_revision_id for task in tasks),
             )
             return {
-                "items": [_review_task_response(task) for task in tasks],
+                "items": [
+                    _review_task_response(task, revisions.get(task.place_revision_id))
+                    for task in tasks
+                ],
                 "limit": limit,
                 "offset": offset,
+                "total": review_workflow.count_tasks(
+                    current,
+                    status=review_status,
+                    keyword=keyword,
+                    admin_area=admin_area,
+                    place_kind=place_kind,
+                ),
             }
 
         @router.post(
@@ -1201,8 +1259,10 @@ def _audit_response(event: AdminAuditEvent) -> dict[str, object]:
     }
 
 
-def _review_task_response(task: PlaceReviewTask) -> dict[str, object]:
-    return {
+def _review_task_response(
+    task: PlaceReviewTask, revision: PlaceRevision | None = None
+) -> dict[str, object]:
+    response: dict[str, object] = {
         "review_task_id": task.review_task_id,
         "place_revision_id": task.place_revision_id,
         "status": task.status,
@@ -1212,6 +1272,18 @@ def _review_task_response(task: PlaceReviewTask) -> dict[str, object]:
         "created_at": task.created_at.isoformat(),
         "updated_at": task.updated_at.isoformat(),
     }
+    if revision is not None:
+        response.update(
+            {
+                "place_id": revision.place_id,
+                "revision_number": revision.revision_number,
+                "canonical_name": revision.canonical_name,
+                "admin_area": revision.admin_area,
+                "place_kind": revision.place_kind,
+                "category": revision.category,
+            }
+        )
+    return response
 
 
 def _revision_response(revision: PlaceRevision) -> dict[str, object]:

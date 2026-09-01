@@ -23,6 +23,12 @@ vi.mock('react-router-dom', () => ({
 const task: ReviewTask = {
   review_task_id: 'task-1',
   place_revision_id: 'revision-west-lake',
+  place_id: 'place-west-lake',
+  revision_number: 2,
+  canonical_name: '西湖',
+  admin_area: '西湖区',
+  place_kind: 'attraction',
+  category: 'museum',
   status: 'ready_for_review',
   assigned_reviewer_id: null,
   version: 1,
@@ -59,7 +65,12 @@ describe('ReviewQueuePage', () => {
   it('provides a direct entry to the reviewed place details', async () => {
     render(<ReviewQueuePage />)
 
-    await waitFor(() => expect(screen.getByText(task.place_revision_id)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('西湖')).toBeTruthy())
+    expect(screen.getByText('西湖区')).toBeTruthy()
+    expect(screen.getByText('景点')).toBeTruthy()
+    expect(screen.getByText('博物馆')).toBeTruthy()
+    expect(screen.getByText('第 2 版')).toBeTruthy()
+    expect(screen.queryByText(task.place_revision_id)).toBeNull()
     const detailsButton = screen.getByText('查看地点详情')
     fireEvent.click(detailsButton)
 

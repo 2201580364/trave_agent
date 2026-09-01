@@ -78,4 +78,4 @@ def test_readiness_distinguishes_database_from_migration_state(tmp_path: Path) -
     assert after["database"] is True
     assert after["migration"] is True
     assert after["ready"] is True
-    assert after["current_revision"] == "0012_relation_review_status"
+    assert after["current_revision"] == "0013_backfill_solver_eligibility"

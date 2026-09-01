@@ -34,7 +34,7 @@ export function HighRiskConfirm({
       okButtonProps={{ danger: true, disabled: typed !== confirmationText }}
       confirmLoading={loading}
       cancelButtonProps={{ disabled: loading }}
-      maskClosable={!loading}
+      mask={{ closable: !loading }}
       closable={!loading}
       onOk={onConfirm}
       onCancel={onCancel}

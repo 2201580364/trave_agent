@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
-import type { ReviewDecision, ReviewTask, ReviewTaskStatus } from '../api/types'
+import type { PlaceListFilters as PlaceListFilterValues, ReviewDecision, ReviewTask, ReviewTaskStatus } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
-import { reasonCodeLabel, reviewStatusLabel } from '../ui/displayLabels'
+import { PlaceListFilters } from '../components/PlaceListFilters'
+import { categoryLabel, placeKindLabel, reasonCodeLabel, reviewStatusLabel } from '../ui/displayLabels'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 20
 const statusLabels: Record<ReviewTaskStatus, string> = {
   draft: reviewStatusLabel('draft'),
   ready_for_review: reviewStatusLabel('ready_for_review'),
@@ -30,19 +31,29 @@ export function ReviewQueuePage() {
   const [batchDecision, setBatchDecision] = useState<ReviewDecision['decision_kind']>('approve')
   const [batchReason, setBatchReason] = useState('OM1_BATCH_REVIEW')
   const [batchWorking, setBatchWorking] = useState(false)
+  const [filters, setFilters] = useState<PlaceListFilterValues>({})
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
+  const [total, setTotal] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await api.listReviewTasks(status, PAGE_SIZE)
+      const result = await api.listReviewTasks(
+        status,
+        pageSize,
+        (page - 1) * pageSize,
+        filters,
+      )
       setTasks(result.items)
+      setTotal(result.total ?? result.items.length)
     } catch (reason) {
       setError(adminErrorMessage(reason))
     } finally {
       setLoading(false)
     }
-  }, [api, status])
+  }, [api, filters, page, pageSize, status])
 
   useEffect(() => {
     void load()
@@ -72,9 +83,11 @@ export function ReviewQueuePage() {
           </Tag>
         ),
       },
-      { title: '审核任务', dataIndex: 'review_task_id', width: 230, ellipsis: true },
-      { title: '修订版本', dataIndex: 'place_revision_id', width: 230, ellipsis: true },
-      { title: '版本', dataIndex: 'version', width: 80 },
+      { title: '景点名称', dataIndex: 'canonical_name', width: 220, ellipsis: true, render: (value: string | undefined) => value ?? '名称未提供' },
+      { title: '区域', dataIndex: 'admin_area', width: 140, render: (value: string | undefined) => value ?? '未提供' },
+      { title: '类型', dataIndex: 'place_kind', width: 130, render: (value: string | undefined) => value ? placeKindLabel(value) : '未提供' },
+      { title: '分类', dataIndex: 'category', width: 140, ellipsis: true, render: categoryLabel },
+      { title: '数据版本', dataIndex: 'revision_number', width: 100, render: (value: number | undefined) => value ? `第 ${value} 版` : '—' },
       { title: '更新时间', dataIndex: 'updated_at', width: 210, render: formatDateTime },
       {
         title: '审核地点',
@@ -112,7 +125,10 @@ export function ReviewQueuePage() {
             placeholder="全部状态"
             style={{ width: 150 }}
             options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
-            onChange={setStatus}
+            onChange={(value) => {
+              setPage(1)
+              setStatus(value)
+            }}
           />
           <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>
             刷新
@@ -121,15 +137,41 @@ export function ReviewQueuePage() {
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
       <Card>
+        <PlaceListFilters
+          value={filters}
+          loading={loading}
+          onSearch={(value) => {
+            setPage(1)
+            setFilters(value)
+          }}
+          onReset={() => {
+            setPage(1)
+            setFilters({})
+          }}
+        />
+      </Card>
+      <Card>
         <Table<ReviewTask>
           rowKey="review_task_id"
           columns={columns}
           dataSource={tasks}
           loading={loading}
-          pagination={false}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100],
+            showTotal: (count, range) => `${range[0]}-${range[1]} / 共 ${count} 条`,
+            onChange: (nextPage, nextPageSize) => {
+              setSelected([])
+              setPage(nextPageSize === pageSize ? nextPage : 1)
+              setPageSize(nextPageSize)
+            },
+          }}
           rowSelection={{ selectedRowKeys: selected, onChange: (keys) => setSelected(keys as string[]), getCheckboxProps: (task) => ({ disabled: !['ready_for_review', 'in_review', 'changes_requested'].includes(task.status) }) }}
           title={() => <Space wrap><Typography.Text>已选 {selected.length} 项</Typography.Text><Select value={batchDecision} onChange={setBatchDecision} options={[{ value: 'approve', label: '批量通过' }, { value: 'request_changes', label: '批量退回修改' }, { value: 'cancel', label: '批量关闭' }]} /><Input value={batchReason} onChange={(event) => setBatchReason(event.target.value)} style={{ width: 190 }} /><Button type="primary" onClick={() => void submitBatch()} disabled={!selected.length || !batchReason} loading={batchWorking}>提交批量审核</Button></Space>}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1180 }}
           expandable={{
             expandedRowRender: (task) => (
               <ReviewTaskDetails task={task} api={api} onChanged={load} />
@@ -191,8 +233,11 @@ function ReviewTaskDetails({
     <Space orientation="vertical" style={{ width: '100%' }}>
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
         <Descriptions.Item label="创建人">{task.created_by}</Descriptions.Item>
-        <Descriptions.Item label="修订版本">{task.place_revision_id}</Descriptions.Item>
-        <Descriptions.Item label="版本">{task.version}</Descriptions.Item>
+        <Descriptions.Item label="景点名称">{task.canonical_name ?? '未提供'}</Descriptions.Item>
+        <Descriptions.Item label="区域">{task.admin_area ?? '未提供'}</Descriptions.Item>
+        <Descriptions.Item label="地点类型">{task.place_kind ? placeKindLabel(task.place_kind) : '未提供'}</Descriptions.Item>
+        <Descriptions.Item label="地点分类">{categoryLabel(task.category)}</Descriptions.Item>
+        <Descriptions.Item label="数据版本">{task.revision_number ? `第 ${task.revision_number} 版` : '—'}</Descriptions.Item>
       </Descriptions>
       <Button
         type="link"

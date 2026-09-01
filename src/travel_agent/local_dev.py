@@ -14,10 +14,16 @@ from typing import cast
 
 from fastapi import FastAPI
 
-from travel_agent.infrastructure.database import DatabaseSettings
+from travel_agent.infrastructure.database import (
+    DatabaseSettings,
+    build_engine,
+    build_session_factory,
+)
 from travel_agent.infrastructure.memory import FixedDataSnapshotVersionProvider
 from travel_agent.infrastructure.solver import (
     InMemoryPublishedSolverDataProvider,
+    DatabasePublishedSnapshotVersionProvider,
+    DatabasePublishedSolverDataProvider,
     PublishedAttraction,
     PublishedSolverData,
 )
@@ -43,9 +49,19 @@ def build_local_dev_app(
 ) -> FastAPI:
     """Build the real A6 HTTP stack with local-only published input data."""
 
-    snapshots, catalog = build_local_hangzhou_catalog(reference_date=reference_date)
+    _, fallback_catalog = build_local_hangzhou_catalog(reference_date=reference_date)
     resolved_url = database_url or os.environ.get(
         "TRAVEL_AGENT_DATABASE_URL", DEFAULT_LOCAL_DATABASE_URL
+    )
+    engine = build_engine(DatabaseSettings(url=resolved_url))
+    sessions = build_session_factory(engine)
+    snapshots = DatabasePublishedSnapshotVersionProvider(
+        sessions, fallback_version=LOCAL_SNAPSHOT_VERSION
+    )
+    catalog = DatabasePublishedSolverDataProvider(
+        sessions,
+        city_id="hangzhou",
+        fallback=fallback_catalog,
     )
     return cast(
         FastAPI,

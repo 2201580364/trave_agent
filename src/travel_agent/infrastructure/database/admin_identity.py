@@ -14,6 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     delete,
     func,
+    or_,
     select,
     update,
 )
@@ -142,14 +143,60 @@ class SqlAlchemyAdminActorRepository:
         )
         return self._from_row(row) if row is not None else None
 
-    def list(self, *, limit: int, offset: int) -> tuple[AdminActor, ...]:
+    def list(
+        self,
+        *,
+        keyword: str | None,
+        status: str | None,
+        role_key: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[AdminActor, ...]:
+        statement = select(AdminActorRow)
+        if role_key is not None:
+            statement = statement.join(
+                AdminActorRoleRow,
+                AdminActorRoleRow.admin_actor_id == AdminActorRow.admin_actor_id,
+            ).where(AdminActorRoleRow.role_key == role_key)
+        if status is not None:
+            statement = statement.where(AdminActorRow.status == status)
+        if keyword is not None:
+            pattern = f"%{keyword}%"
+            statement = statement.where(
+                or_(
+                    AdminActorRow.login_name.ilike(pattern),
+                    AdminActorRow.admin_actor_id.ilike(pattern),
+                )
+            )
         rows = self._session.scalars(
-            select(AdminActorRow)
+            statement
+            .distinct()
             .order_by(AdminActorRow.created_at.asc(), AdminActorRow.admin_actor_id.asc())
             .limit(limit)
             .offset(offset)
         )
         return tuple(self._from_row(row) for row in rows)
+
+    def count_filtered(
+        self, *, keyword: str | None, status: str | None, role_key: str | None
+    ) -> int:
+        statement = select(func.count(func.distinct(AdminActorRow.admin_actor_id)))
+        if role_key is not None:
+            statement = statement.join(
+                AdminActorRoleRow,
+                AdminActorRoleRow.admin_actor_id == AdminActorRow.admin_actor_id,
+            ).where(AdminActorRoleRow.role_key == role_key)
+        if status is not None:
+            statement = statement.where(AdminActorRow.status == status)
+        if keyword is not None:
+            pattern = f"%{keyword}%"
+            statement = statement.where(
+                or_(
+                    AdminActorRow.login_name.ilike(pattern),
+                    AdminActorRow.admin_actor_id.ilike(pattern),
+                )
+            )
+        return int(self._session.scalar(statement) or 0)
 
     def add(self, actor: AdminActor) -> None:
         self._session.add(
@@ -370,10 +417,65 @@ class SqlAlchemyAdminAuditRepository:
         target_id: str | None,
         action: str | None,
         result: str | None,
+        keyword: str | None,
         limit: int,
         offset: int,
     ) -> tuple[AdminAuditEvent, ...]:
-        statement = select(AdminAuditEventRow)
+        statement = self._filtered_statement(
+            actor_id=actor_id,
+            target_type=target_type,
+            target_id=target_id,
+            action=action,
+            result=result,
+            keyword=keyword,
+        )
+        rows = self._session.scalars(
+            statement.order_by(
+                AdminAuditEventRow.occurred_at.desc(),
+                AdminAuditEventRow.audit_event_id.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        return tuple(_audit_from_row(row) for row in rows)
+
+    def count(
+        self,
+        *,
+        actor_id: str | None,
+        target_type: str | None,
+        target_id: str | None,
+        action: str | None,
+        result: str | None,
+        keyword: str | None,
+    ) -> int:
+        statement = self._filtered_statement(
+            actor_id=actor_id,
+            target_type=target_type,
+            target_id=target_id,
+            action=action,
+            result=result,
+            keyword=keyword,
+            count=True,
+        )
+        return int(self._session.scalar(statement) or 0)
+
+    @staticmethod
+    def _filtered_statement(
+        *,
+        actor_id: str | None,
+        target_type: str | None,
+        target_id: str | None,
+        action: str | None,
+        result: str | None,
+        keyword: str | None,
+        count: bool = False,
+    ):
+        statement = (
+            select(func.count()).select_from(AdminAuditEventRow)
+            if count
+            else select(AdminAuditEventRow)
+        )
         filters = (
             (AdminAuditEventRow.actor_id, actor_id),
             (AdminAuditEventRow.target_type, target_type),
@@ -384,15 +486,22 @@ class SqlAlchemyAdminAuditRepository:
         for column, value in filters:
             if value is not None:
                 statement = statement.where(column == value)
-        rows = self._session.scalars(
-            statement.order_by(
-                AdminAuditEventRow.occurred_at.desc(),
-                AdminAuditEventRow.audit_event_id.desc(),
+        if keyword is not None:
+            pattern = f"%{keyword}%"
+            statement = statement.where(
+                or_(
+                    AdminAuditEventRow.actor_id.ilike(pattern),
+                    AdminAuditEventRow.actor_role.ilike(pattern),
+                    AdminAuditEventRow.action.ilike(pattern),
+                    AdminAuditEventRow.target_type.ilike(pattern),
+                    AdminAuditEventRow.target_id.ilike(pattern),
+                    AdminAuditEventRow.reason_code.ilike(pattern),
+                    AdminAuditEventRow.reason_text.ilike(pattern),
+                    AdminAuditEventRow.request_id.ilike(pattern),
+                    AdminAuditEventRow.error_code.ilike(pattern),
+                )
             )
-            .limit(limit)
-            .offset(offset)
-        )
-        return tuple(_audit_from_row(row) for row in rows)
+        return statement
 
 
 class SqlAlchemyAdminUnitOfWork:

@@ -373,7 +373,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0012_relation_review_status"
+    assert revision == "0013_backfill_solver_eligibility"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -917,6 +917,118 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     )
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "resource_not_found"
+
+
+def test_admin_place_and_audit_searches_filter_before_pagination(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-search")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    created_actor = context.client.post(
+        "/api/v1/admin/admin-actors",
+        headers=headers,
+        json={
+            "operation_intent_id": "op-create-search-editor",
+            "login_name": "search.editor",
+            "initial_password": EDITOR_PASSWORD,
+            "role_keys": ["data_editor"],
+            "reason_code": "OM1_TEAM_PROVISIONING",
+        },
+    )
+    assert created_actor.status_code == 201
+
+    actor_by_keyword = context.client.get(
+        "/api/v1/admin/admin-actors",
+        headers=headers,
+        params={"keyword": "search.editor", "limit": 1, "offset": 0},
+    )
+    assert actor_by_keyword.status_code == 200
+    assert actor_by_keyword.json()["total"] == 1
+    assert [item["login_name"] for item in actor_by_keyword.json()["items"]] == [
+        "search.editor"
+    ]
+
+    actor_by_role = context.client.get(
+        "/api/v1/admin/admin-actors",
+        headers=headers,
+        params={"actor_status": "active", "role_key": "admin_security"},
+    )
+    assert actor_by_role.status_code == 200
+    assert actor_by_role.json()["total"] == 1
+    assert actor_by_role.json()["items"][0]["login_name"] == ROOT_LOGIN
+
+    for query in (
+        {"keyword": "Candidate"},
+        {"admin_area": "West Lake"},
+        {"place_kind": "attraction"},
+    ):
+        candidates = context.client.get(
+            "/api/v1/admin/candidates", headers=headers, params=query
+        )
+        assert candidates.status_code == 200
+        assert candidates.json()["total"] == 1
+        assert candidates.json()["items"][0]["place_revision_id"] == "revision-search"
+
+    no_candidates = context.client.get(
+        "/api/v1/admin/candidates",
+        headers=headers,
+        params={"keyword": "not-a-real-place", "limit": 1, "offset": 0},
+    )
+    assert no_candidates.status_code == 200
+    assert no_candidates.json()["items"] == []
+    assert no_candidates.json()["total"] == 0
+
+    submitted = context.client.post(
+        "/api/v1/admin/place-revisions/revision-search/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "review-submit-search",
+            "reason_code": "READY_FOR_REVIEW",
+        },
+    )
+    assert submitted.status_code == 201
+
+    review_queue = context.client.get(
+        "/api/v1/admin/review-tasks",
+        headers=headers,
+        params={
+            "review_status": "ready_for_review",
+            "keyword": "Candidate",
+            "admin_area": "West Lake",
+            "place_kind": "attraction",
+            "limit": 1,
+            "offset": 0,
+        },
+    )
+    assert review_queue.status_code == 200
+    assert review_queue.json()["total"] == 1
+    review_item = review_queue.json()["items"][0]
+    assert review_item["place_revision_id"] == "revision-search"
+    assert review_item["canonical_name"] == "Candidate Place"
+    assert review_item["admin_area"] == "West Lake"
+    assert review_item["place_kind"] == "attraction"
+    assert review_item["category"] == "museum"
+    assert review_item["revision_number"] == 1
+
+    empty_review_page = context.client.get(
+        "/api/v1/admin/review-tasks",
+        headers=headers,
+        params={"keyword": "Candidate", "limit": 1, "offset": 1},
+    )
+    assert empty_review_page.status_code == 200
+    assert empty_review_page.json()["items"] == []
+    assert empty_review_page.json()["total"] == 1
+
+    audit_results = context.client.get(
+        "/api/v1/admin/audit-events",
+        headers=headers,
+        params={"keyword": "ADMIN_ACTOR_CREATE", "limit": 1, "offset": 0},
+    )
+    assert audit_results.status_code == 200
+    assert audit_results.json()["total"] == 1
+    assert audit_results.json()["items"][0]["action"] == "ADMIN_ACTOR_CREATE"
 
 
 def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
@@ -1918,6 +2030,52 @@ def test_place_review_request_changes_keeps_candidate_and_rejects_stale_version(
         revision = session.get(PlaceRevisionRow, "revision-2")
     assert revision is not None
     assert revision.lifecycle_status == "candidate"
+
+
+def test_resubmitting_after_changes_requested_reopens_task_for_review(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-resubmit")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    submit_path = "/api/v1/admin/place-revisions/revision-resubmit/review-tasks"
+    first = context.client.post(
+        submit_path,
+        headers=headers,
+        json={"operation_intent_id": "resubmit-first", "reason_code": "READY_FOR_REVIEW"},
+    )
+    assert first.status_code == 201
+    task_id = first.json()["review_task_id"]
+    changed = context.client.post(
+        f"/api/v1/admin/review-tasks/{task_id}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "resubmit-changes",
+            "expected_version": 1,
+            "decision_kind": "request_changes",
+            "reason_code": "OM1_SOURCE_MISSING",
+            "reason_text": "请补充来源记录",
+        },
+    )
+    assert changed.status_code == 200
+    assert changed.json()["status"] == "changes_requested"
+
+    reopened = context.client.post(
+        submit_path,
+        headers=headers,
+        json={"operation_intent_id": "resubmit-second", "reason_code": "READY_FOR_REVIEW"},
+    )
+    assert reopened.status_code == 201
+    assert reopened.json()["review_task_id"] == task_id
+    assert reopened.json()["status"] == "ready_for_review"
+    assert reopened.json()["version"] == 3
+
+    queue = context.client.get(
+        "/api/v1/admin/review-tasks?review_status=ready_for_review",
+        headers=headers,
+    )
+    assert queue.status_code == 200
+    assert any(item["review_task_id"] == task_id for item in queue.json()["items"])
 
 
 def test_review_rejects_non_candidate_revision_and_audits_rejection(

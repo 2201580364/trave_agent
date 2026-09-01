@@ -650,9 +650,11 @@ function VerificationSummaryCard({ evidence, revision }: { evidence: PlaceRevisi
       <Space wrap>
         {groups.map((group) => {
           const active = group.items.filter((item) => item.active)
-          const verified = active.filter((item) => item.review_status === 'human_verified').length
+          const noRelationsConfirmed = group.target === 'o07-evidence' && active.length === 0 && revision.relation_review_status === 'no_relations'
+          const verified = noRelationsConfirmed ? 1 : active.filter((item) => item.review_status === 'human_verified').length
+          const total = noRelationsConfirmed ? 1 : active.length
           return <Button key={group.target} size="small" onClick={() => document.getElementById(group.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            {group.label}：{verified}/{active.length} 已核验
+            {group.label}：{verified}/{total} 已核验
           </Button>
         })}
         <Tag color={revision.solver_eligible ? 'success' : 'warning'}>{revision.solver_eligible ? '已具备求解资格' : '尚未具备求解资格'}</Tag>

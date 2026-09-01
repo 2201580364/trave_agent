@@ -39,6 +39,77 @@ describe('AdminApi', () => {
     expect(headers.has('Authorization')).toBe(false)
   })
 
+  it('serializes business list filters before server-side pagination', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () =>
+        new Response(JSON.stringify({ items: [], limit: 20, offset: 20, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    const api = new AdminApi(() => 'memory-only-token', vi.fn())
+
+    await api.listCandidates('candidate', 20, 20, {
+      keyword: '西湖',
+      admin_area: '西湖区',
+      place_kind: 'attraction',
+    })
+    await api.listReviewTasks('ready_for_review', 20, 20, {
+      keyword: '博物馆',
+      admin_area: '西湖区',
+      place_kind: 'attraction',
+    })
+    await api.listAdminActors(20, 20, {
+      keyword: 'root.admin',
+      actor_status: 'active',
+      role_key: 'admin_security',
+    })
+    await api.listAuditEvents({
+      keyword: 'ADMIN_ACTOR',
+      result: 'succeeded',
+      limit: 20,
+      offset: 20,
+    })
+
+    const candidateUrl = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
+    expect(Object.fromEntries(candidateUrl.searchParams)).toMatchObject({
+      lifecycle_status: 'candidate',
+      keyword: '西湖',
+      admin_area: '西湖区',
+      place_kind: 'attraction',
+      limit: '20',
+      offset: '20',
+    })
+
+    const reviewUrl = new URL(String(fetchMock.mock.calls[1][0]), 'http://localhost')
+    expect(Object.fromEntries(reviewUrl.searchParams)).toMatchObject({
+      review_status: 'ready_for_review',
+      keyword: '博物馆',
+      admin_area: '西湖区',
+      place_kind: 'attraction',
+      limit: '20',
+      offset: '20',
+    })
+
+    const actorUrl = new URL(String(fetchMock.mock.calls[2][0]), 'http://localhost')
+    expect(Object.fromEntries(actorUrl.searchParams)).toMatchObject({
+      keyword: 'root.admin',
+      actor_status: 'active',
+      role_key: 'admin_security',
+      limit: '20',
+      offset: '20',
+    })
+
+    const auditUrl = new URL(String(fetchMock.mock.calls[3][0]), 'http://localhost')
+    expect(Object.fromEntries(auditUrl.searchParams)).toMatchObject({
+      keyword: 'ADMIN_ACTOR',
+      result: 'succeeded',
+      limit: '20',
+      offset: '20',
+    })
+  })
+
   it('clears the session boundary and exposes the stable error code on 401', async () => {
     const onUnauthorized = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(

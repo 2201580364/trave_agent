@@ -1,4 +1,4 @@
-import { PlusOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import {
   App,
   Button,
@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   Modal,
+  Select,
   Space,
   Table,
   Tag,
@@ -18,7 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AdminApiError, createOperationIntent } from '../api/adminApi'
 import { adminErrorMessage } from '../api/errorMessages'
-import type { AdminActor, CreateAdminActorInput, ReplaceAdminRolesInput } from '../api/types'
+import type { AdminActor, AdminActorFilters, CreateAdminActorInput, ReplaceAdminRolesInput } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
 import { HighRiskConfirm } from '../components/HighRiskConfirm'
@@ -59,6 +60,8 @@ type PendingRoleChange = {
   operationIntentId: string
 }
 
+const PAGE_SIZE = 20
+
 export function AdminActorsPage() {
   const { api, hasPermission, principal } = useAdminSession()
   const { message } = App.useApp()
@@ -74,20 +77,30 @@ export function AdminActorsPage() {
   const [roleLoading, setRoleLoading] = useState(false)
   const [createForm] = Form.useForm<ActorFormFields>()
   const [roleForm] = Form.useForm<RoleFormFields>()
+  const [queryForm] = Form.useForm<AdminActorFilters>()
+  const [filters, setFilters] = useState<AdminActorFilters>({})
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
+  const [total, setTotal] = useState(0)
   const canWrite = hasPermission('admin:actor:roles:write')
 
   const loadActors = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.listAdminActors()
+      const response = await api.listAdminActors(
+        pageSize,
+        (page - 1) * pageSize,
+        filters,
+      )
       setActors(response.items)
+      setTotal(response.total ?? response.items.length)
     } catch (reason) {
       setError(adminErrorMessage(reason))
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [api, filters, page, pageSize])
 
   useEffect(() => {
     void loadActors()
@@ -256,12 +269,57 @@ export function AdminActorsPage() {
       </div>
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
       <Card>
+        <Form<AdminActorFilters>
+          form={queryForm}
+          layout="inline"
+          onFinish={(values) => {
+            setPage(1)
+            setFilters({
+              keyword: values.keyword?.trim() || undefined,
+              actor_status: values.actor_status,
+              role_key: values.role_key,
+            })
+          }}
+        >
+          <Form.Item name="keyword" label="关键字">
+            <Input allowClear placeholder="登录名、管理员编号" style={{ width: 220 }} />
+          </Form.Item>
+          <Form.Item name="actor_status" label="状态">
+            <Select allowClear placeholder="全部状态" style={{ width: 130 }} options={[
+              { value: 'active', label: '有效' },
+              { value: 'locked', label: '已锁定' },
+              { value: 'disabled', label: '已停用' },
+            ]} />
+          </Form.Item>
+          <Form.Item name="role_key" label="角色">
+            <Select allowClear placeholder="全部角色" style={{ width: 150 }} options={ROLE_CATALOG.filter((role) => !('disabled' in role && role.disabled)).map((role) => ({ value: role.key, label: role.label }))} />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>查询</Button>
+              <Button onClick={() => { queryForm.resetFields(); setPage(1); setFilters({}) }}>清空</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
+      <Card>
         <Table<AdminActor>
           rowKey="admin_actor_id"
           loading={loading}
           columns={columns}
           dataSource={actors}
-          pagination={false}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100],
+            showTotal: (count, range) => `${range[0]}-${range[1]} / 共 ${count} 条`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPageSize === pageSize ? nextPage : 1)
+              setPageSize(nextPageSize)
+            },
+          }}
           scroll={{ x: 1100 }}
           locale={{ emptyText: '暂无可见管理员' }}
           expandable={{

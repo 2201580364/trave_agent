@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Integer, String, func, select, update
+from sqlalchemy import Integer, String, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -79,6 +79,18 @@ class SqlAlchemyPlaceReviewRepository:
         )
         return _revision_from_row(row) if row is not None else None
 
+    def get_revisions(
+        self, revision_ids: tuple[str, ...]
+    ) -> tuple[PlaceRevision, ...]:
+        if not revision_ids:
+            return ()
+        rows = self._session.scalars(
+            select(PlaceRevisionRow)
+            .where(PlaceRevisionRow.place_revision_id.in_(revision_ids))
+            .order_by(PlaceRevisionRow.place_revision_id.asc())
+        )
+        return tuple(_revision_from_row(row) for row in rows)
+
     def add_revision(self, revision: PlaceRevision) -> None:
         self._session.add(PlaceRevisionRow(**_revision_values(revision)))
         try:
@@ -107,13 +119,21 @@ class SqlAlchemyPlaceReviewRepository:
             raise ValueError("candidate revision version conflict")
 
     def list_revisions(
-        self, *, lifecycle_status: str | None, limit: int, offset: int
+        self,
+        *,
+        lifecycle_status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        limit: int,
+        offset: int,
     ) -> tuple[PlaceRevision, ...]:
-        statement = select(PlaceRevisionRow)
-        if lifecycle_status is not None:
-            statement = statement.where(
-                PlaceRevisionRow.lifecycle_status == lifecycle_status
-            )
+        statement = self._revision_statement(
+            lifecycle_status=lifecycle_status,
+            keyword=keyword,
+            admin_area=admin_area,
+            place_kind=place_kind,
+        )
         rows = self._session.scalars(
             statement.order_by(
                 PlaceRevisionRow.created_at.desc(),
@@ -124,13 +144,58 @@ class SqlAlchemyPlaceReviewRepository:
         )
         return tuple(_revision_from_row(row) for row in rows)
 
-    def count_revisions(self, *, lifecycle_status: str | None) -> int:
-        statement = select(func.count()).select_from(PlaceRevisionRow)
+    def count_revisions(
+        self,
+        *,
+        lifecycle_status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int:
+        statement = self._revision_statement(
+            lifecycle_status=lifecycle_status,
+            keyword=keyword,
+            admin_area=admin_area,
+            place_kind=place_kind,
+            count=True,
+        )
+        return int(self._session.scalar(statement) or 0)
+
+    @staticmethod
+    def _revision_statement(
+        *,
+        lifecycle_status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        count: bool = False,
+    ):
+        statement = (
+            select(func.count()).select_from(PlaceRevisionRow)
+            if count
+            else select(PlaceRevisionRow)
+        )
         if lifecycle_status is not None:
             statement = statement.where(
                 PlaceRevisionRow.lifecycle_status == lifecycle_status
             )
-        return int(self._session.scalar(statement) or 0)
+        if admin_area is not None:
+            statement = statement.where(PlaceRevisionRow.admin_area == admin_area)
+        if place_kind is not None:
+            statement = statement.where(PlaceRevisionRow.place_kind == place_kind)
+        if keyword is not None:
+            pattern = f"%{keyword}%"
+            statement = statement.where(
+                or_(
+                    PlaceRevisionRow.canonical_name.ilike(pattern),
+                    PlaceRevisionRow.address.ilike(pattern),
+                    PlaceRevisionRow.admin_area.ilike(pattern),
+                    PlaceRevisionRow.category.ilike(pattern),
+                    PlaceRevisionRow.place_id.ilike(pattern),
+                    PlaceRevisionRow.place_revision_id.ilike(pattern),
+                )
+            )
+        return statement
 
     def get_open_task_for_revision(self, revision_id: str) -> PlaceReviewTask | None:
         row = self._session.scalar(
@@ -146,11 +211,21 @@ class SqlAlchemyPlaceReviewRepository:
         return _task_from_row(row) if row is not None else None
 
     def list_tasks(
-        self, *, status: str | None, limit: int, offset: int
+        self,
+        *,
+        status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        limit: int,
+        offset: int,
     ) -> tuple[PlaceReviewTask, ...]:
-        statement = select(PlaceReviewTaskRow)
-        if status is not None:
-            statement = statement.where(PlaceReviewTaskRow.status == status)
+        statement = self._task_statement(
+            status=status,
+            keyword=keyword,
+            admin_area=admin_area,
+            place_kind=place_kind,
+        )
         rows = self._session.scalars(
             statement.order_by(
                 PlaceReviewTaskRow.updated_at.desc(),
@@ -161,11 +236,61 @@ class SqlAlchemyPlaceReviewRepository:
         )
         return tuple(_task_from_row(row) for row in rows)
 
-    def count_tasks(self, *, status: str | None) -> int:
-        statement = select(func.count()).select_from(PlaceReviewTaskRow)
+    def count_tasks(
+        self,
+        *,
+        status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int:
+        statement = self._task_statement(
+            status=status,
+            keyword=keyword,
+            admin_area=admin_area,
+            place_kind=place_kind,
+            count=True,
+        )
+        return int(self._session.scalar(statement) or 0)
+
+    @staticmethod
+    def _task_statement(
+        *,
+        status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        count: bool = False,
+    ):
+        statement = (
+            select(func.count()).select_from(PlaceReviewTaskRow)
+            if count
+            else select(PlaceReviewTaskRow)
+        )
+        statement = statement.join(
+            PlaceRevisionRow,
+            PlaceRevisionRow.place_revision_id == PlaceReviewTaskRow.place_revision_id,
+        )
         if status is not None:
             statement = statement.where(PlaceReviewTaskRow.status == status)
-        return int(self._session.scalar(statement) or 0)
+        if admin_area is not None:
+            statement = statement.where(PlaceRevisionRow.admin_area == admin_area)
+        if place_kind is not None:
+            statement = statement.where(PlaceRevisionRow.place_kind == place_kind)
+        if keyword is not None:
+            pattern = f"%{keyword}%"
+            statement = statement.where(
+                or_(
+                    PlaceReviewTaskRow.review_task_id.ilike(pattern),
+                    PlaceRevisionRow.canonical_name.ilike(pattern),
+                    PlaceRevisionRow.address.ilike(pattern),
+                    PlaceRevisionRow.admin_area.ilike(pattern),
+                    PlaceRevisionRow.category.ilike(pattern),
+                    PlaceRevisionRow.place_id.ilike(pattern),
+                    PlaceRevisionRow.place_revision_id.ilike(pattern),
+                )
+            )
+        return statement
 
     def add_task(self, task: PlaceReviewTask) -> None:
         self._session.add(
@@ -230,7 +355,11 @@ class SqlAlchemyPlaceReviewRepository:
                 PlaceRevisionRow.place_revision_id == revision_id,
                 PlaceRevisionRow.lifecycle_status == "candidate",
             )
-            .values(lifecycle_status="human_verified", reviewed_at=reviewed_at.isoformat())
+            .values(
+                lifecycle_status="human_verified",
+                reviewed_at=reviewed_at.isoformat(),
+                solver_eligible=True,
+            )
         )
         if result.rowcount != 1:
             raise ValueError("candidate revision is not approvable")

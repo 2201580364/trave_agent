@@ -111,6 +111,18 @@ const reasonLabels: Record<string, string> = {
   UNSUPPORTED_PLACE_KIND: '地点类型暂不支持求解',
 }
 
+const categoryLabels: Record<string, string> = {
+  natural_scenery: '自然山水',
+  historic_culture: '古镇人文',
+  temple: '寺庙祈福',
+  city_view: '城市观景',
+  museum: '博物馆',
+  food_district: '美食街区',
+  photo_spot: '网红打卡',
+  family_park: '亲子乐园',
+  performing_arts: '演出演艺',
+}
+
 function label(value: string | null | undefined, fallback = '未识别') {
   if (!value) return fallback
   return labels[value] ?? fallback
@@ -118,6 +130,10 @@ function label(value: string | null | undefined, fallback = '未识别') {
 
 export function lifecycleStatusLabel(value: string | null | undefined) { return label(value) }
 export function placeKindLabel(value: string | null | undefined) { return label(value) }
+export function categoryLabel(value: string | null | undefined) {
+  if (!value) return '未提供'
+  return categoryLabels[value] ?? value
+}
 export function geometryKindLabel(value: string | null | undefined) { return label(value) }
 export function accessPointKindLabel(value: string | null | undefined) { return label(value) }
 export function reviewStatusLabel(value: string | null | undefined) { return label(value) }
