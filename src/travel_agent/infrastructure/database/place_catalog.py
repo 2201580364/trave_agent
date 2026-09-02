@@ -1587,13 +1587,19 @@ def _research_snapshot_from_row(row: ResearchSnapshotRow) -> ResearchSnapshot:
 
 
 def _relation_from_row(row: PlaceRelationRow) -> PlaceRelation:
+    # Early relation imports used ``unresolved`` for the review state. Keep
+    # those rows readable and actionable; the current workflow uses candidate
+    # until a reviewer explicitly verifies or rejects the relation.
+    review_status = row.review_status
+    if review_status not in {"candidate", "human_verified", "rejected"}:
+        review_status = "candidate"
     return PlaceRelation(
         row.relation_id,
         row.from_place_id,
         row.to_place_id,
         row.relation_type,
         row.source_record_id,
-        row.review_status,
+        review_status,
         row.resolution_status,
         row.decision_note,
         row.active,

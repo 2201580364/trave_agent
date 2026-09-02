@@ -220,7 +220,9 @@ export function sourceKindLabel(value: string | null | undefined) {
   return ({ government_public_site: '政府公开网站', official_operator_site: '官方运营方网站', open_data_portal: '开放数据平台', licensed_api: '已授权接口' } as Record<string, string>)[value ?? ''] ?? '其他来源渠道'
 }
 export function relationTypeLabel(value: string | null | undefined) { return label(value) }
-export function relationResolutionLabel(value: string | null | undefined) { return label(value) }
+export function relationResolutionLabel(value: string | null | undefined) {
+  return ({ resolved: '同意此地点关系', not_required: '驳回此地点关系', pending: '待处理' } as Record<string, string>)[value ?? ''] ?? '待处理'
+}
 
 export function relationReviewStatusLabel(value: string | null | undefined) {
   return ({ pending: '待完成关系检查', no_relations: '已确认无关系', not_required: '无需单独确认' } as Record<string, string>)[value ?? ''] ?? '未识别'

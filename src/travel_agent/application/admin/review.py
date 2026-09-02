@@ -415,7 +415,9 @@ class PlaceReviewWorkflowService:
             if relation is None or revision.place_id not in {relation.from_place_id, relation.to_place_id}:
                 raise ResourceNotFoundError
             updated_relation = replace(relation, resolution_status=resolution_status, decision_note=decision_note,
-                                       review_status="pending", reviewed_at=None)
+                                       # A裁决 changes the relation fact but does not
+                                       # itself constitute reviewer verification.
+                                       review_status="candidate", reviewed_at=None)
             updated = uow.catalog.update_relation(updated_relation, revision_id=revision_id, expected_revision_version=expected_revision_version)
             uow.audits.add(self._event(actor, action="PLACE_RELATION_RESOLUTION_UPDATED",
                                         target_type="place_relation", target_id=relation_id,

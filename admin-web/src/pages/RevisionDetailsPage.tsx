@@ -1240,6 +1240,10 @@ function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit
   const [confirmingNone, setConfirmingNone] = useState(false)
   const save = async () => {
     if (!editing) return
+    if (!note.trim()) {
+      onError('请填写判断依据后再保存关系裁决')
+      return
+    }
     setWorking(true)
     try {
       await api.resolvePlaceRelation(revision.place_revision_id, editing.relation_id, {
@@ -1268,7 +1272,7 @@ function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit
     } catch (reason) { onError(adminErrorMessage(reason)) } finally { setConfirmingNone(false) }
   }
   return <Card title="地点关系与裁决（O07）">
-    <InstructionHint text="关系记录由系统根据地点归一与去重线索自动发现，不在此处手工新增。存在关系时请逐条裁决；没有关系记录时，数据编辑员需要确认“已检查，无关系”，该结论会写入当前修订版本并保留审计记录。" />
+    <InstructionHint text="关系记录由系统根据地点归一与去重线索自动发现，不在此处手工新增。请逐条判断关系是否成立：同意会保留该地点关系，驳回会将其标记为误识别并从有效关系中排除；暂时无法判断时选择待处理。没有关系记录时，数据编辑员需要确认“已检查，无关系”。" />
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Alert showIcon type={revision.relation_review_status === 'no_relations' || relations.length > 0 ? 'success' : 'warning'} title={`关系检查：${relationReviewStatusLabel(revision.relation_review_status)}`} description={relations.length > 0 ? '系统已发现关系记录，请确认每条记录的关系类型和裁决状态。' : revision.relation_review_status === 'no_relations' ? '本次修订已记录当前地点没有需要裁决的关系。' : canEdit ? '当前没有关系记录。请确认本次检查完成，系统会保留操作人和时间。' : '当前账号只有查看权限，请由数据编辑员确认“无关系”。'} />
       {relations.length === 0 && canEdit && (revision.relation_review_status ?? 'pending') !== 'no_relations' && <Button type="primary" onClick={() => void confirmNone()} loading={confirmingNone}>确认无关系</Button>}
@@ -1287,8 +1291,9 @@ function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit
     ]} />
     <Modal title="关系裁决" open={editing !== null} onOk={() => void save()} onCancel={() => setEditing(null)} confirmLoading={working}>
       <Space orientation="vertical" style={{ width: '100%' }}>
-        <Select value={status} onChange={setStatus} options={[{ value: 'resolved', label: '已裁决' }, { value: 'not_required', label: '无需裁决' }, { value: 'pending', label: '待处理' }]} />
-        <Input.TextArea value={note} onChange={(event) => setNote(event.target.value)} placeholder="裁决说明（已裁决时必填）" rows={4} />
+        <Alert type="info" showIcon message="请选择关系判断结果" description="同意此地点关系：关系成立并保留；驳回此地点关系：关系不成立并排除；待处理：暂不作决定。" />
+        <Select value={status} onChange={setStatus} options={[{ value: 'resolved', label: '同意此地点关系' }, { value: 'not_required', label: '驳回此地点关系' }, { value: 'pending', label: '待处理' }]} />
+        <Input.TextArea value={note} onChange={(event) => setNote(event.target.value)} placeholder="请填写判断依据（同意或驳回均必填）" rows={4} status={editing && !note.trim() ? 'error' : undefined} />
       </Space>
     </Modal>
     </Space>
