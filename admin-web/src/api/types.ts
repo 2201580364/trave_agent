@@ -265,6 +265,9 @@ export type PlaceRelationEvidence = {
   relation_id: string
   from_place_id: string
   to_place_id: string
+  from_place_name?: string | null
+  to_place_name?: string | null
+  relation_summary?: string | null
   relation_type: string
   source_record_id: string
   source_record_valid: boolean
@@ -391,6 +394,26 @@ export type PlaceDateExceptionInput = {
   end_minute: number | null
   last_entry_minute: number | null
   source_record_id: string
+  operation_intent_id: string
+  reason_code: string
+  reason_text?: string
+}
+
+export type HolidayCalendar = {
+  calendar_id: string
+  display_name: string
+  source_note: string
+  periods: Array<{ name: string; start: string; end: string }>
+}
+
+export type GenerateHolidayExceptionsInput = {
+  expected_revision_version: number
+  calendar_id: string
+  source_record_id: string
+  open_start_minute: number
+  open_end_minute: number
+  open_last_entry_minute: number | null
+  shift_closure: boolean
   operation_intent_id: string
   reason_code: string
   reason_text?: string

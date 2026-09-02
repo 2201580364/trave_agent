@@ -12,6 +12,8 @@
 py -3.12 scripts/run_local_dev.py
 ```
 
+启动脚本默认读取 `.env` 中的 `TRAVEL_AGENT_DATABASE_URL`；需要临时覆盖 SQLite 文件时可使用 `--database .local/xxx.db`。当前本地人工核验环境使用 `.local/research.db`。
+
 前端要求 Node.js 22 和 npm 10：
 
 ```text

@@ -109,6 +109,16 @@ const reasonLabels: Record<string, string> = {
   PROJECTION_PLACE_KIND_MISMATCH: '求解投影地点类型不一致',
   PROJECTION_GEOMETRY_KIND_MISMATCH: '求解投影几何类型不一致',
   UNSUPPORTED_PLACE_KIND: '地点类型暂不支持求解',
+  PLACE_ALWAYS_OPEN: '地点全天开放',
+  PLACE_WEEKLY_CLOSED: '命中固定闭馆日',
+  PLACE_DATE_EXCEPTION_CLOSED: '命中临时关闭日期例外',
+  PLACE_DATE_EXCEPTION_APPLIED: '命中日期开放或场次覆盖',
+  HOLIDAY_OPEN_OVERRIDE: '法定节假日开放，覆盖固定闭馆日',
+  HOLIDAY_CLOSURE_SHIFT: '节假日结束后顺延闭馆',
+  TIME_RULE_NOT_MATCHED: '当天没有匹配的开放时间规则',
+  TIME_RULE_OVERLAP: '同一天存在多条冲突时间规则',
+  CROSS_MIDNIGHT_WINDOW: '开放或场次跨越午夜',
+  LAST_ENTRY_AFTER_CLOSE: '最晚入园时间晚于闭馆时间',
 }
 
 const reviewFlagLabels: Record<string, string> = {

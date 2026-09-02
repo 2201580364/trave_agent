@@ -240,6 +240,19 @@ class PlaceDateExceptionInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+class GenerateHolidayExceptionsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision_version: int = Field(gt=0)
+    calendar_id: str = Field(min_length=1, max_length=64)
+    source_record_id: str = Field(min_length=1, max_length=64)
+    open_start_minute: int = Field(ge=0, le=2880)
+    open_end_minute: int = Field(ge=0, le=2880)
+    open_last_entry_minute: int | None = Field(default=None, ge=0, le=2880)
+    shift_closure: bool = True
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    reason_code: str = Field(min_length=3, max_length=64)
+    reason_text: str | None = Field(default=None, max_length=500)
+
 class ResolveSourceConflictsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision_number: int = Field(gt=0)
@@ -477,6 +490,15 @@ def build_admin_router(
                     for channel in review_workflow.list_source_channels(current)
                 ]
             }
+
+        @router.get("/holiday-calendars")
+        def list_holiday_calendars_endpoint(
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            from travel_agent.domain.place_catalog import list_holiday_calendars
+            return {"items": [{"calendar_id": item.calendar_id, "display_name": item.display_name, "source_note": item.source_note,
+                               "periods": [{"name": p.name, "start": p.start.isoformat(), "end": p.end.isoformat()} for p in item.periods]}
+                              for item in list_holiday_calendars()]}
 
         @router.post("/places/{place_id}/revisions", status_code=status.HTTP_201_CREATED)
         def create_place_revision(
@@ -929,6 +951,24 @@ def build_admin_router(
                 reason_code=payload.reason_code,
                 reason_text=payload.reason_text,
                 request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
+        @router.post("/place-revisions/{revision_id}/holiday-exceptions")
+        def generate_holiday_exceptions(
+            revision_id: str,
+            payload: GenerateHolidayExceptionsInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.generate_holiday_exceptions(
+                current, revision_id=revision_id,
+                expected_revision_version=payload.expected_revision_version,
+                calendar_id=payload.calendar_id, source_record_id=payload.source_record_id,
+                open_start_minute=payload.open_start_minute, open_end_minute=payload.open_end_minute,
+                open_last_entry_minute=payload.open_last_entry_minute, shift_closure=payload.shift_closure,
+                operation_intent_id=payload.operation_intent_id, reason_code=payload.reason_code,
+                reason_text=payload.reason_text, request_id=request.state.request_id,
             )
             return _revision_response(revision)
 
@@ -1562,6 +1602,13 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
                 "relation_id": relation.relation_id,
                 "from_place_id": relation.from_place_id,
                 "to_place_id": relation.to_place_id,
+                "from_place_name": dict(evidence.relation_place_names).get(relation.from_place_id),
+                "to_place_name": dict(evidence.relation_place_names).get(relation.to_place_id),
+                "relation_summary": _relation_summary(
+                    relation.relation_type,
+                    dict(evidence.relation_place_names).get(relation.from_place_id),
+                    dict(evidence.relation_place_names).get(relation.to_place_id),
+                ),
                 "relation_type": relation.relation_type,
                 "source_record_id": relation.source_record_id,
                 "source_record_valid": relation.source_record_id in valid_source_ids,
@@ -1597,6 +1644,18 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
         ),
         "missing_source_record_ids": list(evidence.missing_source_record_ids),
     }
+
+
+def _relation_summary(relation_type: str, from_name: str | None, to_name: str | None) -> str:
+    left = from_name or "待补充地点名称"
+    right = to_name or "待补充地点名称"
+    meanings = {
+        "contains": f"{left} 包含 {right}",
+        "part_of": f"{left} 属于 {right}",
+        "overlaps": f"{left} 与 {right} 范围重叠",
+        "same_experience": f"{left} 与 {right} 属于同一体验",
+    }
+    return meanings.get(relation_type, f"{left} 与 {right} 存在待确认关系")
 
 
 _SENSITIVE_SOURCE_QUERY_KEYS = {

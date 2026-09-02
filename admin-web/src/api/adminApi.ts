@@ -30,6 +30,8 @@ import type {
   SourceConflictResponse,
   SourceChannel,
   CreatePlaceSourceRecordInput,
+  HolidayCalendar,
+  GenerateHolidayExceptionsInput,
 } from './types'
 
 const API_ROOT = '/api/v1/admin'
@@ -143,6 +145,10 @@ export class AdminApi {
     return this.request('/source-channels')
   }
 
+  listHolidayCalendars(): Promise<{ items: HolidayCalendar[] }> {
+    return this.request('/holiday-calendars')
+  }
+
   createSourceRecord(revisionId: string, input: CreatePlaceSourceRecordInput): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/source-records`, {
       method: 'POST', body: JSON.stringify(input),
@@ -248,6 +254,12 @@ export class AdminApi {
 
   createDateException(revisionId: string, input: PlaceDateExceptionInput): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/date-exceptions`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
+  generateHolidayExceptions(revisionId: string, input: GenerateHolidayExceptionsInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/holiday-exceptions`, {
       method: 'POST', body: JSON.stringify(input),
     })
   }

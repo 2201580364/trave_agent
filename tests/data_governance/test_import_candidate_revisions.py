@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from travel_agent.infrastructure.database.place_catalog import (
+    PlaceRelationRow,
     PlaceRevisionRow,
     PlaceRow,
     PlaceSourceRecordRow,
@@ -71,7 +72,7 @@ def test_candidate_import_is_idempotent_and_keeps_revisions_candidate(tmp_path: 
     _migrate(database)
 
     first = _run_import(database)
-    assert "candidate revisions: imported=72, updated=0, skipped=0, dry_run=False" in first.stdout
+    assert "candidate revisions: imported=72, updated=0, skipped=0, relations_imported=15, dry_run=False" in first.stdout
     assert _counts(database) == (72, 72, 72)
 
     engine = create_engine(f"sqlite:///{database}")
@@ -83,13 +84,15 @@ def test_candidate_import_is_idempotent_and_keeps_revisions_candidate(tmp_path: 
             .where(PlaceRevisionRow.solver_eligible.is_(True))
         )
         revisions = tuple(session.scalars(select(PlaceRevisionRow)).all())
+        relation_count = session.scalar(select(func.count()).select_from(PlaceRelationRow)) or 0
     assert statuses == {"candidate"}
     assert eligible == 0
     assert all("DURATION_NOT_COLLECTED" in (revision.review_flags or []) for revision in revisions)
     assert all(revision.relation_review_status == "pending" for revision in revisions)
+    assert relation_count == 15
 
     second = _run_import(database)
-    assert "candidate revisions: imported=0, updated=0, skipped=72, dry_run=False" in second.stdout
+    assert "candidate revisions: imported=0, updated=0, skipped=72, relations_imported=0, dry_run=False" in second.stdout
     assert _counts(database) == (72, 72, 72)
 
 
@@ -98,7 +101,7 @@ def test_candidate_import_dry_run_does_not_write_rows(tmp_path: Path) -> None:
     _migrate(database)
 
     result = _run_import(database, dry_run=True)
-    assert "candidate revisions: imported=72, updated=0, skipped=0, dry_run=True" in result.stdout
+    assert "candidate revisions: imported=72, updated=0, skipped=0, relations_imported=0, dry_run=True" in result.stdout
     assert _counts(database) == (0, 0, 0)
 
 
@@ -108,7 +111,7 @@ def test_candidate_import_supports_controlled_batch_limit(tmp_path: Path) -> Non
 
     result = _run_selected_import(database, limit=12)
 
-    assert "candidate revisions: imported=12, updated=0, skipped=0, dry_run=False" in result.stdout
+    assert "candidate revisions: imported=12, updated=0, skipped=0, relations_imported=6, dry_run=False" in result.stdout
     assert _counts(database) == (12, 12, 12)
 
 
@@ -118,7 +121,7 @@ def test_candidate_import_supports_explicit_candidate_ids(tmp_path: Path) -> Non
 
     result = _run_selected_import(database, candidate_ids=("hz-cand-008", "hz-cand-013"))
 
-    assert "candidate revisions: imported=2, updated=0, skipped=0, dry_run=False" in result.stdout
+    assert "candidate revisions: imported=2, updated=0, skipped=0, relations_imported=0, dry_run=False" in result.stdout
     assert _counts(database) == (2, 2, 2)
 
 
@@ -136,7 +139,7 @@ def test_candidate_import_repairs_only_pristine_legacy_metadata(tmp_path: Path) 
         session.commit()
 
     result = _run_selected_import(database, candidate_ids=("hz-cand-008",))
-    assert "candidate revisions: imported=0, updated=1, skipped=0, dry_run=False" in result.stdout
+    assert "candidate revisions: imported=0, updated=1, skipped=0, relations_imported=0, dry_run=False" in result.stdout
 
     with Session(engine) as session:
         revision = session.get(PlaceRevisionRow, "revision-hz-cand-008")

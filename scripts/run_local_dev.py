@@ -23,12 +23,30 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--database", type=Path, default=ROOT / ".local" / "travel_agent.db")
+    parser.add_argument(
+        "--database",
+        type=Path,
+        default=None,
+        help="SQLite file override; otherwise TRAVEL_AGENT_DATABASE_URL from .env is used",
+    )
     args = parser.parse_args()
 
-    database_path = args.database.resolve()
-    database_path.parent.mkdir(parents=True, exist_ok=True)
-    database_url = f"sqlite:///{database_path.as_posix()}"
+    if args.database is not None:
+        database_path = args.database.resolve()
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+        database_url = f"sqlite:///{database_path.as_posix()}"
+    else:
+        database_url = os.environ.get(
+            "TRAVEL_AGENT_DATABASE_URL",
+            f"sqlite:///{(ROOT / '.local' / 'travel_agent.db').as_posix()}",
+        )
+        if database_url.startswith("sqlite:///"):
+            configured_path = Path(database_url.removeprefix("sqlite:///"))
+            database_path = (
+                configured_path if configured_path.is_absolute() else ROOT / configured_path
+            ).resolve()
+            database_path.parent.mkdir(parents=True, exist_ok=True)
+            database_url = f"sqlite:///{database_path.as_posix()}"
     os.environ["TRAVEL_AGENT_DATABASE_URL"] = database_url
 
     migration = Config(str(ROOT / "alembic.ini"))

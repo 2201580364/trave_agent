@@ -7,10 +7,12 @@
 
 已稳定并版本化的求解器公开边界见 [solver-p1-contract.md](solver-p1-contract.md)。应用、API、数据库和页面设计必须依赖该契约，而不是直接依赖求解器内部实现细节。
 
-M1 应用层规格已经完成 A5 同步：
+M1 应用层规格已经完成 A5 同步，OM1 数据治理规格持续补充：
 
-- [api-contract.md](api-contract.md) V2.7：已实现的用户 HTTP 能力，以及 OM1 管理身份/会话/RBAC/管理员角色/只读审计底座和待实现的地点审核/发布端点；
-- [data-model.md](data-model.md) V2.9：持久化实体、事务、发布快照、Alembic 0001–0007 实际链；AdminActor/Role/Session/AuditEvent 已实现，ReviewTask 和 PublicationBatch 待后续追加。
+- [api-contract.md](api-contract.md) V2.9：已实现的用户 HTTP 能力，以及 OM1 管理身份/会话/RBAC/审核/发布端点和 O18 受控采集批次计划契约；
+- [data-model.md](data-model.md) V3.0：持久化实体、事务、发布快照、Alembic 0001–0013 实际链；AdminActor/Role/Session/AuditEvent、审核任务、研究快照批次已实现，节假日历与采集批次模型仍待后续追加迁移；
+- [O18 采集设计](../product/O18地点数据采集与关系识别设计.md)：采集来源、批次、归一/去重、关系线索和人工审核衔接的产品设计；
+- [ADR-0022](../decisions/ADR-0022-data-collection-staging-and-relation-clues.md)：采集只进入 staging、AI 不越级、批次幂等和关系线索裁决边界。
 
 旧 `/regenerate`、单一 `transport_type` 和单表 `trips.itinerary JSON` 不再是当前实现依据。
 

@@ -34,6 +34,7 @@ from .review import (
     PlaceReviewDecision,
     PlaceReviewTask,
 )
+from .holiday_calendar import HolidayCalendar, HolidayPeriod, get_holiday_calendar, list_holiday_calendars, resolve_holiday_closure_conflicts
 
 __all__ = [
     "ACCESS_POINT_KINDS",
@@ -64,4 +65,9 @@ __all__ = [
     "canonical_projection_sha256",
     "evaluate_projection_publication",
     "publish_projection",
+    "HolidayCalendar",
+    "HolidayPeriod",
+    "get_holiday_calendar",
+    "list_holiday_calendars",
+    "resolve_holiday_closure_conflicts",
 ]

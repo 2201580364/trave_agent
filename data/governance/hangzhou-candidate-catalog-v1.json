@@ -3207,6 +3207,38 @@
       "relation_candidate": "overlaps",
       "review_status": "unresolved",
       "right_candidate_id": "hz-cand-069"
+    },
+    {
+      "clue_id": "hz-rel-012",
+      "left_candidate_id": "hz-cand-001",
+      "reason_code": "WEST_LAKE_CONTAINS_BROKEN_BRIDGE_REMAINS",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-003"
+    },
+    {
+      "clue_id": "hz-rel-013",
+      "left_candidate_id": "hz-cand-001",
+      "reason_code": "WEST_LAKE_CONTAINS_PINGHU_AUTUMN_MOON",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-004"
+    },
+    {
+      "clue_id": "hz-rel-014",
+      "left_candidate_id": "hz-cand-001",
+      "reason_code": "WEST_LAKE_CONTAINS_CURVED_COURTYARD_WIND_LOTUS",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-005"
+    },
+    {
+      "clue_id": "hz-rel-015",
+      "left_candidate_id": "hz-cand-001",
+      "reason_code": "WEST_LAKE_CONTAINS_THREE_POOLS_MIRRORING_MOON",
+      "relation_candidate": "contains",
+      "review_status": "unresolved",
+      "right_candidate_id": "hz-cand-012"
     }
   ],
   "schema_version": "hangzhou-candidate-catalog-v1",

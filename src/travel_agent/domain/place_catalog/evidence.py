@@ -36,3 +36,4 @@ class PlaceRevisionEvidence:
     projection: SolverPlaceProjection | None
     missing_source_record_ids: tuple[str, ...] = ()
     relations: tuple[PlaceRelation, ...] = ()
+    relation_place_names: tuple[tuple[str, str], ...] = ()

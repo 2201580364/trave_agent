@@ -665,6 +665,90 @@ def test_time_preview_resolves_exceptions_closures_cross_midnight_and_sessions(
     assert unauthenticated.status_code == 401
 
 
+def test_holiday_calendar_catalog_is_available_to_authenticated_admin(
+    admin_context: AdminTestContext,
+) -> None:
+    _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    response = admin_context.client.get("/api/v1/admin/holiday-calendars", headers=headers)
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert {item["calendar_id"] for item in items} >= {
+        "cn-mainland-2025",
+        "cn-mainland-2026",
+    }
+    assert all(item["display_name"].startswith("中国大陆法定节假日历") for item in items)
+
+
+def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-holiday-generation")
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-holiday-generation")
+        assert revision is not None
+        revision.source_record_ids = ["source-holiday-generation"]
+        session.add(PlaceSourceRecordRow(
+            source_record_id="source-holiday-generation", place_id=revision.place_id,
+            source_id="test-registry", registry_id="v1", registry_sha256="a" * 64,
+            field_dictionary_id="fields-v1", field_dictionary_sha256="b" * 64,
+            source_url="https://example.test/museum-holiday-policy",
+            collection_mode="manual_reference", target_stage="staging",
+            source_decision="approved", observed_at=NOW.isoformat(),
+            content_sha256="c" * 64, status="active", created_at=NOW.isoformat(),
+        ))
+        session.add(PlaceClosureRow(
+            closure_id="closure-holiday-monday",
+            place_revision_id=revision.place_revision_id,
+            weekday=1,
+            source_record_id="source-holiday-generation",
+            review_status="candidate",
+            active=True,
+            created_at=NOW.isoformat(),
+            reviewed_at=None,
+        ))
+        session.commit()
+
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    response = context.client.post(
+        "/api/v1/admin/place-revisions/revision-holiday-generation/holiday-exceptions",
+        headers=headers,
+        json={
+            "expected_revision_version": 1,
+            "calendar_id": "cn-mainland-2026",
+            "source_record_id": "source-holiday-generation",
+            "open_start_minute": 540,
+            "open_end_minute": 1020,
+            "open_last_entry_minute": 990,
+            "shift_closure": True,
+            "operation_intent_id": "holiday-generation-http-1",
+            "reason_code": "HOLIDAY_POLICY_MATERIALIZED",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["revision_version"] == 10
+    with context.sessions() as session:
+        rows = tuple(session.scalars(
+            select(PlaceDateExceptionRow)
+            .where(PlaceDateExceptionRow.place_revision_id == "revision-holiday-generation")
+            .order_by(PlaceDateExceptionRow.service_date)
+        ))
+        audit = session.scalar(
+            select(AdminAuditEventRow).where(
+                AdminAuditEventRow.action == "PLACE_HOLIDAY_EXCEPTIONS_GENERATED"
+            )
+        )
+    assert len(rows) == 9
+    assert {row.service_date for row in rows if row.exception_kind == "open_override"} == {
+        date(2026, 2, 16), date(2026, 2, 23), date(2026, 4, 6),
+        date(2026, 5, 4), date(2026, 10, 5),
+    }
+    assert {row.service_date for row in rows if row.exception_kind == "closed"} == {
+        date(2026, 2, 24), date(2026, 4, 7), date(2026, 5, 6), date(2026, 10, 8),
+    }
+    assert audit is not None
+    assert audit.target_type == "place_date_exception"
+
 def test_projection_preparation_api_is_verified_idempotent_and_does_not_publish(
     admin_context: AdminTestContext,
 ) -> None:

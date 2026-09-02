@@ -5,11 +5,11 @@
     "night_or_fixed_time_count": 18,
     "non_point_candidate_count": 24,
     "primary_category_count": 9,
-    "relation_clue_count": 11,
+    "relation_clue_count": 15,
     "travel_region_count": 11
   },
   "catalog_id": "hangzhou-m1-candidate-catalog-v1",
-  "catalog_sha256": "48a16f6756706b3e0f1fee7dbf9bfaf9cbfeb5715c08dafbc11391982cadb368",
+  "catalog_sha256": "baba75143ededa9699bf8860e7841bd2e11e8d2a495060aee8d94bdab18237ba",
   "coverage_id": "hangzhou-m1-candidate-coverage-v1",
   "dimensions": {
     "geometry_kinds": [
@@ -250,7 +250,7 @@
         "required_min": 5
       },
       {
-        "actual": 11,
+        "actual": 15,
         "check_id": "relation_clue_count",
         "passed": true,
         "required_min": 1

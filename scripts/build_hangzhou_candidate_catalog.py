@@ -564,6 +564,10 @@ RELATIONS: tuple[tuple[str, int, int, str, str], ...] = (
     ("hz-rel-009", 57, 61, "same_experience", "XIANGHU_DAY_AND_NIGHT_SHARED_AREA"),
     ("hz-rel-010", 62, 63, "contains", "SONGCHENG_SHOW_INSIDE_SCENIC_AREA"),
     ("hz-rel-011", 68, 69, "overlaps", "JIUXI_SPOT_AND_ROUTE_OVERLAP"),
+    ("hz-rel-012", 1, 3, "contains", "WEST_LAKE_CONTAINS_BROKEN_BRIDGE_REMAINS"),
+    ("hz-rel-013", 1, 4, "contains", "WEST_LAKE_CONTAINS_PINGHU_AUTUMN_MOON"),
+    ("hz-rel-014", 1, 5, "contains", "WEST_LAKE_CONTAINS_CURVED_COURTYARD_WIND_LOTUS"),
+    ("hz-rel-015", 1, 12, "contains", "WEST_LAKE_CONTAINS_THREE_POOLS_MIRRORING_MOON"),
 )
 
 PROVIDER_OVERRIDES: dict[str, dict[str, Any]] = {

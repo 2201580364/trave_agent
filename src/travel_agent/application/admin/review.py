@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from types import TracebackType
 from typing import Protocol, Self
@@ -35,6 +35,8 @@ from travel_agent.domain.place_catalog import (
     ResearchSnapshot,
     SolverPlaceProjection,
     evaluate_projection_publication,
+    get_holiday_calendar,
+    resolve_holiday_closure_conflicts,
 )
 from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 
@@ -410,7 +412,8 @@ class PlaceReviewWorkflowService:
             if revision is None or evidence is None: raise ResourceNotFoundError
             if revision.lifecycle_status != "candidate": raise ReviewRevisionNotCandidateError
             relation = next((item for item in evidence.relations if item.relation_id == relation_id and item.active), None)
-            if relation is None or relation.from_place_id != revision.place_id: raise ResourceNotFoundError
+            if relation is None or revision.place_id not in {relation.from_place_id, relation.to_place_id}:
+                raise ResourceNotFoundError
             updated_relation = replace(relation, resolution_status=resolution_status, decision_note=decision_note,
                                        review_status="pending", reviewed_at=None)
             updated = uow.catalog.update_relation(updated_relation, revision_id=revision_id, expected_revision_version=expected_revision_version)
@@ -686,7 +689,13 @@ class PlaceReviewWorkflowService:
         active = lambda item: item.active and item.review_status == "human_verified"
         rules = tuple(sorted((r for r in evidence.time_rules if active(r)), key=lambda r: (r.rule_kind, r.time_rule_id)))
         closures = tuple(c for c in evidence.closures if active(c))
-        exceptions = tuple(e for e in evidence.date_exceptions if active(e) and e.service_date == service_date)
+        exceptions = tuple(sorted(
+            (e for e in evidence.date_exceptions if active(e) and e.service_date == service_date),
+            key=lambda item: ({"closed": 0, "session_override": 1, "open_override": 2}.get(item.exception_kind, 9), item.date_exception_id),
+        ))
+        from travel_agent.domain.place_catalog import list_holiday_calendars
+        holiday_open_dates = {day for calendar in list_holiday_calendars() for day in calendar.holiday_dates()}
+        holiday_shift_dates = {period.end + timedelta(days=1) for calendar in list_holiday_calendars() for period in calendar.periods}
         reasons: list[str] = []
         sessions: list[dict[str, object]] = []
         if revision.is_always_open:
@@ -699,11 +708,11 @@ class PlaceReviewWorkflowService:
         if exceptions:
             exception = exceptions[0]
             if exception.exception_kind == "closed":
-                reasons.append("PLACE_DATE_EXCEPTION_CLOSED")
+                reasons.append("HOLIDAY_CLOSURE_SHIFT" if service_date in holiday_shift_dates else "PLACE_DATE_EXCEPTION_CLOSED")
                 return {"revision_id": revision_id, "service_date": service_date.isoformat(), "open": False,
                         "windows": [], "fixed_sessions": [], "reason_codes": reasons,
                         "applied_exception_ids": [e.date_exception_id for e in exceptions], "rule_ids": []}
-            reasons.append("PLACE_DATE_EXCEPTION_APPLIED")
+            reasons.append("HOLIDAY_OPEN_OVERRIDE" if service_date in holiday_open_dates else "PLACE_DATE_EXCEPTION_APPLIED")
             if exception.start_minute is not None and exception.end_minute is not None:
                 windows = [{"start_minute": exception.start_minute, "end_minute": exception.end_minute,
                             "last_entry_minute": exception.last_entry_minute}]
@@ -1427,6 +1436,24 @@ class PlaceReviewWorkflowService:
             "last_entry_minute": last_entry_minute,
             "source_record_id": source_record_id,
         }
+        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+            if any(item.active and item.service_date == service_date for item in evidence.date_exceptions):
+                raise ValueError("该日期已存在有效日期例外；同一天只能保留一条例外，请编辑或停用原记录")
+            return (
+                uow.catalog.create_date_exception(
+                    PlaceDateException(
+                        date_exception_id, revision_id, service_date, exception_kind,
+                        start_minute, end_minute, last_entry_minute, source_record_id,
+                        "candidate", True, self._clock.now(),
+                    ),
+                    expected_revision_version=expected_revision_version,
+                ),
+                date_exception_id,
+            )
+
         return self._mutate_evidence(
             principal,
             revision_id=revision_id,
@@ -1438,25 +1465,97 @@ class PlaceReviewWorkflowService:
             action="PLACE_DATE_EXCEPTION_CREATED",
             target_id=date_exception_id,
             payload=payload,
-            mutate=lambda uow, _revision: (
-                uow.catalog.create_date_exception(
+            mutate=mutate,
+        )
+
+    def generate_holiday_exceptions(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        expected_revision_version: int,
+        calendar_id: str,
+        source_record_id: str,
+        open_start_minute: int,
+        open_end_minute: int,
+        open_last_entry_minute: int | None,
+        shift_closure: bool,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        """Materialize a verified holiday policy as auditable date exceptions.
+
+        Date exceptions remain the solver contract.  This operation only
+        expands a versioned calendar into candidate evidence; every generated
+        row must still be reviewed before the Revision can be approved.
+        """
+        calendar = get_holiday_calendar(calendar_id)
+        if open_end_minute <= open_start_minute:
+            raise ValueError("holiday opening end must be after opening start")
+        payload = {
+            "revision_id": revision_id,
+            "expected_revision_version": expected_revision_version,
+            "calendar_id": calendar_id,
+            "source_record_id": source_record_id,
+            "open_start_minute": open_start_minute,
+            "open_end_minute": open_end_minute,
+            "open_last_entry_minute": open_last_entry_minute,
+            "shift_closure": shift_closure,
+        }
+
+        def mutate(uow: ReviewUnitOfWork, revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            evidence = uow.catalog.load_revision_evidence(revision_id)
+            if evidence is None:
+                raise ResourceNotFoundError
+            source = next((item for item in evidence.source_records if item.source_record_id == source_record_id), None)
+            if source is None or source.status != "active":
+                raise SourceRecordValidationError("holiday calendar requires an active source record")
+            closure_weekdays = {item.weekday for item in evidence.closures if item.active}
+            if not closure_weekdays:
+                raise ValueError("请先维护固定闭馆日，再生成节假日开放和顺延闭馆例外")
+            holiday_dates, shifted_dates = resolve_holiday_closure_conflicts(
+                calendar, frozenset(closure_weekdays), shift_closure=shift_closure
+            )
+            existing_dates = {item.service_date for item in evidence.date_exceptions if item.active}
+            current = revision
+            generated: list[str] = []
+            offset = 0
+            values = [
+                *((day, "open_override", open_start_minute, open_end_minute, open_last_entry_minute) for day in sorted(holiday_dates)),
+                *((day, "closed", None, None, None) for day in sorted(shifted_dates)),
+            ]
+            for service_date, kind, start, end, last_entry in values:
+                # An explicit manual exception has higher authority than the
+                # generated annual policy, regardless of its kind.
+                if service_date in existing_dates:
+                    continue
+                exception_id = self._ids.new_id("date_exception")
+                current = uow.catalog.create_date_exception(
                     PlaceDateException(
-                        date_exception_id,
-                        revision_id,
-                        service_date,
-                        exception_kind,
-                        start_minute,
-                        end_minute,
-                        last_entry_minute,
-                        source_record_id,
-                        "candidate",
-                        True,
-                        self._clock.now(),
+                        exception_id, revision_id, service_date, kind, start, end,
+                        last_entry, source_record_id, "candidate", True, self._clock.now(),
                     ),
-                    expected_revision_version=expected_revision_version,
-                ),
-                date_exception_id,
-            ),
+                    expected_revision_version=expected_revision_version + offset,
+                )
+                generated.append(exception_id)
+                offset += 1
+            payload["generated_exception_ids"] = generated
+            return current, generated[0] if generated else revision_id
+
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_HOLIDAY_EXCEPTIONS_GENERATED",
+            target_id=revision_id,
+            payload=payload,
+            mutate=mutate,
         )
 
     def update_date_exception(
@@ -1503,6 +1602,13 @@ class PlaceReviewWorkflowService:
             )
             if current is None:
                 raise ResourceNotFoundError
+            if any(
+                item.active
+                and item.date_exception_id != date_exception_id
+                and item.service_date == service_date
+                for item in evidence.date_exceptions
+            ):
+                raise ValueError("该日期已存在其他有效日期例外；同一天只能保留一条例外")
             updated = replace(
                 current,
                 service_date=service_date,
@@ -3140,6 +3246,7 @@ def _revision_digest(revision: PlaceRevision) -> str:
 
 def _evidence_target_type(action: str) -> str:
     for marker, target_type in (
+        ("HOLIDAY_EXCEPTIONS", "place_date_exception"),
         ("DATE_EXCEPTION", "place_date_exception"),
         ("ACCESS_POINT", "place_access_point"),
         ("TIME_RULE", "place_time_rule"),

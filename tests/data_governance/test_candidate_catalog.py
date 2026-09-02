@@ -45,12 +45,12 @@ def test_tracked_candidate_catalog_is_valid_versioned_and_candidate_only() -> No
     assert catalog["status"] == "candidate"
     assert {item["review_state"] for item in catalog["candidates"]} == {"candidate"}
     assert len(catalog["candidates"]) == 72
-    assert len(catalog["relation_clues"]) == 11
+    assert len(catalog["relation_clues"]) == 15
     assert canonical_json_sha256(catalog) == (
-        "48a16f6756706b3e0f1fee7dbf9bfaf9cbfeb5715c08dafbc11391982cadb368"
+        "baba75143ededa9699bf8860e7841bd2e11e8d2a495060aee8d94bdab18237ba"
     )
     assert canonical_json_sha256(coverage) == (
-        "ced7cecc2e3227560f07916585669b4d1950d9499a8b8ca8f5d358b5cc848f67"
+        "14b495a79eb6f58a70197892c78aa9e0b674bc2b9350d10a544aac4d4915c881"
     )
 
 
@@ -65,7 +65,7 @@ def test_candidate_coverage_satisfies_r0_2_04_exit_thresholds() -> None:
         "primary_category_count": 9,
         "night_or_fixed_time_count": 18,
         "indoor_or_rain_count": 28,
-        "relation_clue_count": 11,
+        "relation_clue_count": 15,
         "non_point_candidate_count": 24,
     }
 

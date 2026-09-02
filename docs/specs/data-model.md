@@ -1,11 +1,11 @@
 # M1 业务数据与 OM1 管理逻辑数据模型
 
-- 文档版本：V2.9
-- 日期：2026-08-29
+- 文档版本：V3.0
+- 日期：2026-09-02
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0008 已实现；0006 增加通用地点目录和求解投影发布边界，0007 增加独立 AdminActor/Role/Session、角色关联和追加式管理审计，0008 增加地点审核任务与追加式决定表。PublicationBatch 仍是后续逻辑模型。A6-8.2 真实 MySQL 8.0.46 当前仍停在 0002；0003–0008 待 R0.3 在服务器备份后统一执行。本机未安装或启动 MySQL/Redis
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0013 已实现；0006–0013 已覆盖通用地点目录、管理身份与审计、审核工作流、Revision 审核标记/乐观锁、研究快照批次、关系检查和历史求解资格回填。16.6 节假日历同步持久化模型仍是 G7-R0.2-09 计划，不得写成已迁移。服务器真实 MySQL 当前保持既有受控基线，后续迁移须在 R0.3 备份后统一执行；本机不安装或启动 MySQL/Redis
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.7、应用代码架构 V1.4、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019
+- 上游：API 契约 V2.9、应用代码架构 V1.4、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019、ADR-0021、ADR-0022
 
 ## 1. 建模目标与原则
 
@@ -1009,3 +1009,104 @@ Given 月度运行日志已经压缩并清理
 When 查询同月的地点发布操作
 Then admin_audit_events 仍可按 actor、target 和 publication intent 查询
 ```
+
+### 16.6 OM1 中国法定节假日历自动同步（计划，G7-R0.2-09）
+
+本节是 ADR-0021 已接受的计划模型，当前代码内置 2025/2026 年日历不等于以下持久化模型已实现。迁移必须使用新的 Alembic revision 追加，不能改写既有迁移或历史 `PlaceDateException`。
+
+#### `holiday_calendars`
+
+| 字段 | 说明 |
+|---|---|
+| `holiday_calendar_id` | 年度日历不可变版本 ID |
+| `region_code/calendar_year/version` | 首版固定中国大陆 `CN`；同地区、年份、版本唯一 |
+| `status` | draft/published/superseded；只有 published 可供 O05 使用 |
+| `display_name` | 面向管理端的中文年度名称 |
+| `source_record_id` | 关联官方公告来源记录，不保存网页凭证 |
+| `source_content_sha256` | 原始 HTML/PDF/附件内容哈希 |
+| `normalized_digest` | 规范化假期与调休载荷摘要，用于幂等和差异判断 |
+| `supersedes_calendar_id` | 官方修订时指向被替代版本 |
+| `published_at/created_at/updated_at` | 生命周期与审计时间 |
+
+已发布行不可原地修改；官方内容变化必须创建 v2 等新版本，并将旧版本标记为 superseded。相同官方内容重复同步不得创建重复版本。
+
+#### `holiday_periods`
+
+- 保存 `holiday_period_id/holiday_calendar_id/holiday_name/start_date/end_date/display_order`；
+- 每段保存可定位到官方原文的 `evidence_quote` 或等价受控证据定位；
+- 日期范围必须通过年份、顺序、重叠、完整性和规范化校验。
+
+#### `holiday_adjusted_workdays`
+
+- 保存 `adjusted_workday_id/holiday_calendar_id/service_date/holiday_name/evidence_quote`；
+- 调休工作日用于忠实保存公告和冲突校验；M1 不据此自动改变地点开放状态。
+
+#### `holiday_calendar_sync_jobs`
+
+| 字段组 | 说明 |
+|---|---|
+| 身份与输入 | `sync_job_id/region_code/year/mode` |
+| 生命周期 | queued/running/not_announced/temporarily_unavailable/needs_attention/published/up_to_date/failed |
+| 官方来源 | `source_url/source_title/source_published_at/source_content_sha256` |
+| 处理结果 | `validation_result/calendar_id/attempt_count/next_retry_at` |
+| 幂等与审计 | `operation_intent_id/operation_digest/created_by/created_at/started_at/finished_at` |
+
+同步按钮、周期任务和 AI Tool 共用同一 Job 与应用服务。AI/定时任务使用受限系统主体，`created_by` 不得伪装成人工管理员；同一 operation intent 的不同载荷必须拒绝，相同年度同一时刻只允许一个运行任务。
+
+SourceRecord 或等价来源快照必须保存官方 URL、观察时间、内容哈希和允许的证据摘要。业务审计保存动作、结果码、Job、版本和摘要，不保存模型密钥、网页凭证或无必要的完整网页正文。
+
+新日历版本只影响后续 O05 生成。已经物化、审核或发布的 `PlaceDateException`、Projection、TripRevision 和研究快照不回写；影响查询只产生待办或候选修订建议。
+
+### 16.7 OM1 地点数据采集（计划，O18 / G7-R0.2-05-03）
+
+本节是 O18 的持久化边界，当前尚未创建对应迁移。实现时必须追加新的 Alembic revision，不能把采集表塞入既有地点事实表，也不能把采集结果直接写入 `human_verified` 或 `published`。采集数据的唯一合法路径为：
+
+```text
+CollectionBatch/Attempt/Result
+  → staging 结果与差异
+  → candidate PlaceRevision + SourceRecord + RelationClue
+  → O04/O05/O06/O07 人工审核
+  → Projection / Publication Gate
+```
+
+#### `collection_batches`
+
+| 字段组 | 字段 | 说明 |
+|---|---|---|
+| 身份 | `collection_batch_id` | 不透明、稳定的批次 ID |
+| 范围 | `region_code/city_code/area_ids/target_fields` | 结构化采集范围；不得使用自由 SQL |
+| 来源 | `source_registry_id/source_registry_digest/field_dictionary_digest` | 固化本批次使用的来源和字段白名单版本 |
+| 执行 | `status/collector_version/parser_version` | 状态见 O18；版本用于回放 |
+| 统计 | `requested/succeeded/failed/rate_limited/excluded` | 批次级守恒计数 |
+| 幂等 | `operation_intent_id/operation_digest` | 同 intent 同载荷可重放，不同载荷拒绝 |
+| 审计 | `created_by/created_at/started_at/finished_at` | 人工、系统或 AI Tool 主体必须可区分 |
+
+批次完成只表示执行结束，不代表任何事实已核验。`status=partially_failed` 必须能分别查询成功、失败和排除清单。
+
+#### `collection_attempts`
+
+每个外部请求或页面处理尝试保存：`attempt_id/batch_id/source_id/request_fingerprint/started_at/finished_at/result_code/retry_count/next_retry_at`。不得保存 API Key、Cookie、Authorization、完整响应正文或未授权媒体；请求指纹必须脱敏并可用于去重和审计。
+
+#### `collection_results`
+
+| 字段 | 说明 |
+|---|---|
+| `collection_result_id/batch_id` | 结果及所属批次 |
+| `source_record_draft` | 允许字段的来源摘要、URL、观察时间和内容哈希；仅作为 staging 草稿 |
+| `normalized_payload` | 归一化后的候选字段，不包含发布状态 |
+| `entity_match_status` | `new_entity/same_entity/possible_duplicate/distinct_entity` |
+| `result_status` | `candidate/needs_review/failed/excluded` |
+| `field_conflicts` | 字段级来源差异及证据定位 |
+| `relation_clues` | 可回放的关系候选，不是已成立关系 |
+| `evidence_locator` | 官方页面/公告中的受控定位信息 |
+| `input_hash/output_hash` | 用于幂等和回放，禁止用来代替人工核验 |
+
+同一结果重复物化时，按 `(batch_id, input_hash, normalized_payload)` 幂等；任何字段变化都必须创建新的 candidate Revision 或新的采集结果版本，不能原地覆盖已发布数据。
+
+#### `relation_clues`
+
+关系线索至少保存：`clue_id/left_place_ref/right_place_ref/relation_candidate/reason_code/evidence_source_record_id/detector_version/confidence/review_status/created_at`。端点可以先引用候选实体，只有两端 Place 均可解析时才能延迟导入 `place_relations`；`review_status=unresolved` 不得进入求解投影。O07 负责裁决和“确认无关系”，不提供无证据的任意关系新增入口。
+
+#### 保留与删除
+
+批次运行摘要、差异、失败原因、输入/输出哈希和审计引用按治理保留；原始响应只在来源条款允许且有明确 TTL 时短期缓存。凭证、令牌、完整页面正文和未授权媒体不得进入上述任何表。运行日志与业务审计继续按 ADR-0005 分离，日志归档不能删除批次和审核审计事实。

@@ -1,10 +1,10 @@
 # M1 用户 API 与 OM1 管理 API 契约
 
-- 文档版本：V2.8
-- 日期：2026-08-31
+- 文档版本：V2.9
+- 日期：2026-09-02
 - 阶段：A6 首个浏览器可操作纵向切片
 - 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理身份、地点审核、发布门禁与 O09 批次/研究快照 API 已实现并进入 Chrome 验收
-- 上游：功能模块 V3.5、管理端功能 V1.0、UI V1.4、交互 V1.4、应用代码架构 V1.3、ADR-0005、ADR-0009、ADR-0018、ADR-0019
+- 上游：功能模块 V3.6、管理端功能 V1.4、UI V1.4、交互 V1.4、应用代码架构 V1.5、ADR-0005、ADR-0009、ADR-0018、ADR-0019、ADR-0022
 - API 前缀：用户端 `/api/v1`；管理端 `/api/v1/admin`
 
 ## 1. 契约目标
@@ -1173,6 +1173,35 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 
 当前已实现端点包括管理身份/RBAC/审计、candidates、place-revisions、Revision evidence、review-tasks/decisions、O04/O05/O06/O07 证据与裁决、批量审核、publication check、candidate Projection 准备、Projection 发布入口以及 O09 publication batch preview/execute 和 research snapshot 列表/详情；真实 candidate 审核数据下的 UI 勾选成功路径仍待回归。
 
+O05 节假日规则：`GET /api/v1/admin/holiday-calendars` 返回版本化、受控的年度法定节假日历；`POST /api/v1/admin/place-revisions/{revision_id}/holiday-exceptions` 根据所选日历和开放时间批量物化 `open_override` 与节后 `closed` 日期例外。生成记录均为 `candidate`，必须逐项人工核验并重新送审，不改变求解器的 `PlaceDateException` 分钟值契约。
+
+#### O17 中国法定节假日历自动同步（计划，G7-R0.2-09）
+
+以下端点是已接受但尚未实现的计划契约，不属于当前 O05 已实现端点：
+
+| 方法与路径 | 权限 | 计划语义 |
+|---|---|---|
+| `POST /api/v1/admin/holiday-calendar-sync-jobs` | data_editor/admin_security | 创建中国大陆指定年份的异步同步任务；请求只包含年份、模式和 operation intent，不允许直接提交日期事实或任意来源 URL |
+| `GET /api/v1/admin/holiday-calendar-sync-jobs` | 管理只读角色 | 查询同步任务、状态、重试时间和稳定失败原因 |
+| `GET /api/v1/admin/holiday-calendar-sync-jobs/{job_id}` | 管理只读角色 | 查询官方来源发现、内容获取、AI 抽取、确定性校验和发布结果 |
+| `GET /api/v1/admin/holiday-calendars/{calendar_id}` | 管理只读角色 | 查询年度版本、结构化假期、调休工作日、官方来源和版本历史 |
+| `GET /api/v1/admin/holiday-calendars/{calendar_id}/impact` | publisher/viewer | 查询新版本相对旧版本的日期差异及受影响地点，不改写历史日期例外 |
+
+同步采用异步 Job。O17 前端按钮、后台周期任务和 `sync_china_holiday_calendar` AI Tool 必须调用同一个 `ChinaHolidayCalendarSyncService`，不得分别实现抓取、校验或发布逻辑；HTTP 请求不等待外部网页获取和 AI 推理全部完成。
+
+同步结果使用以下稳定语义：
+
+| 状态 | API 语义 | 可否供 O05 使用 |
+|---|---|---:|
+| `not_announced` | 官方来源发现流程成功，但目标年度正式公告尚未发布 | 否 |
+| `temporarily_unavailable` | 网络、TLS、超时或官方站点暂时不可访问；允许按策略重试 | 否 |
+| `needs_attention` | 找到候选公告，但来源、抽取或确定性校验失败 | 否 |
+| `published` | 新版本通过全部门禁并已由应用服务发布 | 是 |
+| `up_to_date` | 已发布版本与当前官方内容哈希一致 | 是，继续使用现有 published 版本 |
+| `superseded` | 已被同年度新版本替代，仅供历史回放 | 否 |
+
+O05 的 `GET /api/v1/admin/holiday-calendars` 在生成场景中只返回或只允许选择 `published` 版本。AI 输出不能包含或决定生命周期状态；AI、前端和系统任务均无权直接写 `published`。网络失败不得返回 `not_announced`，任何来源或校验异常都必须 fail closed。
+
 `GET /api/v1/admin/candidates` 支持服务端分页参数 `limit`（1–100，默认 50）和 `offset`（非负，默认 0），按 `created_at DESC, place_revision_id ASC` 稳定排序。响应包含 `items`、请求回显的 `limit`/`offset` 和匹配筛选条件的 `total` 总数；当 `offset` 超过总数时返回空 `items`，仍保留准确的 `total`，供管理端分页控件计算页码。
 
 每个候选 `item` 同时返回只读 `review_readiness`，用于批量人工审核准备，不改变 Revision 或审核任务状态。准备度固定包含 `basic`、`source`、`geometry`、`access_point`、`time`、`relation` 六项；每项返回 `collected`、`verified`、`total` 和 `verified_count`。顶层返回 `completed_checks`、`verified_checks`、`missing_checks`、`pending_review_checks`、当前开放任务状态以及以下稳定状态：`needs_evidence`、`ready_for_review`、`under_review`、`changes_requested`、`ready_for_approval`；非 candidate Revision 返回其生命周期状态。
@@ -1288,7 +1317,7 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 关闭结果，日期例外可以覆盖周闭馆。响应包含 `open`、`windows`、`fixed_sessions`、
 `applied_exception_ids`、`rule_ids` 和稳定排序的 `reason_codes`。分钟值大于等于 1440
 表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；演出地点没有已核验固定场次时返回
-`FIXED_SESSION_REQUIRED`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。
+`FIXED_SESSION_REQUIRED`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。管理端录入界面使用 `HH:mm` 和“次日”标记，提交时转换为本契约中的分钟值；API/数据库不新增时间字符串字段。跨午夜仍以结束或最晚入园分钟值大于等于 `1440` 表示。
 
 ### O06 来源冲突只读面
 
@@ -1362,7 +1391,60 @@ O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{
 
 `publication_gate_rejected` 的 `details.reason_codes` 直接使用 PlaceCatalog 稳定拒绝码，不由前端将错误字符串猜成状态。
 
-### 15.5 OM1 API 验收场景
+### 15.5 OM1 受控数据采集批次（O18，计划）
+
+以下端点是 O18 的稳定草案，当前代码尚未实现。实现前不得新增“直接发布采集结果”的替代端点。
+
+| 方法 | 路径 | 权限 | 语义 |
+|---|---|---|---|
+| `POST` | `/api/v1/admin/collection-batches` | `data_editor` | 创建 `draft` 批次，固化来源、字段、范围和版本摘要 |
+| `POST` | `/api/v1/admin/collection-batches/{batch_id}/run` | `data_editor` | 将批次置为 `queued/running` 并执行受控采集 |
+| `POST` | `/api/v1/admin/collection-batches/{batch_id}/pause` | `data_editor` | 主动暂停，保留失败/待重试清单 |
+| `GET` | `/api/v1/admin/collection-batches/{batch_id}` | `research_viewer` | 查看状态、计数、版本和审计摘要 |
+| `GET` | `/api/v1/admin/collection-batches/{batch_id}/results` | `research_viewer` | 分页查看成功、失败、排除和需关注结果 |
+| `GET` | `/api/v1/admin/collection-batches/{batch_id}/diff` | `data_editor` | 查看来源值、归一化值、旧 Revision 值和证据定位 |
+| `POST` | `/api/v1/admin/collection-batches/{batch_id}/materialize` | `data_editor` | 将通过来源/字段校验的结果生成 candidate Revision 和关系线索 |
+| `POST` | `/api/v1/admin/collection-batches/{batch_id}/submit-review` | `data_editor` | 为已物化 Revision 创建 O04–O07 审核任务 |
+
+#### 创建批次请求
+
+```json
+{
+  "operation_intent_id": "uuid",
+  "region_code": "CN-ZJ",
+  "city_code": "hangzhou",
+  "scope": {"areas": ["xihu"], "candidate_ids": []},
+  "source_registry_id": "hangzhou-m1-source-registry-v1",
+  "target_fields": ["identity", "geometry", "opening_hours", "access_points"],
+  "collection_mode": "approved_api"
+}
+```
+
+服务端必须重新解析并校验来源 registry、字段字典、目标阶段和采集方式；客户端不能提交 `target_stage=human_verified/published`，不能提交内部数据库连接串、凭证或任意 URL。成功响应只返回批次 ID、`draft` 状态、规范化范围摘要和版本哈希。
+
+#### 执行与物化约束
+
+- 每个写端点都要求 `operation_intent_id` 和期望版本；同 intent 同载荷可安全重试，不同载荷返回 `admin_operation_intent_conflict`；
+- `run` 受每来源速率、每日预算、并发和熔断控制；限流、网络失败和解析失败必须保留稳定原因码；
+- `materialize` 只产生 `candidate` Revision、`SourceRecord` 和 `RelationClue`，成功不改变审核状态；
+- `submit-review` 只能创建审核任务，不能替代 reviewer 决定；
+- 关系线索缺少另一端时返回 `deferred_missing_endpoint`，不创建孤立关系；
+- AI Tool 和定时任务使用受限系统主体，审计中的 `created_by` 不得伪装成人工管理员。
+
+#### 采集错误码（草案）
+
+| HTTP | 机器码 | 语义 |
+|---:|---|---|
+| 409 | `collection_batch_version_conflict` | 批次版本已变化 |
+| 409 | `collection_batch_not_runnable` | 当前状态、权限或来源不允许执行 |
+| 409 | `collection_result_already_materialized` | 相同结果已幂等物化 |
+| 422 | `collection_source_rejected` | 来源、字段或采集方式未准入 |
+| 422 | `collection_target_stage_forbidden` | 试图越级写入 human_verified/published |
+| 422 | `collection_schema_changed` | Provider/页面结构变化，需要暂停解析器 |
+| 422 | `collection_evidence_insufficient` | 结果缺少可定位证据，只能进入需关注清单 |
+| 503 | `collection_provider_unavailable` | 外部 Provider 暂时不可用，可按策略重试 |
+
+### 15.6 OM1 API 验收场景
 
 ```gherkin
 Given 普通匿名用户拥有有效 access token

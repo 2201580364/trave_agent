@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import type { PlaceRevision, PlaceRevisionEvidence, ReviewTask } from '../api/types'
-import { RevisionDetailsPage } from './RevisionDetailsPage'
+import { RevisionDetailsPage, parseTimeInput, timeFormMinutes } from './RevisionDetailsPage'
 
 const mocks = vi.hoisted(() => ({
   api: {
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     listSourceConflicts: vi.fn(),
     checkPlaceRevisionPublication: vi.fn(),
     listSourceChannels: vi.fn(),
+    listHolidayCalendars: vi.fn(),
     createSourceRecord: vi.fn(),
     detachSourceRecord: vi.fn(),
   },
@@ -125,6 +126,22 @@ const timeEvidence: PlaceRevisionEvidence = {
 }
 
 describe('RevisionDetailsPage', () => {
+  it('converts business HH:mm input to solver minutes and preserves overnight markers', () => {
+    expect(parseTimeInput('23:00')).toBe(1380)
+    expect(parseTimeInput('02:00', true)).toBe(1560)
+    expect(timeFormMinutes({
+      start_time: '23:00',
+      end_time: '02:00',
+      end_next_day: true,
+      last_entry_time: '01:30',
+      last_entry_next_day: true,
+    })).toEqual({ start_minute: 1380, end_minute: 1560, last_entry_minute: 1530 })
+  })
+
+  it('rejects an overnight range without the next-day marker', () => {
+    expect(() => timeFormMinutes({ start_time: '23:00', end_time: '02:00' })).toThrow('次日')
+  })
+
   const openReviewTask: ReviewTask = {
     review_task_id: 'task-1',
     place_revision_id: 'revision-1',
@@ -148,6 +165,12 @@ describe('RevisionDetailsPage', () => {
       collection_modes: ['manual_reference'],
       base_urls: ['https://example.test/'],
       conditions: ['具体页面逐项登记'],
+    }] })
+    mocks.api.listHolidayCalendars.mockResolvedValue({ items: [{
+      calendar_id: 'cn-mainland-2026',
+      display_name: '中国大陆法定节假日历（2026）',
+      source_note: '国务院办公厅年度公告',
+      periods: [],
     }] })
     mocks.permissions.clear()
     mocks.location.search = ''
@@ -179,7 +202,7 @@ describe('RevisionDetailsPage', () => {
 
     await waitFor(() => expect(screen.getAllByText('西湖').length).toBeGreaterThan(0))
 
-    expect(screen.getByText('基础事实')).toBeTruthy()
+    expect(screen.getByText('地点资料')).toBeTruthy()
     expect(screen.getByText('O04 证据暂不可用')).toBeTruthy()
     expect(screen.getByText('O05 时间证据暂不可用')).toBeTruthy()
     expect(screen.getAllByText('管理服务暂时不可用，请稍后重试。')).toHaveLength(2)
@@ -194,10 +217,10 @@ describe('RevisionDetailsPage', () => {
     await waitFor(() => expect(screen.getByText('开放时间与固定场次（O05）')).toBeTruthy())
 
     expect(screen.getByText('固定场次')).toBeTruthy()
-    expect(screen.getByText('23:30 – 次日 00:30 (+1440)')).toBeTruthy()
+    expect(screen.getByText('23:30 – 次日 00:30')).toBeTruthy()
     expect(screen.getByText('周一')).toBeTruthy()
     expect(screen.getByText('场次覆盖')).toBeTruthy()
-    expect(screen.getByText('次日 01:00 (+1440) – 次日 02:00 (+1440)')).toBeTruthy()
+    expect(screen.getByText('次日 01:00 – 次日 02:00')).toBeTruthy()
     expect(screen.getAllByText('无效').length).toBeGreaterThan(0)
     expect(screen.getAllByText('已停用').length).toBeGreaterThan(0)
   })
@@ -214,7 +237,10 @@ describe('RevisionDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('开放时间与固定场次（O05）')).toBeTruthy())
 
-    expect(screen.getAllByText('新增')).toHaveLength(5)
+    expect(screen.getByText('新增开放规则')).toBeTruthy()
+    expect(screen.getByText('新增闭馆日')).toBeTruthy()
+    expect(screen.getByText('新增单日例外')).toBeTruthy()
+    expect(screen.getByText('按节假日历生成')).toBeTruthy()
     const buttonLabels = [...document.querySelectorAll('button')]
       .map((button) => button.textContent?.replace(/\s/g, ''))
     expect(buttonLabels.filter((label) => label === '通过')).toHaveLength(2)

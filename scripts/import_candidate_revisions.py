@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,11 +26,15 @@ from travel_agent.data_governance.candidate_catalog import validate_candidate_ca
 from travel_agent.domain.place_catalog import (  # noqa: E402
     Place,
     PlaceGeometry,
+    PlaceRelation,
     PlaceRevision,
     PlaceSourceRecord,
 )
 from travel_agent.infrastructure.database.place_catalog import (  # noqa: E402
+    PlaceRelationRow,
     PlaceRevisionRow,
+    PlaceRow,
+    PlaceSourceRecordRow,
     SqlAlchemyPlaceCatalogRepository,
 )
 
@@ -73,6 +77,7 @@ def main() -> int:
     imported = 0
     updated = 0
     skipped = 0
+    relations_imported = 0
     with Session(engine) as session:
         repository = SqlAlchemyPlaceCatalogRepository(session)
         for candidate in selected:
@@ -121,10 +126,15 @@ def main() -> int:
                 )
             imported += 1
         if not args.dry_run:
+            available_place_ids = set(session.scalars(select(PlaceRow.place_id)).all())
+            relations_imported = _import_relations(
+                session, repository, catalog, imported_place_ids=available_place_ids
+            )
             session.commit()
     print(
         "candidate revisions: "
-        f"imported={imported}, updated={updated}, skipped={skipped}, dry_run={args.dry_run}"
+        f"imported={imported}, updated={updated}, skipped={skipped}, "
+        f"relations_imported={relations_imported}, dry_run={args.dry_run}"
     )
     return 0
 
@@ -249,6 +259,57 @@ def _import_candidate(
         )
     )
     session.flush()
+
+
+def _import_relations(
+    session: Session,
+    repository: SqlAlchemyPlaceCatalogRepository,
+    catalog: dict[str, Any],
+    *,
+    imported_place_ids: set[str] | None = None,
+) -> int:
+    """Materialize catalog relation clues once both endpoint Places exist.
+
+    Relation rows are deterministic and idempotent. Existing rows are left
+    untouched so a rerun cannot overwrite an editor's or reviewer's decision.
+    With a controlled partial import, clues whose other endpoint is absent are
+    intentionally deferred until a later import includes that endpoint.
+    """
+    candidate_to_place = {
+        str(item["candidate_id"]): f"place-{item['candidate_id']}"
+        for item in catalog["candidates"]
+    }
+    available = imported_place_ids or set(candidate_to_place.values())
+    created = 0
+    now = datetime.fromisoformat(str(catalog["generated_at"]))
+    for clue in catalog.get("relation_clues", []):
+        left = candidate_to_place.get(str(clue["left_candidate_id"]))
+        right = candidate_to_place.get(str(clue["right_candidate_id"]))
+        if left is None or right is None or left not in available or right not in available:
+            continue
+        relation_id = str(clue["clue_id"])
+        if session.get(PlaceRelationRow, relation_id) is not None:
+            continue
+        source_record_id = f"source-{clue['left_candidate_id']}"
+        if session.get(PlaceSourceRecordRow, source_record_id) is None:
+            continue
+        repository.add_relation(
+            PlaceRelation(
+                relation_id=relation_id,
+                from_place_id=left,
+                to_place_id=right,
+                relation_type=str(clue["relation_candidate"]),
+                source_record_id=source_record_id,
+                review_status="candidate",
+                resolution_status="pending",
+                decision_note=None,
+                active=True,
+                created_at=now,
+                reviewed_at=None,
+            )
+        )
+        created += 1
+    return created
 
 
 def _load(path: Path) -> dict[str, Any]:

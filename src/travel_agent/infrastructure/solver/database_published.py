@@ -136,6 +136,8 @@ class DatabasePublishedSolverDataProvider:
                     solver_node_id,
                     name,
                     close_days=frozenset(_close_days(session, revision.place_revision_id)),
+                    open_on_dates=frozenset(_exception_dates(session, revision.place_revision_id, "open_override")),
+                    closed_on_dates=frozenset(_exception_dates(session, revision.place_revision_id, "closed")),
                     suggested_duration=duration,
                     time_rules=rules,
                     is_always_open=revision.is_always_open,
@@ -209,6 +211,22 @@ def _close_days(session: Session, revision_id: str) -> tuple[int, ...]:
                 PlaceClosureRow.place_revision_id == revision_id,
                 PlaceClosureRow.active.is_(True),
                 PlaceClosureRow.review_status == "human_verified",
+            )
+        )
+    )
+
+
+def _exception_dates(session: Session, revision_id: str, kind: str) -> tuple[date, ...]:
+    from travel_agent.infrastructure.database.place_catalog import PlaceDateExceptionRow
+
+    return tuple(
+        row.service_date
+        for row in session.scalars(
+            select(PlaceDateExceptionRow).where(
+                PlaceDateExceptionRow.place_revision_id == revision_id,
+                PlaceDateExceptionRow.exception_kind == kind,
+                PlaceDateExceptionRow.active.is_(True),
+                PlaceDateExceptionRow.review_status == "human_verified",
             )
         )
     )

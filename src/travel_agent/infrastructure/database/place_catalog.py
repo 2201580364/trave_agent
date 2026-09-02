@@ -1060,6 +1060,32 @@ class SqlAlchemyPlaceCatalogRepository:
                 .order_by(PlaceRelationRow.created_at, PlaceRelationRow.relation_id)
             )
         )
+        relation_place_ids = tuple(
+            dict.fromkeys(
+                place_id
+                for relation in relations
+                for place_id in (relation.from_place_id, relation.to_place_id)
+            )
+        )
+        relation_place_names: dict[str, str] = {}
+        for relation_place_id in relation_place_ids:
+            # Resolve each endpoint independently. This supports both canonical
+            # place IDs and legacy revision IDs used by early relation imports.
+            row = self._session.scalar(
+                select(PlaceRevisionRow)
+                .where(
+                    or_(
+                        PlaceRevisionRow.place_id == relation_place_id,
+                        PlaceRevisionRow.place_revision_id == relation_place_id,
+                    )
+                )
+                .order_by(PlaceRevisionRow.revision_number.desc())
+                .limit(1)
+            )
+            if row is not None:
+                relation_place_names[relation_place_id] = row.canonical_name
+                relation_place_names.setdefault(row.place_id, row.canonical_name)
+                relation_place_names.setdefault(row.place_revision_id, row.canonical_name)
         referenced_source_ids = tuple(
             dict.fromkeys(
                 (
@@ -1073,12 +1099,15 @@ class SqlAlchemyPlaceCatalogRepository:
                 )
             )
         )
+        source_owner_place_ids = tuple(
+            dict.fromkeys((revision.place_id, *relation_place_ids))
+        )
         source_rows = (
             tuple(
                 self._session.scalars(
                     select(PlaceSourceRecordRow)
                     .where(
-                        PlaceSourceRecordRow.place_id == revision_row.place_id,
+                        PlaceSourceRecordRow.place_id.in_(source_owner_place_ids),
                         PlaceSourceRecordRow.source_record_id.in_(referenced_source_ids),
                     )
                     .order_by(
@@ -1105,6 +1134,7 @@ class SqlAlchemyPlaceCatalogRepository:
             closures=closures,
             date_exceptions=date_exceptions,
             relations=relations,
+            relation_place_names=tuple(sorted(relation_place_names.items())),
             projection=self.get_projection_for_revision(place_revision_id),
             missing_source_record_ids=tuple(
                 source_id for source_id in referenced_source_ids if source_id not in source_by_id
