@@ -26,6 +26,7 @@ from .projection import (
     ProjectionPublicationError,
     canonical_projection_sha256,
     evaluate_projection_publication,
+    has_source_content_conflict,
     publish_projection,
 )
 from .review import (
@@ -35,6 +36,16 @@ from .review import (
     PlaceReviewTask,
 )
 from .holiday_calendar import HolidayCalendar, HolidayPeriod, get_holiday_calendar, list_holiday_calendars, resolve_holiday_closure_conflicts
+from .holiday_sync import (
+    ExtractedHolidayCalendar,
+    HolidayAdjustedWorkday,
+    HolidayCalendarPeriod,
+    HolidayCalendarSyncJob,
+    HolidayCalendarValidation,
+    HolidayCalendarVersion,
+    normalized_calendar_digest,
+    validate_extracted_calendar,
+)
 
 __all__ = [
     "ACCESS_POINT_KINDS",
@@ -64,10 +75,19 @@ __all__ = [
     "PlaceReviewTask",
     "canonical_projection_sha256",
     "evaluate_projection_publication",
+    "has_source_content_conflict",
     "publish_projection",
     "HolidayCalendar",
     "HolidayPeriod",
     "get_holiday_calendar",
     "list_holiday_calendars",
     "resolve_holiday_closure_conflicts",
+    "ExtractedHolidayCalendar",
+    "HolidayAdjustedWorkday",
+    "HolidayCalendarPeriod",
+    "HolidayCalendarSyncJob",
+    "HolidayCalendarValidation",
+    "HolidayCalendarVersion",
+    "normalized_calendar_digest",
+    "validate_extracted_calendar",
 ]

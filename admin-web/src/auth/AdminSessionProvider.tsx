@@ -8,8 +8,10 @@ import {
   useRef,
   useState,
 } from 'react'
+import { App as AntApp } from 'antd'
 
 import { AdminApi } from '../api/adminApi'
+import { adminErrorMessage } from '../api/errorMessages'
 import type { AdminMe } from '../api/types'
 
 type SessionReason = 'expired' | 'signed-out' | null
@@ -26,15 +28,18 @@ type AdminSessionContextValue = {
 const AdminSessionContext = createContext<AdminSessionContextValue | null>(null)
 
 export function AdminSessionProvider({ children }: PropsWithChildren) {
+  const { notification } = AntApp.useApp()
   const [principal, setPrincipal] = useState<AdminMe | null>(null)
   const [sessionReason, setSessionReason] = useState<SessionReason>(null)
   const tokenRef = useRef<string | null>(null)
   const clearSessionRef = useRef<(reason: SessionReason) => void>(() => undefined)
+  const requestErrorRef = useRef<(error: unknown) => void>(() => undefined)
   const apiRef = useRef<AdminApi | null>(null)
   if (apiRef.current === null) {
     apiRef.current = new AdminApi(
       () => tokenRef.current,
       () => clearSessionRef.current('expired'),
+      (error) => requestErrorRef.current(error),
     )
   }
   const api = apiRef.current
@@ -45,6 +50,20 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
     setSessionReason(reason)
   }, [])
   clearSessionRef.current = clearSession
+  requestErrorRef.current = (error) => {
+    const status = typeof error === 'object' && error !== null && 'status' in error
+      ? Number(error.status)
+      : 0
+    const constraint = status === 400 || status === 403 || status === 409 || status === 422
+    const open = constraint ? notification.warning : notification.error
+    open({
+      key: 'admin-api-error',
+      message: constraint ? '操作受限' : status === 401 ? '登录状态已失效' : '操作未完成',
+      description: adminErrorMessage(error),
+      placement: 'topRight',
+      duration: 6,
+    })
+  }
 
   const login = useCallback(
     async (loginName: string, password: string) => {

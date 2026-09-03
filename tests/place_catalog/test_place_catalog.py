@@ -244,6 +244,30 @@ def test_complete_human_verified_projection_passes_and_publishes_immutably() -> 
     assert projection.projection_hash == context.projection.projection_hash
 
 
+def test_gate_does_not_require_conflict_confirmation_when_no_conflict_exists() -> None:
+    context = replace(
+        _context(),
+        revision=replace(_revision(), conflicts_resolved=False),
+    )
+
+    assert "SOURCE_CONFLICT_UNRESOLVED" not in evaluate_projection_publication(context)
+
+
+def test_gate_rejects_an_actual_unresolved_source_conflict() -> None:
+    conflicting_source = replace(
+        _source(),
+        source_record_id="source_westlake_2",
+        content_sha256="d" * 64,
+    )
+    context = replace(
+        _context(),
+        revision=replace(_revision(), conflicts_resolved=False),
+        source_records=(_source(), conflicting_source),
+    )
+
+    assert "SOURCE_CONFLICT_UNRESOLVED" in evaluate_projection_publication(context)
+
+
 def test_gate_rejects_source_record_belonging_to_another_place() -> None:
     cross_place_source = _source("place_other")
     context = replace(_context(), source_records=(cross_place_source,))

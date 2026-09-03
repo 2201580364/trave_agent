@@ -31,6 +31,9 @@ import type {
   SourceChannel,
   CreatePlaceSourceRecordInput,
   HolidayCalendar,
+  HolidayCalendarImpact,
+  HolidayCalendarSyncJob,
+  HolidayCalendarVersion,
   GenerateHolidayExceptionsInput,
 } from './types'
 
@@ -54,6 +57,7 @@ export class AdminApi {
   constructor(
     private readonly getAccessToken: () => string | null,
     private readonly onUnauthorized: () => void,
+    private readonly onRequestError?: (error: AdminApiError) => void,
   ) {}
 
   createSession(loginName: string, password: string): Promise<AdminLoginResponse> {
@@ -147,6 +151,36 @@ export class AdminApi {
 
   listHolidayCalendars(): Promise<{ items: HolidayCalendar[] }> {
     return this.request('/holiday-calendars')
+  }
+
+  getHolidayCalendarSyncCapability(): Promise<{ execution_available: boolean; region_code: 'CN' }> {
+    return this.request('/holiday-calendar-sync-capability')
+  }
+
+  listHolidayCalendarSyncJobs(year?: number): Promise<{ items: HolidayCalendarSyncJob[]; limit: number; offset: number }> {
+    const query = new URLSearchParams({ limit: '50', offset: '0' })
+    if (year !== undefined) query.set('year', String(year))
+    return this.request(`/holiday-calendar-sync-jobs?${query}`)
+  }
+
+  createHolidayCalendarSyncJob(input: { year: number; mode: 'preview' | 'sync'; operation_intent_id: string }): Promise<HolidayCalendarSyncJob> {
+    return this.request('/holiday-calendar-sync-jobs', { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  confirmHolidayCalendarPreview(jobId: string, input: { periods: Array<Record<string, unknown>>; adjusted_workdays: Array<Record<string, unknown>>; operation_intent_id: string }): Promise<HolidayCalendarSyncJob> {
+    return this.request(`/holiday-calendar-sync-jobs/${encodeURIComponent(jobId)}/confirm`, { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  cancelHolidayCalendarSyncJob(jobId: string): Promise<HolidayCalendarSyncJob> {
+    return this.request(`/holiday-calendar-sync-jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST', body: '{}' })
+  }
+
+  getHolidayCalendarVersion(calendarId: string): Promise<HolidayCalendarVersion> {
+    return this.request(`/holiday-calendars/${encodeURIComponent(calendarId)}`)
+  }
+
+  getHolidayCalendarImpact(calendarId: string): Promise<HolidayCalendarImpact> {
+    return this.request(`/holiday-calendars/${encodeURIComponent(calendarId)}/impact`)
   }
 
   createSourceRecord(revisionId: string, input: CreatePlaceSourceRecordInput): Promise<PlaceRevision> {
@@ -421,7 +455,18 @@ export class AdminApi {
       headers.set('Authorization', `Bearer ${token}`)
     }
 
-    const response = await fetch(`${API_ROOT}${path}`, { ...requestInit, headers })
+    let response: Response
+    try {
+      response = await fetch(`${API_ROOT}${path}`, { ...requestInit, headers })
+    } catch {
+      const error = new AdminApiError(
+        0,
+        'admin_network_error',
+        '无法连接管理服务，请检查网络或服务状态。',
+      )
+      this.onRequestError?.(error)
+      throw error
+    }
     if (response.ok) {
       if (response.status === 204) return undefined as T
       return (await response.json()) as T
@@ -435,7 +480,7 @@ export class AdminApi {
     }
     if (response.status === 401 && authenticated) this.onUnauthorized()
     const code = body.error?.code ?? 'admin_request_failed'
-    throw new AdminApiError(
+    const error = new AdminApiError(
       response.status,
       code,
       body.error?.message ?? `管理请求失败（HTTP ${response.status}）`,
@@ -443,6 +488,8 @@ export class AdminApi {
       body.error?.details,
       body.error?.field_errors,
     )
+    this.onRequestError?.(error)
+    throw error
   }
 }
 

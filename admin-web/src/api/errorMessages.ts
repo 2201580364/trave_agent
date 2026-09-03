@@ -8,6 +8,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   admin_login_name_conflict: '该登录名已存在，请使用其他登录名。',
   admin_actor_version_conflict: '管理员资料已被其他操作更新，请刷新列表后重试。',
   admin_role_safety_violation: '不能移除最后一个有效安全管理员的安全角色，请先建立恢复路径。',
+  admin_network_error: '无法连接管理服务，请检查网络或服务状态。',
   domain_validation_failed: '提交内容未通过安全或格式校验，请检查后重试。',
   projection_preparation_rejected: '求解投影暂不能准备，请先补齐证据。',
   source_record_validation_failed: '来源记录未通过治理校验，请检查来源渠道、地址和采集方式。',
@@ -22,11 +23,14 @@ export function adminErrorMessage(error: unknown): string {
     const reasonCodes = Array.isArray(error.details?.reason_codes)
       ? `（原因：${error.details.reason_codes.map((code) => reasonCodeLabel(String(code))).join('、')}）`
       : ''
+    const domainMessage = error.code === 'domain_validation_failed' && /[\u3400-\u9fff]/.test(error.message)
+      ? error.message
+      : null
     const baseMessage = error.code === 'source_record_validation_failed'
       ? error.message
       : error.code === 'publication_gate_rejected'
       ? '发布门禁未通过，请先补齐依赖证据。'
-      : (ERROR_MESSAGES[error.code] ?? '操作未完成，请检查输入和当前状态。')
+      : (domainMessage ?? ERROR_MESSAGES[error.code] ?? '操作未完成，请检查输入和当前状态。')
     const fieldErrors = error.fieldErrors && error.fieldErrors.length > 0
       ? `（字段：${error.fieldErrors.map((item) => {
         if (typeof item !== 'object' || item === null) return String(item)

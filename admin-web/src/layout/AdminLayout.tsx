@@ -1,5 +1,6 @@
 import {
   AuditOutlined,
+  CalendarOutlined,
   CheckSquareOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
@@ -40,6 +41,9 @@ export function AdminLayout() {
         : []),
       ...(hasPermission('place:candidate:read')
         ? [{ key: '/candidates', icon: <DatabaseOutlined />, label: '候选地点' }]
+        : []),
+      ...(hasPermission('holiday:calendar:read')
+        ? [{ key: '/holiday-calendars', icon: <CalendarOutlined />, label: '节假日历' }]
         : []),
     ],
     [hasPermission],

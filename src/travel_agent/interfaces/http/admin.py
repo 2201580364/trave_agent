@@ -7,7 +7,17 @@ from decimal import Decimal
 from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 from travel_agent.application.admin import (
@@ -15,12 +25,20 @@ from travel_agent.application.admin import (
     AdminIdentityService,
     PlaceReviewWorkflowService,
 )
+from travel_agent.application.admin.errors import AdminPermissionDeniedError
+from travel_agent.application.admin.holiday_calendar_sync import (
+    ChinaHolidayCalendarSyncService,
+)
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
 from travel_agent.domain.place_catalog import (
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
     PlaceRevisionEvidence,
+)
+from travel_agent.domain.place_catalog.holiday_sync import (
+    HolidayCalendarSyncJob,
+    HolidayCalendarVersion,
 )
 
 
@@ -244,7 +262,7 @@ class GenerateHolidayExceptionsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision_version: int = Field(gt=0)
     calendar_id: str = Field(min_length=1, max_length=64)
-    source_record_id: str = Field(min_length=1, max_length=64)
+    source_record_id: str = Field(default="", max_length=64)
     open_start_minute: int = Field(ge=0, le=2880)
     open_end_minute: int = Field(ge=0, le=2880)
     open_last_entry_minute: int | None = Field(default=None, ge=0, le=2880)
@@ -296,9 +314,47 @@ class ReviewPlaceEvidenceInput(BaseModel):
     reason_text: str | None = Field(default=None, max_length=500)
 
 
+class CreateHolidayCalendarSyncJobInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    year: int = Field(ge=2000, le=2200)
+    mode: str = Field(pattern="^(preview|sync)$")
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+
+
+class HolidayCalendarPreviewPeriodInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=50)
+    start: date
+    end: date
+    evidence_quote: str = Field(min_length=1, max_length=1000)
+
+
+class HolidayCalendarPreviewWorkdayInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    date: date
+    holiday_name: str = Field(min_length=1, max_length=50)
+    evidence_quote: str = Field(min_length=1, max_length=1000)
+
+
+class ConfirmHolidayCalendarPreviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_intent_id: str = Field(min_length=1, max_length=64)
+    periods: list[HolidayCalendarPreviewPeriodInput] = Field(
+        min_length=1, max_length=30
+    )
+    adjusted_workdays: list[HolidayCalendarPreviewWorkdayInput] = Field(
+        default_factory=list, max_length=100
+    )
+
+
 def build_admin_router(
     service: AdminIdentityService,
     review_workflow: PlaceReviewWorkflowService | None = None,
+    holiday_calendar_sync: ChinaHolidayCalendarSyncService | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -353,6 +409,146 @@ def build_admin_router(
             "permissions": list(current.permissions),
             "expires_at": current.expires_at.isoformat(),
         }
+
+    if holiday_calendar_sync is not None:
+
+        @router.get("/holiday-calendar-sync-capability")
+        def get_holiday_calendar_sync_capability(
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:read"):
+                raise AdminPermissionDeniedError
+            return {
+                "execution_available": holiday_calendar_sync.execution_available,
+                "region_code": "CN",
+            }
+
+        @router.post(
+            "/holiday-calendar-sync-jobs", status_code=status.HTTP_202_ACCEPTED
+        )
+        def create_holiday_calendar_sync_job(
+            payload: CreateHolidayCalendarSyncJobInput,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:write"):
+                raise AdminPermissionDeniedError
+            if not holiday_calendar_sync.job_submission_available:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "节假日历自动同步执行服务尚未启用",
+                )
+            job = holiday_calendar_sync.create_job(
+                year=payload.year,
+                mode=payload.mode,
+                operation_intent_id=payload.operation_intent_id,
+                created_by=current.admin_actor_id,
+            )
+            return _holiday_sync_job_response(job)
+
+        @router.get("/holiday-calendar-sync-jobs")
+        def list_holiday_calendar_sync_jobs(
+            year: int | None = Query(default=None, ge=2000, le=2200),
+            job_status: str | None = Query(default=None, alias="status", max_length=32),
+            limit: int = Query(default=50, ge=1, le=100),
+            offset: int = Query(default=0, ge=0),
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:read"):
+                raise AdminPermissionDeniedError
+            jobs = holiday_calendar_sync.list_jobs(
+                year=year, status=job_status, limit=limit, offset=offset
+            )
+            return {
+                "items": [_holiday_sync_job_response(job) for job in jobs],
+                "limit": limit,
+                "offset": offset,
+            }
+
+        @router.get("/holiday-calendar-sync-jobs/{job_id}")
+        def get_holiday_calendar_sync_job(
+            job_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:read"):
+                raise AdminPermissionDeniedError
+            return _holiday_sync_job_response(holiday_calendar_sync.get_job(job_id))
+
+        @router.post("/holiday-calendar-sync-jobs/{job_id}/cancel")
+        def cancel_holiday_calendar_sync_job(
+            job_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:write"):
+                raise AdminPermissionDeniedError
+            return _holiday_sync_job_response(
+                holiday_calendar_sync.cancel_job(job_id, cancelled_by=current.admin_actor_id)
+            )
+
+        @router.post("/holiday-calendar-sync-jobs/{job_id}/confirm")
+        def confirm_holiday_calendar_preview(
+            job_id: str,
+            payload: ConfirmHolidayCalendarPreviewInput,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:write"):
+                raise AdminPermissionDeniedError
+            return _holiday_sync_job_response(
+                holiday_calendar_sync.confirm_preview(
+                    job_id=job_id,
+                    periods=[item.model_dump(mode="json") for item in payload.periods],
+                    adjusted_workdays=[
+                        item.model_dump(mode="json")
+                        for item in payload.adjusted_workdays
+                    ],
+                    operation_intent_id=payload.operation_intent_id,
+                    confirmed_by=current.admin_actor_id,
+                )
+            )
+
+        @router.get("/holiday-calendars/{calendar_id}")
+        def get_holiday_calendar_detail(
+            calendar_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:read"):
+                raise AdminPermissionDeniedError
+            return _holiday_calendar_version_response(
+                holiday_calendar_sync.get_calendar(calendar_id)
+            )
+
+        @router.get("/holiday-calendars/{calendar_id}/impact")
+        def get_holiday_calendar_impact(
+            calendar_id: str,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            if not current.has_permission("holiday:calendar:read"):
+                raise AdminPermissionDeniedError
+            impact = holiday_calendar_sync.get_calendar_impact(calendar_id)
+            return {
+                "calendar_id": impact.calendar_id,
+                "compared_calendar_id": impact.compared_calendar_id,
+                "changed_date_count": impact.changed_date_count,
+                "added_holiday_dates": [item.isoformat() for item in impact.added_holiday_dates],
+                "removed_holiday_dates": [
+                    item.isoformat() for item in impact.removed_holiday_dates
+                ],
+                "added_adjusted_workdays": [
+                    item.isoformat() for item in impact.added_adjusted_workdays
+                ],
+                "removed_adjusted_workdays": [
+                    item.isoformat() for item in impact.removed_adjusted_workdays
+                ],
+                "affected_places": [
+                    {
+                        "place_revision_id": item[0],
+                        "place_name": item[1],
+                        "admin_area": item[2],
+                        "materialized_exception_count": item[3],
+                    }
+                    for item in impact.affected_places
+                ],
+                "historical_rows_without_provenance_excluded": True,
+            }
 
     @router.get("/admin-actors")
     def list_admin_actors(
@@ -495,10 +691,25 @@ def build_admin_router(
         def list_holiday_calendars_endpoint(
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
-            from travel_agent.domain.place_catalog import list_holiday_calendars
-            return {"items": [{"calendar_id": item.calendar_id, "display_name": item.display_name, "source_note": item.source_note,
-                               "periods": [{"name": p.name, "start": p.start.isoformat(), "end": p.end.isoformat()} for p in item.periods]}
-                              for item in list_holiday_calendars()]}
+            return {
+                "items": [
+                    {
+                        "calendar_id": item.calendar_id,
+                        "display_name": item.display_name,
+                        "source_note": item.source_note,
+                        "source_record_id": item.source_record_id,
+                        "periods": [
+                            {
+                                "name": period.name,
+                                "start": period.start.isoformat(),
+                                "end": period.end.isoformat(),
+                            }
+                            for period in item.periods
+                        ],
+                    }
+                    for item in review_workflow.list_holiday_calendars(current)
+                ]
+            }
 
         @router.post("/places/{place_id}/revisions", status_code=status.HTTP_201_CREATED)
         def create_place_revision(
@@ -1724,6 +1935,66 @@ def safe_source_url(value: str) -> str:
         query = urlencode(query_pairs)
         return urlunsplit((parsed.scheme, netloc, parsed.path, query, fragment))
     return value
+
+
+def _holiday_sync_job_response(job: HolidayCalendarSyncJob) -> dict[str, object]:
+    return {
+        "sync_job_id": job.job_id,
+        "region_code": job.region_code,
+        "year": job.year,
+        "mode": job.mode,
+        "status": job.status,
+        "source_url": safe_source_url(job.source_url) if job.source_url else None,
+        "source_title": job.source_title,
+        "source_published_at": (
+            job.source_published_at.isoformat() if job.source_published_at else None
+        ),
+        "source_content_sha256": job.source_content_sha256,
+        "validation_result": job.validation_result,
+        "calendar_id": job.calendar_id,
+        "attempt_count": job.attempt_count,
+        "next_retry_at": job.next_retry_at.isoformat() if job.next_retry_at else None,
+        "created_by": job.created_by,
+        "created_at": job.created_at.isoformat(),
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+    }
+
+
+def _holiday_calendar_version_response(
+    calendar: HolidayCalendarVersion,
+) -> dict[str, object]:
+    return {
+        "calendar_id": calendar.calendar_id,
+        "region_code": calendar.region_code,
+        "year": calendar.year,
+        "version": calendar.version,
+        "status": calendar.status,
+        "display_name": calendar.display_name,
+        "source_record_id": calendar.source_record_id,
+        "source_content_sha256": calendar.source_content_sha256,
+        "normalized_digest": calendar.normalized_digest,
+        "supersedes_calendar_id": calendar.supersedes_calendar_id,
+        "published_at": calendar.published_at.isoformat(),
+        "periods": [
+            {
+                "holiday_name": item.name,
+                "start_date": item.start.isoformat(),
+                "end_date": item.end.isoformat(),
+                "evidence_quote": item.evidence_quote,
+                "display_order": item.display_order,
+            }
+            for item in calendar.periods
+        ],
+        "adjusted_workdays": [
+            {
+                "service_date": item.service_date.isoformat(),
+                "holiday_name": item.holiday_name,
+                "evidence_quote": item.evidence_quote,
+            }
+            for item in calendar.adjusted_workdays
+        ],
+    }
 
 
 def _review_decision_response(decision: PlaceReviewDecision) -> dict[str, object]:

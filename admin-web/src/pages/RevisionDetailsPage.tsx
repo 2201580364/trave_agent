@@ -227,6 +227,8 @@ export function RevisionDetailsPage() {
     () => revision ? buildPublicationBlockers(revision, evidence, sourceConflicts, publicationCheck) : [],
     [revision, evidence, sourceConflicts, publicationCheck],
   )
+  const hasSourceConflicts = sourceConflicts.length > 0
+  const hasUnresolvedSourceConflicts = sourceConflicts.some((item) => !item.resolved)
   const verificationProgress = useMemo(() => {
     if (!evidence) return { verified: 0, total: 0 }
     const items = [
@@ -480,7 +482,7 @@ export function RevisionDetailsPage() {
               </div>
               <div className="revision-status-grid">
                 <div className="revision-status-tile"><span>证据核验</span><strong>{verificationProgress.verified}/{verificationProgress.total}</strong></div>
-                <div className={`revision-status-tile ${revision.conflicts_resolved ? 'is-success' : 'is-warning'}`}><span>冲突处理</span><strong>{revision.conflicts_resolved ? '已完成' : '待处理'}</strong></div>
+                <div className={`revision-status-tile ${hasUnresolvedSourceConflicts ? 'is-warning' : 'is-success'}`}><span>来源冲突</span><strong>{hasUnresolvedSourceConflicts ? '待裁决' : hasSourceConflicts ? '已裁决' : '未发现'}</strong></div>
                 <div className={`revision-status-tile ${revision.solver_eligible ? 'is-success' : 'is-warning'}`}><span>求解资格</span><strong>{revision.solver_eligible ? '已具备' : '未具备'}</strong></div>
                 <div className={`revision-status-tile ${blockers.length === 0 ? 'is-success' : 'is-warning'}`}><span>发布待办</span><strong>{blockers.length} 项</strong></div>
               </div>
@@ -565,12 +567,11 @@ export function RevisionDetailsPage() {
             onChanged={load}
             onError={setError}
           /></div>
-          <div id="o07-evidence"><RelationEvidenceCard api={api} evidence={evidence} revision={revision} sourceChannels={sourceChannels} canEdit={hasPermission('place:candidate:write')} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} /></div>
+          <div id="o07-evidence"><RelationEvidenceCard api={api} evidence={evidence} revision={revision} sourceChannels={sourceChannels} canEdit={hasPermission('place:candidate:write')} canReview={canReviewThisRevision} onChanged={load} onSuccess={(text) => messageApi.success(text)} onError={setError} /></div>
           <div id="o06-source-conflicts"><SourceConflictCard
             conflicts={sourceConflicts}
             loading={loading}
             error={sourceConflictError}
-            unresolved={!revision.conflicts_resolved}
             canResolve={revision.lifecycle_status === 'candidate' && hasPermission('place:candidate:write')}
             onResolve={() => { setResolveConflictNote(''); setResolveConflictOpen(true) }}
           /></div>
@@ -694,14 +695,12 @@ function SourceConflictCard({
   conflicts,
   loading,
   error,
-  unresolved,
   canResolve,
   onResolve,
 }: {
   conflicts: SourceConflict[]
   loading: boolean
   error: string | null
-  unresolved: boolean
   canResolve: boolean
   onResolve: () => void
 }) {
@@ -710,11 +709,7 @@ function SourceConflictCard({
       {loading ? <Card loading size="small" /> : error ? (
         <Alert showIcon type="warning" title="来源冲突暂不可用" description={error} />
       ) : conflicts.length === 0 ? (
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-          <Alert showIcon type={unresolved ? 'warning' : 'success'} title={unresolved ? '尚未确认来源冲突检查结果' : '当前没有检测到来源内容冲突'} description={unresolved ? '当前自动检查范围为：同一来源标识下的多条记录内容指纹是否不一致。没有发现具体冲突不代表不同来源的地址、坐标或开放时间已经完成字段级比对；请核对来源后确认本次检查结果。' : '本次已完成同一来源标识下的内容指纹检查，未发现冲突。不同来源之间的事实值比对仍以 O04/O05 中的具体证据和人工判断为准。'} />
-          {unresolved && canResolve && <Button type="primary" onClick={onResolve}>确认无冲突并完成裁决</Button>}
-          {unresolved && !canResolve && <Typography.Text type="secondary">当前账号只有查看权限，请由数据编辑员确认来源冲突检查结果。</Typography.Text>}
-        </Space>
+        <Alert showIcon type="success" title="当前没有检测到来源内容冲突" description="系统已检查同一来源标识下的内容版本，无需额外确认。不同来源之间的地址、坐标和开放时间差异，仍在 O04/O05 的具体证据中核验。" />
       ) : (
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Alert
@@ -765,10 +760,18 @@ function VerificationSummaryCard({ evidence, revision }: { evidence: PlaceRevisi
         {groups.map((group) => {
           const active = group.items.filter((item) => item.active)
           const noRelationsConfirmed = group.target === 'o07-evidence' && active.length === 0 && revision.relation_review_status === 'no_relations'
-          const verified = noRelationsConfirmed ? 1 : active.filter((item) => item.review_status === 'human_verified').length
+          // O07 has two independent states: the editor's relation decision and
+          // the reviewer's evidence verification. This summary is the former,
+          // so an agreed/rejected relation is already a completed decision even
+          // while its reviewer status remains pending in the table below.
+          const verified = noRelationsConfirmed
+            ? 1
+            : group.target === 'o07-evidence'
+              ? active.filter((item) => 'resolution_status' in item && item.resolution_status !== 'pending').length
+              : active.filter((item) => item.review_status === 'human_verified').length
           const total = noRelationsConfirmed ? 1 : active.length
           return <Button key={group.target} size="small" onClick={() => document.getElementById(group.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            {group.label}：{verified}/{total} 已核验
+            {group.label}：{verified}/{total} {group.target === 'o07-evidence' ? '已裁决' : '已核验'}
           </Button>
         })}
         <Tag color={revision.solver_eligible ? 'success' : 'warning'}>{revision.solver_eligible ? '已具备求解资格' : '尚未具备求解资格'}</Tag>
@@ -1222,12 +1225,13 @@ function EvidenceCard({
   )
 }
 
-function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit, onChanged, onSuccess, onError }: {
+function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit, canReview, onChanged, onSuccess, onError }: {
   api: ReturnType<typeof useAdminSession>['api']
   evidence: PlaceRevisionEvidence | null
   revision: PlaceRevision
   sourceChannels: SourceChannel[]
   canEdit: boolean
+  canReview: boolean
   onChanged: () => Promise<void>
   onSuccess: (text: string) => void
   onError: (message: string) => void
@@ -1238,6 +1242,18 @@ function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit
   const [working, setWorking] = useState(false)
   const relations = evidence?.relations ?? []
   const [confirmingNone, setConfirmingNone] = useState(false)
+  const reviewEvidence = async (item: PlaceRelationEvidence, reviewStatus: 'human_verified' | 'rejected') => {
+    setWorking(true)
+    try {
+      await api.reviewEvidence(revision.place_revision_id, 'relation', item.relation_id, {
+        review_status: reviewStatus,
+        operation_intent_id: `relation-evidence-review-${crypto.randomUUID()}`,
+        reason_code: reviewStatus === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED',
+      })
+      await onChanged()
+      onSuccess(reviewStatus === 'human_verified' ? '关系证据已通过审核' : '关系证据已驳回')
+    } catch (reason) { onError(adminErrorMessage(reason)) } finally { setWorking(false) }
+  }
   const save = async () => {
     if (!editing) return
     if (!note.trim()) {
@@ -1284,7 +1300,7 @@ function RelationEvidenceCard({ api, evidence, revision, sourceChannels, canEdit
         return <Tooltip title={`内部端点：${item.from_place_id} → ${item.to_place_id}`}><span className="relation-endpoints"><strong>{fromName}</strong><span className="relation-arrow">→</span><strong>{toName}</strong></span></Tooltip>
       } },
       { title: '关系说明', render: (_: unknown, item: PlaceRelationEvidence) => <span>{relationExplanation(item)}</span> },
-      { title: '审核', dataIndex: 'review_status', render: reviewStatusLabel },
+      { title: '审核', dataIndex: 'review_status', render: (_value: string, item: PlaceRelationEvidence) => <Space size={6}><span>{reviewStatusLabel(item.review_status)}</span>{canReview && <><Button size="small" type={item.review_status === 'human_verified' ? 'primary' : 'default'} disabled={working || item.review_status === 'human_verified'} onClick={() => void reviewEvidence(item, 'human_verified')}>通过</Button><Button size="small" danger disabled={working || item.review_status === 'rejected'} onClick={() => void reviewEvidence(item, 'rejected')}>驳回</Button></>}</Space> },
       { title: '裁决', dataIndex: 'resolution_status', render: relationResolutionLabel },
       { title: '识别依据', render: (_: unknown, item: PlaceRelationEvidence) => <span>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}<br /><Typography.Text type="secondary">系统关系线索</Typography.Text></span> },
       ...(canEdit ? [{ title: '操作', key: 'actions', width: 110, render: (_: unknown, item: PlaceRelationEvidence) => <Button size="small" onClick={() => { setEditing(item); setStatus(item.resolution_status); setNote(item.decision_note ?? '') }}>裁决</Button> }] : []),
@@ -1355,7 +1371,7 @@ function TimeEvidenceCard({
       await api.generateHolidayExceptions(revision.place_revision_id, {
         expected_revision_version: revision.revision_version,
         calendar_id: values.calendar_id,
-        source_record_id: values.source_record_id,
+        source_record_id: values.source_record_id || selectedHolidayCalendar?.source_record_id || '',
         open_start_minute: minutes.start_minute,
         open_end_minute: minutes.end_minute,
         open_last_entry_minute: minutes.last_entry_minute,
@@ -1621,7 +1637,7 @@ function TimeEvidenceCard({
               <Typography.Title level={5}>生成依据</Typography.Title>
               <div className="time-modal-grid">
                 <Form.Item name="calendar_id" label="法定节假日历" rules={[{ required: true, message: '请选择法定节假日历' }]}><Select options={holidayCalendars.map((calendar) => ({ value: calendar.calendar_id, label: calendar.display_name }))} placeholder="选择已核验的年度节假日历" /></Form.Item>
-                <SourceRecordField sources={evidence.sources} sourceChannels={sourceChannels} />
+                <SourceRecordField sources={evidence.sources} sourceChannels={sourceChannels} required={false} extraOption={selectedHolidayCalendar?.source_record_id ? { value: selectedHolidayCalendar.source_record_id, label: '该年度法定节假日历官方来源' } : undefined} />
               </div>
               {selectedHolidayCalendar && <Typography.Paragraph type="secondary" className="holiday-calendar-note">日历依据：{selectedHolidayCalendar.source_note}；包含 {selectedHolidayCalendar.periods.length} 段法定节假日。</Typography.Paragraph>}
             </section>
@@ -1754,9 +1770,10 @@ function TimeField({ name, nextDayName, label, hint, required = false }: { name:
   </Form.Item>
 }
 
-function SourceRecordField({ sources = [], sourceChannels }: { sources?: PlaceRevisionEvidence['sources']; sourceChannels: SourceChannel[] }) {
-  return <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="只能选择当前地点的有效来源记录；来源 URL、观察时间和采集方式请在来源证据区域核对。" />} rules={[{ required: true }]}>
-    <Select showSearch optionFilterProp="label" options={sources.map((source) => ({ value: source.source_record_id, label: sourceRecordBusinessLabel(source, sourceChannels) }))} placeholder="选择当前地点的有效来源" />
+function SourceRecordField({ sources = [], sourceChannels, required = true, extraOption }: { sources?: PlaceRevisionEvidence['sources']; sourceChannels: SourceChannel[]; required?: boolean; extraOption?: { value: string; label: string } }) {
+  const options = [...sources.map((source) => ({ value: source.source_record_id, label: sourceRecordBusinessLabel(source, sourceChannels) })), ...(extraOption ? [extraOption] : [])]
+  return <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="普通证据选择当前地点的有效来源；按法定节假日历生成时，可直接使用该年度日历的官方来源。" />} rules={required ? [{ required: true }] : []}>
+    <Select showSearch optionFilterProp="label" options={options} placeholder={extraOption ? '可选择地点来源，也可使用法定节假日历官方来源' : '选择当前地点的有效来源'} />
   </Form.Item>
 }
 
@@ -1818,7 +1835,7 @@ function buildPublicationBlockers(
   const codes: string[] = []
   if (revision.lifecycle_status === 'candidate') codes.push('REVISION_NOT_HUMAN_VERIFIED')
   if (revision.source_record_ids.length === 0) codes.push('MISSING_SOURCE_RECORD')
-  if (!revision.conflicts_resolved || sourceConflicts.some((item) => !item.resolved)) codes.push('SOURCE_CONFLICT_UNRESOLVED')
+  if (sourceConflicts.some((item) => !item.resolved)) codes.push('SOURCE_CONFLICT_UNRESOLVED')
 
   const validSourceIds = new Set((evidence?.sources ?? []).filter((item) => item.status === 'active').map((item) => item.source_record_id))
   if (evidence) {
@@ -1831,6 +1848,7 @@ function buildPublicationBlockers(
     if (!verifiedTimeRule) codes.push('TIME_RULE_UNRESOLVED')
     if (revision.place_kind === 'show' && verifiedTimeRules.filter((item) => item.rule_kind === 'fixed_session').length === 0) codes.push('FIXED_SESSION_REQUIRED')
     if (evidence.relations?.some((item) => item.active && ['overlaps', 'same_experience'].includes(item.relation_type) && item.resolution_status === 'pending')) codes.push('OVERLAPPING_SELECTION_UNRESOLVED')
+    if (evidence.relations?.some((item) => item.active && item.review_status !== 'human_verified')) codes.push('RELATION_EVIDENCE_UNVERIFIED')
     if ((evidence.relations ?? []).filter((item) => item.active).length === 0 && revision.relation_review_status === 'pending') codes.push('RELATION_REVIEW_REQUIRED')
   }
   if (!revision.solver_eligible) codes.push('PLACE_NOT_SOLVER_ELIGIBLE')
@@ -1845,6 +1863,7 @@ function buildPublicationBlockers(
     'MISSING_VERIFIED_GEOMETRY',
     'MISSING_VERIFIED_ACCESS_POINT',
     'RELATION_REVIEW_REQUIRED',
+    'RELATION_EVIDENCE_UNVERIFIED',
     'OVERLAPPING_SELECTION_UNRESOLVED',
     'REVISION_NOT_HUMAN_VERIFIED',
     'PLACE_NOT_SOLVER_ELIGIBLE',
@@ -1867,9 +1886,7 @@ function buildPublicationBlockers(
     }
     if (code === 'SOURCE_CONFLICT_UNRESOLVED') return {
       code, title: '存在未完成裁决的来源冲突',
-      description: sourceConflicts.some((item) => !item.resolved)
-        ? `检测到 ${sourceConflicts.filter((item) => !item.resolved).length} 组来源内容不一致。请打开 O06 查看每条来源记录，核对后由数据编辑员标记处理完成。`
-        : '当前修订版本尚未完成来源冲突状态确认。请打开 O06 刷新并核对来源记录；如确认没有冲突，由数据编辑员标记处理完成。',
+      description: `检测到 ${sourceConflicts.filter((item) => !item.resolved).length} 组来源内容不一致。请打开 O06 查看每条来源记录，核对后由数据编辑员标记处理完成。`,
       actionLabel: '查看来源冲突（O06）', target: 'o06-source-conflicts',
     }
     if (code === 'MISSING_VERIFIED_GEOMETRY' || code === 'MISSING_VERIFIED_ACCESS_POINT' || code === 'MISSING_ARRIVAL_ACCESS_POINT' || code === 'MISSING_DEPARTURE_ACCESS_POINT' || code === 'ACCESS_POINT_NOT_HUMAN_VERIFIED' || code === 'ACCESS_POINT_REVISION_MISMATCH') return {
@@ -1895,6 +1912,11 @@ function buildPublicationBlockers(
       code, title: reasonCodeLabel(code),
       description: '存在“重叠”或“同一体验”关系尚未裁决。请在 O07 选择已裁决或无需裁决，并填写裁决说明。',
       actionLabel: '查看关系裁决（O07）', target: 'o07-evidence',
+    }
+    if (code === 'RELATION_EVIDENCE_UNVERIFIED') return {
+      code, title: '地点关系证据尚未审核',
+      description: '关系裁决表示数据编辑员是否同意该关系；当前 O07 关系证据仍是“候选”，请由 reviewer 在关系表的“审核”列点击“通过”或“驳回”，再执行修订版本审核。',
+      actionLabel: '审核关系证据（O07）', target: 'o07-evidence',
     }
     if (code === 'RELATION_REVIEW_REQUIRED') return {
       code, title: reasonCodeLabel(code),

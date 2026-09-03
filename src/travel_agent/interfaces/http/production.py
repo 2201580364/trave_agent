@@ -12,6 +12,7 @@ from typing import cast
 from fastapi import FastAPI
 
 from travel_agent.infrastructure.database import DatabaseSettings
+from travel_agent.infrastructure.holiday_sync import HolidaySyncSettings
 from travel_agent.infrastructure.memory import FixedDataSnapshotVersionProvider
 from travel_agent.infrastructure.solver import JsonPublishedSolverDataProvider
 from travel_agent.runtime_config import load_runtime_environment
@@ -79,6 +80,7 @@ class ProductionHttpSettings:
     plan_share_token_secret: str
     admin_bootstrap_login: str | None = None
     admin_bootstrap_password: str | None = field(default=None, repr=False)
+    holiday_sync: HolidaySyncSettings = field(default_factory=HolidaySyncSettings)
 
     @classmethod
     def from_env(
@@ -108,6 +110,7 @@ class ProductionHttpSettings:
             secret,
             admin_login or None,
             admin_password or None,
+            HolidaySyncSettings.from_env(load_dotenv_file=False),
         )
 
 
@@ -157,6 +160,7 @@ def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
                 settings.plan_share_token_secret,
                 settings.admin_bootstrap_login,
                 settings.admin_bootstrap_password,
+                settings.holiday_sync,
             ),
             snapshot_versions,
             published_data,

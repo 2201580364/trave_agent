@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     listHolidayCalendars: vi.fn(),
     createSourceRecord: vi.fn(),
     detachSourceRecord: vi.fn(),
+    reviewEvidence: vi.fn(),
   },
   permissions: new Set<string>(),
   navigate: vi.fn(),
@@ -290,6 +291,38 @@ describe('RevisionDetailsPage', () => {
     expect(screen.getByText('查看来源冲突（O06）')).toBeTruthy()
     expect(screen.getAllByText('查看地图与访问点（O04）').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '开放时间（O05）：0/1 已核验' })).toBeTruthy()
+  })
+
+  it('does not report an unresolved conflict when the source conflict list is empty', async () => {
+    const uncheckedRevision = { ...revision, conflicts_resolved: false }
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(uncheckedRevision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({ ...timeEvidence, revision: uncheckedRevision })
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('当前没有检测到来源内容冲突')).toBeTruthy())
+    expect(screen.getByText('未发现')).toBeTruthy()
+    expect(screen.queryByText('存在未完成裁决的来源冲突')).toBeNull()
+    expect(screen.queryByText('确认无冲突并完成裁决')).toBeNull()
+  })
+
+  it('distinguishes an adjudicated relation from reviewer verification', async () => {
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({
+      ...timeEvidence,
+      relations: [{
+        relation_id: 'relation-1', from_place_id: 'place-1', to_place_id: 'place-2',
+        relation_type: 'contains', review_status: 'candidate', resolution_status: 'resolved',
+        decision_note: '关系成立', source_record_id: 'source-1', source_record_valid: true,
+        active: true, created_at: '2026-09-01T00:00:00Z', reviewed_at: null,
+        from_place_name: '西湖', to_place_name: '平湖秋月', relation_summary: '西湖包含平湖秋月',
+      }],
+    })
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('地点关系证据尚未审核')).toBeTruthy())
+    expect(screen.getByText('审核关系证据（O07）')).toBeTruthy()
   })
 
   it('does not claim ordinary opening hours exist when a show has no time rules', async () => {

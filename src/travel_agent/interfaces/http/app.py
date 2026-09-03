@@ -15,6 +15,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
+from travel_agent.application.admin.holiday_calendar_sync import (
+    ChinaHolidayCalendarSyncService,
+)
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ApplicationError, ResourceNotFoundError
 from travel_agent.application.common.unit_of_work import UnitOfWork
@@ -76,6 +79,7 @@ class HttpContainer:
     share_tokens: PlanShareTokenCodec | None = None
     admin_identity: AdminIdentityService | None = None
     review_workflow: PlaceReviewWorkflowService | None = None
+    holiday_calendar_sync: ChinaHolidayCalendarSyncService | None = None
 
 
 class AnonymousSessionInput(BaseModel):
@@ -192,7 +196,13 @@ def create_app(container: HttpContainer) -> FastAPI:
     app = FastAPI(title="Travel Agent API", version="1.0.0")
 
     if container.admin_identity is not None:
-        app.include_router(build_admin_router(container.admin_identity, container.review_workflow))
+        app.include_router(
+            build_admin_router(
+                container.admin_identity,
+                container.review_workflow,
+                container.holiday_calendar_sync,
+            )
+        )
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):

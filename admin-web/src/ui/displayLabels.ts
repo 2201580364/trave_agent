@@ -181,6 +181,14 @@ const auditActionLabels: Record<string, string> = {
   SOLVER_PROJECTION_PREPARED: '准备求解投影',
   PUBLICATION_BATCH_PREVIEWED: '预览发布批次',
   PUBLICATION_BATCH_EXECUTED: '执行发布批次',
+  HOLIDAY_CALENDAR_SYNC_QUEUED: '创建法定节假日历同步任务',
+  HOLIDAY_CALENDAR_PUBLISHED: '发布法定节假日历版本',
+  HOLIDAY_CALENDAR_NOT_ANNOUNCED: '确认年度法定节假日安排尚未发布',
+  HOLIDAY_CALENDAR_SYNC_TEMPORARILY_UNAVAILABLE: '节假日历同步暂时不可用',
+  HOLIDAY_CALENDAR_SYNC_NEEDS_ATTENTION: '节假日历同步需要人工处理',
+  HOLIDAY_CALENDAR_PREVIEW_VALIDATED: '法定节假日历预览校验通过',
+  HOLIDAY_CALENDAR_PREVIEW_CONFIRMED: '确认并发布法定节假日历预览',
+  HOLIDAY_CALENDAR_UP_TO_DATE: '确认法定节假日历已是最新版本',
 }
 
 const adminRoleLabels: Record<string, string> = {
@@ -255,6 +263,8 @@ export function auditTargetTypeLabel(value: string | null | undefined) {
     solver_projection: '求解投影',
     publication_batch: '发布批次',
     research_snapshot: '研究快照',
+    holiday_calendar_sync_job: '节假日历同步任务',
+    holiday_calendar: '法定节假日历',
   }
   return targetLabels[value ?? ''] ?? '管理对象'
 }

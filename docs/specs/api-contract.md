@@ -1175,19 +1175,23 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 
 O05 节假日规则：`GET /api/v1/admin/holiday-calendars` 返回版本化、受控的年度法定节假日历；`POST /api/v1/admin/place-revisions/{revision_id}/holiday-exceptions` 根据所选日历和开放时间批量物化 `open_override` 与节后 `closed` 日期例外。生成记录均为 `candidate`，必须逐项人工核验并重新送审，不改变求解器的 `PlaceDateException` 分钟值契约。
 
-#### O17 中国法定节假日历自动同步（计划，G7-R0.2-09）
+#### O17 中国法定节假日历自动同步（G7-R0.2-09）
 
-以下端点是已接受但尚未实现的计划契约，不属于当前 O05 已实现端点：
+以下端点属于 O17 节假日历同步与版本治理契约；同步执行由独立 Worker 消费任务，HTTP 请求本身不等待外部来源和模型完成：
 
-| 方法与路径 | 权限 | 计划语义 |
+| 方法与路径 | 权限 | 语义 |
 |---|---|---|
 | `POST /api/v1/admin/holiday-calendar-sync-jobs` | data_editor/admin_security | 创建中国大陆指定年份的异步同步任务；请求只包含年份、模式和 operation intent，不允许直接提交日期事实或任意来源 URL |
 | `GET /api/v1/admin/holiday-calendar-sync-jobs` | 管理只读角色 | 查询同步任务、状态、重试时间和稳定失败原因 |
 | `GET /api/v1/admin/holiday-calendar-sync-jobs/{job_id}` | 管理只读角色 | 查询官方来源发现、内容获取、AI 抽取、确定性校验和发布结果 |
+| `POST /api/v1/admin/holiday-calendar-sync-jobs/{job_id}/cancel` | data_editor/admin_security | 取消 queued 或等待重试的同步任务；running 任务返回状态错误，不强制终止 |
+| `POST /api/v1/admin/holiday-calendar-sync-jobs/{job_id}/confirm` | data_editor/admin_security | 提交已核对或调整的预览节假日段和调休日期；沿用该任务官方来源，重新确定性校验，通过后直接发布不可变新版本 |
 | `GET /api/v1/admin/holiday-calendars/{calendar_id}` | 管理只读角色 | 查询年度版本、结构化假期、调休工作日、官方来源和版本历史 |
-| `GET /api/v1/admin/holiday-calendars/{calendar_id}/impact` | publisher/viewer | 查询新版本相对旧版本的日期差异及受影响地点，不改写历史日期例外 |
+| `GET /api/v1/admin/holiday-calendars/{calendar_id}/impact` | 管理只读角色 | 查询新版本相对旧版本的日期差异及受影响地点，不改写历史日期例外；仅统计带日历来源追溯的物化记录 |
 
 同步采用异步 Job。O17 前端按钮、后台周期任务和 `sync_china_holiday_calendar` AI Tool 必须调用同一个 `ChinaHolidayCalendarSyncService`，不得分别实现抓取、校验或发布逻辑；HTTP 请求不等待外部网页获取和 AI 推理全部完成。
+
+`confirm` 不是新的 AI 同步任务。它只接受状态为 `validated_preview` 的原任务以及业务人员调整后的结构化数据，不允许更换来源 URL 或正文指纹。服务端必须重新检查年度、日期范围、重叠、节假日/调休冲突、七类法定节日完整性和原文依据，并在发布版本、替代旧版本、任务终态和管理审计之间保持单事务。确认意图须满足 64 字符限制；相同意图重试不得创建重复版本。
 
 同步结果使用以下稳定语义：
 

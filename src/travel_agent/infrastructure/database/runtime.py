@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from travel_agent.runtime_config import load_runtime_environment
 
-EXPECTED_ALEMBIC_REVISION = "0013_backfill_solver_eligibility"
+EXPECTED_ALEMBIC_REVISION = "0015_holiday_exception_provenance"
 
 
 @dataclass(frozen=True, slots=True)

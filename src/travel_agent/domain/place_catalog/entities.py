@@ -365,6 +365,7 @@ class PlaceDateException:
     active: bool
     created_at: datetime
     reviewed_at: datetime | None = None
+    holiday_calendar_id: str | None = None
 
     def __post_init__(self) -> None:
         _required(self.date_exception_id, self.place_revision_id, self.source_record_id)

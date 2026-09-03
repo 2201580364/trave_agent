@@ -170,6 +170,34 @@ def test_complete_evidence_without_task_is_ready_to_submit_not_ready_to_approve(
     assert result["status"] == "ready_for_review"
 
 
+def test_no_source_conflict_needs_no_manual_conflict_confirmation() -> None:
+    result = _review_readiness(
+        _evidence(revision=_revision(conflicts_resolved=False)),
+        None,
+    )
+
+    assert _check(result, "source")["collected"] is True
+    assert result["status"] == "ready_for_review"
+
+
+def test_real_source_conflict_still_requires_resolution() -> None:
+    conflicting_source = replace(
+        _source(),
+        source_record_id="source-2",
+        content_sha256="d" * 64,
+    )
+    result = _review_readiness(
+        _evidence(
+            revision=_revision(conflicts_resolved=False),
+            sources=(_source(), conflicting_source),
+        ),
+        None,
+    )
+
+    assert _check(result, "source")["collected"] is False
+    assert result["status"] == "needs_evidence"
+
+
 def test_complete_evidence_in_review_is_ready_for_approval() -> None:
     result = _review_readiness(_evidence(), _task("in_review"))
 

@@ -232,6 +232,9 @@ class PlaceDateExceptionRow(Base):
     source_record_id: Mapped[str] = mapped_column(
         ForeignKey("place_source_records.source_record_id"), index=True
     )
+    holiday_calendar_id: Mapped[str | None] = mapped_column(
+        ForeignKey("holiday_calendars.holiday_calendar_id"), nullable=True, index=True
+    )
     review_status: Mapped[str] = mapped_column(String(24), index=True)
     active: Mapped[bool] = mapped_column(Boolean, index=True)
     created_at: Mapped[str] = mapped_column(String(40))
@@ -1526,6 +1529,7 @@ def _date_exception_values(value: PlaceDateException) -> dict[str, Any]:
         "end_minute": value.end_minute,
         "last_entry_minute": value.last_entry_minute,
         "source_record_id": value.source_record_id,
+        "holiday_calendar_id": value.holiday_calendar_id,
         "review_status": value.review_status,
         "active": value.active,
         "created_at": value.created_at.isoformat(),
@@ -1547,6 +1551,7 @@ def _date_exception_from_row(row: PlaceDateExceptionRow) -> PlaceDateException:
         row.active,
         datetime.fromisoformat(row.created_at),
         datetime.fromisoformat(row.reviewed_at) if row.reviewed_at else None,
+        row.holiday_calendar_id,
     )
 
 

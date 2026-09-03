@@ -79,6 +79,34 @@ def test_local_app_uses_migrated_database_and_serves_catalog(
     assert "admin_security" in admin_session.json()["role_keys"]
 
 
+def test_local_app_exposes_holiday_sync_capability_from_environment(
+    tmp_path: Path, monkeypatch
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'holiday-capability.db').as_posix()}"
+    migration = Config("alembic.ini")
+    migration.attributes["skip_dotenv"] = True
+    migration.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(migration, "head")
+    monkeypatch.setenv("TRAVEL_AGENT_HOLIDAY_SYNC_WORKER_ENABLED", "true")
+    monkeypatch.setenv("TRAVEL_AGENT_HOLIDAY_AI_MODEL", "configured-model")
+    monkeypatch.setenv("TRAVEL_AGENT_HOLIDAY_AI_API_KEY", "configured-key")
+    monkeypatch.setenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "holiday-admin")
+    monkeypatch.setenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "Holiday-Admin-Password-2026!")
+
+    client = TestClient(build_local_dev_app(database_url=database_url))
+    session = client.post(
+        "/api/v1/admin/sessions",
+        json={"login_name": "holiday-admin", "password": "Holiday-Admin-Password-2026!"},
+    )
+    assert session.status_code == 201
+    capability = client.get(
+        "/api/v1/admin/holiday-calendar-sync-capability",
+        headers={"Authorization": f"Bearer {session.json()['access_token']}"},
+    )
+    assert capability.status_code == 200
+    assert capability.json()["execution_available"] is True
+
+
 def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None:
     database_path = tmp_path / "published.db"
     database_url = f"sqlite:///{database_path.as_posix()}"

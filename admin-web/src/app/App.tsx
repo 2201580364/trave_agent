@@ -32,6 +32,9 @@ const PublicationsPage = lazy(() => import('../pages/PublicationsPage').then((mo
 const RevisionDetailsPage = lazy(() =>
   import('../pages/RevisionDetailsPage').then((module) => ({ default: module.RevisionDetailsPage })),
 )
+const HolidayCalendarsPage = lazy(() =>
+  import('../pages/HolidayCalendarsPage').then((module) => ({ default: module.HolidayCalendarsPage })),
+)
 
 export function App() {
   return (
@@ -82,6 +85,7 @@ export function App() {
                   }
                 />
                 <Route path="publications" element={<RoleGate permission="place:publication:check"><PublicationsPage /></RoleGate>} />
+                <Route path="holiday-calendars" element={<RoleGate permission="holiday:calendar:read"><HolidayCalendarsPage /></RoleGate>} />
                 <Route
                   path="candidates/:revisionId"
                   element={

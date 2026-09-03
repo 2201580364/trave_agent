@@ -78,6 +78,19 @@ def canonical_projection_sha256(projection: SolverPlaceProjection) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def has_source_content_conflict(
+    source_records: tuple[PlaceSourceRecord, ...],
+) -> bool:
+    """Return whether one governed source has multiple distinct content versions."""
+
+    fingerprints_by_source: dict[str, set[str]] = {}
+    for record in source_records:
+        fingerprints_by_source.setdefault(record.source_id, set()).add(
+            record.content_sha256 or record.registry_sha256
+        )
+    return any(len(fingerprints) > 1 for fingerprints in fingerprints_by_source.values())
+
+
 def evaluate_projection_publication(
     context: ProjectionPublicationContext,
 ) -> tuple[str, ...]:
@@ -215,7 +228,7 @@ def evaluate_projection_publication(
         elif len(fixed_sessions) != 1:
             reasons.add("FIXED_SESSION_AMBIGUOUS")
 
-    if not revision.conflicts_resolved:
+    if has_source_content_conflict(context.source_records) and not revision.conflicts_resolved:
         reasons.add("SOURCE_CONFLICT_UNRESOLVED")
     if any(
         relation.active

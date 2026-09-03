@@ -134,6 +134,57 @@ describe('AdminApi', () => {
     expect(onUnauthorized).toHaveBeenCalledOnce()
   })
 
+  it('reports every standard API error through the shared notification boundary', async () => {
+    const onRequestError = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'domain_validation_failed',
+            message: '请先维护固定闭馆日，再生成节假日开放和顺延闭馆例外',
+            request_id: 'req-holiday-policy',
+            retryable: false,
+            field_errors: [],
+            details: {},
+          },
+        }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    const api = new AdminApi(() => 'editor-token', vi.fn(), onRequestError)
+
+    await expect(api.generateHolidayExceptions('revision-1', {
+      expected_revision_version: 1,
+      calendar_id: 'calendar-2024',
+      source_record_id: '',
+      open_start_minute: 540,
+      open_end_minute: 1020,
+      open_last_entry_minute: 990,
+      shift_closure: true,
+      operation_intent_id: 'holiday-exceptions-1',
+      reason_code: 'HOLIDAY_POLICY_MATERIALIZED',
+    })).rejects.toMatchObject({
+      status: 422,
+      code: 'domain_validation_failed',
+      requestId: 'req-holiday-policy',
+    })
+    expect(onRequestError).toHaveBeenCalledWith(expect.objectContaining({
+      message: '请先维护固定闭馆日，再生成节假日开放和顺延闭馆例外',
+    }))
+  })
+
+  it('reports network failures through the same notification boundary', async () => {
+    const onRequestError = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const api = new AdminApi(() => 'editor-token', vi.fn(), onRequestError)
+
+    await expect(api.getDashboardSummary()).rejects.toMatchObject({
+      status: 0,
+      code: 'admin_network_error',
+    })
+    expect(onRequestError).toHaveBeenCalledOnce()
+  })
+
   it('uses operation intents for review decisions and keeps review history read-only', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

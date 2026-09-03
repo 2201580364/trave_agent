@@ -166,6 +166,7 @@ export function CandidatesPage() {
 }
 
 function RevisionDetails({ revision }: { revision: PlaceRevision }) {
+  const sourceReadiness = revision.review_readiness?.checks.find((check) => check.key === 'source')
   return (
     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
       <Descriptions.Item label="修订版本编号">{revision.place_revision_id}</Descriptions.Item>
@@ -179,7 +180,11 @@ function RevisionDetails({ revision }: { revision: PlaceRevision }) {
       <Descriptions.Item label="室内/室外">{indoorOutdoorLabel(revision.indoor_outdoor)}</Descriptions.Item>
       <Descriptions.Item label="雨天适配">{rainSuitabilityLabel(revision.rain_suitability)}</Descriptions.Item>
       <Descriptions.Item label="来源记录数">{revision.source_record_ids.length}</Descriptions.Item>
-      <Descriptions.Item label="冲突已裁决">{revision.conflicts_resolved ? '是' : '否'}</Descriptions.Item>
+      <Descriptions.Item label="来源与冲突">
+        {sourceReadiness
+          ? sourceReadiness.verified ? '已核验' : sourceReadiness.collected ? '待审核' : '待处理'
+          : '准备度暂不可用'}
+      </Descriptions.Item>
       <Descriptions.Item label="求解器可用">{revision.solver_eligible ? '是' : '否'}</Descriptions.Item>
       <Descriptions.Item label="审核准备清单" span="filled">
         {revision.review_readiness

@@ -403,7 +403,54 @@ export type HolidayCalendar = {
   calendar_id: string
   display_name: string
   source_note: string
+  source_record_id?: string | null
   periods: Array<{ name: string; start: string; end: string }>
+}
+
+export type HolidayCalendarSyncJob = {
+  sync_job_id: string
+  region_code: string
+  year: number
+  mode: 'preview' | 'sync'
+  status: 'queued' | 'running' | 'not_announced' | 'temporarily_unavailable' | 'needs_attention' | 'validated_preview' | 'published' | 'up_to_date' | 'cancelled'
+  source_url?: string | null
+  source_title?: string | null
+  validation_result: Record<string, unknown>
+  calendar_id?: string | null
+  attempt_count: number
+  next_retry_at?: string | null
+  created_by: string
+  created_at: string
+  started_at?: string | null
+  finished_at?: string | null
+}
+
+export type HolidayCalendarVersion = {
+  calendar_id: string
+  region_code: string
+  year: number
+  version: number
+  status: 'published' | 'superseded'
+  display_name: string
+  source_record_id: string
+  source_content_sha256: string
+  normalized_digest: string
+  supersedes_calendar_id?: string | null
+  published_at: string
+  periods: Array<{ holiday_name: string; start_date: string; end_date: string; evidence_quote: string; display_order: number }>
+  adjusted_workdays: Array<{ service_date: string; holiday_name: string; evidence_quote: string }>
+}
+
+export type HolidayCalendarImpact = {
+  calendar_id: string
+  compared_calendar_id?: string | null
+  changed_date_count: number
+  added_holiday_dates: string[]
+  removed_holiday_dates: string[]
+  added_adjusted_workdays: string[]
+  removed_adjusted_workdays: string[]
+  affected_places: Array<{ place_revision_id: string; place_name: string; admin_area: string; materialized_exception_count: number }>
+  historical_rows_without_provenance_excluded: boolean
 }
 
 export type GenerateHolidayExceptionsInput = {

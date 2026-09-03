@@ -17,6 +17,7 @@ from travel_agent.application.common.errors import ResourceNotFoundError
 from travel_agent.application.planning.ports import IdGenerator
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
 from travel_agent.domain.place_catalog import (
+    HolidayCalendar,
     PlaceAccessPoint,
     PlaceClosure,
     PlaceDateException,
@@ -35,8 +36,12 @@ from travel_agent.domain.place_catalog import (
     ResearchSnapshot,
     SolverPlaceProjection,
     evaluate_projection_publication,
-    get_holiday_calendar,
+    has_source_content_conflict,
     resolve_holiday_closure_conflicts,
+)
+from travel_agent.domain.place_catalog.holiday_calendar import (
+    get_holiday_calendar,
+    list_holiday_calendars,
 )
 from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 
@@ -182,6 +187,19 @@ class ReviewUnitOfWork(Protocol):
     def commit(self) -> None: ...
 
 
+class HolidayCalendarCatalog(Protocol):
+    def list_calendars(self) -> tuple[HolidayCalendar, ...]: ...
+    def get_calendar(self, calendar_id: str) -> HolidayCalendar: ...
+
+
+class BuiltinHolidayCalendarCatalog:
+    def list_calendars(self) -> tuple[HolidayCalendar, ...]:
+        return list_holiday_calendars()
+
+    def get_calendar(self, calendar_id: str) -> HolidayCalendar:
+        return get_holiday_calendar(calendar_id)
+
+
 class PlaceReviewWorkflowService:
     def __init__(
         self,
@@ -189,11 +207,19 @@ class PlaceReviewWorkflowService:
         clock: Clock,
         ids: IdGenerator,
         source_catalog: GovernedSourceCatalog,
+        holiday_calendars: HolidayCalendarCatalog | None = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._clock = clock
         self._ids = ids
         self._source_catalog = source_catalog
+        self._holiday_calendars = holiday_calendars or BuiltinHolidayCalendarCatalog()
+
+    def list_holiday_calendars(
+        self, principal: AdminPrincipal
+    ) -> tuple[HolidayCalendar, ...]:
+        self._require(principal, "place:candidate:read")
+        return self._holiday_calendars.list_calendars()
 
     def list_tasks(
         self,
@@ -695,9 +721,15 @@ class PlaceReviewWorkflowService:
             (e for e in evidence.date_exceptions if active(e) and e.service_date == service_date),
             key=lambda item: ({"closed": 0, "session_override": 1, "open_override": 2}.get(item.exception_kind, 9), item.date_exception_id),
         ))
-        from travel_agent.domain.place_catalog import list_holiday_calendars
-        holiday_open_dates = {day for calendar in list_holiday_calendars() for day in calendar.holiday_dates()}
-        holiday_shift_dates = {period.end + timedelta(days=1) for calendar in list_holiday_calendars() for period in calendar.periods}
+        calendars = self._holiday_calendars.list_calendars()
+        holiday_open_dates = {
+            day for calendar in calendars for day in calendar.holiday_dates()
+        }
+        holiday_shift_dates = {
+            period.end + timedelta(days=1)
+            for calendar in calendars
+            for period in calendar.periods
+        }
         reasons: list[str] = []
         sessions: list[dict[str, object]] = []
         if revision.is_always_open:
@@ -1493,7 +1525,13 @@ class PlaceReviewWorkflowService:
         expands a versioned calendar into candidate evidence; every generated
         row must still be reviewed before the Revision can be approved.
         """
-        calendar = get_holiday_calendar(calendar_id)
+        calendar = self._holiday_calendars.get_calendar(calendar_id)
+        # The annual calendar carries its own official provenance. Older
+        # clients may omit it; resolve it server-side to keep the operation
+        # compatible while preserving mandatory place sources elsewhere.
+        source_record_id = source_record_id or getattr(calendar, "source_record_id", None) or ""
+        if not source_record_id:
+            raise ValueError("该年度法定节假日历缺少官方来源记录，请重新同步并发布日历")
         if open_end_minute <= open_start_minute:
             raise ValueError("holiday opening end must be after opening start")
         payload = {
@@ -1512,7 +1550,8 @@ class PlaceReviewWorkflowService:
             if evidence is None:
                 raise ResourceNotFoundError
             source = next((item for item in evidence.source_records if item.source_record_id == source_record_id), None)
-            if source is None or source.status != "active":
+            calendar_source = getattr(calendar, "source_record_id", None) == source_record_id
+            if (source is None or source.status != "active") and not calendar_source:
                 raise SourceRecordValidationError("holiday calendar requires an active source record")
             closure_weekdays = {item.weekday for item in evidence.closures if item.active}
             if not closure_weekdays:
@@ -1538,6 +1577,7 @@ class PlaceReviewWorkflowService:
                     PlaceDateException(
                         exception_id, revision_id, service_date, kind, start, end,
                         last_entry, source_record_id, "candidate", True, self._clock.now(),
+                        holiday_calendar_id=calendar_id,
                     ),
                     expected_revision_version=expected_revision_version + offset,
                 )
@@ -2775,14 +2815,11 @@ class PlaceReviewWorkflowService:
                 raise ReviewRevisionNotApprovableError
             if decision_kind == "approve":
                 evidence = uow.catalog.load_revision_evidence(task.place_revision_id)
-                source_conflict = False
-                if evidence is not None:
-                    grouped: dict[str, set[str]] = {}
-                    for source in evidence.source_records:
-                        grouped.setdefault(source.source_id, set()).add(
-                            source.content_sha256 or source.registry_sha256
-                        )
-                    source_conflict = any(len(fingerprints) > 1 for fingerprints in grouped.values())
+                source_conflict = (
+                    has_source_content_conflict(evidence.source_records)
+                    if evidence is not None
+                    else False
+                )
                 if evidence is None or source_conflict and not revision.conflicts_resolved or evidence is not None and any(
                     item.active and item.review_status != "human_verified"
                     for item in (
@@ -3027,7 +3064,10 @@ def _review_readiness(
     source_collected = source_collected and all(
         source_id in active_source_ids for source_id in revision.source_record_ids
     )
-    source_collected = source_collected and revision.conflicts_resolved
+    source_collected = source_collected and (
+        not has_source_content_conflict(evidence.source_records)
+        or revision.conflicts_resolved
+    )
 
     blocking_fact_flags = {
         "NAME_REQUIRES_HUMAN_VERIFICATION",

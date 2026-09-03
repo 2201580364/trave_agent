@@ -19,6 +19,7 @@ from travel_agent.infrastructure.database import (
     build_engine,
     build_session_factory,
 )
+from travel_agent.infrastructure.holiday_sync import HolidaySyncSettings
 from travel_agent.infrastructure.memory import FixedDataSnapshotVersionProvider
 from travel_agent.infrastructure.solver import (
     InMemoryPublishedSolverDataProvider,
@@ -71,6 +72,7 @@ def build_local_dev_app(
                 "local-only-plan-share-secret-2026-08-28-do-not-use-production",
                 os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN") or None,
                 os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD") or None,
+                HolidaySyncSettings.from_env(load_dotenv_file=False),
             ),
             snapshots,
             catalog,

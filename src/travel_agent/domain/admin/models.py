@@ -30,6 +30,8 @@ _ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "place:candidate:write",
             "place:revision:write",
             "place:review:request",
+            "holiday:calendar:read",
+            "holiday:calendar:write",
         }
     ),
     "data_reviewer": frozenset(
@@ -38,6 +40,7 @@ _ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "place:candidate:read",
             "place:review:read",
             "place:review:decide",
+            "holiday:calendar:read",
         }
     ),
     "data_publisher": frozenset(
@@ -48,6 +51,7 @@ _ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "place:publication:write",
             "research:snapshot:read",
             "research:snapshot:write",
+            "holiday:calendar:read",
         }
     ),
     "research_viewer": frozenset(
@@ -55,6 +59,7 @@ _ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "admin:session:self",
             "place:candidate:read",
             "research:snapshot:read",
+            "holiday:calendar:read",
         }
     ),
     "content_moderator": frozenset(
@@ -70,6 +75,8 @@ _ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "admin:actor:read",
             "admin:actor:roles:write",
             "admin:audit:read",
+            "holiday:calendar:read",
+            "holiday:calendar:write",
         }
     ),
 }

@@ -24,6 +24,7 @@ class HolidayCalendar:
     display_name: str
     periods: tuple[HolidayPeriod, ...]
     source_note: str
+    source_record_id: str | None = None
 
     def holiday_dates(self) -> frozenset[date]:
         result: set[date] = set()

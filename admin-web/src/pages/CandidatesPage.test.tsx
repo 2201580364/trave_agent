@@ -75,6 +75,8 @@ describe('CandidatesPage review readiness', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand row' }))
     expect(screen.getByText('基础事实：待补录')).toBeTruthy()
     expect(screen.getByText('来源与冲突：已核验')).toBeTruthy()
+    expect(screen.getByText('来源与冲突', { exact: true })).toBeTruthy()
+    expect(screen.queryByText('冲突已裁决')).toBeNull()
     expect(screen.getByText('地点几何：待审核')).toBeTruthy()
     expect(screen.getByText('访问点：待补录')).toBeTruthy()
     expect(screen.getByText('开放时间：待补录')).toBeTruthy()

@@ -21,12 +21,18 @@ from travel_agent.application.admin import (
     GovernedSourceCatalog,
     PlaceReviewWorkflowService,
 )
+from travel_agent.application.admin.holiday_calendar_sync import (
+    ChinaHolidayCalendarSyncService,
+)
 from travel_agent.application.admin.service import verify_admin_password
 from travel_agent.infrastructure.database import (
     AnonymousIdentityService,
     SqlAlchemyAdminUnitOfWork,
+    SqlAlchemyHolidayCalendarUnitOfWork,
+    SqlAlchemyPublishedHolidayCalendarCatalog,
     SqlAlchemyUnitOfWork,
     create_schema,
+    ensure_builtin_holiday_calendar_seeds,
 )
 from travel_agent.infrastructure.database.admin_identity import (
     AdminActorRow,
@@ -39,8 +45,8 @@ from travel_agent.infrastructure.database.place_catalog import (
     PlaceClosureRow,
     PlaceDateExceptionRow,
     PlaceGeometryRow,
-    PlaceRevisionRow,
     PlaceRelationRow,
+    PlaceRevisionRow,
     PlaceRow,
     PlaceSourceRecordRow,
     PlaceTimeRuleRow,
@@ -89,6 +95,7 @@ def admin_context(tmp_path: Path) -> Iterator[AdminTestContext]:
     engine = create_engine(f"sqlite:///{tmp_path / 'admin.db'}")
     create_schema(engine)
     sessions = sessionmaker(engine, expire_on_commit=False)
+    ensure_builtin_holiday_calendar_seeds(sessions)
     ids = SequenceIdGenerator()
     clock = FixedClock()
     service = AdminIdentityService(
@@ -126,6 +133,10 @@ def admin_context(tmp_path: Path) -> Iterator[AdminTestContext]:
                 Path(__file__).resolve().parents[2]
                 / "data/governance/place-collection-field-dictionary-v1.json",
             ),
+            SqlAlchemyPublishedHolidayCalendarCatalog(sessions),
+        ),
+        holiday_calendar_sync=ChinaHolidayCalendarSyncService(
+            lambda: SqlAlchemyHolidayCalendarUnitOfWork(sessions), clock, ids
         ),
     )
     with TestClient(create_app(container)) as client:
@@ -386,7 +397,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             )
         }
 
-    assert revision == "0013_backfill_solver_eligibility"
+    assert revision == "0015_holiday_exception_provenance"
     assert set(roles) == {
         "admin_security",
         "content_moderator",
@@ -679,6 +690,45 @@ def test_holiday_calendar_catalog_is_available_to_authenticated_admin(
     assert all(item["display_name"].startswith("中国大陆法定节假日历") for item in items)
 
 
+def test_holiday_calendar_sync_job_api_creates_lists_and_reads_job(
+    admin_context: AdminTestContext,
+) -> None:
+    _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
+
+    created = admin_context.client.post(
+        "/api/v1/admin/holiday-calendar-sync-jobs",
+        headers=headers,
+        json={
+            "year": 2027,
+            "mode": "sync",
+            "operation_intent_id": "holiday-sync-api-2027",
+        },
+    )
+
+    assert created.status_code == 202
+    assert created.json()["status"] == "queued"
+    job_id = created.json()["sync_job_id"]
+    listed = admin_context.client.get(
+        "/api/v1/admin/holiday-calendar-sync-jobs",
+        params={"year": 2027},
+        headers=headers,
+    )
+    assert listed.status_code == 200
+    assert [item["sync_job_id"] for item in listed.json()["items"]] == [job_id]
+    detail = admin_context.client.get(
+        f"/api/v1/admin/holiday-calendar-sync-jobs/{job_id}", headers=headers
+    )
+    assert detail.status_code == 200
+    assert detail.json()["year"] == 2027
+
+    calendar = admin_context.client.get(
+        "/api/v1/admin/holiday-calendars/cn-mainland-2026", headers=headers
+    )
+    assert calendar.status_code == 200
+    assert calendar.json()["status"] == "published"
+    assert calendar.json()["periods"]
+
+
 def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts(
     admin_context: AdminTestContext,
 ) -> None:
@@ -739,6 +789,7 @@ def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts
             )
         )
     assert len(rows) == 9
+    assert {row.holiday_calendar_id for row in rows} == {"cn-mainland-2026"}
     assert {row.service_date for row in rows if row.exception_kind == "open_override"} == {
         date(2026, 2, 16), date(2026, 2, 23), date(2026, 4, 6),
         date(2026, 5, 4), date(2026, 10, 5),
@@ -748,6 +799,20 @@ def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts
     }
     assert audit is not None
     assert audit.target_type == "place_date_exception"
+
+    impact = context.client.get(
+        "/api/v1/admin/holiday-calendars/cn-mainland-2026/impact",
+        headers=headers,
+    )
+    assert impact.status_code == 200, impact.text
+    assert impact.json()["affected_places"] == [
+        {
+            "place_revision_id": "revision-holiday-generation",
+            "place_name": "Candidate Place",
+            "admin_area": "West Lake",
+            "materialized_exception_count": 9,
+        }
+    ]
 
 def test_projection_preparation_api_is_verified_idempotent_and_does_not_publish(
     admin_context: AdminTestContext,

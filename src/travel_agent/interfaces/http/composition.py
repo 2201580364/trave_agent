@@ -6,10 +6,15 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
+
 from travel_agent.application.admin import (
     AdminIdentityService,
     GovernedSourceCatalog,
     PlaceReviewWorkflowService,
+)
+from travel_agent.application.admin.holiday_calendar_sync import (
+    ChinaHolidayCalendarSyncService,
 )
 from travel_agent.application.planning import ExecuteGenerationHandler
 from travel_agent.application.planning.ports import DataSnapshotVersionProvider
@@ -18,11 +23,21 @@ from travel_agent.infrastructure.database import (
     DatabaseReadiness,
     DatabaseSettings,
     SqlAlchemyAdminUnitOfWork,
+    SqlAlchemyHolidayCalendarUnitOfWork,
+    SqlAlchemyPublishedHolidayCalendarCatalog,
     SqlAlchemyUnitOfWork,
     build_engine,
     build_session_factory,
+    ensure_builtin_holiday_calendar_seeds,
 )
 from travel_agent.infrastructure.execution import InlineGenerationExecutor
+from travel_agent.infrastructure.holiday_sync import (
+    AiHolidayAnnouncementExtractor,
+    GovCnAnnouncementDiscoverer,
+    GovCnAnnouncementFetcher,
+    HolidaySyncSettings,
+    OpenAiCompatibleStructuredHolidayModel,
+)
 from travel_agent.infrastructure.ids import UuidIdGenerator
 from travel_agent.infrastructure.memory import SystemClock
 from travel_agent.infrastructure.sharing import HmacPlanShareTokenCodec
@@ -40,6 +55,7 @@ class HttpSettings:
     plan_share_token_secret: str
     admin_bootstrap_login: str | None = None
     admin_bootstrap_password: str | None = field(default=None, repr=False)
+    holiday_sync: HolidaySyncSettings = field(default_factory=HolidaySyncSettings)
 
     def __post_init__(self) -> None:
         if (self.admin_bootstrap_login is None) != (
@@ -63,6 +79,7 @@ class HttpSettings:
             secret,
             login or None,
             password or None,
+            HolidaySyncSettings.from_env(load_dotenv_file=False),
         )
 
 
@@ -73,6 +90,7 @@ def build_http_app(
 ):
     engine = build_engine(settings.database)
     sessions = build_session_factory(engine)
+    ensure_builtin_holiday_calendar_seeds(sessions)
     clock = SystemClock()
     ids = UuidIdGenerator()
 
@@ -95,6 +113,34 @@ def build_http_app(
             Path(__file__).resolve().parents[4]
             / "data/governance/place-collection-field-dictionary-v1.json",
         ),
+        SqlAlchemyPublishedHolidayCalendarCatalog(sessions),
+    )
+    holiday_settings = settings.holiday_sync
+    discoverer = fetcher = extractor = None
+    if holiday_settings.configured:
+        holiday_http = httpx.Client(
+            headers={"User-Agent": "travel-agent-holiday-sync/1.0"}
+        )
+        discoverer = GovCnAnnouncementDiscoverer(holiday_http)
+        fetcher = GovCnAnnouncementFetcher(holiday_http)
+        extractor = AiHolidayAnnouncementExtractor(
+            OpenAiCompatibleStructuredHolidayModel(
+                holiday_http,
+                base_url=holiday_settings.model_base_url,
+                api_key=holiday_settings.model_api_key,
+                model=holiday_settings.model_name,
+                timeout_seconds=holiday_settings.timeout_seconds,
+            )
+        )
+    holiday_calendar_sync = ChinaHolidayCalendarSyncService(
+        lambda: SqlAlchemyHolidayCalendarUnitOfWork(sessions),
+        clock,
+        ids,
+        discoverer,
+        fetcher,
+        extractor,
+        worker_available=holiday_settings.configured,
+        job_submission_available=holiday_settings.configured,
     )
     if (
         settings.admin_bootstrap_login is not None
@@ -118,5 +164,6 @@ def build_http_app(
             share_tokens,
             admin_identity,
             review_workflow,
+            holiday_calendar_sync,
         )
     )
