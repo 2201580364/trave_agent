@@ -476,6 +476,85 @@ def _seed_candidate_revision(context: AdminTestContext, revision_id: str = "revi
         session.commit()
 
 
+def _seed_approvable_candidate(
+    context: AdminTestContext, revision_id: str = "revision-1"
+) -> None:
+    _seed_candidate_revision(context, revision_id)
+    source_id = f"source-{revision_id}"
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, revision_id)
+        assert revision is not None
+        revision.source_record_ids = [source_id]
+        revision.relation_review_status = "no_relations"
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id=source_id,
+                place_id=revision.place_id,
+                source_id="test-official-source",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="dictionary-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url=f"https://example.test/{revision_id}",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="approved",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceGeometryRow(
+                geometry_id=f"geometry-{revision_id}",
+                place_revision_id=revision_id,
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.15, 30.25]},
+                source_record_id=source_id,
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id=f"access-{revision_id}",
+                place_revision_id=revision_id,
+                access_point_kind="visitor_entrance",
+                name="主入口",
+                lat=30.25,
+                lng=120.15,
+                source_record_id=source_id,
+                review_status="human_verified",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id=f"time-{revision_id}",
+                place_revision_id=revision_id,
+                rule_kind="opening_hours",
+                weekdays=[1, 2, 3, 4, 5, 6, 7],
+                start_minute=540,
+                end_minute=1020,
+                last_entry_minute=990,
+                valid_from=None,
+                valid_to=None,
+                source_record_id=source_id,
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.commit()
+
+
 def _seed_human_verified_revision_with_evidence(
     context: AdminTestContext, revision_id: str = "revision-projection"
 ) -> None:
@@ -942,7 +1021,7 @@ def test_place_review_submit_approve_and_audit_are_one_workflow(
     admin_context: AdminTestContext,
 ) -> None:
     context = admin_context
-    _seed_candidate_revision(context)
+    _seed_approvable_candidate(context)
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
 
     submit_payload = {
@@ -1046,6 +1125,41 @@ def test_place_review_submit_approve_and_audit_are_one_workflow(
     assert history.json()["items"][0]["actor_role"] == "data_reviewer"
 
 
+def test_revision_approval_requires_all_six_readiness_checks(
+    admin_context: AdminTestContext,
+) -> None:
+    context = admin_context
+    _seed_candidate_revision(context, "revision-incomplete")
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    submitted = context.client.post(
+        "/api/v1/admin/place-revisions/revision-incomplete/review-tasks",
+        headers=headers,
+        json={
+            "operation_intent_id": "submit-incomplete-revision",
+            "reason_code": "READY_FOR_REVIEW",
+        },
+    )
+    assert submitted.status_code == 201
+
+    decision = context.client.post(
+        f"/api/v1/admin/review-tasks/{submitted.json()['review_task_id']}/decisions",
+        headers=headers,
+        json={
+            "operation_intent_id": "approve-incomplete-revision",
+            "expected_version": 1,
+            "decision_kind": "approve",
+            "reason_code": "FACTS_VERIFIED",
+        },
+    )
+
+    assert decision.status_code == 409
+    assert decision.json()["error"]["code"] == "review_revision_not_approvable"
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-incomplete")
+    assert revision is not None
+    assert revision.lifecycle_status == "candidate"
+
+
 def test_candidate_list_and_revision_detail_are_permission_scoped(
     admin_context: AdminTestContext,
 ) -> None:
@@ -1096,6 +1210,14 @@ def test_place_source_records_are_governed_versioned_audited_and_reference_safe(
 ) -> None:
     context = admin_context
     _seed_candidate_revision(context, "revision-source-maintenance")
+    with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-source-maintenance")
+        assert revision is not None
+        revision.review_flags = [
+            "GEOMETRY_UNVERIFIED",
+            "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY",
+        ]
+        session.commit()
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
 
     channels = context.client.get("/api/v1/admin/source-channels", headers=headers)
@@ -1181,6 +1303,8 @@ def test_place_source_records_are_governed_versioned_audited_and_reference_safe(
         },
     )
     assert geometry.status_code == 200
+    assert "GEOMETRY_UNVERIFIED" not in geometry.json()["review_flags"]
+    assert "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY" not in geometry.json()["review_flags"]
     blocked = context.client.request(
         "DELETE",
         f"/api/v1/admin/place-revisions/revision-source-maintenance/source-records/{source_record_id}",
@@ -1388,6 +1512,28 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
     context = admin_context
     _seed_candidate_revision(context, "revision-review-evidence")
     with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, "revision-review-evidence")
+        assert revision is not None
+        revision.source_record_ids = ["source-review"]
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-review",
+                place_id="place-1",
+                source_id="test-official-source",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="dictionary-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://example.test/reviewer-evidence",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="approved",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
         session.add(
             PlaceGeometryRow(
                 geometry_id="geometry-review",
@@ -1424,6 +1570,40 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
                 active=True,
                 created_at=NOW.isoformat(),
                 reviewed_at=None,
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="access-review",
+                place_revision_id="revision-review-evidence",
+                access_point_kind="visitor_entrance",
+                name="主入口",
+                lat=30.25,
+                lng=120.15,
+                source_record_id="source-review",
+                review_status="human_verified",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="time-review",
+                place_revision_id="revision-review-evidence",
+                rule_kind="opening_hours",
+                weekdays=[1, 2, 3, 4, 5, 6, 7],
+                start_minute=540,
+                end_minute=1020,
+                last_entry_minute=990,
+                valid_from=None,
+                valid_to=None,
+                source_record_id="source-review",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
             )
         )
         session.commit()
@@ -1557,6 +1737,10 @@ def test_time_evidence_crud_review_and_revision_gate_form_one_versioned_workflow
     revision_id = "revision-time-crud"
     _seed_candidate_revision(context, revision_id)
     with context.sessions() as session:
+        revision = session.get(PlaceRevisionRow, revision_id)
+        assert revision is not None
+        revision.source_record_ids = ["source-time-crud"]
+        revision.relation_review_status = "no_relations"
         session.add(
             PlaceSourceRecordRow(
                 source_record_id="source-time-crud",
@@ -1573,6 +1757,35 @@ def test_time_evidence_crud_review_and_revision_gate_form_one_versioned_workflow
                 observed_at=NOW.isoformat(),
                 content_sha256="c" * 64,
                 status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceGeometryRow(
+                geometry_id="geometry-time-crud",
+                place_revision_id=revision_id,
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.15, 30.25]},
+                source_record_id="source-time-crud",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="access-time-crud",
+                place_revision_id=revision_id,
+                access_point_kind="visitor_entrance",
+                name="主入口",
+                lat=30.25,
+                lng=120.15,
+                source_record_id="source-time-crud",
+                review_status="human_verified",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
                 created_at=NOW.isoformat(),
             )
         )
@@ -2172,7 +2385,7 @@ def test_revision_editing_creates_new_candidate_and_keeps_base_immutable(
     admin_context: AdminTestContext,
 ) -> None:
     context = admin_context
-    _seed_candidate_revision(context, "revision-base")
+    _seed_approvable_candidate(context, "revision-base")
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
 
     created = context.client.post(
@@ -2433,7 +2646,7 @@ def test_review_rejects_non_candidate_revision_and_audits_rejection(
     admin_context: AdminTestContext,
 ) -> None:
     context = admin_context
-    _seed_candidate_revision(context, "revision-3")
+    _seed_approvable_candidate(context, "revision-3")
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
     task = context.client.post(
         "/api/v1/admin/place-revisions/revision-3/review-tasks",
@@ -2484,7 +2697,11 @@ def test_editing_uncollected_candidate_recommended_duration_establishes_valid_ra
             is_always_open=False, solver_eligible=False, conflicts_resolved=False,
             source_record_ids=["source-duration"], created_at=NOW.isoformat(),
             reviewed_at=None, published_at=None,
-            review_flags=["DURATION_NOT_COLLECTED"],
+            review_flags=[
+                "NAME_REQUIRES_HUMAN_VERIFICATION",
+                "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+                "DURATION_NOT_COLLECTED",
+            ],
         ))
         session.commit()
     _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
@@ -2495,6 +2712,8 @@ def test_editing_uncollected_candidate_recommended_duration_establishes_valid_ra
             "expected_revision_number": 1,
             "operation_intent_id": "update-duration-only",
             "reason_code": "PLACE_FACTS_EDITED",
+            "canonical_name": "已核验时长地点",
+            "category": "museum",
             "duration_recommended": 60,
         },
     )
@@ -2502,3 +2721,5 @@ def test_editing_uncollected_candidate_recommended_duration_establishes_valid_ra
     body = response.json()
     assert (body["duration_min"], body["duration_recommended"], body["duration_max"]) == (60, 60, 60)
     assert "DURATION_NOT_COLLECTED" not in body["review_flags"]
+    assert "NAME_REQUIRES_HUMAN_VERIFICATION" not in body["review_flags"]
+    assert "CATEGORY_REQUIRES_HUMAN_VERIFICATION" not in body["review_flags"]

@@ -331,7 +331,7 @@ class PlaceReviewWorkflowService:
                 evidence = uow.catalog.load_revision_evidence(revision_id)
                 if evidence is None:
                     continue
-                result[revision_id] = _review_readiness(
+                result[revision_id] = evaluate_review_readiness(
                     evidence,
                     uow.reviews.get_open_task_for_revision(revision_id),
                 )
@@ -1802,6 +1802,23 @@ class PlaceReviewWorkflowService:
                 if "not found" in str(exc):
                     raise ResourceNotFoundError from exc
                 raise
+            flags_to_clear = _evidence_flags_cleared_by_action(action)
+            if flags_to_clear:
+                cleaned = replace(
+                    updated,
+                    review_flags=tuple(
+                        flag
+                        for flag in updated.review_flags
+                        if flag not in flags_to_clear
+                    ),
+                )
+                if cleaned != updated:
+                    uow.reviews.update_revision(
+                        cleaned,
+                        expected_revision_number=updated.revision_number,
+                        expected_revision_version=updated.revision_version,
+                    )
+                    updated = cleaned
             uow.audits.add(
                 self._event(
                     actor,
@@ -2168,6 +2185,24 @@ class PlaceReviewWorkflowService:
                     maximum = normalized.get("duration_max", current.duration_max)
                     if not isinstance(minimum, int) or not isinstance(maximum, int) or not minimum <= recommended <= maximum:
                         raise ValueError(f"建议时长必须介于 {minimum} 到 {maximum} 分钟之间；如需调整范围，请同时修改最短和最长时长")
+            cleared_flags: set[str] = set()
+            if "canonical_name" in normalized:
+                cleared_flags.add("NAME_REQUIRES_HUMAN_VERIFICATION")
+            if "category" in normalized:
+                cleared_flags.add("CATEGORY_REQUIRES_HUMAN_VERIFICATION")
+            if {"duration_min", "duration_recommended", "duration_max"}.intersection(
+                normalized
+            ):
+                cleared_flags.add("DURATION_NOT_COLLECTED")
+            if normalized.get("is_always_open") is True:
+                cleared_flags.add("TIME_RULES_NOT_COLLECTED")
+            if cleared_flags:
+                existing_flags = normalized.get("review_flags", current.review_flags)
+                if not isinstance(existing_flags, tuple):
+                    raise ValueError("review flags are invalid")
+                normalized["review_flags"] = tuple(
+                    flag for flag in existing_flags if flag not in cleared_flags
+                )
             updated = replace(
                 current,
                 **normalized,
@@ -2815,21 +2850,14 @@ class PlaceReviewWorkflowService:
                 raise ReviewRevisionNotApprovableError
             if decision_kind == "approve":
                 evidence = uow.catalog.load_revision_evidence(task.place_revision_id)
-                source_conflict = (
-                    has_source_content_conflict(evidence.source_records)
+                readiness = (
+                    evaluate_review_readiness(evidence, task)
                     if evidence is not None
-                    else False
+                    else None
                 )
-                if evidence is None or source_conflict and not revision.conflicts_resolved or evidence is not None and any(
-                    item.active and item.review_status != "human_verified"
-                    for item in (
-                        *evidence.geometries,
-                        *evidence.access_points,
-                        *evidence.time_rules,
-                        *evidence.closures,
-                        *evidence.date_exceptions,
-                        *evidence.relations,
-                    )
+                if (
+                    readiness is None
+                    or readiness["verified_checks"] != readiness["total_checks"]
                 ):
                     self._reject(
                         uow,
@@ -3048,7 +3076,7 @@ class PlaceReviewWorkflowService:
         return normalized
 
 
-def _review_readiness(
+def evaluate_review_readiness(
     evidence: PlaceRevisionEvidence,
     task: PlaceReviewTask | None,
 ) -> dict[str, object]:
@@ -3074,7 +3102,9 @@ def _review_readiness(
         "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
         "DURATION_NOT_COLLECTED",
     }
-    basic_collected = not any(flag in blocking_fact_flags for flag in revision.review_flags)
+    basic_collected = revision.lifecycle_status in {"human_verified", "published"} or not any(
+        flag in blocking_fact_flags for flag in revision.review_flags
+    )
 
     active_geometries = tuple(item for item in evidence.geometries if item.active)
     geometry_sources_valid = all(
@@ -3218,6 +3248,11 @@ def _review_readiness(
     }
 
 
+# Backward-compatible private name for existing callers while offline research
+# reporting adopts the explicit public evaluator.
+_review_readiness = evaluate_review_readiness
+
+
 def _readiness_check(
     key: str,
     collected: bool,
@@ -3298,6 +3333,18 @@ def _evidence_target_type(action: str) -> str:
         if marker in action:
             return target_type
     raise ValueError("unknown place evidence action")
+
+
+def _evidence_flags_cleared_by_action(action: str) -> frozenset[str]:
+    if action in {"PLACE_GEOMETRY_CREATED", "PLACE_GEOMETRY_UPDATED"}:
+        return frozenset(
+            {"GEOMETRY_UNVERIFIED", "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"}
+        )
+    if action in {"PLACE_ACCESS_POINT_CREATED", "PLACE_ACCESS_POINT_UPDATED"}:
+        return frozenset({"ACCESS_POINT_UNVERIFIED"})
+    if action in {"PLACE_TIME_RULE_CREATED", "PLACE_TIME_RULE_UPDATED"}:
+        return frozenset({"TIME_RULES_NOT_COLLECTED"})
+    return frozenset()
 
 
 def _evidence_digest(
