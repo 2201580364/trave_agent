@@ -492,6 +492,76 @@ def test_repository_rejects_direct_published_inserts(tmp_path: Path) -> None:
             uow.place_catalog.add_projection(published_projection)
 
 
+def test_publishing_new_revision_retires_previous_solver_version(tmp_path: Path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'revision-retirement.db'}")
+    create_schema(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+
+    second_revision_id = "place_revision_westlake_2"
+    second_projection_id = "projection_westlake_2"
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        uow.place_catalog.add_place(_place())
+        uow.place_catalog.add_source_record(_source())
+        uow.place_catalog.add_revision(_revision())
+        uow.place_catalog.add_geometry(_geometry())
+        for point in _access_points():
+            uow.place_catalog.add_access_point(point)
+        uow.place_catalog.add_time_rule(_time_rule())
+        uow.place_catalog.add_projection(_projection())
+        uow.place_catalog.publish_projection("projection_westlake_1", published_at=NOW)
+
+        second_revision = replace(
+            _revision(),
+            place_revision_id=second_revision_id,
+            revision_number=2,
+            lifecycle_status="human_verified",
+        )
+        uow.place_catalog.add_revision(second_revision)
+        uow.place_catalog.add_geometry(
+            replace(_geometry(), geometry_id="geometry_westlake_2", place_revision_id=second_revision_id)
+        )
+        for point in _access_points():
+            uow.place_catalog.add_access_point(
+                replace(
+                    point,
+                    access_point_id=point.access_point_id.replace("westlake", "westlake2"),
+                    place_revision_id=second_revision_id,
+                )
+            )
+        uow.place_catalog.add_time_rule(
+            replace(_time_rule(), time_rule_id="time_westlake_2", place_revision_id=second_revision_id)
+        )
+        second_projection = replace(
+            _projection(),
+            projection_id=second_projection_id,
+            data_snapshot_version="hangzhou-candidate-2026-08-29-v2",
+            solver_node_id=102,
+            place_revision_id=second_revision_id,
+            arrival_access_point_id="access_westlake2_arrival",
+            departure_access_point_id="access_westlake2_departure",
+        )
+        second_projection = replace(
+            second_projection,
+            projection_hash=canonical_projection_sha256(second_projection),
+        )
+        uow.place_catalog.add_projection(second_projection)
+        uow.place_catalog.publish_projection(second_projection_id, published_at=NOW)
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        old_revision = uow.place_catalog.get_revision("place_revision_westlake_1")
+        old_projection = uow.place_catalog.get_projection("projection_westlake_1")
+        current_revision = uow.place_catalog.get_revision(second_revision_id)
+        current_projection = uow.place_catalog.get_projection(second_projection_id)
+
+    assert old_revision is not None and old_revision.lifecycle_status == "retired"
+    assert old_revision.solver_eligible is False
+    assert old_projection is not None and old_projection.status == "retired"
+    assert current_revision is not None and current_revision.lifecycle_status == "published"
+    assert current_revision.solver_eligible is True
+    assert current_projection is not None and current_projection.status == "published"
+
+
 def test_o04_candidate_evidence_mutations_bump_revision_version_and_reset_eligibility(
     tmp_path: Path,
 ) -> None:

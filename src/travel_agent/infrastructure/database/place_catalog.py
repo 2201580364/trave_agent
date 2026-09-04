@@ -1241,6 +1241,28 @@ class SqlAlchemyPlaceCatalogRepository:
             raise ProjectionPublicationError(("PROJECTION_DEPENDENCY_MISSING",))
         if revision.published_at is None or projection.published_at is None:
             raise ProjectionPublicationError(("PROJECTION_PUBLICATION_TIME_MISSING",))
+
+        # A Place has one current published revision.  Keep older versions in
+        # the append-only history, but retire both their revision and solver
+        # projection atomically so stale data cannot be selected for planning.
+        self._session.execute(
+            update(PlaceRevisionRow)
+            .where(
+                PlaceRevisionRow.place_id == revision.place_id,
+                PlaceRevisionRow.place_revision_id != revision.place_revision_id,
+                PlaceRevisionRow.lifecycle_status == "published",
+            )
+            .values(lifecycle_status="retired", solver_eligible=False, published_at=None)
+        )
+        self._session.execute(
+            update(SolverPlaceProjectionRow)
+            .where(
+                SolverPlaceProjectionRow.place_id == revision.place_id,
+                SolverPlaceProjectionRow.projection_id != projection.projection_id,
+                SolverPlaceProjectionRow.status == "published",
+            )
+            .values(status="retired", published_at=None)
+        )
         revision_row.lifecycle_status = revision.lifecycle_status
         revision_row.published_at = revision.published_at.isoformat()
         projection_row.status = projection.status
