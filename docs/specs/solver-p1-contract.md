@@ -198,7 +198,7 @@ best_so_far（需如实标注）
 默认值以机器快照为准：
 
 ```text
-docs/test/reports/solver-p1-contract.json
+var/reports/solver-p1-contract.json
 ```
 
 代码来源：

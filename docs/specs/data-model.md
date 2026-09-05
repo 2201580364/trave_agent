@@ -1,11 +1,11 @@
 # M1 业务数据与 OM1 管理逻辑数据模型
 
-- 文档版本：V3.0
-- 日期：2026-09-02
-- 阶段：A6 首个浏览器可操作纵向切片
-- 状态：SQLAlchemy 仓储与 Alembic 0001–0013 已实现；0006–0013 已覆盖通用地点目录、管理身份与审计、审核工作流、Revision 审核标记/乐观锁、研究快照批次、关系检查和历史求解资格回填。16.6 节假日历同步持久化模型仍是 G7-R0.2-09 计划，不得写成已迁移。服务器真实 MySQL 当前保持既有受控基线，后续迁移须在 R0.3 备份后统一执行；本机不安装或启动 MySQL/Redis
+- 文档版本：V3.1
+- 日期：2026-09-05
+- 阶段：M1 后段 / Gate 7 / OM1
+- 状态：SQLAlchemy 仓储与 Alembic 0001–0015 已实现；0006–0013 已覆盖通用地点目录、管理身份与审计、审核工作流、Revision 审核标记/乐观锁、研究快照批次、关系检查和历史求解资格回填；0014–0015 已实现 16.6 节假日历同步持久化模型与 DateException 节假日溯源外键。服务器真实 MySQL 当前保持既有受控基线（停在 0002），后续迁移须在 R0.3 备份后统一执行；本机不安装或启动 MySQL/Redis
 - 数据库：MySQL 8.0；SQLAlchemy 2.0；Alembic
-- 上游：API 契约 V2.9、应用代码架构 V1.4、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019、ADR-0021、ADR-0022
+- 上游：API 契约 V2.10、应用代码架构 V1.4、ADR-0002、ADR-0005、ADR-0009、ADR-0018、ADR-0019、ADR-0021、ADR-0022
 
 ## 1. 建模目标与原则
 
@@ -192,7 +192,7 @@ places
 - `PlaceSourceRecord` 强制绑定 source、registry/dictionary ID 与规范化 SHA-256、来源 URL、采集方式、来源决策和目标阶段；conditional 来源在领域构造阶段即拒绝 `target_stage=published`；
 - `PlaceRevision` 使用 `(place_id, revision_number)` 唯一约束，保存名称、类型、几何类型、时长范围、内部步行、体力、室内外、适用时段、人群、雨天适配、来源闭包和 candidate/human_verified/published/retired 生命周期；
 - 几何、访问点、时间规则、闭馆日和日期例外分别持久化，访问点坐标使用 `DECIMAL(10,7)`，跨午夜分钟值允许到 2880；
-- O05 Revision evidence 已覆盖 `place_time_rules`、`place_closures` 和 `place_date_exceptions`：三类记录严格按 `place_revision_id` 加载，其来源纳入当前 Place 的依赖闭包，并逐项暴露来源有效性、审核状态、active 状态和审核时间；candidate CRUD、软停用、重新启用和 reviewer 逐项审核已开放，指定日期解析预览仍待后续切片；
+- O05 Revision evidence 已覆盖 `place_time_rules`、`place_closures` 和 `place_date_exceptions`：三类记录严格按 `place_revision_id` 加载，其来源纳入当前 Place 的依赖闭包，并逐项暴露来源有效性、审核状态、active 状态和审核时间；candidate CRUD、软停用、重新启用、reviewer 逐项审核和 O05 指定日期解析预览（`POST /api/v1/admin/places/{place_id}/revisions/{revision_id}/time-preview`）已开放；
 - `PlaceRelation` 表达 contains/part_of/overlaps/same_experience，并保存 pending/resolved/not_required 裁决状态；互斥组与成员使用独立表和唯一约束。`PlaceRevision.relation_review_status` 记录本次修订是否已完成关系检查：`pending`、`no_relations`；历史修订默认 `not_required` 以保持向后兼容。无关系时必须通过 O07 确认接口登记 `no_relations`，不得伪造关系行；
 - `SolverPlaceProjection` 在同一 `data_snapshot_version` 内约束 solver node ID 唯一、PlaceRevision 唯一，保存显式到达/离开访问点、时长范围、solver payload 和稳定 SHA-256；
 - 仓储拒绝直接插入 published Revision 或 projection；唯一发布入口加载 Place、Revision、来源、几何、访问点、时间和关系依赖闭包，执行 fail-closed 门禁后在同一事务中更新 Revision 与 projection 状态。
@@ -785,9 +785,25 @@ degradations
   → 通用 Place、来源、Revision、几何、访问点、时间、关系、互斥组和求解投影发布边界
 0007_admin_identity_audit
   → 独立管理员身份、角色、会话摘要、服务端 RBAC 版本和追加式业务审计
+0008_place_review_workflow
+  → 审核任务与决定（16.2）
+0009_place_revision_review_flags
+  → Revision 候选数据质量/审核标记
+0010_place_revision_version
+  → Revision 乐观锁版本
+0011_research_snapshot_batches
+  → 发布批次、批次条目与研究快照（16.3）
+0012_place_relation_checks
+  → 关系检查结果
+0013_solver_place_projections_backfill
+  → 历史求解资格回填
+0014_holiday_calendar_sync
+  → 节假日历、时段、调休工作日与同步任务（16.6）
+0015_holiday_exception_provenance
+  → place_date_exceptions 追加 holiday_calendar_id 溯源外键
 ```
 
-以上是仓库当前实际物理迁移链，不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再依次执行 0003、0004、0005、0006、0007、0008、0009、0010，并确认 readiness 的 `expected_revision/current_revision` 都是 `0010_place_revision_version`。R0.2-05-02 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
+以上是仓库当前实际物理迁移链（0001–0015），不再沿用早期把每一组概念表拆成 001–010 的预估编号。服务器真实 MySQL 当前仍停在 `0002_anonymous_identity`；R0.3 部署前必须先备份，再按序执行 0003–0015，并确认 readiness 的 `expected_revision/current_revision` 都是 `0015_holiday_exception_provenance`。R0.2-05-02 只在临时 SQLite 测试库从空库执行完整 `upgrade head`，未连接或变更服务器数据库。
 
 每次迁移必须：
 
@@ -898,7 +914,7 @@ And 不生成 published research snapshot
 
 ## 16. OM1 管理端数据模型（身份与审计底座已实现）
 
-本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；`0009_place_revision_review_flags` 已追加实现候选 Revision 数据质量/审核标记；`0010_place_revision_version` 已追加 Revision 子资源写入所需的乐观锁版本。O04 与 O05 的写入/逐项审核复用现有 0006 事实表和 0010 Revision 乐观锁，不新增空壳迁移；16.3 发布批次仍待 R0.2-07 通过新迁移追加。0001–0009 未被改写。
+本节定义 R0.2-05 的分阶段模型。`0007_admin_identity_audit` 已追加实现 16.1 和 16.4；`0008_place_review_workflow` 已追加实现 16.2 审核任务与决定；`0009_place_revision_review_flags` 已追加实现候选 Revision 数据质量/审核标记；`0010_place_revision_version` 已追加 Revision 子资源写入所需的乐观锁版本；`0011_research_snapshot_batches` 已追加实现 16.3 发布批次、批次条目与研究快照。O04 与 O05 的写入/逐项审核复用现有 0006 事实表和 0010 Revision 乐观锁，不新增空壳迁移。0001–0013 未被改写。
 
 ### 16.1 管理身份
 
@@ -951,22 +967,22 @@ ReviewTask 状态不能替代 `PlaceRevision.review_status`；它表达人员工
 - approve 与 Revision 进入 human_verified 在同一事务中完成；
 - 不允许 UPDATE 改写历史决定，纠正通过新决定或新任务表达。
 
-### 16.3 发布批次
+### 16.3 发布批次（已由 0011 实现）
 
-#### `place_publication_batches`
+#### `publication_batches`
 
 - 保存 publication_intent_id、发起人、状态、目标数据版本、规范化输入哈希、质量报告摘要和时间；
 - 同 publication_intent_id 只对应一个规范化载荷；
-- 批次状态建议 `previewed/running/completed/partial_failed/failed`；
-- 批次成功不替代逐 Revision/Projection 的 published 状态。
+- 批次状态 `previewed/running/completed/partial_failed/failed`；
+- 批次成功不替代逐 Revision/Projection 的 published 状态；发布即原子退役——新批次完成时旧 published Revision/Projection 转 retired（R0.2-07 语义）。
 
-#### `place_publication_batch_items`
+#### `publication_batch_items`
 
 - 绑定 batch、place_revision、projection、结果和稳定 reason codes；
 - `(batch_id, place_revision_id)` 唯一；
 - 部分失败必须可逐项查询，不能只保留一个批次错误字符串。
 
-研究快照继续使用现有发布快照边界；如当前物理表不足，后续迁移只追加快照与批次关系，不改写历史 snapshot 内容。
+研究快照由 `research_snapshots` 表持久化；如当前物理表不足，后续迁移只追加快照与批次关系，不改写历史 snapshot 内容。
 
 ### 16.4 管理业务审计
 
@@ -1045,11 +1061,12 @@ Then admin_audit_events 仍可按 actor、target 和 publication intent 查询
 
 | 字段组 | 说明 |
 |---|---|
-| 身份与输入 | `sync_job_id/region_code/year/mode` |
+| 身份与输入 | `sync_job_id/region_code/calendar_year/mode` |
 | 生命周期 | queued/running/not_announced/temporarily_unavailable/needs_attention/published/up_to_date/failed |
 | 官方来源 | `source_url/source_title/source_published_at/source_content_sha256` |
 | 处理结果 | `validation_result/calendar_id/attempt_count/next_retry_at` |
 | 幂等与审计 | `operation_intent_id/operation_digest/created_by/created_at/started_at/finished_at` |
+| 运行锁 | `run_lock_key`（可空、唯一）：worker 通过 `claim_job/claim_next` 领取并写入运行锁，lease 过期由 `claim_next` 恢复（标记 `worker_lease_expired` 后重新入队），保证同一年度同一时刻只允许一个运行任务 |
 
 同步按钮、周期任务和 AI Tool 共用同一 Job 与应用服务。AI/定时任务使用受限系统主体，`created_by` 不得伪装成人工管理员；同一 operation intent 的不同载荷必须拒绝，相同年度同一时刻只允许一个运行任务。
 

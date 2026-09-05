@@ -13,7 +13,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from travel_agent.solver import GeoBounds, validate_attraction_data  # noqa: E402
 
-
 HANGZHOU_BOUNDS = GeoBounds(29.1, 30.6, 118.3, 120.8)
 
 
@@ -27,7 +26,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("docs/test/reports/gate6-data-validation-latest.json"),
+        default=Path("var/reports/gate6-data-validation-latest.json"),
     )
     parser.add_argument("--target-date", type=date.fromisoformat, default=date(2026, 8, 25))
     args = parser.parse_args()

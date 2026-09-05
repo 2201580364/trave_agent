@@ -9,8 +9,8 @@
 
 M1 应用层规格已经完成 A5 同步，OM1 数据治理规格持续补充：
 
-- [api-contract.md](api-contract.md) V2.9：已实现的用户 HTTP 能力，以及 OM1 管理身份/会话/RBAC/审核/发布端点和 O18 受控采集批次计划契约；
-- [data-model.md](data-model.md) V3.0：持久化实体、事务、发布快照、Alembic 0001–0013 实际链；AdminActor/Role/Session/AuditEvent、审核任务、研究快照批次已实现，节假日历与采集批次模型仍待后续追加迁移；
+- [api-contract.md](api-contract.md) V2.11：已实现的用户 HTTP 能力与 OM1 管理端点；端点清单已完成人工裁决（删除 candidates 创建与独立退役端点、place 聚合读移入 §15.2.0 计划、补登 3 条已实现端点），差异对照及裁决记录见 [api-contract-endpoint-diff-2026-09-05.md](api-contract-endpoint-diff-2026-09-05.md)；
+- [data-model.md](data-model.md) V3.1：持久化实体、事务、发布快照、Alembic 0001–0015 实际链；AdminActor/Role/Session/AuditEvent、审核任务、研究快照批次已实现，节假日历模型（0014/0015）已实现，采集批次模型仍待后续追加迁移；
 - [O18 采集设计](../product/O18地点数据采集与关系识别设计.md)：采集来源、批次、归一/去重、关系线索和人工审核衔接的产品设计；
 - [ADR-0022](../decisions/ADR-0022-data-collection-staging-and-relation-clues.md)：采集只进入 staging、AI 不越级、批次幂等和关系线索裁决边界。
 

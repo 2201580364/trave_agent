@@ -40,7 +40,7 @@ python -m pytest tests/solver/test_solver_contract.py -q
 python scripts/run_solver_contract.py
 ```
 
-机器可读快照：`docs/test/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013/ADR-0015 升级版本。
+机器可读快照：`var/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013/ADR-0015 升级版本。
 
 ### 高德 OD Provider 与 V2 结果映射
 
@@ -63,7 +63,7 @@ python -m pytest tests/solver/test_closeness.py tests/closeness -q
 python scripts/run_closeness_report.py
 ```
 
-报告为 `docs/test/reports/gate6-closeness-latest.json`。报告同时保留逐景点/逐关系的优选值、可接受值、实际值和命中结果，不能只根据综合分判断算法变化。当前杭州案例来源类型是 `PUBLIC_GUIDE_SYNTHESIS`，综合接近度是可重复的技术回归证据，不是领域专家金标，也不能替代 G7 的真实专家评审和用户认可测试。
+报告为 `var/reports/gate6-closeness-latest.json`。报告同时保留逐景点/逐关系的优选值、可接受值、实际值和命中结果，不能只根据综合分判断算法变化。当前杭州案例来源类型是 `PUBLIC_GUIDE_SYNTHESIS`，综合接近度是可重复的技术回归证据，不是领域专家金标，也不能替代 G7 的真实专家评审和用户认可测试。
 
 > 由领域专家手工编排的「正确行程」，是主观「合理」的客观化锚点。
 
@@ -88,7 +88,7 @@ python scripts/run_golden_cases.py
 报告保存到：
 
 ```text
-docs/test/reports/gate6-golden-latest.json
+var/reports/gate6-golden-latest.json
 ```
 
 | ID | 场景 | 覆盖 |
@@ -124,7 +124,7 @@ tests/data/hangzhou_attractions_snapshot.json
 机器可读报告：
 
 ```text
-docs/test/reports/gate6-data-validation-latest.json
+var/reports/gate6-data-validation-latest.json
 ```
 
 当前杭州快照结果：`7/7` 条记录结构合法且可进入求解器，规则 1–9 各自通过 `7/7`。
@@ -140,7 +140,7 @@ python scripts/run_solver_benchmark.py
 机器可读报告：
 
 ```text
-docs/test/reports/gate6-performance-latest.json
+var/reports/gate6-performance-latest.json
 ```
 
 | 场景 | 目标 | 本机 5 次结果 | 状态 |
@@ -164,7 +164,7 @@ python scripts/run_degradation_cases.py
 机器可读报告：
 
 ```text
-docs/test/reports/gate6-degradation-latest.json
+var/reports/gate6-degradation-latest.json
 ```
 
 | ID | 反例/降级场景 | 期望 |

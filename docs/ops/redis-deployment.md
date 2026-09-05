@@ -108,4 +108,4 @@ Redis 数据目录、备份位置和监控系统
 - 当前只绑定 loopback，不为跨主机开放 6379；未来跨主机必须先补私网/VPN + TLS；
 - 尚未使用两台物理发布机器执行网络分区和跨机器故障测试；
 - 尚无集中配额看板、Redis 指标告警和异地备份；
-- 详细真实证据见 `docs/test/reports/a6-8-2-server-mysql-redis-validation-2026-08-28.md`。
+- 详细真实证据见 `docs/test/reports/archive/2026-08/a6-8-2-server-mysql-redis-validation-2026-08-28.md`。

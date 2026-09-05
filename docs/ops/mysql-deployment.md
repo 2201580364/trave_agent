@@ -109,7 +109,7 @@ current_revision = expected_revision
 - 每日同机备份已经启用，但尚无对象存储/第二故障域和备份加密；
 - 尚无集中指标、告警和值班通知；
 - 同机既有非本项目 MySQL 暴露 0.0.0.0:3306 且 UFW inactive，未获授权不得修改，服务器所有者必须独立核查云安全组；
-- 详细真实证据见 `docs/test/reports/a6-8-2-server-mysql-redis-validation-2026-08-28.md`。
+- 详细真实证据见 `docs/test/reports/archive/2026-08/a6-8-2-server-mysql-redis-validation-2026-08-28.md`。
 
 ## 8. 开始服务器部署前需要的信息
 

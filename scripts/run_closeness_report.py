@@ -21,7 +21,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("docs/test/reports/gate6-closeness-latest.json"),
+        default=Path("var/reports/gate6-closeness-latest.json"),
     )
     args = parser.parse_args()
     result = run_hangzhou_closeness_case()

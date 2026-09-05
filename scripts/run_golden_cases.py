@@ -21,7 +21,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("docs/test/reports/gate6-golden-latest.json"),
+        default=Path("var/reports/gate6-golden-latest.json"),
     )
     args = parser.parse_args()
     results = run_hangzhou_golden_cases()

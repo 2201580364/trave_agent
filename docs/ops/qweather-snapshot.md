@@ -96,7 +96,7 @@ py -3.12 scripts/build_published_solver_snapshot.py `
 - 已生成不可变天气审计快照 `var/audit/qweather-hangzhou-2026-08-27-v1.json`：三个唯一连续日期为 2026-08-27 至 2026-08-29，Provider、来源字段和内容哈希均通过；
 - 7 个路线点均为 `human_verified`，审核后严格高德有向 OD 为 42/42、0 fallback、0 missing；
 - 已生成并严格加载 `var/published/hangzhou-published-2026-08-27-v1.json`，状态为 `published`；
-- 正式生产组合根、FastAPI 端到端生成、数据库 Revision 持久化和 Chrome P00→P04 回放均通过；详细证据见 `docs/test/reports/a6-8-1-qweather-published-production-replay-2026-08-27.md`。
+- 正式生产组合根、FastAPI 端到端生成、数据库 Revision 持久化和 Chrome P00→P04 回放均通过；详细证据见 `docs/test/reports/archive/2026-08/a6-8-1-qweather-published-production-replay-2026-08-27.md`。
 
 ## 6. 当前未完成
 

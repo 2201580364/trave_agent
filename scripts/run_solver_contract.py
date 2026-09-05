@@ -19,7 +19,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("docs/test/reports/solver-p1-contract.json"),
+        default=Path("var/reports/solver-p1-contract.json"),
     )
     args = parser.parse_args()
     payload = {

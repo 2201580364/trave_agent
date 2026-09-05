@@ -1,9 +1,9 @@
 # M1 用户 API 与 OM1 管理 API 契约
 
-- 文档版本：V2.9
-- 日期：2026-09-02
+- 文档版本：V2.11
+- 日期：2026-09-05
 - 阶段：A6 首个浏览器可操作纵向切片
-- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理身份、地点审核、发布门禁与 O09 批次/研究快照 API 已实现并进入 Chrome 验收
+- 状态：P00–P08 核心 HTTP v1、“替换景点→新 Revision”、匿名主体行程历史、`plan-share-v1` 安全计划分享和 Revision/节点结构化反馈已实现；OM1 管理身份、地点审核、发布门禁与 O09 批次/研究快照 API 已实现并进入 Chrome 验收。V2.11 完成端点清单人工裁决：删除 `POST /admin/candidates` 与独立 `retirements` 端点、`GET /admin/places/{place_id}` 移入计划小节、补登 3 个已实现端点与 health 探针
 - 上游：功能模块 V3.6、管理端功能 V1.4、UI V1.4、交互 V1.4、应用代码架构 V1.5、ADR-0005、ADR-0009、ADR-0018、ADR-0019、ADR-0022
 - API 前缀：用户端 `/api/v1`；管理端 `/api/v1/admin`
 
@@ -36,6 +36,10 @@
 - 分钟字段使用整数，字段名以 `_min` 结尾；
 - ID 对客户端是不透明字符串；实现可用 UUID/ULID，客户端不得解析；
 - 所有响应返回 `X-Request-ID`；客户端可传合法 `X-Request-ID`，服务端也必须校验或生成。
+
+### 2.1.1 运维探针
+
+`GET /api/v1/health/live`（存活）与 `GET /api/v1/health/ready`（就绪，含数据库 readiness 版本校验）为基础设施探针，不属于业务 API 面；无认证，仅暴露健康状态与就绪校验所需的最小信息。负载均衡、部署脚本和监控以此二端点为准，不得用业务端点充当探针。
 
 ### 2.2 身份
 
@@ -165,7 +169,7 @@ od_basis: gaode | approximate
 | GET | `/attractions/{attraction_id}` | 景点基础详情 | 是 |
 | POST | `/generation-intents` | 提交生成意图 | 是 |
 | GET | `/generation-intents/{intent_id}` | 查询生成状态 | 是 |
-| POST | `/generation-intents/{intent_id}/retry` | 稳定重试暂时失败的同一意图 | P1 |
+| POST | `/generation-intents/{intent_id}/retry` | 稳定重试暂时失败的同一意图 | P1（未排期） |
 | GET | `/trips/{trip_id}` | 获取 Trip 摘要及当前 revision | 是 |
 | GET | `/trips/{trip_id}/revisions/{revision_id}` | 获取不可变行程结果 | 是 |
 | GET | `/trips` | 当前主体行程历史 | 是 |
@@ -178,21 +182,7 @@ od_basis: gaode | approximate
 
 M1 不提供 `/regenerate`。用户修改条件时更新或创建草稿，再提交新的 generation intent。
 
-## 12. O09 管理端研究快照批次
-
-批次发布只允许管理员调用，且不绕过单 Projection 的 publication check。预览阶段不会改变 Revision 或 Projection 状态；执行阶段逐项发布可发布项，阻断或异常项保留在批次结果中。
-
-### 12.1 POST `/api/v1/admin/publication-batches/previews`
-
-请求包含 `city_id`、`place_revision_ids`（1–500 项）、`operation_intent_id`、`reason_code` 和可选 `reason_text`。响应返回 `batch_id`、逐项 `status`（`publishable|blocked`）与稳定 `reason_codes`。相同 operation intent 和载荷重放返回相同批次；载荷变化返回 `admin_operation_intent_conflict`。
-
-### 12.2 POST `/api/v1/admin/publication-batches/{batch_id}/execute`
-
-执行只处理预览中可发布或仍待处理的项。每项记录 `published|blocked|failed`、Projection ID、发布时间和原因。批次状态为 `published`（全部成功）、`partial_failed`（部分成功）或 `failed`（无成功项）。成功项生成 `ResearchSnapshot`，其 `content_sha256` 和规范化 `payload` 永久不可变；重复执行使用相同 operation intent 时返回原结果，不创建第二个快照。
-
-### 12.3 GET `/api/v1/admin/research-snapshots` 与 `/{snapshot_id}`
-
-快照列表支持 `city_id`、`limit`、`offset`，详情额外返回完整不可变 payload。快照版本由城市和内容 hash 确定，同一内容不能生成多个版本；接口不提供更新或删除操作。
+用户端实际路由还包括 `POST /trips/{trip_id}/revisions/{revision_id}/attraction-replacements`（替换景点→新 Revision，见 9.5）。
 
 ## 5. 匿名会话
 
@@ -515,7 +505,7 @@ failed：
 
 ### 8.3 POST `/generation-intents/{intent_id}/retry`
 
-M1 P1。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约版本和 seed。不能用于修改条件或请求随机新方案。
+M1 P1，**当前未排期、无路由实现**。仅 `failed_retryable` 可调用，沿用原输入/数据快照、契约版本和 seed。不能用于修改条件或请求随机新方案。
 
 ## 9. Trip 与不可变 Revision
 
@@ -1134,9 +1124,8 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `GET /api/v1/admin/me` | 任意管理员 | 返回当前 actor、角色和权限摘要 |
 | `POST /api/v1/admin/admin-actors` | admin_security | 创建独立管理员并分配最小角色；初始密码不进入审计 |
 | `GET /api/v1/admin/candidates` | editor/reviewer/publisher/viewer | 查询候选和覆盖维度 |
-| `POST /api/v1/admin/candidates` | data_editor | 创建最小候选，不伪造 human_verified |
-| `GET /api/v1/admin/places/{place_id}` | editor/reviewer/publisher/viewer | 查询 Place、当前 Revision 和依赖摘要 |
 | `POST /api/v1/admin/places/{place_id}/revisions` | data_editor | 基于指定 Revision 创建 candidate Revision；复制基线当前有效的 O04/O05 子证据并重置为待核验，Projection 不复制 |
+| `GET /api/v1/admin/place-revisions/{revision_id}` | editor/reviewer/publisher/viewer | 只读查询单个 Revision 详情（含生命周期状态与基础事实），供审核详情页直接取数 |
 | `PATCH /api/v1/admin/place-revisions/{revision_id}` | data_editor | 以 expected version 编辑 candidate |
 | `POST /api/v1/admin/place-revisions/{revision_id}/review-tasks` | data_editor | 创建/重提审核任务；需 operation intent 和 reason code |
 | `GET /api/v1/admin/review-tasks` | data_reviewer | 查询待审核队列 |
@@ -1154,7 +1143,7 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 | `POST /api/v1/admin/publication-batches/{batch_id}/execute` | data_publisher | 执行已预览批次，逐项记录发布结果并生成不可变快照 |
 | `GET /api/v1/admin/research-snapshots` | publisher/viewer | 查询不可变研究快照和质量报告 |
 | `GET /api/v1/admin/research-snapshots/{snapshot_id}` | publisher/viewer | 查询单个不可变研究快照详情 |
-| `POST /api/v1/admin/places/{place_id}/retirements` | data_publisher | 退役当前发布版本，不物理删除历史 |
+| `GET /api/v1/admin/dashboard-summary` | editor/reviewer/publisher/viewer | OM1 工作台汇总：候选/待审/发布/同步任务计数与待办摘要 |
 | `GET /api/v1/admin/audit-events` | admin_security/受权只读角色 | 只读查询结构化管理审计 |
 | `GET /api/v1/admin/admin-actors` | admin_security | 查询管理员和角色 |
 | `PUT /api/v1/admin/admin-actors/{actor_id}/roles` | admin_security | 以 expected version 修改角色并审计 |
@@ -1173,6 +1162,16 @@ And 主体 B 不能修改主体 A 的 Trip、Revision 或分享快照
 
 当前已实现端点包括管理身份/RBAC/审计、candidates、place-revisions、Revision evidence、review-tasks/decisions、O04/O05/O06/O07 证据与裁决、批量审核、publication check、candidate Projection 准备、Projection 发布入口以及 O09 publication batch preview/execute 和 research snapshot 列表/详情；真实 candidate 审核数据下的 UI 勾选成功路径仍待回归。
 
+**发布版本退役语义（V2.11 裁决）**：发布地点不存在独立退役端点。R0.2-07 起，`POST /api/v1/admin/place-revisions/{revision_id}/publications`（及批次发布链路）发布新版 Projection 时在同一事务中原子退役同地点旧 `published` Revision/Projection（转 `retired`、`solver_eligible=false`）；历史记录保留但不进入用户端求解目录。不提供绕过发布门禁的单独退役通道。
+
+### 15.2.0 计划端点（未实现）
+
+以下端点已立项、当前代码尚未实现，实现时按本契约语义执行：
+
+| 方法与路径 | 最小角色 | 计划语义 |
+|---|---|---|
+| `GET /api/v1/admin/places/{place_id}` | editor/reviewer/publisher/viewer | 聚合读 Place、当前 Revision 和依赖摘要；管理端当前以 `GET /candidates` + `GET /place-revisions/{revision_id}` 组合取数，聚合端点待真实页面痛点出现后再实现 |
+
 O05 节假日规则：`GET /api/v1/admin/holiday-calendars` 返回版本化、受控的年度法定节假日历；`POST /api/v1/admin/place-revisions/{revision_id}/holiday-exceptions` 根据所选日历和开放时间批量物化 `open_override` 与节后 `closed` 日期例外。生成记录均为 `candidate`，必须逐项人工核验并重新送审，不改变求解器的 `PlaceDateException` 分钟值契约。
 
 #### O17 中国法定节假日历自动同步（G7-R0.2-09）
@@ -1186,6 +1185,7 @@ O05 节假日规则：`GET /api/v1/admin/holiday-calendars` 返回版本化、�
 | `GET /api/v1/admin/holiday-calendar-sync-jobs/{job_id}` | 管理只读角色 | 查询官方来源发现、内容获取、AI 抽取、确定性校验和发布结果 |
 | `POST /api/v1/admin/holiday-calendar-sync-jobs/{job_id}/cancel` | data_editor/admin_security | 取消 queued 或等待重试的同步任务；running 任务返回状态错误，不强制终止 |
 | `POST /api/v1/admin/holiday-calendar-sync-jobs/{job_id}/confirm` | data_editor/admin_security | 提交已核对或调整的预览节假日段和调休日期；沿用该任务官方来源，重新确定性校验，通过后直接发布不可变新版本 |
+| `GET /api/v1/admin/holiday-calendar-sync-capability` | 管理只读角色 | O17 前端能力探测：返回同步执行器是否可用（execution_available）与受支持 region_code，供页面决定入口展示 |
 | `GET /api/v1/admin/holiday-calendars/{calendar_id}` | 管理只读角色 | 查询年度版本、结构化假期、调休工作日、官方来源和版本历史 |
 | `GET /api/v1/admin/holiday-calendars/{calendar_id}/impact` | 管理只读角色 | 查询新版本相对旧版本的日期差异及受影响地点，不改写历史日期例外；仅统计带日历来源追溯的物化记录 |
 
@@ -1225,7 +1225,17 @@ Place 的来源记录；几何、访问点、时间规则、闭馆日和日期�
 来源必须显示为 `false`，不能只依赖顶部汇总警告。时间分钟值允许 `0–2880`；大于等于
 1440 表示跨午夜后的次日时间，客户端必须明确显示“次日”，不能对 1440 取模后隐藏日期偏移。
 
-### Revision 来源记录维护
+#### O09 管理端研究快照批次
+
+批次发布只允许管理员调用，且不绕过单 Projection 的 publication check。预览阶段不会改变 Revision 或 Projection 状态；执行阶段逐项发布可发布项，阻断或异常项保留在批次结果中。
+
+`POST /api/v1/admin/publication-batches/previews` 请求包含 `city_id`、`place_revision_ids`（1–500 项）、`operation_intent_id`、`reason_code` 和可选 `reason_text`。响应返回 `batch_id`、逐项 `status`（`publishable|blocked`）与稳定 `reason_codes`。相同 operation intent 和载荷重放返回相同批次；载荷变化返回 `admin_operation_intent_conflict`。
+
+`POST /api/v1/admin/publication-batches/{batch_id}/execute` 执行只处理预览中可发布或仍待处理的项。每项记录 `published|blocked|failed`、Projection ID、发布时间和原因。批次状态为 `published`（全部成功）、`partial_failed`（部分成功）或 `failed`（无成功项）。成功项生成 `ResearchSnapshot`，其 `content_sha256` 和规范化 `payload` 永久不可变；重复执行使用相同 operation intent 时返回原结果，不创建第二个快照。
+
+`GET /api/v1/admin/research-snapshots` 与 `/{snapshot_id}`：快照列表支持 `city_id`、`limit`、`offset`，详情额外返回完整不可变 payload。快照版本由城市和内容 hash 确定，同一内容不能生成多个版本；接口不提供更新或删除操作。
+
+### 15.2.1 Revision 来源记录维护
 
 来源渠道与来源记录分层治理：Source Registry 是系统级已审查渠道，只由来源治理流程维护；
 `PlaceSourceRecord` 是数据编辑员针对某个具体地点、具体页面和具体观察时间建立的不可变证据记录。
@@ -1313,7 +1323,7 @@ Revision 版本并清除求解/审核资格。逐项审核端点的 `evidence_ki
 `409 admin_operation_intent_conflict`。Revision 级 approve 同时检查所有 active 的
 Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_verified`。
 
-### O05 指定日期解析预览
+### 15.2.2 O05 指定日期解析预览
 
 `GET /api/v1/admin/place-revisions/{revision_id}/time-preview?service_date=YYYY-MM-DD`
 需要 `place:candidate:read`。接口只读且可重复，不改变 Revision、证据、审核或审计状态。
@@ -1323,9 +1333,20 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；演出地点没有已核验固定场次时返回
 `FIXED_SESSION_REQUIRED`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。管理端录入界面使用 `HH:mm` 和“次日”标记，提交时转换为本契约中的分钟值；API/数据库不新增时间字符串字段。跨午夜仍以结束或最晚入园分钟值大于等于 `1440` 表示。
 
-### O06 来源冲突只读面
+### 15.2.3 O06 来源冲突只读面与裁决
 
-### 批量审核
+`GET /api/v1/admin/place-revisions/{revision_id}/source-conflicts` 需要
+`place:candidate:read`，按 `source_id` 聚合当前 Revision 依赖闭包中的来源记录；
+当同一来源存在不同内容指纹时返回冲突记录及 `resolved` 状态。该接口只读，来源裁决
+仍须通过 O06 写入工作流完成，不能由前端自行推断或修改 `conflicts_resolved`。
+
+`POST /api/v1/admin/place-revisions/{revision_id}/source-conflicts/resolve` 需要
+`place:candidate:write`，请求携带 `expected_revision_number`、`expected_revision_version`、
+`resolved`、`operation_intent_id` 和审计理由。服务端仅允许 candidate Revision，成功后原子
+递增 Revision 版本并记录 `PLACE_SOURCE_CONFLICTS_RESOLVED` 审计；重复 intent 可重放，版本
+冲突和非 candidate 均拒绝。该动作不会直接修改来源记录，Revision 仍须重新送审。
+
+### 15.2.4 批量审核与 O07 关系裁决
 
 `POST /api/v1/admin/review-tasks/batch-decisions` 需要 `place:review:decide`，请求最多包含
 100 个与单项决定相同的 payload。批量采用逐项独立提交语义：响应分别返回 `succeeded` 与
@@ -1342,17 +1363,6 @@ O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{
 需要 `place:candidate:write`，携带 `expected_revision_version`、`resolution_status`、可选
 `decision_note`、`operation_intent_id` 和审计理由。仅允许当前 Place 的 active 关系；成功后
 递增 Revision 版本、重置关系审核状态并要求重新送审。`resolved` 必须提供裁决说明。
-
-`GET /api/v1/admin/place-revisions/{revision_id}/source-conflicts` 需要
-`place:candidate:read`，按 `source_id` 聚合当前 Revision 依赖闭包中的来源记录；
-当同一来源存在不同内容指纹时返回冲突记录及 `resolved` 状态。该接口只读，来源裁决
-仍须通过后续 O06 写入工作流完成，不能由前端自行推断或修改 `conflicts_resolved`。
-
-`POST /api/v1/admin/place-revisions/{revision_id}/source-conflicts/resolve` 需要
-`place:candidate:write`，请求携带 `expected_revision_number`、`expected_revision_version`、
-`resolved`、`operation_intent_id` 和审计理由。服务端仅允许 candidate Revision，成功后原子
-递增 Revision 版本并记录 `PLACE_SOURCE_CONFLICTS_RESOLVED` 审计；重复 intent 可重放，版本
-冲突和非 candidate 均拒绝。该动作不会直接修改来源记录，Revision 仍须重新送审。
 
 ### 15.3 管理写入通用字段
 

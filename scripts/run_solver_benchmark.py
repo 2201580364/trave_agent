@@ -27,7 +27,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("docs/test/reports/gate6-performance-latest.json"),
+        default=Path("var/reports/gate6-performance-latest.json"),
     )
     args = parser.parse_args()
     results = tuple(
