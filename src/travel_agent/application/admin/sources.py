@@ -12,7 +12,6 @@ from travel_agent.data_governance import (
     validate_governance_bundle,
 )
 
-
 _PLACE_FIELD_PREFIXES = ("place.", "access.", "time.", "experience.", "relation.")
 _SENSITIVE_QUERY_KEYS = frozenset(
     (

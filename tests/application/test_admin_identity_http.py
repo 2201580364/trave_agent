@@ -208,9 +208,7 @@ def test_admin_session_is_independent_revocable_and_stores_only_token_digest(
     assert "admin:actor:roles:write" in me.json()["permissions"]
 
     with context.sessions() as session:
-        stored = session.scalar(
-            select(AdminSessionRow).order_by(AdminSessionRow.created_at.desc())
-        )
+        stored = session.scalar(select(AdminSessionRow).order_by(AdminSessionRow.created_at.desc()))
     assert stored is not None
     assert stored.token_hash == hashlib.sha256(token.encode("utf-8")).hexdigest()
     assert token not in stored.token_hash
@@ -228,8 +226,7 @@ def test_admin_session_is_independent_revocable_and_stores_only_token_digest(
     assert ordinary_token.json()["error"]["code"] == "admin_authentication_required"
 
     assert (
-        context.client.delete("/api/v1/admin/sessions/current", headers=headers).status_code
-        == 204
+        context.client.delete("/api/v1/admin/sessions/current", headers=headers).status_code == 204
     )
     assert context.client.get("/api/v1/admin/me", headers=headers).status_code == 401
 
@@ -267,14 +264,10 @@ def test_server_side_rbac_role_versioning_idempotency_and_session_invalidation(
         json={**create_payload, "initial_password": "Changed-Password-2026!"},
     )
     assert conflicting_replay.status_code == 409
-    assert conflicting_replay.json()["error"]["code"] == (
-        "admin_operation_intent_conflict"
-    )
+    assert conflicting_replay.json()["error"]["code"] == ("admin_operation_intent_conflict")
 
     _, editor_headers = _login(context.client, "place.editor", EDITOR_PASSWORD)
-    forbidden = context.client.get(
-        "/api/v1/admin/admin-actors", headers=editor_headers
-    )
+    forbidden = context.client.get("/api/v1/admin/admin-actors", headers=editor_headers)
     assert forbidden.status_code == 403
     assert forbidden.json()["error"]["code"] == "admin_permission_denied"
 
@@ -317,9 +310,7 @@ def test_last_security_role_is_protected_and_rejected_attempt_is_audited(
 ) -> None:
     context = admin_context
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
-    actor = context.client.get("/api/v1/admin/admin-actors", headers=headers).json()[
-        "items"
-    ][0]
+    actor = context.client.get("/api/v1/admin/admin-actors", headers=headers).json()["items"][0]
     response = context.client.put(
         f"/api/v1/admin/admin-actors/{actor['admin_actor_id']}/roles",
         headers={**headers, "X-Request-ID": "req-remove-last-security"},
@@ -347,9 +338,12 @@ def test_last_security_role_is_protected_and_rejected_attempt_is_audited(
     assert event["error_code"] == "admin_role_safety_violation"
     assert event["before_digest"] is not None
     assert event["after_digest"] is None
-    assert context.client.patch(
-        f"/api/v1/admin/audit-events/{event['audit_event_id']}", headers=headers
-    ).status_code == 404
+    assert (
+        context.client.patch(
+            f"/api/v1/admin/audit-events/{event['audit_event_id']}", headers=headers
+        ).status_code
+        == 404
+    )
 
 
 def test_reason_text_rejects_likely_credentials(
@@ -384,17 +378,13 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
 
     engine = create_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
-        revision = connection.execute(
-            text("SELECT version_num FROM alembic_version")
-        ).scalar_one()
+        revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
         roles = connection.execute(
             text("SELECT role_key FROM admin_roles ORDER BY role_key")
         ).scalars()
         table_names = {
             row[0]
-            for row in connection.execute(
-                text("SELECT name FROM sqlite_master WHERE type='table'")
-            )
+            for row in connection.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
         }
 
     assert revision == "0015_holiday_exception_provenance"
@@ -421,9 +411,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
         ).scalar_one()
         downgraded_tables = {
             row[0]
-            for row in connection.execute(
-                text("SELECT name FROM sqlite_master WHERE type='table'")
-            )
+            for row in connection.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
         }
     assert downgraded_revision == "0006_place_catalog"
     assert "admin_actors" not in downgraded_tables
@@ -476,9 +464,7 @@ def _seed_candidate_revision(context: AdminTestContext, revision_id: str = "revi
         session.commit()
 
 
-def _seed_approvable_candidate(
-    context: AdminTestContext, revision_id: str = "revision-1"
-) -> None:
+def _seed_approvable_candidate(context: AdminTestContext, revision_id: str = "revision-1") -> None:
     _seed_candidate_revision(context, revision_id)
     source_id = f"source-{revision_id}"
     with context.sessions() as session:
@@ -560,48 +546,113 @@ def _seed_human_verified_revision_with_evidence(
 ) -> None:
     """Seed the smallest fully verified catalog graph for projection API tests."""
     with context.sessions() as session:
-        session.add(PlaceRow(
-            place_id="place-projection", city_id="hangzhou", status="active",
-            merged_into_place_id=None, created_at=NOW.isoformat(), updated_at=NOW.isoformat(),
-        ))
-        session.add(PlaceSourceRecordRow(
-            source_record_id="source-projection", place_id="place-projection",
-            source_id="test-registry", registry_id="v1", registry_sha256="a" * 64,
-            field_dictionary_id="fields-v1", field_dictionary_sha256="b" * 64,
-            source_url="https://example.test/place", collection_mode="manual_reference",
-            target_stage="published", source_decision="approved", observed_at=NOW.isoformat(),
-            content_sha256="c" * 64, status="active", created_at=NOW.isoformat(),
-        ))
-        session.add(PlaceRevisionRow(
-            place_revision_id=revision_id, place_id="place-projection", revision_number=1,
-            lifecycle_status="human_verified", canonical_name="Verified Place", aliases=[],
-            place_kind="attraction", category="museum", admin_area="West Lake", address="杭州",
-            geometry_kind="point", duration_min=30, duration_recommended=60, duration_max=90,
-            internal_travel_min=0, energy_level=2, indoor_outdoor="indoor",
-            suitable_periods=["morning", "afternoon"], audience_tags=[], rain_suitability="suitable",
-            is_always_open=False, solver_eligible=True, conflicts_resolved=True,
-            source_record_ids=["source-projection"], created_at=NOW.isoformat(),
-            reviewed_at=NOW.isoformat(), published_at=None,
-        ))
-        session.add(PlaceGeometryRow(
-            geometry_id="geometry-projection", place_revision_id=revision_id, geometry_kind="point",
-            geometry={"type": "Point", "coordinates": [120.15, 30.25]},
-            source_record_id="source-projection", review_status="human_verified", active=True,
-            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
-        ))
-        session.add(PlaceAccessPointRow(
-            access_point_id="access-projection", place_revision_id=revision_id,
-            access_point_kind="visitor_entrance", name="主入口", lat=30.25, lng=120.15,
-            source_record_id="source-projection", review_status="human_verified", active=True,
-            fetched_at=NOW.isoformat(), reviewed_at=NOW.isoformat(), created_at=NOW.isoformat(),
-        ))
-        session.add(PlaceTimeRuleRow(
-            time_rule_id="time-projection", place_revision_id=revision_id, rule_kind="opening_hours",
-            weekdays=[1, 2, 3, 4, 5, 6, 7], start_minute=540, end_minute=1020,
-            last_entry_minute=990, valid_from=date(2026, 1, 1), valid_to=None,
-            source_record_id="source-projection", review_status="human_verified", active=True,
-            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
-        ))
+        session.add(
+            PlaceRow(
+                place_id="place-projection",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at=NOW.isoformat(),
+                updated_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-projection",
+                place_id="place-projection",
+                source_id="test-registry",
+                registry_id="v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="fields-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://example.test/place",
+                collection_mode="manual_reference",
+                target_stage="published",
+                source_decision="approved",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceRevisionRow(
+                place_revision_id=revision_id,
+                place_id="place-projection",
+                revision_number=1,
+                lifecycle_status="human_verified",
+                canonical_name="Verified Place",
+                aliases=[],
+                place_kind="attraction",
+                category="museum",
+                admin_area="West Lake",
+                address="杭州",
+                geometry_kind="point",
+                duration_min=30,
+                duration_recommended=60,
+                duration_max=90,
+                internal_travel_min=0,
+                energy_level=2,
+                indoor_outdoor="indoor",
+                suitable_periods=["morning", "afternoon"],
+                audience_tags=[],
+                rain_suitability="suitable",
+                is_always_open=False,
+                solver_eligible=True,
+                conflicts_resolved=True,
+                source_record_ids=["source-projection"],
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+                published_at=None,
+            )
+        )
+        session.add(
+            PlaceGeometryRow(
+                geometry_id="geometry-projection",
+                place_revision_id=revision_id,
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.15, 30.25]},
+                source_record_id="source-projection",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="access-projection",
+                place_revision_id=revision_id,
+                access_point_kind="visitor_entrance",
+                name="主入口",
+                lat=30.25,
+                lng=120.15,
+                source_record_id="source-projection",
+                review_status="human_verified",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="time-projection",
+                place_revision_id=revision_id,
+                rule_kind="opening_hours",
+                weekdays=[1, 2, 3, 4, 5, 6, 7],
+                start_minute=540,
+                end_minute=1020,
+                last_entry_minute=990,
+                valid_from=date(2026, 1, 1),
+                valid_to=None,
+                source_record_id="source-projection",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
         session.commit()
 
 
@@ -817,25 +868,37 @@ def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts
         revision = session.get(PlaceRevisionRow, "revision-holiday-generation")
         assert revision is not None
         revision.source_record_ids = ["source-holiday-generation"]
-        session.add(PlaceSourceRecordRow(
-            source_record_id="source-holiday-generation", place_id=revision.place_id,
-            source_id="test-registry", registry_id="v1", registry_sha256="a" * 64,
-            field_dictionary_id="fields-v1", field_dictionary_sha256="b" * 64,
-            source_url="https://example.test/museum-holiday-policy",
-            collection_mode="manual_reference", target_stage="staging",
-            source_decision="approved", observed_at=NOW.isoformat(),
-            content_sha256="c" * 64, status="active", created_at=NOW.isoformat(),
-        ))
-        session.add(PlaceClosureRow(
-            closure_id="closure-holiday-monday",
-            place_revision_id=revision.place_revision_id,
-            weekday=1,
-            source_record_id="source-holiday-generation",
-            review_status="candidate",
-            active=True,
-            created_at=NOW.isoformat(),
-            reviewed_at=None,
-        ))
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-holiday-generation",
+                place_id=revision.place_id,
+                source_id="test-registry",
+                registry_id="v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="fields-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://example.test/museum-holiday-policy",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="approved",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceClosureRow(
+                closure_id="closure-holiday-monday",
+                place_revision_id=revision.place_revision_id,
+                weekday=1,
+                source_record_id="source-holiday-generation",
+                review_status="candidate",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+            )
+        )
         session.commit()
 
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
@@ -857,11 +920,13 @@ def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts
     assert response.status_code == 200, response.text
     assert response.json()["revision_version"] == 10
     with context.sessions() as session:
-        rows = tuple(session.scalars(
-            select(PlaceDateExceptionRow)
-            .where(PlaceDateExceptionRow.place_revision_id == "revision-holiday-generation")
-            .order_by(PlaceDateExceptionRow.service_date)
-        ))
+        rows = tuple(
+            session.scalars(
+                select(PlaceDateExceptionRow)
+                .where(PlaceDateExceptionRow.place_revision_id == "revision-holiday-generation")
+                .order_by(PlaceDateExceptionRow.service_date)
+            )
+        )
         audit = session.scalar(
             select(AdminAuditEventRow).where(
                 AdminAuditEventRow.action == "PLACE_HOLIDAY_EXCEPTIONS_GENERATED"
@@ -870,11 +935,17 @@ def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts
     assert len(rows) == 9
     assert {row.holiday_calendar_id for row in rows} == {"cn-mainland-2026"}
     assert {row.service_date for row in rows if row.exception_kind == "open_override"} == {
-        date(2026, 2, 16), date(2026, 2, 23), date(2026, 4, 6),
-        date(2026, 5, 4), date(2026, 10, 5),
+        date(2026, 2, 16),
+        date(2026, 2, 23),
+        date(2026, 4, 6),
+        date(2026, 5, 4),
+        date(2026, 10, 5),
     }
     assert {row.service_date for row in rows if row.exception_kind == "closed"} == {
-        date(2026, 2, 24), date(2026, 4, 7), date(2026, 5, 6), date(2026, 10, 8),
+        date(2026, 2, 24),
+        date(2026, 4, 7),
+        date(2026, 5, 6),
+        date(2026, 10, 8),
     }
     assert audit is not None
     assert audit.target_type == "place_date_exception"
@@ -892,6 +963,7 @@ def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts
             "materialized_exception_count": 9,
         }
     ]
+
 
 def test_projection_preparation_api_is_verified_idempotent_and_does_not_publish(
     admin_context: AdminTestContext,
@@ -956,7 +1028,11 @@ def test_projection_preparation_api_enforces_permission_and_revision_state(
     denied = context.client.post(
         "/api/v1/admin/place-revisions/revision-projection-auth/projection-preparations",
         headers=editor_headers,
-        json={"data_snapshot_version": "snapshot", "operation_intent_id": "denied", "reason_code": "TEST"},
+        json={
+            "data_snapshot_version": "snapshot",
+            "operation_intent_id": "denied",
+            "reason_code": "TEST",
+        },
     )
     assert denied.status_code == 403
     assert denied.json()["error"]["code"] == "admin_permission_denied"
@@ -965,7 +1041,11 @@ def test_projection_preparation_api_enforces_permission_and_revision_state(
     blocked = context.client.post(
         "/api/v1/admin/place-revisions/revision-projection-candidate/projection-preparations",
         headers=root_headers,
-        json={"data_snapshot_version": "snapshot", "operation_intent_id": "candidate", "reason_code": "TEST"},
+        json={
+            "data_snapshot_version": "snapshot",
+            "operation_intent_id": "candidate",
+            "reason_code": "TEST",
+        },
     )
     assert blocked.status_code == 409
     assert blocked.json()["error"]["code"] == "review_revision_not_approvable"
@@ -1185,9 +1265,7 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     assert candidates.json()["offset"] == 0
     assert candidates.json()["total"] == 1
 
-    empty_page = context.client.get(
-        "/api/v1/admin/candidates?limit=1&offset=1", headers=headers
-    )
+    empty_page = context.client.get("/api/v1/admin/candidates?limit=1&offset=1", headers=headers)
     assert empty_page.status_code == 200
     assert empty_page.json()["items"] == []
     assert empty_page.json()["total"] == 1
@@ -1198,9 +1276,7 @@ def test_candidate_list_and_revision_detail_are_permission_scoped(
     assert detail.status_code == 200
     assert detail.json()["canonical_name"] == "Candidate Place"
 
-    missing = context.client.get(
-        "/api/v1/admin/place-revisions/missing", headers=headers
-    )
+    missing = context.client.get("/api/v1/admin/place-revisions/missing", headers=headers)
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "resource_not_found"
 
@@ -1388,9 +1464,7 @@ def test_admin_place_and_audit_searches_filter_before_pagination(
     )
     assert actor_by_keyword.status_code == 200
     assert actor_by_keyword.json()["total"] == 1
-    assert [item["login_name"] for item in actor_by_keyword.json()["items"]] == [
-        "search.editor"
-    ]
+    assert [item["login_name"] for item in actor_by_keyword.json()["items"]] == ["search.editor"]
 
     actor_by_role = context.client.get(
         "/api/v1/admin/admin-actors",
@@ -1406,9 +1480,7 @@ def test_admin_place_and_audit_searches_filter_before_pagination(
         {"admin_area": "West Lake"},
         {"place_kind": "attraction"},
     ):
-        candidates = context.client.get(
-            "/api/v1/admin/candidates", headers=headers, params=query
-        )
+        candidates = context.client.get("/api/v1/admin/candidates", headers=headers, params=query)
         assert candidates.status_code == 200
         assert candidates.json()["total"] == 1
         assert candidates.json()["items"][0]["place_revision_id"] == "revision-search"
@@ -1641,9 +1713,7 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
         },
     )
     assert premature_revision_approval.status_code == 409
-    assert premature_revision_approval.json()["error"]["code"] == (
-        "review_revision_not_approvable"
-    )
+    assert premature_revision_approval.json()["error"]["code"] == ("review_revision_not_approvable")
     approved = context.client.post(path, headers=root_headers, json=payload)
     assert approved.status_code == 200
     relation_payload = {
@@ -1715,11 +1785,14 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
         "role_keys": ["data_editor"],
         "reason_code": "OM1_TEAM_PROVISIONING",
     }
-    assert context.client.post(
-        "/api/v1/admin/admin-actors",
-        headers=root_headers,
-        json=editor_payload,
-    ).status_code == 201
+    assert (
+        context.client.post(
+            "/api/v1/admin/admin-actors",
+            headers=root_headers,
+            json=editor_payload,
+        ).status_code
+        == 201
+    )
     _, editor_headers = _login(context.client, "evidence.editor", EDITOR_PASSWORD)
     forbidden = context.client.post(
         path,
@@ -1934,9 +2007,7 @@ def test_time_evidence_crud_review_and_revision_gate_form_one_versioned_workflow
             "closures": "closures",
             "date-exceptions": "date_exceptions",
         }[kind]
-        retired_item = next(
-            item for item in current[key] if evidence_id in item.values()
-        )
+        retired_item = next(item for item in current[key] if evidence_id in item.values())
         assert retired_item["active"] is False
 
         if kind == "time-rules":
@@ -2347,9 +2418,7 @@ def test_revision_evidence_is_revision_scoped_and_exposes_projection_endpoints(
         "source-other-place",
     ]
 
-    unauthenticated = context.client.get(
-        "/api/v1/admin/place-revisions/revision-evidence/evidence"
-    )
+    unauthenticated = context.client.get("/api/v1/admin/place-revisions/revision-evidence/evidence")
     assert unauthenticated.status_code == 401
     assert unauthenticated.json()["error"]["code"] == "admin_authentication_required"
 
@@ -2457,9 +2526,7 @@ def test_revision_editing_creates_new_candidate_and_keeps_base_immutable(
     assert update_intent_conflict.status_code == 409
     assert update_intent_conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
 
-    base = context.client.get(
-        "/api/v1/admin/place-revisions/revision-base", headers=headers
-    )
+    base = context.client.get("/api/v1/admin/place-revisions/revision-base", headers=headers)
     assert base.status_code == 200
     assert base.json()["canonical_name"] == "Candidate Place"
 
@@ -2504,56 +2571,122 @@ def test_new_revision_copies_active_evidence_as_unverified_children(
     context = admin_context
     _seed_candidate_revision(context, "revision-with-evidence")
     with context.sessions() as session:
-        session.add(PlaceSourceRecordRow(
-            source_record_id="source-copy", place_id="place-1", source_id="manual",
-            registry_id="registry-v1", registry_sha256="a" * 64,
-            field_dictionary_id="fields-v1", field_dictionary_sha256="b" * 64,
-            source_url="https://example.test/source", collection_mode="manual_reference",
-            target_stage="staging", source_decision="approved", observed_at=NOW.isoformat(),
-            content_sha256="c" * 64, status="active", created_at=NOW.isoformat(),
-        ))
+        session.add(
+            PlaceSourceRecordRow(
+                source_record_id="source-copy",
+                place_id="place-1",
+                source_id="manual",
+                registry_id="registry-v1",
+                registry_sha256="a" * 64,
+                field_dictionary_id="fields-v1",
+                field_dictionary_sha256="b" * 64,
+                source_url="https://example.test/source",
+                collection_mode="manual_reference",
+                target_stage="staging",
+                source_decision="approved",
+                observed_at=NOW.isoformat(),
+                content_sha256="c" * 64,
+                status="active",
+                created_at=NOW.isoformat(),
+            )
+        )
         base = session.get(PlaceRevisionRow, "revision-with-evidence")
         assert base is not None
         base.source_record_ids = ["source-copy"]
-        session.add(PlaceGeometryRow(
-            geometry_id="geometry-copy", place_revision_id=base.place_revision_id,
-            geometry_kind="point", geometry={"type": "Point", "coordinates": [120.1, 30.2]},
-            source_record_id="source-copy", review_status="human_verified", active=True,
-            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
-        ))
-        session.add(PlaceAccessPointRow(
-            access_point_id="access-copy", place_revision_id=base.place_revision_id,
-            access_point_kind="visitor_entrance", name="主入口", lat=30.2, lng=120.1,
-            source_record_id="source-copy", review_status="human_verified", active=True,
-            fetched_at=NOW.isoformat(), reviewed_at=NOW.isoformat(), created_at=NOW.isoformat(),
-        ))
-        session.add(PlaceTimeRuleRow(
-            time_rule_id="time-copy", place_revision_id=base.place_revision_id,
-            rule_kind="opening_hours", weekdays=[1, 2, 3, 4, 5, 6, 7],
-            start_minute=540, end_minute=1020, last_entry_minute=990,
-            valid_from=None, valid_to=None, source_record_id="source-copy",
-            review_status="human_verified", active=True,
-            created_at=NOW.isoformat(), reviewed_at=NOW.isoformat(),
-        ))
+        session.add(
+            PlaceGeometryRow(
+                geometry_id="geometry-copy",
+                place_revision_id=base.place_revision_id,
+                geometry_kind="point",
+                geometry={"type": "Point", "coordinates": [120.1, 30.2]},
+                source_record_id="source-copy",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="access-copy",
+                place_revision_id=base.place_revision_id,
+                access_point_kind="visitor_entrance",
+                name="主入口",
+                lat=30.2,
+                lng=120.1,
+                source_record_id="source-copy",
+                review_status="human_verified",
+                active=True,
+                fetched_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+                created_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceTimeRuleRow(
+                time_rule_id="time-copy",
+                place_revision_id=base.place_revision_id,
+                rule_kind="opening_hours",
+                weekdays=[1, 2, 3, 4, 5, 6, 7],
+                start_minute=540,
+                end_minute=1020,
+                last_entry_minute=990,
+                valid_from=None,
+                valid_to=None,
+                source_record_id="source-copy",
+                review_status="human_verified",
+                active=True,
+                created_at=NOW.isoformat(),
+                reviewed_at=NOW.isoformat(),
+            )
+        )
         session.commit()
 
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
     response = context.client.post(
-        "/api/v1/admin/places/place-1/revisions", headers=headers,
-        json={"base_revision_id": "revision-with-evidence", "operation_intent_id": "copy-evidence-1", "reason_code": "PLACE_FACTS_REFRESH"},
+        "/api/v1/admin/places/place-1/revisions",
+        headers=headers,
+        json={
+            "base_revision_id": "revision-with-evidence",
+            "operation_intent_id": "copy-evidence-1",
+            "reason_code": "PLACE_FACTS_REFRESH",
+        },
     )
     assert response.status_code == 201, response.text
     new_id = response.json()["place_revision_id"]
     with context.sessions() as session:
-        geometries = tuple(session.scalars(select(PlaceGeometryRow).where(PlaceGeometryRow.place_revision_id == new_id)))
-        access_points = tuple(session.scalars(select(PlaceAccessPointRow).where(PlaceAccessPointRow.place_revision_id == new_id)))
-        time_rules = tuple(session.scalars(select(PlaceTimeRuleRow).where(PlaceTimeRuleRow.place_revision_id == new_id)))
+        geometries = tuple(
+            session.scalars(
+                select(PlaceGeometryRow).where(PlaceGeometryRow.place_revision_id == new_id)
+            )
+        )
+        access_points = tuple(
+            session.scalars(
+                select(PlaceAccessPointRow).where(PlaceAccessPointRow.place_revision_id == new_id)
+            )
+        )
+        time_rules = tuple(
+            session.scalars(
+                select(PlaceTimeRuleRow).where(PlaceTimeRuleRow.place_revision_id == new_id)
+            )
+        )
     assert len(geometries) == len(access_points) == len(time_rules) == 1
     assert geometries[0].geometry_id != "geometry-copy"
     assert access_points[0].access_point_id != "access-copy"
     assert time_rules[0].time_rule_id != "time-copy"
-    assert geometries[0].review_status == access_points[0].review_status == time_rules[0].review_status == "candidate"
-    assert geometries[0].reviewed_at is None and access_points[0].reviewed_at is None and time_rules[0].reviewed_at is None
+    assert (
+        geometries[0].review_status
+        == access_points[0].review_status
+        == time_rules[0].review_status
+        == "candidate"
+    )
+    assert (
+        geometries[0].reviewed_at is None
+        and access_points[0].reviewed_at is None
+        and time_rules[0].reviewed_at is None
+    )
+
+
 def test_place_review_request_changes_keeps_candidate_and_rejects_stale_version(
     admin_context: AdminTestContext,
 ) -> None:
@@ -2683,26 +2816,52 @@ def test_editing_uncollected_candidate_recommended_duration_establishes_valid_ra
     admin_context: AdminTestContext,
 ) -> None:
     with admin_context.sessions() as session:
-        session.add(PlaceRow(
-            place_id="place-duration", city_id="hangzhou", status="active",
-            merged_into_place_id=None, created_at=NOW.isoformat(), updated_at=NOW.isoformat(),
-        ))
-        session.add(PlaceRevisionRow(
-            place_revision_id="revision-duration", place_id="place-duration", revision_number=1,
-            lifecycle_status="candidate", canonical_name="待采集时长地点", aliases=[],
-            place_kind="attraction", category="museum", admin_area="西湖区", address=None,
-            geometry_kind="point", duration_min=1, duration_recommended=1, duration_max=1,
-            internal_travel_min=0, energy_level=2, indoor_outdoor="indoor",
-            suitable_periods=["morning"], audience_tags=[], rain_suitability="suitable",
-            is_always_open=False, solver_eligible=False, conflicts_resolved=False,
-            source_record_ids=["source-duration"], created_at=NOW.isoformat(),
-            reviewed_at=None, published_at=None,
-            review_flags=[
-                "NAME_REQUIRES_HUMAN_VERIFICATION",
-                "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
-                "DURATION_NOT_COLLECTED",
-            ],
-        ))
+        session.add(
+            PlaceRow(
+                place_id="place-duration",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at=NOW.isoformat(),
+                updated_at=NOW.isoformat(),
+            )
+        )
+        session.add(
+            PlaceRevisionRow(
+                place_revision_id="revision-duration",
+                place_id="place-duration",
+                revision_number=1,
+                lifecycle_status="candidate",
+                canonical_name="待采集时长地点",
+                aliases=[],
+                place_kind="attraction",
+                category="museum",
+                admin_area="西湖区",
+                address=None,
+                geometry_kind="point",
+                duration_min=1,
+                duration_recommended=1,
+                duration_max=1,
+                internal_travel_min=0,
+                energy_level=2,
+                indoor_outdoor="indoor",
+                suitable_periods=["morning"],
+                audience_tags=[],
+                rain_suitability="suitable",
+                is_always_open=False,
+                solver_eligible=False,
+                conflicts_resolved=False,
+                source_record_ids=["source-duration"],
+                created_at=NOW.isoformat(),
+                reviewed_at=None,
+                published_at=None,
+                review_flags=[
+                    "NAME_REQUIRES_HUMAN_VERIFICATION",
+                    "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
+                    "DURATION_NOT_COLLECTED",
+                ],
+            )
+        )
         session.commit()
     _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
     response = admin_context.client.patch(
@@ -2719,7 +2878,11 @@ def test_editing_uncollected_candidate_recommended_duration_establishes_valid_ra
     )
     assert response.status_code == 200
     body = response.json()
-    assert (body["duration_min"], body["duration_recommended"], body["duration_max"]) == (60, 60, 60)
+    assert (body["duration_min"], body["duration_recommended"], body["duration_max"]) == (
+        60,
+        60,
+        60,
+    )
     assert "DURATION_NOT_COLLECTED" not in body["review_flags"]
     assert "NAME_REQUIRES_HUMAN_VERIFICATION" not in body["review_flags"]
     assert "CATEGORY_REQUIRES_HUMAN_VERIFICATION" not in body["review_flags"]

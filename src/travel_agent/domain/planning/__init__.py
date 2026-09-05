@@ -2,8 +2,8 @@
 
 from .entities import GenerationIntent, SolverRun, Trip, TripDraft, TripRevision
 from .values import (
-    ConfirmationStatus,
     CompletionKind,
+    ConfirmationStatus,
     CrowdType,
     GenerationStatus,
     TransportType,

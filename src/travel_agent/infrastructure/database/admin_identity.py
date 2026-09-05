@@ -34,9 +34,9 @@ from travel_agent.domain.admin import (
     AdminSessionRecord,
 )
 
-from .planning import Base
 from .place_catalog import SqlAlchemyPlaceCatalogRepository
 from .place_review import SqlAlchemyPlaceReviewRepository
+from .planning import Base
 
 
 class AdminActorRow(Base):

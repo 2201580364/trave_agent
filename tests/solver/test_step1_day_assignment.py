@@ -9,8 +9,8 @@ from travel_agent.solver import (
     DailyWeather,
     PaceLevel,
     RejectionCode,
-    TimeRule,
     TimeBucket,
+    TimeRule,
     TravelMode,
     TripTimeAnchors,
     VisitPeriodPreference,
@@ -18,7 +18,6 @@ from travel_agent.solver import (
     WeatherSeverity,
     assign_days,
 )
-
 
 MONDAY = date(2026, 8, 24)
 TUESDAY = date(2026, 8, 25)

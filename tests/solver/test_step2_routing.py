@@ -25,7 +25,6 @@ from travel_agent.solver import (
     validate_routed_day,
 )
 
-
 DAY = date(2026, 8, 24)
 NOW = datetime(2026, 8, 22, tzinfo=UTC)
 ALL_DAY = (TimeRule.from_strings(("01-01", "12-31"), "09:00", "21:00"),)

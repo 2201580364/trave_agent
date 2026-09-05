@@ -2,7 +2,11 @@ from datetime import date, timedelta
 
 import pytest
 
-from travel_agent.domain.place_catalog import get_holiday_calendar, list_holiday_calendars, resolve_holiday_closure_conflicts
+from travel_agent.domain.place_catalog import (
+    get_holiday_calendar,
+    list_holiday_calendars,
+    resolve_holiday_closure_conflicts,
+)
 from travel_agent.solver.availability import is_open_on
 from travel_agent.solver.models import Attraction
 

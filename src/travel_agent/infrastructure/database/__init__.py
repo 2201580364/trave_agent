@@ -2,13 +2,13 @@
 
 from .admin_identity import SqlAlchemyAdminUnitOfWork
 from .feedback import SqlAlchemyFeedbackRepository
-from .identity import AnonymousIdentityService
 from .holiday_calendar import (
-    SqlAlchemyPublishedHolidayCalendarCatalog,
     SqlAlchemyHolidayCalendarRepository,
     SqlAlchemyHolidayCalendarUnitOfWork,
+    SqlAlchemyPublishedHolidayCalendarCatalog,
     ensure_builtin_holiday_calendar_seeds,
 )
+from .identity import AnonymousIdentityService
 from .place_catalog import SqlAlchemyPlaceCatalogRepository
 from .place_review import SqlAlchemyPlaceReviewRepository
 from .planning import Base, SqlAlchemyUnitOfWork, create_schema

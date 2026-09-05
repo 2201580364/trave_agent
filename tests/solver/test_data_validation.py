@@ -7,7 +7,6 @@ import pytest
 
 from travel_agent.solver import DataRule, GeoBounds, validate_attraction_data
 
-
 HANGZHOU_BOUNDS = GeoBounds(29.1, 30.6, 118.3, 120.8)
 
 

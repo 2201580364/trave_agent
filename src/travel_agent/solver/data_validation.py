@@ -11,7 +11,6 @@ from datetime import date, datetime
 from enum import IntEnum
 from typing import Any
 
-
 ALLOWED_CATEGORIES = frozenset(
     {
         "自然山水",

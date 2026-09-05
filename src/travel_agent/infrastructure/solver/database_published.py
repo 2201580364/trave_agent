@@ -6,15 +6,22 @@ Only rows that passed the publication gate are exposed to anonymous users.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import UTC, date, datetime, timedelta
 import hashlib
 import json
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from travel_agent.infrastructure.database.place_catalog import (
+    PlaceAccessPointRow,
+    PlaceRevisionRow,
+    PlaceRow,
+    PlaceTimeRuleRow,
+    SolverPlaceProjectionRow,
+)
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
     Attraction,
@@ -23,14 +30,6 @@ from travel_agent.solver import (
     TimeRule,
     WeatherBasis,
     WeatherSeverity,
-)
-
-from travel_agent.infrastructure.database.place_catalog import (
-    PlaceAccessPointRow,
-    PlaceRow,
-    PlaceRevisionRow,
-    PlaceTimeRuleRow,
-    SolverPlaceProjectionRow,
 )
 
 from .gateway import PublishedAttraction, PublishedSolverData, PublishedSolverDataProvider
@@ -123,7 +122,9 @@ class DatabasePublishedSolverDataProvider:
                     )
                 )
                 by_id = {row.access_point_id: row for row in access_rows}
-                arrival = by_id.get(projection.arrival_access_point_id) or (access_rows[0] if access_rows else None)
+                arrival = by_id.get(projection.arrival_access_point_id) or (
+                    access_rows[0] if access_rows else None
+                )
                 if arrival is None:
                     continue
                 coordinate = Coordinate(float(arrival.lat), float(arrival.lng))
@@ -136,8 +137,12 @@ class DatabasePublishedSolverDataProvider:
                     solver_node_id,
                     name,
                     close_days=frozenset(_close_days(session, revision.place_revision_id)),
-                    open_on_dates=frozenset(_exception_dates(session, revision.place_revision_id, "open_override")),
-                    closed_on_dates=frozenset(_exception_dates(session, revision.place_revision_id, "closed")),
+                    open_on_dates=frozenset(
+                        _exception_dates(session, revision.place_revision_id, "open_override")
+                    ),
+                    closed_on_dates=frozenset(
+                        _exception_dates(session, revision.place_revision_id, "closed")
+                    ),
                     suggested_duration=duration,
                     time_rules=rules,
                     is_always_open=revision.is_always_open,
@@ -238,8 +243,9 @@ def _clock(minutes: int) -> str:
 
 
 def _local_weather(today: date) -> dict[date, DailyWeather]:
+    note = "local deterministic normal weather"
     return {
-        day: DailyWeather(day, WeatherBasis.FORECAST, WeatherSeverity.NORMAL, "local deterministic normal weather")
+        day: DailyWeather(day, WeatherBasis.FORECAST, WeatherSeverity.NORMAL, note)
         for offset in range(-30, 401)
         for day in (today + timedelta(days=offset),)
     }

@@ -6,9 +6,9 @@ Traceability: H3, C1, C2, C4, C5, C6, S1, S6, Gate 6.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Callable
 from typing import Any
 
 from ortools.constraint_solver import routing_enums_pb2
@@ -22,8 +22,8 @@ from travel_agent.solver import (
     DayAllocation,
     DayPlan,
     DayTimeBounds,
-    DegradationCode,
     DefaultRoutingSearchExecutor,
+    DegradationCode,
     InMemoryTravelTimeProvider,
     MealStatus,
     ODBasis,
@@ -42,7 +42,6 @@ from travel_agent.solver import (
     evaluate_solver_quality,
     route_itinerary,
 )
-
 
 MONDAY = date(2026, 8, 24)
 TUESDAY = date(2026, 8, 25)

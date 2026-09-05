@@ -122,7 +122,9 @@ class PlaceRevisionRow(Base):
     reviewed_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     published_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
     review_flags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
-    relation_review_status: Mapped[str] = mapped_column(String(24), nullable=False, default="not_required")
+    relation_review_status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="not_required"
+    )
 
 
 class PlaceGeometryRow(Base):
@@ -283,12 +285,17 @@ class PublicationBatchItemRow(Base):
     __tablename__ = "publication_batch_items"
     batch_item_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     batch_id: Mapped[str] = mapped_column(ForeignKey("publication_batches.batch_id"), index=True)
-    place_revision_id: Mapped[str] = mapped_column(ForeignKey("place_revisions.place_revision_id"), index=True)
+    place_revision_id: Mapped[str] = mapped_column(
+        ForeignKey("place_revisions.place_revision_id"), index=True
+    )
     status: Mapped[str] = mapped_column(String(24))
     reason_codes: Mapped[list[str]] = mapped_column(JSON)
     projection_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     published_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    __table_args__ = (UniqueConstraint("batch_id", "place_revision_id", name="uq_publication_batch_revision"), MYSQL_TABLE_ARGS)
+    __table_args__ = (
+        UniqueConstraint("batch_id", "place_revision_id", name="uq_publication_batch_revision"),
+        MYSQL_TABLE_ARGS,
+    )
 
 
 class ResearchSnapshotRow(Base):
@@ -297,7 +304,9 @@ class ResearchSnapshotRow(Base):
     data_snapshot_version: Mapped[str] = mapped_column(String(80), unique=True)
     city_id: Mapped[str] = mapped_column(String(64), index=True)
     content_sha256: Mapped[str] = mapped_column(String(64), unique=True)
-    source_batch_id: Mapped[str] = mapped_column(ForeignKey("publication_batches.batch_id"), index=True)
+    source_batch_id: Mapped[str] = mapped_column(
+        ForeignKey("publication_batches.batch_id"), index=True
+    )
     snapshot_payload: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[str] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(24))
@@ -445,7 +454,11 @@ class SqlAlchemyPlaceCatalogRepository:
             ("访问点", PlaceAccessPointRow, PlaceAccessPointRow.place_revision_id == revision_id),
             ("开放时间", PlaceTimeRuleRow, PlaceTimeRuleRow.place_revision_id == revision_id),
             ("固定闭馆日", PlaceClosureRow, PlaceClosureRow.place_revision_id == revision_id),
-            ("日期例外", PlaceDateExceptionRow, PlaceDateExceptionRow.place_revision_id == revision_id),
+            (
+                "日期例外",
+                PlaceDateExceptionRow,
+                PlaceDateExceptionRow.place_revision_id == revision_id,
+            ),
             (
                 "地点关系",
                 PlaceRelationRow,
@@ -458,11 +471,13 @@ class SqlAlchemyPlaceCatalogRepository:
         references: list[str] = []
         for label, table, scope in checks:
             found = self._session.scalar(
-                select(table).where(
+                select(table)
+                .where(
                     scope,
                     table.source_record_id == source_record_id,
                     table.active.is_(True),
-                ).limit(1)
+                )
+                .limit(1)
             )
             if found is not None:
                 references.append(label)
@@ -802,7 +817,8 @@ class SqlAlchemyPlaceCatalogRepository:
         else:
             predicates.append(table.place_revision_id == revision_id)
         result = self._session.execute(
-            update(table).where(*predicates)
+            update(table)
+            .where(*predicates)
             .values(
                 review_status=review_status,
                 reviewed_at=reviewed_at if review_status == "human_verified" else None,
@@ -849,11 +865,18 @@ class SqlAlchemyPlaceCatalogRepository:
         self._add(PlaceRelationRow(**_relation_values(relation)), "relation already exists")
 
     def add_publication_batch(self, batch: PublicationBatch) -> None:
-        self._add(PublicationBatchRow(batch_id=batch.batch_id, city_id=batch.city_id,
-                                      operation_intent_id=batch.operation_intent_id,
-                                      created_by=batch.created_by, status=batch.status,
-                                      snapshot_id=batch.snapshot_id,
-                                      created_at=batch.created_at.isoformat()), "publication batch already exists")
+        self._add(
+            PublicationBatchRow(
+                batch_id=batch.batch_id,
+                city_id=batch.city_id,
+                operation_intent_id=batch.operation_intent_id,
+                created_by=batch.created_by,
+                status=batch.status,
+                snapshot_id=batch.snapshot_id,
+                created_at=batch.created_at.isoformat(),
+            ),
+            "publication batch already exists",
+        )
 
     def update_publication_batch(self, batch: PublicationBatch) -> None:
         row = self._session.get(PublicationBatchRow, batch.batch_id)
@@ -868,21 +891,27 @@ class SqlAlchemyPlaceCatalogRepository:
         self._session.flush()
 
     def add_publication_batch_item(self, item: PublicationBatchItem) -> None:
-        self._add(PublicationBatchItemRow(
-            batch_item_id=item.batch_item_id,
-            batch_id=item.batch_id,
-            place_revision_id=item.place_revision_id,
-            status=item.status,
-            reason_codes=list(item.reason_codes),
-            projection_id=item.projection_id,
-            published_at=_iso(item.published_at),
-        ), "publication batch item already exists")
+        self._add(
+            PublicationBatchItemRow(
+                batch_item_id=item.batch_item_id,
+                batch_id=item.batch_id,
+                place_revision_id=item.place_revision_id,
+                status=item.status,
+                reason_codes=list(item.reason_codes),
+                projection_id=item.projection_id,
+                published_at=_iso(item.published_at),
+            ),
+            "publication batch item already exists",
+        )
 
     def list_publication_batch_items(self, batch_id: str) -> tuple[PublicationBatchItem, ...]:
         rows = self._session.scalars(
             select(PublicationBatchItemRow)
             .where(PublicationBatchItemRow.batch_id == batch_id)
-            .order_by(PublicationBatchItemRow.place_revision_id.asc(), PublicationBatchItemRow.batch_item_id.asc())
+            .order_by(
+                PublicationBatchItemRow.place_revision_id.asc(),
+                PublicationBatchItemRow.batch_item_id.asc(),
+            )
         )
         return tuple(_publication_batch_item_from_row(row) for row in rows)
 
@@ -899,13 +928,19 @@ class SqlAlchemyPlaceCatalogRepository:
         self._session.flush()
 
     def add_research_snapshot(self, snapshot: ResearchSnapshot) -> None:
-        self._add(ResearchSnapshotRow(snapshot_id=snapshot.snapshot_id,
-                                      data_snapshot_version=snapshot.data_snapshot_version,
-                                      city_id=snapshot.city_id, content_sha256=snapshot.content_sha256,
-                                      source_batch_id=snapshot.source_batch_id,
-                                      snapshot_payload=snapshot.snapshot_payload,
-                                      created_at=snapshot.created_at.isoformat(), status=snapshot.status),
-                  "research snapshot already exists")
+        self._add(
+            ResearchSnapshotRow(
+                snapshot_id=snapshot.snapshot_id,
+                data_snapshot_version=snapshot.data_snapshot_version,
+                city_id=snapshot.city_id,
+                content_sha256=snapshot.content_sha256,
+                source_batch_id=snapshot.source_batch_id,
+                snapshot_payload=snapshot.snapshot_payload,
+                created_at=snapshot.created_at.isoformat(),
+                status=snapshot.status,
+            ),
+            "research snapshot already exists",
+        )
 
     def get_publication_batch(self, batch_id: str) -> PublicationBatch | None:
         row = self._session.get(PublicationBatchRow, batch_id)
@@ -915,23 +950,34 @@ class SqlAlchemyPlaceCatalogRepository:
         row = self._session.get(ResearchSnapshotRow, snapshot_id)
         return _research_snapshot_from_row(row) if row is not None else None
 
-    def list_research_snapshots(self, *, city_id: str | None = None, limit: int = 50, offset: int = 0) -> tuple[ResearchSnapshot, ...]:
+    def list_research_snapshots(
+        self, *, city_id: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[ResearchSnapshot, ...]:
         statement = select(ResearchSnapshotRow)
         if city_id is not None:
             statement = statement.where(ResearchSnapshotRow.city_id == city_id)
         rows = self._session.scalars(
-            statement.order_by(ResearchSnapshotRow.created_at.desc(), ResearchSnapshotRow.snapshot_id.asc())
-            .limit(limit).offset(offset)
+            statement.order_by(
+                ResearchSnapshotRow.created_at.desc(), ResearchSnapshotRow.snapshot_id.asc()
+            )
+            .limit(limit)
+            .offset(offset)
         )
         return tuple(_research_snapshot_from_row(row) for row in rows)
 
-    def update_relation(self, relation: PlaceRelation, *, revision_id: str, expected_revision_version: int) -> PlaceRevision:
+    def update_relation(
+        self, relation: PlaceRelation, *, revision_id: str, expected_revision_version: int
+    ) -> PlaceRevision:
         self._bump_revision(revision_id, expected_revision_version)
         result = self._session.execute(
             update(PlaceRelationRow)
             .where(PlaceRelationRow.relation_id == relation.relation_id)
-            .values(resolution_status=relation.resolution_status, decision_note=relation.decision_note,
-                    review_status="pending", reviewed_at=None)
+            .values(
+                resolution_status=relation.resolution_status,
+                decision_note=relation.decision_note,
+                review_status="pending",
+                reviewed_at=None,
+            )
         )
         if result.rowcount != 1:
             raise ValueError("place relation not found")
@@ -1059,7 +1105,12 @@ class SqlAlchemyPlaceCatalogRepository:
             _relation_from_row(row)
             for row in self._session.scalars(
                 select(PlaceRelationRow)
-                .where(or_(PlaceRelationRow.from_place_id == revision.place_id, PlaceRelationRow.to_place_id == revision.place_id))
+                .where(
+                    or_(
+                        PlaceRelationRow.from_place_id == revision.place_id,
+                        PlaceRelationRow.to_place_id == revision.place_id,
+                    )
+                )
                 .order_by(PlaceRelationRow.created_at, PlaceRelationRow.relation_id)
             )
         )
@@ -1102,9 +1153,7 @@ class SqlAlchemyPlaceCatalogRepository:
                 )
             )
         )
-        source_owner_place_ids = tuple(
-            dict.fromkeys((revision.place_id, *relation_place_ids))
-        )
+        source_owner_place_ids = tuple(dict.fromkeys((revision.place_id, *relation_place_ids)))
         source_rows = (
             tuple(
                 self._session.scalars(
@@ -1592,9 +1641,18 @@ def _relation_values(value: PlaceRelation) -> dict[str, Any]:
         "reviewed_at": _iso(value.reviewed_at),
     }
 
+
 def _publication_batch_from_row(row: PublicationBatchRow) -> PublicationBatch:
-    return PublicationBatch(row.batch_id, row.city_id, row.operation_intent_id, row.created_by,
-                             datetime.fromisoformat(row.created_at), row.status, row.snapshot_id)
+    return PublicationBatch(
+        row.batch_id,
+        row.city_id,
+        row.operation_intent_id,
+        row.created_by,
+        datetime.fromisoformat(row.created_at),
+        row.status,
+        row.snapshot_id,
+    )
+
 
 def _publication_batch_item_from_row(row: PublicationBatchItemRow) -> PublicationBatchItem:
     return PublicationBatchItem(
@@ -1607,10 +1665,18 @@ def _publication_batch_item_from_row(row: PublicationBatchItemRow) -> Publicatio
         datetime.fromisoformat(row.published_at) if row.published_at else None,
     )
 
+
 def _research_snapshot_from_row(row: ResearchSnapshotRow) -> ResearchSnapshot:
-    return ResearchSnapshot(row.snapshot_id, row.data_snapshot_version, row.city_id,
-                            row.content_sha256, row.source_batch_id, row.snapshot_payload,
-                            datetime.fromisoformat(row.created_at), row.status)
+    return ResearchSnapshot(
+        row.snapshot_id,
+        row.data_snapshot_version,
+        row.city_id,
+        row.content_sha256,
+        row.source_batch_id,
+        row.snapshot_payload,
+        datetime.fromisoformat(row.created_at),
+        row.status,
+    )
 
 
 def _relation_from_row(row: PlaceRelationRow) -> PlaceRelation:

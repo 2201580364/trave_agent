@@ -20,7 +20,6 @@ from travel_agent.solver import (
     route_itinerary,
 )
 
-
 MONDAY = date(2026, 8, 24)
 TUESDAY = date(2026, 8, 25)
 WEDNESDAY = date(2026, 8, 26)

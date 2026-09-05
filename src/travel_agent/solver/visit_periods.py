@@ -13,7 +13,6 @@ from .models import (
     VisitPeriodPreferenceSource,
 )
 
-
 SOURCE_PRIORITY = {
     VisitPeriodPreferenceSource.PUBLIC_GUIDE_SYNTHESIS: 1,
     VisitPeriodPreferenceSource.CURATED: 2,

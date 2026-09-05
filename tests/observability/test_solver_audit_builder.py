@@ -8,15 +8,14 @@ from travel_agent.solver import (
     DayTimeBounds,
     ItineraryPlan,
     ItineraryReassignment,
+    RoutedDay,
     RouteValidation,
     RouteVisit,
-    RoutedDay,
     TimeBucket,
     VisitPeriodPreference,
-    evaluate_visit_period,
     evaluate_solver_quality,
+    evaluate_visit_period,
 )
-
 
 DAY = date(2026, 8, 24)
 

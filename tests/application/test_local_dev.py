@@ -8,15 +8,19 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from travel_agent.local_dev import build_local_dev_app, build_local_hangzhou_catalog
-from travel_agent.infrastructure.database import DatabaseSettings, build_engine, build_session_factory
+
+from travel_agent.infrastructure.database import (
+    DatabaseSettings,
+    build_engine,
+    build_session_factory,
+)
 from travel_agent.infrastructure.database.place_catalog import (
     PlaceAccessPointRow,
     PlaceRevisionRow,
     PlaceRow,
-    ResearchSnapshotRow,
     SolverPlaceProjectionRow,
 )
+from travel_agent.local_dev import build_local_dev_app, build_local_hangzhou_catalog
 
 
 def test_local_catalog_is_explicit_and_covers_evening_attraction() -> None:
@@ -139,7 +143,8 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None
             audience_tags=[], rain_suitability="conditional", is_always_open=True,
             solver_eligible=True, conflicts_resolved=True, source_record_ids=[],
             created_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
-            published_at="2026-08-30T00:00:00+00:00", review_flags=[], relation_review_status="no_relations",
+            published_at="2026-08-30T00:00:00+00:00", review_flags=[],
+            relation_review_status="no_relations",
         ))
         session.add(PlaceAccessPointRow(
             access_point_id="published-access", place_revision_id="published-revision",
@@ -153,7 +158,8 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None
             data_snapshot_version="db-published-v1", place_id="published-place",
             place_revision_id="published-revision", solver_node_id=101,
             place_kind="attraction", geometry_kind="point",
-            arrival_access_point_id="published-access", departure_access_point_id="published-access",
+            arrival_access_point_id="published-access",
+            departure_access_point_id="published-access",
             duration_min=30, duration_recommended=90, duration_max=120,
             internal_travel_min=5, solver_payload={"name": "数据库发布景点"},
             projection_hash="a" * 64, status="published", gate_reason_codes=[],
@@ -161,7 +167,8 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None
         ))
         session.commit()
 
-    client = TestClient(build_local_dev_app(database_url=database_url, reference_date=date(2026, 8, 25)))
+    app = build_local_dev_app(database_url=database_url, reference_date=date(2026, 8, 25))
+    client = TestClient(app)
     token = client.post("/api/v1/anonymous-sessions", json={}).json()["access_token"]
     response = client.get("/api/v1/attractions", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200

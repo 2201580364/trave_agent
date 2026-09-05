@@ -98,10 +98,11 @@ class DailyFileHandler(logging.Handler):
             self.archive_coordinator.check(current_date)
             self.directory.mkdir(parents=True, exist_ok=True)
             path = self.directory / f"{current_date.isoformat()}.log"
-            with InterProcessFileLock(self.directory / ".write.lock"):
-                with path.open(mode="a", encoding="utf-8", newline="") as stream:
-                    stream.write(self.format(record) + "\n")
-                    stream.flush()
+            with InterProcessFileLock(self.directory / ".write.lock"), path.open(
+                mode="a", encoding="utf-8", newline=""
+            ) as stream:
+                stream.write(self.format(record) + "\n")
+                stream.flush()
         except Exception:
             self.handleError(record)
 

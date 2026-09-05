@@ -25,7 +25,6 @@ from travel_agent.solver import (
     route_itinerary,
 )
 
-
 BASE_DATE = date(2026, 9, 1)
 SNAPSHOT_AT = datetime(2026, 8, 23, tzinfo=UTC)
 ALL_DAY = (TimeRule.from_strings(("01-01", "12-31"), "09:00", "21:00"),)

@@ -429,9 +429,7 @@ def test_sqlalchemy_catalog_persists_and_only_gate_can_publish(tmp_path: Path) -
             SelectionExclusionMember("group_westlake_overlap", "place_westlake", NOW)
         )
         uow.place_catalog.add_projection(_projection())
-        published = uow.place_catalog.publish_projection(
-            "projection_westlake_1", published_at=NOW
-        )
+        published = uow.place_catalog.publish_projection("projection_westlake_1", published_at=NOW)
         uow.commit()
 
     assert published.status == "published"
@@ -472,9 +470,7 @@ def test_sqlalchemy_publication_context_rejects_cross_place_source(tmp_path: Pat
         assert context is not None
         assert context.source_records[0].place_id == "place_other"
         with pytest.raises(ProjectionPublicationError) as exc_info:
-            uow.place_catalog.publish_projection(
-                "projection_westlake_1", published_at=NOW
-            )
+            uow.place_catalog.publish_projection("projection_westlake_1", published_at=NOW)
 
     assert "SOURCE_RECORD_PLACE_MISMATCH" in exc_info.value.reason_codes
 
@@ -518,7 +514,9 @@ def test_publishing_new_revision_retires_previous_solver_version(tmp_path: Path)
         )
         uow.place_catalog.add_revision(second_revision)
         uow.place_catalog.add_geometry(
-            replace(_geometry(), geometry_id="geometry_westlake_2", place_revision_id=second_revision_id)
+            replace(
+                _geometry(), geometry_id="geometry_westlake_2", place_revision_id=second_revision_id
+            )
         )
         for point in _access_points():
             uow.place_catalog.add_access_point(
@@ -529,7 +527,9 @@ def test_publishing_new_revision_retires_previous_solver_version(tmp_path: Path)
                 )
             )
         uow.place_catalog.add_time_rule(
-            replace(_time_rule(), time_rule_id="time_westlake_2", place_revision_id=second_revision_id)
+            replace(
+                _time_rule(), time_rule_id="time_westlake_2", place_revision_id=second_revision_id
+            )
         )
         second_projection = replace(
             _projection(),
@@ -587,9 +587,7 @@ def test_o04_candidate_evidence_mutations_bump_revision_version_and_reset_eligib
         assert updated.solver_eligible is False
         assert updated.conflicts_resolved is False
         with pytest.raises(ValueError, match="version conflict"):
-            uow.place_catalog.create_access_point(
-                _access_points()[1], expected_revision_version=1
-            )
+            uow.place_catalog.create_access_point(_access_points()[1], expected_revision_version=1)
         uow.commit()
 
     with SqlAlchemyUnitOfWork(factory) as uow:

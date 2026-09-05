@@ -12,16 +12,15 @@ from travel_agent.solver import (
     ExpectationOutcome,
     ItineraryBaseline,
     ItineraryPlan,
+    RoutedDay,
     RouteValidation,
     RouteVisit,
-    RoutedDay,
     SameDayExpectation,
     TimeBucket,
     VisitExpectation,
     evaluate_itinerary_closeness,
     evaluate_solver_quality,
 )
-
 
 MONDAY = date(2026, 8, 24)
 TUESDAY = date(2026, 8, 25)

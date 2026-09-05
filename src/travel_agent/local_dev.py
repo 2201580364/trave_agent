@@ -22,9 +22,9 @@ from travel_agent.infrastructure.database import (
 from travel_agent.infrastructure.holiday_sync import HolidaySyncSettings
 from travel_agent.infrastructure.memory import FixedDataSnapshotVersionProvider
 from travel_agent.infrastructure.solver import (
-    InMemoryPublishedSolverDataProvider,
     DatabasePublishedSnapshotVersionProvider,
     DatabasePublishedSolverDataProvider,
+    InMemoryPublishedSolverDataProvider,
     PublishedAttraction,
     PublishedSolverData,
 )

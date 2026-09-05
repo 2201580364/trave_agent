@@ -13,12 +13,11 @@ from travel_agent.solver import (
     ItineraryUnplaced,
     RejectedAttraction,
     RejectionCode,
+    RoutedDay,
     RouteValidation,
     RouteVisit,
-    RoutedDay,
     evaluate_solver_quality,
 )
-
 
 DAY = date(2026, 8, 24)
 

@@ -8,16 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from travel_agent.solver import (
-    AdjacencyExpectation,
-    BaselineProvenance,
-    ItineraryBaseline,
-    SameDayExpectation,
-    TimeBucket,
-    VisitExpectation,
-    evaluate_itinerary_closeness,
-)
-
 from tests.golden.hangzhou_cases import (
     MONDAY,
     TUESDAY,
@@ -28,14 +18,20 @@ from tests.golden.hangzhou_cases import (
     _weather,
 )
 from travel_agent.solver import (
+    AdjacencyExpectation,
     AttractionPreference,
+    BaselineProvenance,
     Coordinate,
-    TripTimeAnchors,
+    ItineraryBaseline,
+    SameDayExpectation,
     TimeBucket,
+    TripTimeAnchors,
+    VisitExpectation,
     VisitPeriodPreference,
     VisitPeriodPreferenceSource,
     WeatherSeverity,
     assign_days,
+    evaluate_itinerary_closeness,
     evaluate_solver_quality,
     route_itinerary,
 )

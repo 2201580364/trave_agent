@@ -31,7 +31,6 @@ from .models import (
 from .time_windows import DEFAULT_DURATION_RATIO, resolve_effective_window
 from .weather import evaluate_weather_availability
 
-
 DEFAULT_DURATION_RATIO_BY_MODE = {
     TravelMode.SPEED: DEFAULT_DURATION_RATIO,
     TravelMode.NORMAL: DEFAULT_DURATION_RATIO,

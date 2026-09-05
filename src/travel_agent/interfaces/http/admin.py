@@ -87,6 +87,7 @@ class DecidePlaceReviewInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+
 class BatchDecidePlaceReviewInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: tuple[DecidePlaceReviewInput, ...] = Field(min_length=1, max_length=100)
@@ -258,6 +259,7 @@ class PlaceDateExceptionInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+
 class GenerateHolidayExceptionsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision_version: int = Field(gt=0)
@@ -271,6 +273,7 @@ class GenerateHolidayExceptionsInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+
 class ResolveSourceConflictsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision_number: int = Field(gt=0)
@@ -280,6 +283,7 @@ class ResolveSourceConflictsInput(BaseModel):
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
 
+
 class ResolveRelationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision_version: int = Field(gt=0)
@@ -288,6 +292,7 @@ class ResolveRelationInput(BaseModel):
     operation_intent_id: str = Field(min_length=1, max_length=64)
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
+
 
 class ConfirmNoRelationsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -305,6 +310,7 @@ class RetirePlaceEvidenceInput(BaseModel):
     operation_intent_id: str = Field(min_length=1, max_length=64)
     reason_code: str = Field(min_length=3, max_length=64)
     reason_text: str | None = Field(default=None, max_length=500)
+
 
 class ReviewPlaceEvidenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -343,9 +349,7 @@ class ConfirmHolidayCalendarPreviewInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation_intent_id: str = Field(min_length=1, max_length=64)
-    periods: list[HolidayCalendarPreviewPeriodInput] = Field(
-        min_length=1, max_length=30
-    )
+    periods: list[HolidayCalendarPreviewPeriodInput] = Field(min_length=1, max_length=30)
     adjusted_workdays: list[HolidayCalendarPreviewWorkdayInput] = Field(
         default_factory=list, max_length=100
     )
@@ -423,9 +427,7 @@ def build_admin_router(
                 "region_code": "CN",
             }
 
-        @router.post(
-            "/holiday-calendar-sync-jobs", status_code=status.HTTP_202_ACCEPTED
-        )
+        @router.post("/holiday-calendar-sync-jobs", status_code=status.HTTP_202_ACCEPTED)
         def create_holiday_calendar_sync_job(
             payload: CreateHolidayCalendarSyncJobInput,
             current: AdminPrincipal = principal_dependency,
@@ -497,8 +499,7 @@ def build_admin_router(
                     job_id=job_id,
                     periods=[item.model_dump(mode="json") for item in payload.periods],
                     adjusted_workdays=[
-                        item.model_dump(mode="json")
-                        for item in payload.adjusted_workdays
+                        item.model_dump(mode="json") for item in payload.adjusted_workdays
                     ],
                     operation_intent_id=payload.operation_intent_id,
                     confirmed_by=current.admin_actor_id,
@@ -554,9 +555,7 @@ def build_admin_router(
     def list_admin_actors(
         current: AdminPrincipal = principal_dependency,
         keyword: str | None = Query(default=None, max_length=100),
-        actor_status: str | None = Query(
-            default=None, pattern="^(active|disabled|locked)$"
-        ),
+        actor_status: str | None = Query(default=None, pattern="^(active|disabled|locked)$"),
         role_key: str | None = Query(default=None, max_length=64),
         limit: int = Query(default=50, ge=1, le=100),
         offset: int = Query(default=0, ge=0),
@@ -776,9 +775,7 @@ def build_admin_router(
             revision_id: str,
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
-            evidence = review_workflow.get_revision_evidence(
-                current, revision_id=revision_id
-            )
+            evidence = review_workflow.get_revision_evidence(current, revision_id=revision_id)
             return _revision_evidence_response(evidence)
 
         @router.post(
@@ -807,9 +804,7 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete(
-            "/place-revisions/{revision_id}/source-records/{source_record_id}"
-        )
+        @router.delete("/place-revisions/{revision_id}/source-records/{source_record_id}")
         def detach_place_source_record(
             revision_id: str,
             source_record_id: str,
@@ -858,44 +853,61 @@ def build_admin_router(
 
         @router.post("/place-revisions/{revision_id}/source-conflicts/resolve")
         def resolve_place_source_conflicts(
-            revision_id: str, payload: ResolveSourceConflictsInput, request: Request,
+            revision_id: str,
+            payload: ResolveSourceConflictsInput,
+            request: Request,
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
             revision = review_workflow.resolve_source_conflicts(
-                current, revision_id=revision_id,
+                current,
+                revision_id=revision_id,
                 expected_revision_number=payload.expected_revision_number,
                 expected_revision_version=payload.expected_revision_version,
-                resolved=payload.resolved, operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code, reason_text=payload.reason_text,
+                resolved=payload.resolved,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
                 request_id=request.state.request_id,
             )
             return _revision_response(revision)
 
         @router.post("/place-revisions/{revision_id}/relations/{relation_id}/resolve")
         def resolve_place_relation(
-            revision_id: str, relation_id: str, payload: ResolveRelationInput, request: Request,
+            revision_id: str,
+            relation_id: str,
+            payload: ResolveRelationInput,
+            request: Request,
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
             revision = review_workflow.resolve_relation(
-                current, revision_id=revision_id, relation_id=relation_id,
+                current,
+                revision_id=revision_id,
+                relation_id=relation_id,
                 expected_revision_version=payload.expected_revision_version,
-                resolution_status=payload.resolution_status, decision_note=payload.decision_note,
-                operation_intent_id=payload.operation_intent_id, reason_code=payload.reason_code,
-                reason_text=payload.reason_text, request_id=request.state.request_id,
+                resolution_status=payload.resolution_status,
+                decision_note=payload.decision_note,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
             )
             return _revision_response(revision)
 
         @router.post("/place-revisions/{revision_id}/relations/confirm-none")
         def confirm_no_place_relations(
-            revision_id: str, payload: ConfirmNoRelationsInput, request: Request,
+            revision_id: str,
+            payload: ConfirmNoRelationsInput,
+            request: Request,
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
             revision = review_workflow.confirm_no_relations(
-                current, revision_id=revision_id,
+                current,
+                revision_id=revision_id,
                 expected_revision_number=payload.expected_revision_number,
                 expected_revision_version=payload.expected_revision_version,
                 operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code, reason_text=payload.reason_text,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
                 request_id=request.state.request_id,
             )
             return _revision_response(revision)
@@ -916,9 +928,7 @@ def build_admin_router(
             evidence_kind: Annotated[
                 str,
                 Path(
-                    pattern=(
-                        "^(geometry|access_point|time_rule|closure|date_exception|relation)$"
-                    )
+                    pattern=("^(geometry|access_point|time_rule|closure|date_exception|relation)$")
                 ),
             ],
             evidence_id: str,
@@ -927,10 +937,14 @@ def build_admin_router(
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
             revision = review_workflow.review_evidence(
-                current, revision_id=revision_id, evidence_kind=evidence_kind,
-                evidence_id=evidence_id, review_status=payload.review_status,
+                current,
+                revision_id=revision_id,
+                evidence_kind=evidence_kind,
+                evidence_id=evidence_id,
+                review_status=payload.review_status,
                 operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code, reason_text=payload.reason_text,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
                 request_id=request.state.request_id,
             )
             return _revision_response(revision)
@@ -1049,9 +1063,7 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete(
-            "/place-revisions/{revision_id}/access-points/{access_point_id}"
-        )
+        @router.delete("/place-revisions/{revision_id}/access-points/{access_point_id}")
         def retire_place_access_point(
             revision_id: str,
             access_point_id: str,
@@ -1173,13 +1185,19 @@ def build_admin_router(
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
             revision = review_workflow.generate_holiday_exceptions(
-                current, revision_id=revision_id,
+                current,
+                revision_id=revision_id,
                 expected_revision_version=payload.expected_revision_version,
-                calendar_id=payload.calendar_id, source_record_id=payload.source_record_id,
-                open_start_minute=payload.open_start_minute, open_end_minute=payload.open_end_minute,
-                open_last_entry_minute=payload.open_last_entry_minute, shift_closure=payload.shift_closure,
-                operation_intent_id=payload.operation_intent_id, reason_code=payload.reason_code,
-                reason_text=payload.reason_text, request_id=request.state.request_id,
+                calendar_id=payload.calendar_id,
+                source_record_id=payload.source_record_id,
+                open_start_minute=payload.open_start_minute,
+                open_end_minute=payload.open_end_minute,
+                open_last_entry_minute=payload.open_last_entry_minute,
+                shift_closure=payload.shift_closure,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
             )
             return _revision_response(revision)
 
@@ -1249,9 +1267,7 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch(
-            "/place-revisions/{revision_id}/date-exceptions/{date_exception_id}"
-        )
+        @router.patch("/place-revisions/{revision_id}/date-exceptions/{date_exception_id}")
         def update_place_date_exception(
             revision_id: str,
             date_exception_id: str,
@@ -1277,9 +1293,7 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete(
-            "/place-revisions/{revision_id}/date-exceptions/{date_exception_id}"
-        )
+        @router.delete("/place-revisions/{revision_id}/date-exceptions/{date_exception_id}")
         def retire_place_date_exception(
             revision_id: str,
             date_exception_id: str,
@@ -1320,9 +1334,7 @@ def build_admin_router(
                 "data_snapshot_version": projection.data_snapshot_version,
                 "status": projection.status,
                 "published_at": (
-                    projection.published_at.isoformat()
-                    if projection.published_at
-                    else None
+                    projection.published_at.isoformat() if projection.published_at else None
                 ),
             }
 
@@ -1390,15 +1402,26 @@ def build_admin_router(
             limit: int = Query(default=50, ge=1, le=100),
             offset: int = Query(default=0, ge=0),
         ) -> dict[str, object]:
-            snapshots = review_workflow.list_research_snapshots(current, city_id=city_id, limit=limit, offset=offset)
-            return {"items": [_snapshot_api_response(item, include_payload=False) for item in snapshots], "limit": limit, "offset": offset}
+            snapshots = review_workflow.list_research_snapshots(
+                current, city_id=city_id, limit=limit, offset=offset
+            )
+            return {
+                "items": [
+                    _snapshot_api_response(item, include_payload=False) for item in snapshots
+                ],
+                "limit": limit,
+                "offset": offset,
+            }
 
         @router.get("/research-snapshots/{snapshot_id}")
         def get_research_snapshot(
             snapshot_id: str,
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
-            return _snapshot_api_response(review_workflow.get_research_snapshot(current, snapshot_id=snapshot_id), include_payload=True)
+            return _snapshot_api_response(
+                review_workflow.get_research_snapshot(current, snapshot_id=snapshot_id),
+                include_payload=True,
+            )
 
         @router.get("/candidates")
         def list_candidates(
@@ -1451,7 +1474,9 @@ def build_admin_router(
             return {
                 "revisions": summary["revisions"],
                 "review_tasks": summary["review_tasks"],
-                "recent_ready_tasks": [_review_task_response(task) for task in summary["recent_ready_tasks"]],
+                "recent_ready_tasks": [
+                    _review_task_response(task) for task in summary["recent_ready_tasks"]
+                ],
             }
 
         @router.get("/place-revisions/{revision_id}")
@@ -1695,9 +1720,7 @@ def _revision_response(revision: PlaceRevision) -> dict[str, object]:
 def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, object]:
     projection = evidence.projection
     valid_source_ids = {
-        source.source_record_id
-        for source in evidence.source_records
-        if source.status == "active"
+        source.source_record_id for source in evidence.source_records if source.status == "active"
     }
     return {
         "revision": _revision_response(evidence.revision),
@@ -1706,8 +1729,7 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
                 "source_record_id": source.source_record_id,
                 "source_id": source.source_id,
                 "source_url": safe_source_url(source.source_url),
-                "source_url_redacted": safe_source_url(source.source_url)
-                != source.source_url,
+                "source_url_redacted": safe_source_url(source.source_url) != source.source_url,
                 "collection_mode": source.collection_mode,
                 "target_stage": source.target_stage,
                 "source_decision": source.source_decision,
@@ -1730,9 +1752,7 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
                 "review_status": geometry.review_status,
                 "active": geometry.active,
                 "created_at": geometry.created_at.isoformat(),
-                "reviewed_at": (
-                    geometry.reviewed_at.isoformat() if geometry.reviewed_at else None
-                ),
+                "reviewed_at": (geometry.reviewed_at.isoformat() if geometry.reviewed_at else None),
             }
             for geometry in evidence.geometries
         ],
@@ -1781,9 +1801,7 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
                 "review_status": closure.review_status,
                 "active": closure.active,
                 "created_at": closure.created_at.isoformat(),
-                "reviewed_at": (
-                    closure.reviewed_at.isoformat() if closure.reviewed_at else None
-                ),
+                "reviewed_at": (closure.reviewed_at.isoformat() if closure.reviewed_at else None),
             }
             for closure in evidence.closures
         ],
@@ -1801,9 +1819,7 @@ def _revision_evidence_response(evidence: PlaceRevisionEvidence) -> dict[str, ob
                 "active": exception.active,
                 "created_at": exception.created_at.isoformat(),
                 "reviewed_at": (
-                    exception.reviewed_at.isoformat()
-                    if exception.reviewed_at
-                    else None
+                    exception.reviewed_at.isoformat() if exception.reviewed_at else None
                 ),
             }
             for exception in evidence.date_exceptions

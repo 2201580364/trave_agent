@@ -46,6 +46,8 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+# B008: FastAPI 官方惯用法（Depends()/Query() 作为默认参数），非真实缺陷。
+extend-ignore = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
