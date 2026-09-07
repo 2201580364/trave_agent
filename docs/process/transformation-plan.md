@@ -171,7 +171,7 @@
 
 | # | 任务 | 内容 | 状态 |
 |---|---|---|---|
-| S8-1 | frontend 引入 Vitest，覆盖 `entities/planning`、`features/trip-draft` 的 store 与纯函数（核心路径优先） | 测试集 | 进行中（2026-09-07：vitest.config.ts 已建；待装依赖 + 写测试） |
+| S8-1 | frontend 引入 Vitest，覆盖 `entities/planning`、`features/trip-draft` 的 store 与纯函数（核心路径优先） | 测试集 | **实现完成待合并（2026-09-07）**：vitest@1.6.0（`--legacy-peer-deps`，Taro 的 `peerOptional vite@^4` 与 vitest 携带的 vite@5 冲突，构建实际走 webpack5 故 vite 版本仅影响 vitest 自身）+ vitest.config.ts（`@` 别名、node 环境）；19 项测试（store 13 + api client 6）全过，`npm run test` script 已加，tsc --noEmit 过；CI 集成留给 S8-2 统一改 ci.yml |
 | S8-2 | CI 导出 FastAPI OpenAPI schema 快照，与 `docs/specs/api-contract.md` 关键字段做 diff 校验 | 契约对照 | 未开始 |
 | S8-3 | `admin-web/src/api/types.ts` 改为 openapi-typescript 生成，消除手工同步 | 生成式类型 | 未开始 |
 | S8-4 | （R0.3 部署后）Playwright E2E 覆盖 H5 核心路径：创建草稿→选点→生成→查看→分享 | E2E 套件 | 未开始 |

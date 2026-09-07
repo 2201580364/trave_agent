@@ -9,7 +9,8 @@
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-07 S6 并行开发试点（transformation-plan，本会话）：协作规范落地 `.claude/rules/parallel-workflow.md` 并经复盘升版 v2（一会话=一分支=一能力域 + In-flight 登记 + 迁移/共享库互斥 + 合并队列纪律 + 基线口径/验证纪律）；AGENTS.md 加 2 行硬规则（sync + check_docs 全过）；In-flight 区启用（S5 + S6-C 双登记）；试点任务 C=admin 会话持久化：后端 admin_sessions 本就持久化，前端 token 由内存 ref 改 sessionStorage + 挂载 /me 恢复（fail-closed）+ 3 个新测试；全量回归零回退（pytest 479/479[465+S5 新增 14]、Vitest 44/44[41+3]、tsc、build、golden 8/8、check_docs、layering 全过）。
+- 2026-09-07 S8-1 frontend Vitest 补测（transformation-plan，实现完成待合并）：vitest@1.6.0 经 `--legacy-peer-deps` 安装（Taro 4.2.1 的 `peerOptional vite@^4` 与 vitest 携带依赖的 vite@5 peer 冲突；Taro 构建实际走 webpack5，vite 仅服务 vitest 运行）；`frontend/vitest.config.ts`（`@` 别名对齐 tsconfig paths、node 环境、默认 include `*.test.ts(x)`）；`npm run test` script；19 项测试全过——store 13 项（会话/草稿生命周期/行程与 Revision 导航/replacePlan 语义/persist 经 Taro storage 序列化与 reset 清空）+ api client 6 项（成功透传、Bearer 头、网络失败→status 0 network_unavailable、HTTP 错误信封→code/details 映射、无信封回退 request_failed）；tsc --noEmit 零错误；CI 集成留给 S8-2 统一处理。另：账本收口——transformation-plan V1.1（S5/S6/S3-6 状态对齐 git 实际、里程碑 M-a/M-b/M-c 达成标记）+ parallel-workflow v2.1 第八节账本时效纪律（单会话同样适用，收尾三件事）。
+- 2026-09-07 S6 并行开发试点（transformation-plan，已合并 `fae014e`）：协作规范落地 `.claude/rules/parallel-workflow.md` 并经复盘升版 v2（一会话=一分支=一能力域 + In-flight 登记 + 迁移/共享库互斥 + 合并队列纪律 + 基线口径/验证纪律）；AGENTS.md 加 2 行硬规则；试点任务 C=admin 会话持久化（sessionStorage + 挂载 /me 恢复）；全量回归零回退。
 
 - 2026-09-07 S5 脚本契约标准化 + 工具安全分级（transformation-plan）：`.claude/rules/script-contract.md`（契约七条 + L1/L2/L3 三级分类 + scripts/ 全量 26 脚本分级登记）；首批 5 脚本达标改造（report_research_readiness 补 --json、audit_catalog_boundaries 补缺库 fail-closed 退出 1、validate_candidate_catalog 0/1/2 语义 + 修复 SourceRegistryError 未捕获崩溃、run_golden_cases 补 --json + 门禁失败 1→2、import_candidate_revisions 补 --json + 修复空库 dry-run 崩溃）；`tests/scripts/test_script_contracts.py` 10 项契约测试全过；同步更新存量断言（status "valid"→"ok"）。
 - 2026-09-05 api-contract V2.11 端点差异裁决落地（S1.5-1 ②收尾，本会话）：6 条全部裁决——删除 `POST /admin/candidates`（与 `POST /places/{place_id}/revisions` 重复）；删除独立 `POST /admin/places/{place_id}/retirements`，§15.2 新增「发布版本退役语义」声明（退役由 publications 单条/批次链路发布新版时同事务原子完成，不提供绕过发布门禁的退役通道）；`GET /admin/places/{place_id}` 移入新增 §15.2.0「计划端点」小节；补登 3 个已实现端点（`GET /place-revisions/{revision_id}`、`GET /dashboard-summary`、`GET /holiday-calendar-sync-capability`）；retry（P1）标注未排期；health 探针写入 §2.1.1 运维探针。check_docs 全过。
@@ -39,9 +40,9 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| S8-1 frontend Vitest 补测 | dev（S8 会话） | `frontend/`（vitest.config.ts 已建、待装依赖与写测试） | 进行中（2026-09-07；纯 frontend 触碰面，不动 ci.yml——CI 集成留给 S8-2 统一处理） |
+| S8-1 frontend Vitest 补测 | dev（S8 会话） | `frontend/`（vitest.config.ts、2 个测试文件、package.json/package-lock.json） | 实现完成待合并（2026-09-07：19 项测试全过 + tsc 干净；CI 集成留给 S8-2） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。S8-2/8-3（OpenAPI 契约对照 + 生成式类型）待 S8-1 合并后开工，将触碰 ci.yml（冻结文件，届时登记 owner）。
 
 ## 关键事实速查
 
