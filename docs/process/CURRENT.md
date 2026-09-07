@@ -3,9 +3,9 @@
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
 - 更新时间：2026-09-07
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S5 已完成，S6 并行试点进行中（本会话任务 C admin 会话持久化已实现待合并，协作规范 v2 已沉淀，S6-4 合并交用户）`
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S6 已完成（S6 合并 941578e/fae014e），S8-1 进行中，S7 等待数据批次（12 条中 2 条已发布）`
 - 稳定测试基线：后端 pytest `465/465`（424 存量 + 33 新增测试 + 8 golden 独立跑全过）；ruff check 全仓清零；admin-web Vitest `41/41` + typecheck + production build 全过（`@testing-library/dom` peer 缺失已补）；Alembic 迁移链至 `0015_holiday_exception_provenance`
-- 最近提交基线：`89ea3de fix(publication): 发布新版时原子退役旧版本`；`c2ea117 feat(gate7): 完成节假日历同步与审核治理闭环`
+- 最近提交基线：`fae014e feat(s6): 并行开发试点——协作规范 v2 与 admin 会话持久化`；`941578e feat(scripts): S5 脚本契约标准化`
 
 ## 最近三轮已完成（一行一项）
 
@@ -39,9 +39,9 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| transformation-plan 文档治理 | 工作区 | S1/S1.5/S2/S3/S4 产出（见 transformation-plan.md 状态表） | S1/S1.5/S2/S3/S4 已完成（S3-6 分支保护已开启）；api-contract 端点差异 6 条已裁决落地（V2.11） |
-| S5 脚本契约标准化 | dev（曾用建议分支 `feat/script-contract`） | `scripts/`（首批 5 个脚本）、`tests/scripts/`、新建 `.claude/rules/script-contract.md`、`docs/process/transformation-plan.md`、`docs/process/CURRENT.md` | **已合并销账（2026-09-07，dev 提交 `941578e`）**：契约+分级成文、5/5 脚本达标、10 项契约测试全过、附带修复 2 个脚本真实缺陷与 1 处存量断言同步 |
-| S6 并行开发试点（任务 C：admin 会话持久化） | `feat/s6-admin-session-persistence`（用户手动创建） | `.claude/rules/parallel-workflow.md`（新建）、`AGENTS.md`（+2 行硬规则）、`CLAUDE.md`（sync 派生）、`docs/process/CURRENT.md`（本登记）、`docs/process/transformation-plan.md`（S6 状态表）、`admin-web/src/auth/AdminSessionProvider.tsx`、`admin-web/src/pages/LoginPage.tsx`、`admin-web/src/auth/AdminSessionProvider.test.tsx` | 实现完成待合并（全量回归零回退：pytest 479/479[465+S5 新增 14] + Vitest 44/44[41+3] + tsc + build + golden 8/8 + check_docs + layering 全过；改动清单与 commit message 已交用户，见 S6-4 材料） |
+| S8-1 frontend Vitest 补测 | dev（S8 会话） | `frontend/`（vitest.config.ts 已建、待装依赖与写测试） | 进行中（2026-09-07；纯 frontend 触碰面，不动 ci.yml——CI 集成留给 S8-2 统一处理） |
+
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。
 
 ## 关键事实速查
 

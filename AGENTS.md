@@ -78,6 +78,7 @@ G0 假设登记 → G1 用户研究 → G2 需求规格化 → G3 技术 Spike�
 - 本机禁止安装/启动 MySQL/Redis；服务器操作须在授权服务器上执行。
 - **Git 提交/推送/合并等写操作一律由用户手动执行，AI 禁止自动进行；删除文件前必须列清单获用户确认**——完整分级与纪律见 [.claude/rules/git-safety.md](.claude/rules/git-safety.md)。
 - **并行开发遵守「一会话=一分支=一能力域」：任务启动先在 CURRENT.md In-flight 区登记触碰文件清单，登记清单不得有交集；并行期 Alembic 迁移与 `.local/*.db` 互斥**——完整纪律见 [.claude/rules/parallel-workflow.md](.claude/rules/parallel-workflow.md)。
+- **账本时效：任务实现完成即更新账本（不等合并）；开工前发现账本与 git log 不一致，顺手收口（单会话同样适用）**——见 [.claude/rules/parallel-workflow.md](.claude/rules/parallel-workflow.md) 第八节。
 - 提交边界按「可验收能力域/里程碑切片」划分，不按单个 API/字段/按钮拆分（详见 status-archive 账本头）。
 
 ## 权威来源简表
