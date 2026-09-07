@@ -125,7 +125,9 @@ def test_candidate_catalog_cli_emits_non_sensitive_summary() -> None:
     )
     summary = json.loads(result.stdout)
 
-    assert summary["status"] == "valid"
+    # S5-3 script contract (.claude/rules/script-contract.md) standardized the
+    # verdict vocabulary to ok/failed/error; the old value was "valid".
+    assert summary["status"] == "ok"
     assert summary["candidate_count"] == 72
     assert summary["exit_evaluation"] == "passed"
     assert "key" not in result.stdout.lower()

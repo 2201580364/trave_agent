@@ -16,6 +16,9 @@ from travel_agent.data_governance import (  # noqa: E402
     validate_candidate_catalog,
     validate_candidate_coverage,
 )
+from travel_agent.data_governance.source_registry import (  # noqa: E402
+    SourceRegistryError,
+)
 
 
 def main() -> int:
@@ -43,19 +46,29 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
 
-    catalog = load_json_object(_rooted(args.catalog))
-    coverage = load_json_object(_rooted(args.coverage))
-    registry = load_json_object(_rooted(args.registry))
-    dictionary = load_json_object(_rooted(args.field_dictionary))
+    try:
+        catalog = load_json_object(_rooted(args.catalog))
+        coverage = load_json_object(_rooted(args.coverage))
+        registry = load_json_object(_rooted(args.registry))
+        dictionary = load_json_object(_rooted(args.field_dictionary))
+    except (OSError, ValueError) as exc:
+        if args.as_json:
+            print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
+        else:
+            print(f"candidate catalog inputs failed to load: {exc}", file=sys.stderr)
+        return 1
     try:
         validate_candidate_catalog(catalog, registry, dictionary)
         validate_candidate_coverage(coverage, catalog)
-    except CandidateCatalogError as exc:
-        print(f"candidate catalog validation failed: {exc}", file=sys.stderr)
-        return 1
+    except (CandidateCatalogError, SourceRegistryError) as exc:
+        if args.as_json:
+            print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+        else:
+            print(f"candidate catalog validation failed: {exc}", file=sys.stderr)
+        return 2
 
     summary = {
-        "status": "valid",
+        "status": "ok",
         "catalog_id": catalog["catalog_id"],
         "candidate_count": len(catalog["candidates"]),
         "relation_clue_count": len(catalog["relation_clues"]),

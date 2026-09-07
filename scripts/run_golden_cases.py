@@ -23,6 +23,11 @@ def main() -> int:
         type=Path,
         default=Path("var/reports/gate6-golden-latest.json"),
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the full machine-readable payload to stdout (script-contract L2)",
+    )
     args = parser.parse_args()
     results = run_hangzhou_golden_cases()
     payload = {
@@ -39,9 +44,12 @@ def main() -> int:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"Golden Cases: {payload['passed']}/{payload['total']} passed")
-    print(f"Report: {args.output}")
-    return 0 if payload["gate_passed"] else 1
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"Golden Cases: {payload['passed']}/{payload['total']} passed")
+        print(f"Report: {args.output}")
+    return 0 if payload["gate_passed"] else 2
 
 
 if __name__ == "__main__":

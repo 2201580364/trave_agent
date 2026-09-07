@@ -38,7 +38,14 @@ def main() -> int:
         help="limit the report to one lifecycle status",
     )
     parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="shorthand for --format json (script-contract L1)",
+    )
     args = parser.parse_args()
+    if args.json:
+        args.format = "json"
 
     try:
         report = load_research_readiness(

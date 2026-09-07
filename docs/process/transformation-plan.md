@@ -17,7 +17,7 @@
 | S2 | check_docs.py 文档门禁 | **已完成（2026-09-05）** | S1 | 1 天 |
 | S3 | CI 流水线 + 分层断言 | **已完成（2026-09-05；S3-6 分支保护待仓库设置）** | S2 | 1–2 天 |
 | S4 | 依赖锁定 + 文档对齐实现 | **已完成（2026-09-05）** | 无（可并行） | 0.5 天 |
-| S5 | 脚本契约标准化 + 工具分级 | **未开始** | S2 | 1 天 |
+| S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **未开始** | S3 | 1–2 天 |
 | S7 | 上帝类拆分（代码健康切片） | **未开始** | S3、R0.2-07 数据批次完成 | 1–2 周 |
 | S8 | 用户端补测 + 契约对照 | **未开始** | S3 | 3–5 天 |
@@ -117,13 +117,15 @@
 
 | # | 任务 | 内容 | 状态 |
 |---|---|---|---|
-| S5-1 | 制定脚本契约并写入 `.claude/rules/`（后派生 Cursor rules）：JSON 输出（`--json`）、稳定退出码（0/1/2）、fail-closed、幂等、写操作必须 `--dry-run` | 契约文档 | 未开始 |
-| S5-2 | 工具安全三级分类（成文规则）：只读类→可直接给模型；写入类→dry-run+显式确认；破坏类→永不进模型工具面、一次性用完即删 | rules 条目 | 未开始 |
-| S5-3 | 改造首批高价值脚本达标：`report_research_readiness` / `audit_catalog_boundaries`（已是范本，补 --json）/ `run_golden_cases` / `validate_candidate_catalog` / `import_candidate_revisions`（写入类，加 dry-run） | 5 个脚本改造 | 未开始 |
-| S5-4 | 每个达标脚本配最小契约测试（退出码 + JSON schema） | tests/scripts/ | 未开始 |
+| S5-1 | 制定脚本契约并写入 `.claude/rules/`（后派生 Cursor rules）：JSON 输出（`--json`）、稳定退出码（0/1/2）、fail-closed、幂等、写操作必须 `--dry-run` | 契约文档 | 已完成（2026-09-07：`.claude/rules/script-contract.md`，契约七条 + 契约测试要求 + 维护约定） |
+| S5-2 | 工具安全三级分类（成文规则）：只读类→可直接给模型；写入类→dry-run+显式确认；破坏类→永不进模型工具面、一次性用完即删 | rules 条目 | 已完成（2026-09-07：并入 script-contract.md 第二节；scripts/ 全量 26 脚本逐一分级登记于第三节） |
+| S5-3 | 改造首批高价值脚本达标：`report_research_readiness` / `audit_catalog_boundaries`（已是范本，补 --json）/ `run_golden_cases` / `validate_candidate_catalog` / `import_candidate_revisions`（写入类，加 dry-run） | 5 个脚本改造 | 已完成（2026-09-07：5/5 达标；附带修复两个真实缺陷——validate_candidate_catalog 的 SourceRegistryError 未捕获崩溃、import_candidate_revisions 空库 dry-run 崩溃；run_golden_cases 门禁失败退出码 1→2 对齐契约） |
+| S5-4 | 每个达标脚本配最小契约测试（退出码 + JSON schema） | tests/scripts/ | 已完成（2026-09-07：`tests/scripts/test_script_contracts.py` 10 项——成功/失败/缺库/dry-run 无副作用/JSON 判定字段/`--json` 与 `--format json` 等价，全过） |
 | S5-5 | （按需，暂缓）FastMCP 封装 2–3 个高频脚本供 WorkBuddy 直调；仅当出现真实跨平台直调需求时启动 | — | 暂缓 |
 
 **退出准则**：首批 5 个脚本全部通过契约测试；模型在会话中可直接调用只读类并正确解析 JSON。
+
+> 2026-09-07 验收：退出准则已满足——5/5 脚本达标、`tests/scripts/test_script_contracts.py` 10 项契约测试全过；全量 pytest 回归见 CURRENT.md 当轮记录。
 
 ---
 

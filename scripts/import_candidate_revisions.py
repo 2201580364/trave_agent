@@ -63,6 +63,11 @@ def main() -> int:
         help="import at most this many candidates after candidate-id filtering",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the result summary as a JSON object (script-contract L2)",
+    )
     args = parser.parse_args()
 
     catalog = _load(args.catalog)
@@ -73,69 +78,90 @@ def main() -> int:
     selected = _select_candidates(
         catalog["candidates"], candidate_ids=args.candidate_ids, limit=args.limit
     )
-    engine = create_engine(f"sqlite:///{args.database.resolve().as_posix()}")
+    database = args.database.resolve()
+    database.parent.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
     imported = 0
     updated = 0
     skipped = 0
     relations_imported = 0
-    with Session(engine) as session:
-        repository = SqlAlchemyPlaceCatalogRepository(session)
-        for candidate in selected:
-            revision_id = f"revision-{candidate['candidate_id']}"
-            existing = session.get(PlaceRevisionRow, revision_id)
-            if existing is not None:
-                # Older imports created the 1/1/1 placeholder duration without
-                # carrying the catalog review flags and inherited the legacy
-                # ``not_required`` relation status.  Reconcile only pristine
-                # imports so rerunning this command never overwrites facts that
-                # an editor has already reviewed or changed.
-                pristine_import = (
-                    existing.lifecycle_status == "candidate"
-                    and existing.revision_number == 1
-                    and existing.revision_version == 1
-                    and existing.reviewed_at is None
-                    and existing.published_at is None
-                    and not existing.solver_eligible
-                    and (
-                        existing.duration_min,
-                        existing.duration_recommended,
-                        existing.duration_max,
+    if args.dry_run and not database.exists():
+        # A fresh database cannot contain existing revisions, so the dry-run
+        # verdict is fully determined by the candidate selection: everything
+        # selected would be imported. Avoid touching SQLite so --dry-run never
+        # creates a schema-less file on disk (script-contract L2).
+        imported = len(selected)
+    else:
+        with Session(engine) as session:
+            repository = SqlAlchemyPlaceCatalogRepository(session)
+            for candidate in selected:
+                revision_id = f"revision-{candidate['candidate_id']}"
+                existing = session.get(PlaceRevisionRow, revision_id)
+                if existing is not None:
+                    # Older imports created the 1/1/1 placeholder duration without
+                    # carrying the catalog review flags and inherited the legacy
+                    # ``not_required`` relation status.  Reconcile only pristine
+                    # imports so rerunning this command never overwrites facts that
+                    # an editor has already reviewed or changed.
+                    pristine_import = (
+                        existing.lifecycle_status == "candidate"
+                        and existing.revision_number == 1
+                        and existing.revision_version == 1
+                        and existing.reviewed_at is None
+                        and existing.published_at is None
+                        and not existing.solver_eligible
+                        and (
+                            existing.duration_min,
+                            existing.duration_recommended,
+                            existing.duration_max,
+                        )
+                        == (1, 1, 1)
                     )
-                    == (1, 1, 1)
-                )
-                changed = False
-                if pristine_import and not existing.review_flags:
-                    existing.review_flags = list(candidate["review_flags"])
-                    changed = True
-                if pristine_import and existing.relation_review_status == "not_required":
-                    existing.relation_review_status = "pending"
-                    changed = True
-                if changed:
-                    updated += 1
-                else:
-                    skipped += 1
-                continue
+                    changed = False
+                    if pristine_import and not existing.review_flags:
+                        existing.review_flags = list(candidate["review_flags"])
+                        changed = True
+                    if pristine_import and existing.relation_review_status == "not_required":
+                        existing.relation_review_status = "pending"
+                        changed = True
+                    if changed:
+                        updated += 1
+                    else:
+                        skipped += 1
+                    continue
+                if not args.dry_run:
+                    _import_candidate(
+                        session,
+                        repository,
+                        candidate,
+                        catalog,
+                        registry,
+                        dictionary,
+                    )
+                imported += 1
             if not args.dry_run:
-                _import_candidate(
-                    session,
-                    repository,
-                    candidate,
-                    catalog,
-                    registry,
-                    dictionary,
+                available_place_ids = set(session.scalars(select(PlaceRow.place_id)).all())
+                relations_imported = _import_relations(
+                    session, repository, catalog, imported_place_ids=available_place_ids
                 )
-            imported += 1
-        if not args.dry_run:
-            available_place_ids = set(session.scalars(select(PlaceRow.place_id)).all())
-            relations_imported = _import_relations(
-                session, repository, catalog, imported_place_ids=available_place_ids
-            )
-            session.commit()
-    print(
-        "candidate revisions: "
-        f"imported={imported}, updated={updated}, skipped={skipped}, "
-        f"relations_imported={relations_imported}, dry_run={args.dry_run}"
-    )
+                session.commit()
+    summary = {
+        "status": "ok",
+        "dry_run": args.dry_run,
+        "imported": imported,
+        "updated": updated,
+        "skipped": skipped,
+        "relations_imported": relations_imported,
+        "database": str(database),
+    }
+    if args.json:
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    else:
+        print(
+            "candidate revisions: "
+            f"imported={imported}, updated={updated}, skipped={skipped}, "
+            f"relations_imported={relations_imported}, dry_run={args.dry_run}"
+        )
     return 0
 
 
@@ -276,8 +302,7 @@ def _import_relations(
     intentionally deferred until a later import includes that endpoint.
     """
     candidate_to_place = {
-        str(item["candidate_id"]): f"place-{item['candidate_id']}"
-        for item in catalog["candidates"]
+        str(item["candidate_id"]): f"place-{item['candidate_id']}" for item in catalog["candidates"]
     }
     available = imported_place_ids or set(candidate_to_place.values())
     created = 0

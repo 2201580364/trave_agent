@@ -23,9 +23,31 @@ def main() -> int:
         default=ROOT / ".local" / "travel_agent.db",
         help="SQLite catalog database to audit",
     )
+    parser.add_argument(
+        "--human",
+        action="store_true",
+        help="print a human-readable summary in addition to the JSON payload",
+    )
     args = parser.parse_args()
-    report = audit_catalog_database(args.database.resolve())
-    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    database = args.database.resolve()
+    if not database.exists():
+        print(
+            json.dumps(
+                {"status": "error", "error": f"database not found: {database}"},
+                ensure_ascii=False,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    report = audit_catalog_database(database)
+    payload = report.to_dict()
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if args.human:
+        print(
+            f"audit {'passed' if report.passed else 'failed'}: "
+            f"{len(payload.get('violations', []))} violation(s)",
+            file=sys.stderr,
+        )
     return 0 if report.passed else 2
 
 

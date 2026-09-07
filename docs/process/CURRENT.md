@@ -2,13 +2,14 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-05
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S4 已完成，S1.5 已完成（api-contract V2.11 端点差异 6 条已裁决落地）`
+- 更新时间：2026-09-07
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S5 已完成，S6 并行试点进行中（另一会话，试点任务 C）`
 - 稳定测试基线：后端 pytest `465/465`（424 存量 + 33 新增测试 + 8 golden 独立跑全过）；ruff check 全仓清零；admin-web Vitest `41/41` + typecheck + production build 全过（`@testing-library/dom` peer 缺失已补）；Alembic 迁移链至 `0015_holiday_exception_provenance`
 - 最近提交基线：`89ea3de fix(publication): 发布新版时原子退役旧版本`；`c2ea117 feat(gate7): 完成节假日历同步与审核治理闭环`
 
 ## 最近三轮已完成（一行一项）
 
+- 2026-09-07 S5 脚本契约标准化 + 工具安全分级（transformation-plan）：`.claude/rules/script-contract.md`（契约七条 + L1/L2/L3 三级分类 + scripts/ 全量 26 脚本分级登记）；首批 5 脚本达标改造（report_research_readiness 补 --json、audit_catalog_boundaries 补缺库 fail-closed 退出 1、validate_candidate_catalog 0/1/2 语义 + 修复 SourceRegistryError 未捕获崩溃、run_golden_cases 补 --json + 门禁失败 1→2、import_candidate_revisions 补 --json + 修复空库 dry-run 崩溃）；`tests/scripts/test_script_contracts.py` 10 项契约测试全过；同步更新存量断言（status "valid"→"ok"）。
 - 2026-09-05 api-contract V2.11 端点差异裁决落地（S1.5-1 ②收尾，本会话）：6 条全部裁决——删除 `POST /admin/candidates`（与 `POST /places/{place_id}/revisions` 重复）；删除独立 `POST /admin/places/{place_id}/retirements`，§15.2 新增「发布版本退役语义」声明（退役由 publications 单条/批次链路发布新版时同事务原子完成，不提供绕过发布门禁的退役通道）；`GET /admin/places/{place_id}` 移入新增 §15.2.0「计划端点」小节；补登 3 个已实现端点（`GET /place-revisions/{revision_id}`、`GET /dashboard-summary`、`GET /holiday-calendar-sync-capability`）；retry（P1）标注未排期；health 探针写入 §2.1.1 运维探针。check_docs 全过。
 - 2026-09-05 S4 依赖锁定 + 文档对齐实现（transformation-plan）：`uv.lock`（141 包）入库，`uv sync` 后全量 pytest 465/465 验证；升级政策 ADR-0024（5 步升级流程 + 4 个行为敏感依赖 ortools/sqlalchemy/alembic/fastapi 清单，golden 差异即停）；frontend/admin-web Node engines 统一为 `>=22 <25`、npm `>=10 <12`（frontend package-lock engines 同步再生，diff 仅 4 行，typecheck 过）；AGENTS.md 技术栈表核对实现（Celery/COS/LLM 虚报 S1 已清，本项补 Python 版本口径与 uv.lock 引用），sync 脚本重派生 CLAUDE.md。
 - 2026-09-05 S3 CI 流水线 + 分层断言（transformation-plan）：`.github/workflows/ci.yml` 三 job（backend: ruff+pytest+golden+layering+docs；admin-web: vitest+tsc+build；frontend: tsc）；自研 `scripts/check_layering.py` 四规则 + 组合根豁免 + 8 项契约自测；ruff 存量 170→0（formatter 批量清偿，全量 pytest 465/465 验证零语义破坏）；修复 P0-1 乱码正则（中文敏感词「私钥/密码/令牌」恢复拦截 + 17 项回归测试）；CI 排查指引 `docs/process/ci-troubleshooting.md`。
@@ -36,7 +37,9 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| transformation-plan 文档治理 | 工作区 | S1/S1.5/S2/S3/S4 产出（见 transformation-plan.md 状态表） | S1/S1.5/S2/S3/S4 已完成（S3-6 分支保护待仓库设置）；api-contract 端点差异 6 条已裁决落地（V2.11）；下一步 S5 脚本契约（前置 S2 已满足）/ S6 并行试点（前置 S3 需 S3-6） |
+| transformation-plan 文档治理 | 工作区 | S1/S1.5/S2/S3/S4 产出（见 transformation-plan.md 状态表） | S1/S1.5/S2/S3/S4 已完成（S3-6 分支保护已开启）；api-contract 端点差异 6 条已裁决落地（V2.11） |
+| S5 脚本契约标准化 | `feat/script-contract`（建议分支名，由用户手动创建） | `scripts/`（首批 5 个脚本）、`tests/scripts/`、新建 `.claude/rules/script-contract.md`、`docs/process/transformation-plan.md`、`docs/process/CURRENT.md` | **已完成（2026-09-07）**：契约+分级成文、5/5 脚本达标、10 项契约测试全过、附带修复 2 个脚本真实缺陷与 1 处存量断言同步；改动待用户手动提交 |
+| S6 并行开发试点（任务 C：admin 会话持久化） | `feat/s6-admin-session-persistence`（用户手动创建） | `.claude/rules/parallel-workflow.md`（新建）、`AGENTS.md`（+2 行硬规则）、`CLAUDE.md`（sync 派生）、`docs/process/CURRENT.md`（本登记）、`docs/process/transformation-plan.md`（S6 状态表）、`admin-web/src/auth/AdminSessionProvider.tsx`、`admin-web/src/pages/LoginPage.tsx`、`admin-web/src/auth/AdminSessionProvider.test.tsx` | 进行中（S6-1 规范已落地；S6-3 实施中；与 S5 清单零交集） |
 
 ## 关键事实速查
 
