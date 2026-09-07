@@ -1,5 +1,11 @@
 # trave_agent 项目记忆
 
+## Git 与文件操作硬规则（2026-09-07 用户明确要求，同样写入 AGENTS.md 关键约定与 ~/.workbuddy/MEMORY.md）
+
+- **禁止 AI 自动执行 git 提交/推送/合并/分支删除/force 操作**；AI 只做只读 git 操作与工作区编辑，提交由用户手动执行。
+- **删除文件/目录前必须列完整清单并获用户显式确认**；`.git` 目录永不删除或重建，git 异常时停止并报告。
+- 测试/构建不得有删除副作用；有副作用的脚本先说明再运行。
+
 ## 文档治理架构（2026-09-05 S1 文档手术确立）
 
 - **状态分层**：L0 正本=AGENTS.md（CLAUDE.md 为薄指针，改内容只改 AGENTS.md 再跑 `python scripts/sync_agents_docs.py`）；L1 滚动状态=docs/process/CURRENT.md（唯一「当前节点」入口，每轮更新，≤150 行）；L2 稳定路线/规范；L3 历史归档=docs/process/status-archive/ 按月切片（永不全文读）。
