@@ -79,7 +79,7 @@ export function LoginPage() {
             </Button>
           </Form>
           <Typography.Paragraph type="secondary" className="security-note">
-            管理会话只保存在当前页面内存中；刷新页面后需要重新登录。请勿在理由字段中填写密码、Token、API Key 或私钥。
+            管理会话仅保存在当前标签页内，关闭标签页即退出；刷新页面无需重新登录。请勿在理由字段中填写密码、Token、API Key 或私钥。
           </Typography.Paragraph>
         </Space>
       </Card>

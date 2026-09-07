@@ -25,13 +25,32 @@ type AdminSessionContextValue = {
   hasPermission: (permission: string) => boolean
 }
 
+const TOKEN_STORAGE_KEY = 'travel-agent-admin-session-token'
+
+function readStoredToken(): string | null {
+  try {
+    return window.sessionStorage.getItem(TOKEN_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function persistToken(token: string | null): void {
+  try {
+    if (token === null) window.sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+    else window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token)
+  } catch {
+    // 存储不可用（隐私模式/禁用）时退化为内存会话，不阻塞登录。
+  }
+}
+
 const AdminSessionContext = createContext<AdminSessionContextValue | null>(null)
 
 export function AdminSessionProvider({ children }: PropsWithChildren) {
   const { notification } = AntApp.useApp()
   const [principal, setPrincipal] = useState<AdminMe | null>(null)
   const [sessionReason, setSessionReason] = useState<SessionReason>(null)
-  const tokenRef = useRef<string | null>(null)
+  const tokenRef = useRef<string | null>(readStoredToken())
   const clearSessionRef = useRef<(reason: SessionReason) => void>(() => undefined)
   const requestErrorRef = useRef<(error: unknown) => void>(() => undefined)
   const apiRef = useRef<AdminApi | null>(null)
@@ -46,6 +65,7 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
 
   const clearSession = useCallback((reason: SessionReason) => {
     tokenRef.current = null
+    persistToken(null)
     setPrincipal(null)
     setSessionReason(reason)
   }, [])
@@ -69,6 +89,7 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
     async (loginName: string, password: string) => {
       const created = await api.createSession(loginName, password)
       tokenRef.current = created.access_token
+      persistToken(created.access_token)
       try {
         const me = await api.getMe()
         setPrincipal(me)
@@ -88,6 +109,28 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
       clearSession('signed-out')
     }
   }, [api, clearSession])
+
+  // 挂载恢复：token 存活于 sessionStorage 时经 /me 验证恢复会话，fail-closed。
+  useEffect(() => {
+    if (tokenRef.current === null) return
+    let cancelled = false
+    void api
+      .getMe()
+      .then((me) => {
+        if (cancelled) return
+        setPrincipal(me)
+        setSessionReason(null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        clearSession('expired')
+      })
+    return () => {
+      cancelled = true
+    }
+    // 仅挂载时执行一次恢复；api/clearSession 为稳定引用。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (principal === null) return

@@ -34,6 +34,7 @@
 | 求解器/约束改动 | [docs/domain/](docs/domain/) + [.claude/rules/solver.md](.claude/rules/solver.md) + ADR-0003/0004/0009~0015 |
 | Git 操作/文件删除（任何任务都适用） | [.claude/rules/git-safety.md](.claude/rules/git-safety.md)（硬规则，用户要求） |
 | 写规则/写文档/新建文件（任何任务都适用） | [.claude/rules/file-management.md](.claude/rules/file-management.md)（写入位置对照表，用户要求） |
+| 并行开发/多会话协作 | [.claude/rules/parallel-workflow.md](.claude/rules/parallel-workflow.md)（一会话=一分支=一能力域 + In-flight 登记纪律） |
 | 地点数据/审核/发布 | [docs/product/管理端功能模块设计.md](docs/product/管理端功能模块设计.md) + ADR-0018/0019 + [docs/domain/地点数据来源与采集规范.md](docs/domain/地点数据来源与采集规范.md) |
 | O17 节假日同步 | ADR-0021 + [docs/product/O17中国法定节假日历自动同步设计.md](docs/product/O17中国法定节假日历自动同步设计.md) |
 | O18 数据采集 | ADR-0022 + [docs/product/O18地点数据采集与关系识别设计.md](docs/product/O18地点数据采集与关系识别设计.md) |
@@ -76,6 +77,7 @@ G0 假设登记 → G1 用户研究 → G2 需求规格化 → G3 技术 Spike�
 - 真实凭证（API Key、密码、token）不入仓库、不入日志、不入文档；`.env` 被 Git 忽略。
 - 本机禁止安装/启动 MySQL/Redis；服务器操作须在授权服务器上执行。
 - **Git 提交/推送/合并等写操作一律由用户手动执行，AI 禁止自动进行；删除文件前必须列清单获用户确认**——完整分级与纪律见 [.claude/rules/git-safety.md](.claude/rules/git-safety.md)。
+- **并行开发遵守「一会话=一分支=一能力域」：任务启动先在 CURRENT.md In-flight 区登记触碰文件清单，登记清单不得有交集；并行期 Alembic 迁移与 `.local/*.db` 互斥**——完整纪律见 [.claude/rules/parallel-workflow.md](.claude/rules/parallel-workflow.md)。
 - 提交边界按「可验收能力域/里程碑切片」划分，不按单个 API/字段/按钮拆分（详见 status-archive 账本头）。
 
 ## 权威来源简表

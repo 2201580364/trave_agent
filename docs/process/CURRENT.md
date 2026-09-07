@@ -3,11 +3,13 @@
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
 - 更新时间：2026-09-07
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S5 已完成，S6 并行试点进行中（另一会话，试点任务 C）`
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S5 已完成，S6 并行试点进行中（本会话任务 C admin 会话持久化已实现待合并，协作规范 v2 已沉淀，S6-4 合并交用户）`
 - 稳定测试基线：后端 pytest `465/465`（424 存量 + 33 新增测试 + 8 golden 独立跑全过）；ruff check 全仓清零；admin-web Vitest `41/41` + typecheck + production build 全过（`@testing-library/dom` peer 缺失已补）；Alembic 迁移链至 `0015_holiday_exception_provenance`
 - 最近提交基线：`89ea3de fix(publication): 发布新版时原子退役旧版本`；`c2ea117 feat(gate7): 完成节假日历同步与审核治理闭环`
 
 ## 最近三轮已完成（一行一项）
+
+- 2026-09-07 S6 并行开发试点（transformation-plan，本会话）：协作规范落地 `.claude/rules/parallel-workflow.md` 并经复盘升版 v2（一会话=一分支=一能力域 + In-flight 登记 + 迁移/共享库互斥 + 合并队列纪律 + 基线口径/验证纪律）；AGENTS.md 加 2 行硬规则（sync + check_docs 全过）；In-flight 区启用（S5 + S6-C 双登记）；试点任务 C=admin 会话持久化：后端 admin_sessions 本就持久化，前端 token 由内存 ref 改 sessionStorage + 挂载 /me 恢复（fail-closed）+ 3 个新测试；全量回归零回退（pytest 479/479[465+S5 新增 14]、Vitest 44/44[41+3]、tsc、build、golden 8/8、check_docs、layering 全过）。
 
 - 2026-09-07 S5 脚本契约标准化 + 工具安全分级（transformation-plan）：`.claude/rules/script-contract.md`（契约七条 + L1/L2/L3 三级分类 + scripts/ 全量 26 脚本分级登记）；首批 5 脚本达标改造（report_research_readiness 补 --json、audit_catalog_boundaries 补缺库 fail-closed 退出 1、validate_candidate_catalog 0/1/2 语义 + 修复 SourceRegistryError 未捕获崩溃、run_golden_cases 补 --json + 门禁失败 1→2、import_candidate_revisions 补 --json + 修复空库 dry-run 崩溃）；`tests/scripts/test_script_contracts.py` 10 项契约测试全过；同步更新存量断言（status "valid"→"ok"）。
 - 2026-09-05 api-contract V2.11 端点差异裁决落地（S1.5-1 ②收尾，本会话）：6 条全部裁决——删除 `POST /admin/candidates`（与 `POST /places/{place_id}/revisions` 重复）；删除独立 `POST /admin/places/{place_id}/retirements`，§15.2 新增「发布版本退役语义」声明（退役由 publications 单条/批次链路发布新版时同事务原子完成，不提供绕过发布门禁的退役通道）；`GET /admin/places/{place_id}` 移入新增 §15.2.0「计划端点」小节；补登 3 个已实现端点（`GET /place-revisions/{revision_id}`、`GET /dashboard-summary`、`GET /holiday-calendar-sync-capability`）；retry（P1）标注未排期；health 探针写入 §2.1.1 运维探针。check_docs 全过。
@@ -38,8 +40,8 @@
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
 | transformation-plan 文档治理 | 工作区 | S1/S1.5/S2/S3/S4 产出（见 transformation-plan.md 状态表） | S1/S1.5/S2/S3/S4 已完成（S3-6 分支保护已开启）；api-contract 端点差异 6 条已裁决落地（V2.11） |
-| S5 脚本契约标准化 | `feat/script-contract`（建议分支名，由用户手动创建） | `scripts/`（首批 5 个脚本）、`tests/scripts/`、新建 `.claude/rules/script-contract.md`、`docs/process/transformation-plan.md`、`docs/process/CURRENT.md` | **已完成（2026-09-07）**：契约+分级成文、5/5 脚本达标、10 项契约测试全过、附带修复 2 个脚本真实缺陷与 1 处存量断言同步；改动待用户手动提交 |
-| S6 并行开发试点（任务 C：admin 会话持久化） | `feat/s6-admin-session-persistence`（用户手动创建） | `.claude/rules/parallel-workflow.md`（新建）、`AGENTS.md`（+2 行硬规则）、`CLAUDE.md`（sync 派生）、`docs/process/CURRENT.md`（本登记）、`docs/process/transformation-plan.md`（S6 状态表）、`admin-web/src/auth/AdminSessionProvider.tsx`、`admin-web/src/pages/LoginPage.tsx`、`admin-web/src/auth/AdminSessionProvider.test.tsx` | 进行中（S6-1 规范已落地；S6-3 实施中；与 S5 清单零交集） |
+| S5 脚本契约标准化 | dev（曾用建议分支 `feat/script-contract`） | `scripts/`（首批 5 个脚本）、`tests/scripts/`、新建 `.claude/rules/script-contract.md`、`docs/process/transformation-plan.md`、`docs/process/CURRENT.md` | **已合并销账（2026-09-07，dev 提交 `941578e`）**：契约+分级成文、5/5 脚本达标、10 项契约测试全过、附带修复 2 个脚本真实缺陷与 1 处存量断言同步 |
+| S6 并行开发试点（任务 C：admin 会话持久化） | `feat/s6-admin-session-persistence`（用户手动创建） | `.claude/rules/parallel-workflow.md`（新建）、`AGENTS.md`（+2 行硬规则）、`CLAUDE.md`（sync 派生）、`docs/process/CURRENT.md`（本登记）、`docs/process/transformation-plan.md`（S6 状态表）、`admin-web/src/auth/AdminSessionProvider.tsx`、`admin-web/src/pages/LoginPage.tsx`、`admin-web/src/auth/AdminSessionProvider.test.tsx` | 实现完成待合并（全量回归零回退：pytest 479/479[465+S5 新增 14] + Vitest 44/44[41+3] + tsc + build + golden 8/8 + check_docs + layering 全过；改动清单与 commit message 已交用户，见 S6-4 材料） |
 
 ## 关键事实速查
 
