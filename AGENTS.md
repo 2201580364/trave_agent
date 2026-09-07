@@ -30,8 +30,10 @@
 
 | 任务类型 | 先读 |
 |---|---|
-| 任何任务（第一步） | 本文件 → [docs/process/CURRENT.md](docs/process/CURRENT.md) |
+| 任何任务（第一步） | 本文件 → [docs/process/CURRENT.md](docs/process/CURRENT.md) → **[.claude/rules/file-management.md](.claude/rules/file-management.md)（文件写入位置纪律）+ [.claude/rules/git-safety.md](.claude/rules/git-safety.md)（Git/删除硬规则）** |
 | 求解器/约束改动 | [docs/domain/](docs/domain/) + [.claude/rules/solver.md](.claude/rules/solver.md) + ADR-0003/0004/0009~0015 |
+| Git 操作/文件删除（任何任务都适用） | [.claude/rules/git-safety.md](.claude/rules/git-safety.md)（硬规则，用户要求） |
+| 写规则/写文档/新建文件（任何任务都适用） | [.claude/rules/file-management.md](.claude/rules/file-management.md)（写入位置对照表，用户要求） |
 | 地点数据/审核/发布 | [docs/product/管理端功能模块设计.md](docs/product/管理端功能模块设计.md) + ADR-0018/0019 + [docs/domain/地点数据来源与采集规范.md](docs/domain/地点数据来源与采集规范.md) |
 | O17 节假日同步 | ADR-0021 + [docs/product/O17中国法定节假日历自动同步设计.md](docs/product/O17中国法定节假日历自动同步设计.md) |
 | O18 数据采集 | ADR-0022 + [docs/product/O18地点数据采集与关系识别设计.md](docs/product/O18地点数据采集与关系识别设计.md) |
@@ -73,6 +75,7 @@ G0 假设登记 → G1 用户研究 → G2 需求规格化 → G3 技术 Spike�
 - 管理端不能直连 MySQL；published 只能通过共享 application/domain 发布用例。
 - 真实凭证（API Key、密码、token）不入仓库、不入日志、不入文档；`.env` 被 Git 忽略。
 - 本机禁止安装/启动 MySQL/Redis；服务器操作须在授权服务器上执行。
+- **Git 提交/推送/合并等写操作一律由用户手动执行，AI 禁止自动进行；删除文件前必须列清单获用户确认**——完整分级与纪律见 [.claude/rules/git-safety.md](.claude/rules/git-safety.md)。
 - 提交边界按「可验收能力域/里程碑切片」划分，不按单个 API/字段/按钮拆分（详见 status-archive 账本头）。
 
 ## 权威来源简表
