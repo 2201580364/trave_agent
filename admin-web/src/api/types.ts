@@ -1,3 +1,21 @@
+/**
+ * API 手工类型（S8-3 过渡期边界说明）：
+ *
+ * - `api-schema.d.ts` 由 `npm run generate-api-types`（openapi-typescript）从
+ *   `var/reports/openapi-schema.json`（后端 `scripts/export_openapi_schema.py`
+ *   导出，CI 同链路）生成，是**请求体（Input）类型的权威来源**；
+ * - 后端响应端点当前声明为 `dict[str, object]`（无结构化 schema），生成器
+ *   无法产出响应类型，因此**响应类型暂留本文件手工维护**；
+ * - 新增请求体类型：不要在本文件手写——直接使用
+ *   `import type { components } from './api-schema'` 中的
+ *   `components['schemas']['XxxInput']`；
+ * - 本文件中已存在的 `*Input` 类型在过渡期保留（与生成类型双向兼容，S8-3
+ *   已验证），待后端补 response_model 后整体迁往生成类型并删除。
+ * - 后端补齐 response_model 后的收尾：重跑 generate-api-types → 响应类型
+ *   改从生成文件取 → 删除本文件对应手工类型。
+ */
+import type { components } from './api-schema'
+
 export type AdminLoginResponse = {
   admin_actor_id: string
   access_token: string
@@ -57,14 +75,12 @@ export type PageResponse<T> = {
   total?: number
 }
 
-export type CreateAdminActorInput = {
-  operation_intent_id: string
-  login_name: string
-  initial_password: string
-  role_keys: string[]
-  reason_code: string
-  reason_text?: string | null
-}
+/**
+ * 生成类型再导出（S8-3 示范接线）：本体来自 api-schema.d.ts，
+ * 后端 Pydantic 模型变更后重跑 `npm run generate-api-types` 即自动同步。
+ */
+export type CreateAdminActorInput =
+  components['schemas']['CreateAdminActorInput']
 
 export type ReplaceAdminRolesInput = {
   operation_intent_id: string

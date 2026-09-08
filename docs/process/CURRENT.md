@@ -2,12 +2,14 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-07
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S6 已完成（S6 合并 941578e/fae014e），S8-1/S8-2 实现完成待合并，S7 等待数据批次（12 条中 2 条已发布）`
-- 稳定测试基线：后端 pytest `492/492`（465 存量 + S8-2 契约测试 7 + 并行能力域新增 20）；ruff check 全仓清零；admin-web Vitest `41/41` + typecheck + production build 全过（`@testing-library/dom` peer 缺失已补）；Alembic 迁移链至 `0015_holiday_exception_provenance`
-- 最近提交基线：`fae014e feat(s6): 并行开发试点——协作规范 v2 与 admin 会话持久化`；`941578e feat(scripts): S5 脚本契约标准化`
+- 更新时间：2026-09-08
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S6 已完成（S6 合并 941578e/fae014e），S8-1/S8-2 已合并（a657504/dc5d1ea），S8-3 实现完成待合并，S7 等待数据批次（12 条中 2 条已发布）`
+- 稳定测试基线：后端 pytest `492/492`；ruff check 全仓清零；admin-web Vitest `46/46` + tsc --noEmit + production build 全过（vitest 4 `fileParallelism` 类型收窄 boolean，vite.config 已改 `false`）；frontend Vitest `19/19` + tsc；Alembic 迁移链至 `0015_holiday_exception_provenance`
+- 最近提交基线：`dc5d1ea feat(scripts): S8-2 OpenAPI schema 快照与 api-contract 契约 diff 门禁（含 CI 集成）`；`a657504 test(frontend): S8-1 引入 Vitest`
 
 ## 最近三轮已完成（一行一项）
+
+- 2026-09-08 S8-3 admin-web 生成式 API 类型·小步落地（transformation-plan，实现完成待合并）：openapi-typescript@7 入库（devDep，npmmirror）+ `npm run generate-api-types`，从 `var/reports/openapi-schema.json` 生成 `admin-web/src/api/api-schema.d.ts`（4941 行）；**勘察关键事实：后端 63/73 响应端点声明 `dict[str, object]` 无结构化 schema，生成器只能覆盖请求侧 47 组件**，AdminActor/PlaceRevision 等 20 个响应类型无生成来源暂留手工（后端补 response_model 另立任务，非 S8 范围）；已验证手工输入类型与生成组件双向兼容，`CreateAdminActorInput` 改为 `components['schemas']` 再导出示范（消费方零改动）；types.ts 头部写明过渡期边界与收尾路径；附带修复 vite.config.ts `fileParallelism: 2→false`（vitest 4 类型收窄，数值写法致 tsc -b/build 报 TS2769，S8-2 提交引入、本轮回归暴露）；回归：admin-web vitest 46/46 + tsc + build 全过。
 
 - 2026-09-07 S8-2 OpenAPI 契约对照（transformation-plan，实现完成待合并）：`scripts/export_openapi_schema.py` 离线导出 73 路径完整 schema（内存 SQLite 组合根装配 admin_identity + review_workflow + holiday_calendar_sync，治理 catalog 从 data/governance 加载，不调 bootstrap 无副作用）；`scripts/check_api_contract.py` 解析契约 4 种登记风格做双向 diff（O05 聚合句按 REST 语义展开 POST→集合根、PATCH/DELETE→成员路径；code-only=门禁退出 2，contract-only=信息性；§2.1.1 探针前缀差异按文档化别名处理）；当前 85 契约/82 实现、code_only=0 PASS、contract_only=3（places/{place_id} 计划端点、retry 未排期、trips/generate 旧设计叙述）；发现 2 项契约债：health 探针路径笔误（契约 `/api/v1/health/*` vs 实际 `/health/*`，代码+ops 文档一致）、9 条 O05 时间证据端点以聚合句而非逐条登记（脚本已兼容，建议下版契约改表格）；7 项契约测试 `tests/scripts/test_openapi_contract.py`；全量 pytest、ruff、check_docs、layering 零回退；ci.yml 集成待确认后动冻结文件。
 - 2026-09-07 S8-1 frontend Vitest 补测（transformation-plan，实现完成待合并）：vitest@1.6.0 经 `--legacy-peer-deps` 安装（Taro 4.2.1 的 `peerOptional vite@^4` 与 vitest 携带依赖的 vite@5 peer 冲突；Taro 构建实际走 webpack5，vite 仅服务 vitest 运行）；`frontend/vitest.config.ts`（`@` 别名对齐 tsconfig paths、node 环境、默认 include `*.test.ts(x)`）；`npm run test` script；19 项测试全过——store 13 项（会话/草稿生命周期/行程与 Revision 导航/replacePlan 语义/persist 经 Taro storage 序列化与 reset 清空）+ api client 6 项（成功透传、Bearer 头、网络失败→status 0 network_unavailable、HTTP 错误信封→code/details 映射、无信封回退 request_failed）；tsc --noEmit 零错误；CI 集成留给 S8-2 统一处理。另：账本收口——transformation-plan V1.1（S5/S6/S3-6 状态对齐 git 实际、里程碑 M-a/M-b/M-c 达成标记）+ parallel-workflow v2.1 第八节账本时效纪律（单会话同样适用，收尾三件事）。
@@ -41,10 +43,9 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| S8-1 frontend Vitest 补测 | dev（S8 会话） | `frontend/`（vitest.config.ts、2 个测试文件、package.json/package-lock.json） | 实现完成待合并（2026-09-07：19 项测试全过 + tsc 干净；CI 集成留给 S8-2） |
-| S8-2 OpenAPI 契约对照 | dev（S8 会话，同会话接续） | `scripts/export_openapi_schema.py`、`scripts/check_api_contract.py`（新增）；`tests/scripts/test_openapi_contract.py`（新增）；`.github/workflows/ci.yml`（backend job 加 1 步骤）；`docs/process/transformation-plan.md`、`docs/process/CURRENT.md`；快照 `var/reports/`、`var/ci/`（gitignored） | **实现+CI 集成完成待合并（2026-09-07）**：code_only=0 PASS；ci.yml 本地命令链预演 PASS |
+| S8-3 admin-web 生成式 API 类型 | dev（S8 会话，同会话接续） | `admin-web/`（package.json/package-lock.json 加 openapi-typescript + script、`src/api/api-schema.d.ts` 新增生成物、`src/api/types.ts` 边界说明 + CreateAdminActorInput 再导出、vite.config.ts fileParallelism 修复）、`docs/process/transformation-plan.md`、`docs/process/CURRENT.md` | 实现完成待合并（2026-09-08：vitest 46/46 + tsc + build 全过；后端响应模型改造另立任务） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。S8-2 已实现待合并；S8-2 的 ci.yml 集成与 S8-3（生成式类型）待 S8-1 合并后统一处理。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/S8-2 已合并（a657504/dc5d1ea）销账；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。S8 后续遗留：后端 63 个响应端点补 response_model（另立任务，S8-3 勘察发现）。
 
 ## 关键事实速查
 
