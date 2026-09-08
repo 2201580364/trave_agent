@@ -261,11 +261,17 @@ def create_app(container: HttpContainer) -> FastAPI:
 
     @app.exception_handler(ValueError)
     async def domain_validation_error_handler(request: Request, exc: ValueError):
+        message = str(exc)
+        # Contract §2.4: `message` is versioned user copy. Domain invariants
+        # may raise English invariant text; only pass through copy that is
+        # already user-facing, otherwise fall back to the stable generic line.
+        if not any("\u4e00" <= char <= "\u9fff" for char in message):
+            message = "提交内容未通过校验，请检查后重试。"
         return _error_response(
             request,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "domain_validation_failed",
-            str(exc),
+            message,
             retryable=False,
         )
 

@@ -490,6 +490,7 @@ export function RevisionDetailsPage() {
           </Card>
 
           <Card title="地点资料" className="revision-profile-card">
+            <div id="revision-basic-facts" />
             <Descriptions size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
               <Descriptions.Item label="别名">{revision.aliases.join('、') || '未提供'}</Descriptions.Item>
               <Descriptions.Item label="地址">{revision.address ?? '未提供'}</Descriptions.Item>
@@ -1607,7 +1608,7 @@ function TimeEvidenceCard({
         </section>
         <section className="time-evidence-section time-evidence-section-emphasis">
           <div className="time-evidence-section-heading">
-            <div><Typography.Title level={5}>日期例外</Typography.Title><Typography.Text type="secondary">用于法定节假日开放、顺延闭馆或临时调整；临时关闭优先级最高。</Typography.Text></div>
+            <div><Typography.Title level={5}>日期例外</Typography.Title><Typography.Text type="secondary">可选项，仅用于法定节假日开放、顺延闭馆或临时调整；临时关闭优先级最高。没有例外不影响审核与发布。</Typography.Text></div>
             {editable && <Space wrap><Button loading={holidayCalendarsLoading} onClick={() => { if (!holidayCalendars.length) { void onReloadHolidayCalendars(); return } form.resetFields(); form.setFieldsValue({ calendar_id: holidayCalendars[0]?.calendar_id, shift_closure: true, start_time: '09:00', end_time: '17:00', last_entry_time: '16:30' }); setEditing(null); setModal('holiday') }}>{holidayCalendars.length ? '按节假日历生成' : '加载节假日历'}</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor('date_exception')}>新增单日例外</Button></Space>}
           </div>
           <Table<PlaceDateExceptionEvidence>
@@ -1823,7 +1824,7 @@ type PublicationBlocker = {
   title: string
   description: string
   actionLabel?: string
-  target?: 'review-actions' | 'o04-evidence' | 'o05-evidence' | 'o06-source-conflicts' | 'o07-evidence'
+  target?: 'review-actions' | 'o04-evidence' | 'o05-evidence' | 'o06-source-conflicts' | 'o07-evidence' | 'revision-basic-facts'
 }
 
 function buildPublicationBlockers(
@@ -1836,6 +1837,13 @@ function buildPublicationBlockers(
   if (revision.lifecycle_status === 'candidate') codes.push('REVISION_NOT_HUMAN_VERIFIED')
   if (revision.source_record_ids.length === 0) codes.push('MISSING_SOURCE_RECORD')
   if (sourceConflicts.some((item) => !item.resolved)) codes.push('SOURCE_CONFLICT_UNRESOLVED')
+
+  // 基础事实阻断项（与后端 evaluate_review_readiness 的 basic 检查同口径）：
+  // 阻断 flag 只能通过编辑并保存名称/分类/时长清除，证据核验不会碰它们。
+  const BASIC_FACT_BLOCKING_FLAGS = ['NAME_REQUIRES_HUMAN_VERIFICATION', 'CATEGORY_REQUIRES_HUMAN_VERIFICATION', 'DURATION_NOT_COLLECTED'] as const
+  if (revision.lifecycle_status === 'candidate' && revision.review_flags.some((flag) => BASIC_FACT_BLOCKING_FLAGS.includes(flag as typeof BASIC_FACT_BLOCKING_FLAGS[number]))) {
+    codes.push('BASIC_FACTS_NOT_CONFIRMED')
+  }
 
   const validSourceIds = new Set((evidence?.sources ?? []).filter((item) => item.status === 'active').map((item) => item.source_record_id))
   if (evidence) {
@@ -1855,6 +1863,7 @@ function buildPublicationBlockers(
   if (publicationCheck && !publicationCheck.publishable) codes.push(...publicationCheck.reason_codes)
 
   const priority = [
+    'BASIC_FACTS_NOT_CONFIRMED',
     'FIXED_SESSION_REQUIRED',
     'FIXED_SESSION_AMBIGUOUS',
     'SOURCE_CONFLICT_UNRESOLVED',
@@ -1874,6 +1883,11 @@ function buildPublicationBlockers(
     return (leftIndex < 0 ? priority.length : leftIndex) - (rightIndex < 0 ? priority.length : rightIndex)
   })
   return uniqueCodes.map((code): PublicationBlocker => {
+    if (code === 'BASIC_FACTS_NOT_CONFIRMED') return {
+      code, title: '基础事实尚未经编辑确认',
+      description: `名称、分类或游览时长还没有人工确认过（系统标记：${revision.review_flags.filter((flag) => BASIC_FACT_BLOCKING_FLAGS.includes(flag as typeof BASIC_FACT_BLOCKING_FLAGS[number])).map((flag) => reviewFlagLabel(flag)).join('、') || '待核验'}）。请在页面上方的“基础信息”中重新保存一次名称与分类，并把时长改为真实游览时长（当前导入值 ${revision.duration_recommended} 分钟通常是占位值）。仅核验证据区不会清除这些标记。`,
+      actionLabel: '编辑基础事实', target: 'revision-basic-facts',
+    }
     if (code === 'REVISION_NOT_HUMAN_VERIFIED') return {
       code, title: '尚未完成人工核验',
       description: '当前仍是候选修订版本。数据编辑员先补齐证据并送审，审核员逐项核验后点击“审核通过”。',
@@ -1905,7 +1919,7 @@ function buildPublicationBlockers(
       code, title: reasonCodeLabel(code),
       description: revision.is_always_open
         ? '当前标记为全天开放；请在 O05 核对该事实是否有来源支持。'
-        : `当前读取到 ${evidence?.time_rules.filter((item) => item.active).length ?? 0} 条有效开放时间规则，其中 ${evidence?.time_rules.filter((item) => item.active && item.review_status === 'human_verified').length ?? 0} 条已人工核验。需要至少一条当前有效来源支持、并已人工核验的规则；固定场次地点还必须只有一条明确场次。`,
+        : `当前读取到 ${evidence?.time_rules.filter((item) => item.active).length ?? 0} 条有效开放时间规则，其中 ${evidence?.time_rules.filter((item) => item.active && item.review_status === 'human_verified').length ?? 0} 条已人工核验。需要至少一条当前有效来源支持、并已人工核验的“开放时间规则”；日期例外仅用于节假日/临时调整，不是必需项。`,
       actionLabel: '查看开放时间（O05）', target: 'o05-evidence',
     }
     if (code === 'OVERLAPPING_SELECTION_UNRESOLVED') return {

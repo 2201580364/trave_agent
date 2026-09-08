@@ -1049,6 +1049,7 @@ def test_projection_preparation_api_enforces_permission_and_revision_state(
     )
     assert blocked.status_code == 409
     assert blocked.json()["error"]["code"] == "review_revision_not_approvable"
+    assert blocked.json()["error"]["details"]["not_candidate"] is True
 
 
 def test_publication_batch_preview_and_failed_execution_are_auditable(
@@ -1234,6 +1235,9 @@ def test_revision_approval_requires_all_six_readiness_checks(
 
     assert decision.status_code == 409
     assert decision.json()["error"]["code"] == "review_revision_not_approvable"
+    not_approvable_details = decision.json()["error"]["details"]
+    assert "source" in not_approvable_details["missing_checks"]
+    assert not_approvable_details["not_candidate"] is False
     with context.sessions() as session:
         revision = session.get(PlaceRevisionRow, "revision-incomplete")
     assert revision is not None
@@ -2061,6 +2065,7 @@ def test_time_evidence_crud_review_and_revision_gate_form_one_versioned_workflow
     )
     assert premature.status_code == 409
     assert premature.json()["error"]["code"] == "review_revision_not_approvable"
+    assert len(premature.json()["error"]["details"]["pending_review_checks"]) > 0
 
     for kind, evidence_id in (
         ("time_rule", time_rule_id),

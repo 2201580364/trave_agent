@@ -34,6 +34,7 @@
 | 求解器/约束改动 | [docs/domain/](docs/domain/) + [.claude/rules/solver.md](.claude/rules/solver.md) + ADR-0003/0004/0009~0015 |
 | Git 操作/文件删除（任何任务都适用） | [.claude/rules/git-safety.md](.claude/rules/git-safety.md)（硬规则，用户要求） |
 | 写规则/写文档/新建文件（任何任务都适用） | [.claude/rules/file-management.md](.claude/rules/file-management.md)（写入位置对照表，用户要求） |
+| 新增/修改用户可见错误提示 | [.claude/rules/error-messages.md](.claude/rules/error-messages.md)（统一报错管线硬规则，用户要求） |
 | 并行开发/多会话协作 | [.claude/rules/parallel-workflow.md](.claude/rules/parallel-workflow.md)（一会话=一分支=一能力域 + In-flight 登记纪律） |
 | 地点数据/审核/发布 | [docs/product/管理端功能模块设计.md](docs/product/管理端功能模块设计.md) + ADR-0018/0019 + [docs/domain/地点数据来源与采集规范.md](docs/domain/地点数据来源与采集规范.md) |
 | O17 节假日同步 | ADR-0021 + [docs/product/O17中国法定节假日历自动同步设计.md](docs/product/O17中国法定节假日历自动同步设计.md) |

@@ -2559,7 +2559,7 @@ class PlaceReviewWorkflowService:
             if revision is None or evidence is None or place is None:
                 raise ResourceNotFoundError
             if revision.lifecycle_status != "human_verified":
-                raise ReviewRevisionNotApprovableError
+                raise ReviewRevisionNotApprovableError(not_candidate=True)
             if solver_node_id is None:
                 solver_node_id = uow.catalog.next_solver_node_id(data_snapshot_version)
             elif solver_node_id <= 0:
@@ -3285,13 +3285,17 @@ class PlaceReviewWorkflowService:
                     error_code="review_revision_not_approvable",
                 )
                 uow.commit()
-                raise ReviewRevisionNotApprovableError
+                raise ReviewRevisionNotApprovableError(not_candidate=True)
             if decision_kind == "approve":
                 evidence = uow.catalog.load_revision_evidence(task.place_revision_id)
                 readiness = (
                     evaluate_review_readiness(evidence, task) if evidence is not None else None
                 )
                 if readiness is None or readiness["verified_checks"] != readiness["total_checks"]:
+                    missing = readiness["missing_checks"] if readiness is not None else ()
+                    pending = (
+                        readiness["pending_review_checks"] if readiness is not None else ()
+                    )
                     self._reject(
                         uow,
                         actor,
@@ -3308,7 +3312,10 @@ class PlaceReviewWorkflowService:
                         error_code="review_revision_not_approvable",
                     )
                     uow.commit()
-                    raise ReviewRevisionNotApprovableError
+                    raise ReviewRevisionNotApprovableError(
+                        missing_checks=tuple(str(item) for item in missing),
+                        pending_review_checks=tuple(str(item) for item in pending),
+                    )
             uow.reviews.add_decision(
                 PlaceReviewDecision(
                     self._ids.new_id("review_decision"),
@@ -3326,7 +3333,7 @@ class PlaceReviewWorkflowService:
                 try:
                     uow.reviews.approve_revision(task.place_revision_id, reviewed_at=now)
                 except ValueError as exc:
-                    raise ReviewRevisionNotApprovableError from exc
+                    raise ReviewRevisionNotApprovableError(not_candidate=True) from exc
             try:
                 uow.reviews.advance_task(
                     task, expected_version=expected_version, status=next_status, now=now
@@ -3716,7 +3723,7 @@ def _raise_review_error(error_code: str | None) -> None:
     if error_code == "review_task_conflict":
         raise ReviewTaskConflictError
     if error_code == "review_revision_not_approvable":
-        raise ReviewRevisionNotApprovableError
+        raise ReviewRevisionNotApprovableError(not_candidate=True)
     if error_code == "review_revision_not_candidate":
         raise ReviewRevisionNotCandidateError
     if error_code == "publication_gate_rejected":

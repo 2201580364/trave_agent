@@ -306,6 +306,37 @@ describe('RevisionDetailsPage', () => {
     expect(screen.queryByText('确认无冲突并完成裁决')).toBeNull()
   })
 
+  it('flags unconfirmed basic facts as a blocker with edit guidance', async () => {
+    mocks.permissions.add('place:publication:check')
+    const flaggedRevision = {
+      ...revision,
+      review_flags: ['NAME_REQUIRES_HUMAN_VERIFICATION', 'DURATION_NOT_COLLECTED'],
+      duration_recommended: 1,
+    }
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(flaggedRevision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({ ...timeEvidence, revision: flaggedRevision })
+
+    render(<RevisionDetailsPage />)
+
+    await waitFor(() => expect(screen.getByText('基础事实尚未经编辑确认')).toBeTruthy())
+    expect(screen.getByText('编辑基础事实')).toBeTruthy()
+    expect(screen.getByText(/重新保存一次名称与分类/)).toBeTruthy()
+    expect(screen.queryByText('当前修订版本没有识别出的阻断项')).toBeNull()
+  })
+
+  it('does not flag basic facts when no blocking review flags exist', async () => {
+    mocks.permissions.add('place:publication:check')
+    mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({ ...timeEvidence, revision })
+
+    render(<RevisionDetailsPage />)
+
+    // 该夹具缺几何/访问点证据，发布准备卡必然有其余 blocker；
+    // 本测试只验证「基础事实」blocker 不因无 blocking review flags 而误报。
+    await waitFor(() => expect(screen.getByText('缺少已核验的地点几何')).toBeTruthy())
+    expect(screen.queryByText('基础事实尚未经编辑确认')).toBeNull()
+  })
+
   it('distinguishes an adjudicated relation from reviewer verification', async () => {
     mocks.api.getPlaceRevision.mockResolvedValueOnce(revision)
     mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({

@@ -1,5 +1,13 @@
-"""Stable administrator identity and authorization errors."""
+"""Stable administrator identity and authorization errors.
 
+User copy lives in ``error_messages`` (single source of truth); this module
+only wires stable machine codes to it and attaches whitelisted details.
+"""
+
+from travel_agent.application.common.error_messages import (
+    admin_error_message,
+    summarize_error_details,
+)
 from travel_agent.application.common.errors import ApplicationError
 
 
@@ -7,7 +15,7 @@ class AdminAuthenticationError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
             "admin_authentication_required",
-            "管理员会话缺失、已失效或已撤销。",
+            admin_error_message("admin_authentication_required"),
         )
 
 
@@ -15,7 +23,7 @@ class AdminPermissionDeniedError(ApplicationError):
     def __init__(self, permission: str) -> None:
         super().__init__(
             "admin_permission_denied",
-            "当前管理员角色无权执行该操作。",
+            admin_error_message("admin_permission_denied"),
             {"required_permission": permission},
         )
 
@@ -24,7 +32,7 @@ class AdminActorVersionConflictError(ApplicationError):
     def __init__(self, expected_version: int, current_version: int) -> None:
         super().__init__(
             "admin_actor_version_conflict",
-            "管理员角色已被其他操作更新，请刷新后重试。",
+            admin_error_message("admin_actor_version_conflict"),
             {
                 "expected_version": expected_version,
                 "current_version": current_version,
@@ -36,7 +44,7 @@ class AdminOperationIntentConflictError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
             "admin_operation_intent_conflict",
-            "该管理操作标识已经用于其他载荷。",
+            admin_error_message("admin_operation_intent_conflict"),
         )
 
 
@@ -44,7 +52,7 @@ class AdminLoginNameConflictError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
             "admin_login_name_conflict",
-            "该管理员登录名已存在。",
+            admin_error_message("admin_login_name_conflict"),
         )
 
 
@@ -55,24 +63,46 @@ class AdminRoleSafetyError(ApplicationError):
 
 class ReviewTaskNotFoundError(ApplicationError):
     def __init__(self) -> None:
-        super().__init__("review_task_not_found", "review task was not found")
+        super().__init__(
+            "review_task_not_found",
+            admin_error_message("review_task_not_found"),
+        )
 
 
 class ReviewTaskConflictError(ApplicationError):
     def __init__(self) -> None:
-        super().__init__("review_task_conflict", "review task has changed; refresh and retry")
+        super().__init__(
+            "review_task_conflict",
+            admin_error_message("review_task_conflict"),
+        )
 
 
 class ReviewRevisionNotApprovableError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("review_revision_not_approvable", "candidate revision is not approvable")
+    def __init__(
+        self,
+        *,
+        missing_checks: tuple[str, ...] = (),
+        pending_review_checks: tuple[str, ...] = (),
+        not_candidate: bool = False,
+    ) -> None:
+        details: dict[str, object] = {
+            "missing_checks": list(missing_checks),
+            "pending_review_checks": list(pending_review_checks),
+            "not_candidate": not_candidate,
+        }
+        super().__init__(
+            "review_revision_not_approvable",
+            admin_error_message("review_revision_not_approvable")
+            + summarize_error_details("review_revision_not_approvable", details),
+            details,
+        )
 
 
 class ReviewRevisionNotCandidateError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
             "review_revision_not_candidate",
-            "only candidate revisions can enter human review",
+            admin_error_message("review_revision_not_candidate"),
         )
 
 
@@ -80,16 +110,18 @@ class PlaceRevisionVersionConflictError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
             "place_revision_version_conflict",
-            "Revision 已被其他操作更新，请刷新后重试。",
+            admin_error_message("place_revision_version_conflict"),
         )
 
 
 class SourceRecordInUseError(ApplicationError):
     def __init__(self, references: tuple[str, ...]) -> None:
+        details: dict[str, object] = {"references": references}
         super().__init__(
             "source_record_in_use",
-            "当前来源仍被地点证据引用，请先把这些证据改用其他来源。",
-            {"references": references},
+            admin_error_message("source_record_in_use")
+            + summarize_error_details("source_record_in_use", details),
+            details,
         )
 
 
@@ -103,10 +135,12 @@ class PublicationGateRejectedError(ApplicationError):
 
     def __init__(self, reason_codes: tuple[str, ...]) -> None:
         normalized = tuple(sorted(set(reason_codes)))
+        details: dict[str, object] = {"reason_codes": normalized}
         super().__init__(
             "publication_gate_rejected",
-            "place revision cannot be published until all publication gates pass",
-            {"reason_codes": normalized},
+            admin_error_message("publication_gate_rejected")
+            + summarize_error_details("publication_gate_rejected", details),
+            details,
         )
 
 
@@ -115,8 +149,10 @@ class ProjectionPreparationRejectedError(ApplicationError):
 
     def __init__(self, reason_codes: tuple[str, ...]) -> None:
         normalized = tuple(sorted(set(reason_codes)))
+        details: dict[str, object] = {"reason_codes": normalized}
         super().__init__(
             "projection_preparation_rejected",
-            "Projection 准备未完成，请先补齐所需证据。",
-            {"reason_codes": normalized},
+            admin_error_message("projection_preparation_rejected")
+            + summarize_error_details("projection_preparation_rejected", details),
+            details,
         )

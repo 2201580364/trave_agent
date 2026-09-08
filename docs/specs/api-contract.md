@@ -1405,6 +1405,8 @@ O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{
 
 `publication_gate_rejected` 的 `details.reason_codes` 直接使用 PlaceCatalog 稳定拒绝码，不由前端将错误字符串猜成状态。
 
+**统一错误文案管线**（实现规范，配合 §2.4）：后端用户文案集中维护于 `src/travel_agent/application/common/error_messages.py`（`ADMIN_ERROR_MESSAGES` 表，按机器码索引）；携带白名单 details 的错误类（`review_revision_not_approvable` 的六项检查、`publication_gate_rejected`/`projection_preparation_rejected` 的 reason_codes、`source_record_in_use` 的 references、`draft_not_ready` 的 issues）在 message 中附加结构化摘要，前端仍以 `code` + `details` 做程序判断、`message` 只做展示。`ValueError` 兜底处理器只透传含中文的用户文案，英文领域不变量文本一律替换为通用提示；两个前端均按 code 维护兜底文案表，服务器中文文案优先生效。
+
 ### 15.5 OM1 受控数据采集批次（O18，计划）
 
 以下端点是 O18 的稳定草案，当前代码尚未实现。实现前不得新增“直接发布采集结果”的替代端点。
