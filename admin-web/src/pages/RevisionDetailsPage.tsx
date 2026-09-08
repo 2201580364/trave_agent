@@ -71,6 +71,20 @@ export function geometryFormValues(item: PlaceGeometryEvidence | undefined, fall
   return { geometry_kind: item.geometry_kind as GeometryFormValues['geometry_kind'], geometry_coordinates: lines, source_record_id: item.source_record_id }
 }
 
+// 解析并校验坐标文本；返回坐标点数组，格式/数量不合法时抛出用户可读错误。
+// 表单字段级校验与 payload 生成共用此函数，保证两处口径一致。
+export function parseCoordinateLines(kind: GeometryFormValues['geometry_kind'], text: string | undefined): [number, number][] {
+  const points = (text ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const pair = line.split(/[,，\s]+/).filter(Boolean).map(Number)
+    if (pair.length !== 2 || pair.some((value) => !Number.isFinite(value) || value < -180 || value > 180)) throw new Error('边界/路线坐标必须逐行填写“经度, 纬度”')
+    if (pair[1] < -90 || pair[1] > 90) throw new Error('纬度必须在 -90 到 90 之间')
+    return [pair[0], pair[1]] as [number, number]
+  })
+  const minimum = kind === 'area' ? 3 : 2
+  if (points.length < minimum) throw new Error(`${kind === 'area' ? '区域边界' : '路线轨迹'}至少需要 ${minimum} 个坐标点`)
+  return points
+}
+
 export function geometryPayload(values: GeometryFormValues): Record<string, unknown> {
   if (values.geometry_kind === 'point') {
     if (typeof values.geometry_lng !== 'number' || typeof values.geometry_lat !== 'number') throw new Error('请填写完整的经度和纬度')
@@ -78,14 +92,7 @@ export function geometryPayload(values: GeometryFormValues): Record<string, unkn
     if (values.geometry_lat < -90 || values.geometry_lat > 90) throw new Error('请输入 -90 到 90 之间的纬度')
     return { type: 'Point', coordinates: [values.geometry_lng, values.geometry_lat] }
   }
-  const points = (values.geometry_coordinates ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
-    const pair = line.split(/[,，\s]+/).filter(Boolean).map(Number)
-    if (pair.length !== 2 || pair.some((value) => !Number.isFinite(value) || value < -180 || value > 180)) throw new Error('边界/路线坐标必须逐行填写“经度, 纬度”')
-    if (pair[1] < -90 || pair[1] > 90) throw new Error('纬度必须在 -90 到 90 之间')
-    return pair
-  })
-  const minimum = values.geometry_kind === 'area' ? 3 : 2
-  if (points.length < minimum) throw new Error(`${values.geometry_kind === 'area' ? '区域边界' : '路线轨迹'}至少需要 ${minimum} 个坐标点`)
+  const points = parseCoordinateLines(values.geometry_kind, values.geometry_coordinates)
   if (values.geometry_kind === 'area' && (points[0][0] !== points.at(-1)?.[0] || points[0][1] !== points.at(-1)?.[1])) points.push(points[0])
   return values.geometry_kind === 'area'
     ? { type: 'Polygon', coordinates: [points] }
@@ -957,21 +964,25 @@ function EvidenceCard({
   const [modal, setModal] = useState<'geometry' | 'access' | null>(null)
   const [editing, setEditing] = useState<PlaceGeometryEvidence | PlaceAccessPointEvidence | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [form] = Form.useForm()
   const openGeometry = (item?: PlaceGeometryEvidence) => {
     setEditing(item ?? null)
+    setSaveError(null)
     form.resetFields()
     form.setFieldsValue(geometryFormValues(item, revision.geometry_kind, evidence?.sources[0]?.source_record_id))
     setModal('geometry')
   }
   const openAccess = (item?: PlaceAccessPointEvidence) => {
     setEditing(item ?? null)
+    setSaveError(null)
     form.resetFields()
     form.setFieldsValue(item ? item : { access_point_kind: 'visitor_entrance', source_record_id: evidence?.sources[0]?.source_record_id })
     setModal('access')
   }
   const saveEvidence = async () => {
     setSaving(true)
+    setSaveError(null)
     try {
       const values = await form.validateFields()
       const base = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-${crypto.randomUUID()}`, reason_code: editing ? 'EVIDENCE_UPDATED' : 'EVIDENCE_CREATED' }
@@ -984,7 +995,13 @@ function EvidenceCard({
         if (editing) await api.updateAccessPoint(revision.place_revision_id, (editing as PlaceAccessPointEvidence).access_point_id, input); else await api.createAccessPoint(revision.place_revision_id, input)
       }
       setModal(null); await onChanged(); onSuccess('证据已保存，修订版本需重新送审')
-    } catch (reason) { if (!isFormValidationError(reason)) onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+    } catch (reason) {
+      if (isFormValidationError(reason)) return
+      // 客户端构造 payload 时的普通 Error（如坐标数量不足）：原样显示在弹窗内，
+      // 不走 adminErrorMessage——那是 API 错误翻译管线，会把普通 Error 变成「服务不可用」。
+      if (reason instanceof Error && !('code' in reason)) { setSaveError(reason.message); return }
+      setSaveError(adminErrorMessage(reason))
+    } finally { setSaving(false) }
   }
   const review = async (kind: 'geometry' | 'access_point', id: string, status: 'human_verified' | 'rejected') => {
     setSaving(true)
@@ -1176,8 +1193,9 @@ function EvidenceCard({
           />
         )}
       </Space>
-      <Modal title={modal === 'geometry' ? '新增/编辑几何证据' : '新增/编辑访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => setModal(null)} confirmLoading={saving} forceRender>
-        <Form form={form} layout="vertical">
+      <Modal title={modal === 'geometry' ? '新增/编辑几何证据' : '新增/编辑访问点证据'} open={modal !== null} onOk={() => void saveEvidence()} onCancel={() => { setModal(null); setSaveError(null) }} confirmLoading={saving} forceRender>
+        {saveError !== null && <Alert showIcon type="error" title={saveError} style={{ marginBottom: 16 }} closable onClose={() => setSaveError(null)} />}
+        <Form form={form} layout="vertical" onValuesChange={() => { if (saveError !== null) setSaveError(null) }}>
           {modal === 'geometry' ? <>
             <Form.Item name="geometry_kind" label={<FieldLabel label="几何类型" hint="点状景点选“点”；景区/街区边界选“区域”；步行路线选“路线”。" />} rules={[{ required: true }]}>
               <Select options={[{ value: 'point', label: '点（地点代表点）' }, { value: 'area', label: '区域（边界或范围）' }, { value: 'route', label: '路线（起终点或轨迹）' }]} />
@@ -1190,7 +1208,18 @@ function EvidenceCard({
                 <Form.Item name="geometry_lat" label={<FieldLabel label="纬度" hint="填写地图上的纬度，范围 -90 至 90，例如 30.253778。" />} rules={[{ required: true, type: 'number', min: -90, max: 90, message: '请输入 -90 到 90 之间的纬度' }]} style={{ flex: 1 }}>
                   <InputNumber style={{ width: '100%' }} placeholder="30.253778" />
                 </Form.Item>
-              </Space> : <Form.Item name="geometry_coordinates" label={<FieldLabel label={getFieldValue('geometry_kind') === 'area' ? '边界坐标点' : '路线坐标点'} hint={getFieldValue('geometry_kind') === 'area' ? '每行一个边界点，格式为“经度, 纬度”，至少 3 个点；系统会自动闭合边界。' : '每行一个轨迹点，格式为“经度, 纬度”，至少 2 个点；按行填写行进顺序。'} />} rules={[{ required: true, message: '请至少填写所需坐标点' }]}>
+              </Space> : <Form.Item name="geometry_coordinates" label={<FieldLabel label={getFieldValue('geometry_kind') === 'area' ? '边界坐标点' : '路线坐标点'} hint={getFieldValue('geometry_kind') === 'area' ? '每行一个边界点，格式为“经度, 纬度”，至少 3 个点；系统会自动闭合边界。' : '每行一个轨迹点，格式为“经度, 纬度”，至少 2 个点；按行填写行进顺序。'} />} rules={[{ required: true, message: '请至少填写所需坐标点' }, {
+                // 与 geometryPayload 同口径的即时校验：格式/范围/数量错误直接显示在字段下。
+                // 此前只校验非空，点数不足等错误在提交后才抛出且渲染在弹窗之外，用户看到「没反应」。
+                validator: (_rule: unknown, value: string | undefined) => {
+                  try {
+                    parseCoordinateLines(getFieldValue('geometry_kind'), value)
+                    return Promise.resolve()
+                  } catch (reason) {
+                    return Promise.reject(reason instanceof Error ? reason : new Error(String(reason)))
+                  }
+                },
+              }]}>
                 <Input.TextArea rows={5} placeholder={'例如：\n120.160970, 30.253778\n120.161200, 30.254100\n120.161500, 30.253900'} />
               </Form.Item>}
             </Form.Item>

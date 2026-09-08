@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import type { PlaceRevision, PlaceRevisionEvidence, ReviewTask } from '../api/types'
-import { RevisionDetailsPage, parseTimeInput, timeFormMinutes } from './RevisionDetailsPage'
+import { RevisionDetailsPage, parseCoordinateLines, parseTimeInput, timeFormMinutes } from './RevisionDetailsPage'
 
 const mocks = vi.hoisted(() => ({
   api: {
@@ -141,6 +141,16 @@ describe('RevisionDetailsPage', () => {
 
   it('rejects an overnight range without the next-day marker', () => {
     expect(() => timeFormMinutes({ start_time: '23:00', end_time: '02:00' })).toThrow('次日')
+  })
+
+  it('validates coordinate lines with the same rules as payload generation', () => {
+    expect(parseCoordinateLines('route', '120.1, 30.2\n120.3, 30.4')).toEqual([[120.1, 30.2], [120.3, 30.4]])
+    // 区域至少 3 个点——此前该校验只在提交后触发且错误渲染在弹窗外，用户看到「确认无反应」
+    expect(() => parseCoordinateLines('area', '120.177818,30.243454\n120.177818,30.243454')).toThrow('至少需要 3 个坐标点')
+    expect(() => parseCoordinateLines('route', '120.1, 30.2')).toThrow('至少需要 2 个坐标点')
+    expect(() => parseCoordinateLines('route', 'abc')).toThrow('经度, 纬度')
+    expect(() => parseCoordinateLines('route', '200.0, 30.2')).toThrow('经度, 纬度')
+    expect(() => parseCoordinateLines('route', '120.1, 95.0')).toThrow('纬度')
   })
 
   const openReviewTask: ReviewTask = {
