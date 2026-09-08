@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import re
 import secrets
 from collections.abc import Callable
@@ -27,6 +26,11 @@ from travel_agent.domain.admin import (
     permissions_for_roles,
 )
 
+from .audit_events import (
+    build_audit_event,
+    canonical_digest,
+    identity_flow_role,
+)
 from .errors import (
     AdminActorVersionConflictError,
     AdminAuthenticationError,
@@ -706,24 +710,25 @@ class AdminIdentityService:
         operation_digest: str | None = None,
         error_code: str | None = None,
     ) -> AdminAuditEvent:
-        return AdminAuditEvent(
-            self._ids.new_id("admin_audit"),
-            actor.admin_actor_id,
-            actor_role,
-            action,
-            target_type,
-            target_id,
-            target_revision,
-            before_digest,
-            after_digest,
-            reason_code,
-            reason_text,
-            request_id,
-            operation_intent_id,
-            operation_digest,
-            result,
-            error_code,
-            _utc(self._clock.now()),
+        # Thin delegate to the shared constructor (audit-logging.md §1.2).
+        return build_audit_event(
+            event_id=self._ids.new_id("admin_audit"),
+            actor=actor,
+            actor_role=actor_role,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            target_revision=target_revision,
+            before_digest=before_digest,
+            after_digest=after_digest,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            operation_intent_id=operation_intent_id,
+            operation_digest=operation_digest,
+            result=result,
+            error_code=error_code,
+            occurred_at=_utc(self._clock.now()),
         )
 
 
@@ -817,17 +822,7 @@ def _validate_reason(reason_code: str, reason_text: str | None) -> str | None:
 
 
 def _representative_role(role_keys: tuple[str, ...]) -> str:
-    for role_key in (
-        "admin_security",
-        "data_publisher",
-        "data_reviewer",
-        "data_editor",
-        "research_viewer",
-        "content_moderator",
-    ):
-        if role_key in role_keys:
-            return role_key
-    return "authenticated_admin"
+    return identity_flow_role(role_keys)
 
 
 def _optional_query(value: str | None) -> str | None:
@@ -864,10 +859,8 @@ def _session_digest(session: AdminSessionRecord) -> str:
 
 
 def _canonical_digest(value: object) -> str:
-    payload = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    # Single authoritative implementation lives in audit_events.py.
+    return canonical_digest(value)
 
 
 def _token_hash(token: str) -> str:

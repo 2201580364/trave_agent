@@ -24,6 +24,8 @@ from travel_agent.domain.place_catalog.holiday_sync import (
     validate_extracted_calendar,
 )
 
+from .audit_events import build_audit_event
+
 
 class HolidayCalendarRepository(Protocol):
     def add_job(self, job: HolidayCalendarSyncJob) -> None: ...
@@ -230,13 +232,25 @@ class ChinaHolidayCalendarSyncService:
                 next_retry_at=None,
             )
             uow.calendars.update_job(cancelled)
-            uow.audits.add(AdminAuditEvent(
-                self._ids.new_id("admin_audit"), cancelled_by, "data_editor",
-                "HOLIDAY_CALENDAR_SYNC_CANCELLED", "holiday_calendar_sync_job", job_id,
-                None, None, job.operation_digest, "HOLIDAY_SYNC_CANCELLED",
-                f"取消 {job.year} 年中国法定节假日历同步任务", job_id,
-                job.operation_intent_id, job.operation_digest, "succeeded", None,
-                cancelled.finished_at or self._clock.now(),
+            uow.audits.add(build_audit_event(
+                event_id=self._ids.new_id("admin_audit"),
+                actor=None,
+                actor_id_override=cancelled_by,
+                actor_role="data_editor",
+                action="HOLIDAY_CALENDAR_SYNC_CANCELLED",
+                target_type="holiday_calendar_sync_job",
+                target_id=job_id,
+                target_revision=None,
+                before_digest=None,
+                after_digest=job.operation_digest,
+                reason_code="HOLIDAY_SYNC_CANCELLED",
+                reason_text=f"取消 {job.year} 年中国法定节假日历同步任务",
+                request_id=job_id,
+                operation_intent_id=job.operation_intent_id,
+                operation_digest=job.operation_digest,
+                result="succeeded",
+                error_code=None,
+                occurred_at=cancelled.finished_at or self._clock.now(),
             ))
             uow.commit()
             return cancelled
@@ -404,24 +418,25 @@ class ChinaHolidayCalendarSyncService:
             uow.calendars.publish(calendar)
             uow.calendars.update_job(finished)
             uow.audits.add(
-                AdminAuditEvent(
-                    self._ids.new_id("admin_audit"),
-                    confirmed_by,
-                    "data_editor",
-                    "HOLIDAY_CALENDAR_PREVIEW_CONFIRMED",
-                    "holiday_calendar",
-                    calendar_id,
-                    str(calendar.version),
-                    None if current is None else current.normalized_digest,
-                    calendar.normalized_digest,
-                    "HOLIDAY_CALENDAR_PREVIEW_CONFIRMED",
-                    f"确认并发布 {job.year} 年中国法定节假日历",
-                    job.job_id,
-                    operation_intent_id,
-                    validation.normalized_digest,
-                    "succeeded",
-                    None,
-                    now,
+                build_audit_event(
+                    event_id=self._ids.new_id("admin_audit"),
+                    actor=None,
+                    actor_id_override=confirmed_by,
+                    actor_role="data_editor",
+                    action="HOLIDAY_CALENDAR_PREVIEW_CONFIRMED",
+                    target_type="holiday_calendar",
+                    target_id=calendar_id,
+                    target_revision=str(calendar.version),
+                    before_digest=None if current is None else current.normalized_digest,
+                    after_digest=calendar.normalized_digest,
+                    reason_code="HOLIDAY_CALENDAR_PREVIEW_CONFIRMED",
+                    reason_text=f"确认并发布 {job.year} 年中国法定节假日历",
+                    request_id=job.job_id,
+                    operation_intent_id=operation_intent_id,
+                    operation_digest=validation.normalized_digest,
+                    result="succeeded",
+                    error_code=None,
+                    occurred_at=now,
                 )
             )
             uow.commit()
@@ -464,24 +479,25 @@ class ChinaHolidayCalendarSyncService:
             )
             uow.calendars.add_job(job)
             uow.audits.add(
-                AdminAuditEvent(
-                    self._ids.new_id("admin_audit"),
-                    created_by,
-                    "data_editor",
-                    "HOLIDAY_CALENDAR_SYNC_QUEUED",
-                    "holiday_calendar_sync_job",
-                    job.job_id,
-                    None,
-                    None,
-                    digest,
-                    "HOLIDAY_CALENDAR_SYNC_REQUESTED",
-                    f"请求同步 {year} 年中国法定节假日历",
-                    job.job_id,
-                    None,
-                    None,
-                    "succeeded",
-                    None,
-                    job.created_at,
+                build_audit_event(
+                    event_id=self._ids.new_id("admin_audit"),
+                    actor=None,
+                    actor_id_override=created_by,
+                    actor_role="data_editor",
+                    action="HOLIDAY_CALENDAR_SYNC_QUEUED",
+                    target_type="holiday_calendar_sync_job",
+                    target_id=job.job_id,
+                    target_revision=None,
+                    before_digest=None,
+                    after_digest=digest,
+                    reason_code="HOLIDAY_CALENDAR_SYNC_REQUESTED",
+                    reason_text=f"请求同步 {year} 年中国法定节假日历",
+                    request_id=job.job_id,
+                    operation_intent_id=None,
+                    operation_digest=None,
+                    result="succeeded",
+                    error_code=None,
+                    occurred_at=job.created_at,
                 )
             )
             uow.commit()
@@ -718,24 +734,25 @@ class ChinaHolidayCalendarSyncService:
             uow.calendars.publish(calendar)
             uow.calendars.update_job(finished)
             uow.audits.add(
-                AdminAuditEvent(
-                    self._ids.new_id("admin_audit"),
-                    job.created_by,
-                    "data_editor",
-                    "HOLIDAY_CALENDAR_PUBLISHED",
-                    "holiday_calendar",
-                    calendar.calendar_id,
-                    str(calendar.version),
-                    None if current is None else current.normalized_digest,
-                    calendar.normalized_digest,
-                    "HOLIDAY_CALENDAR_VALIDATED",
-                    f"{job.year} 年中国法定节假日历通过确定性校验并发布",
-                    job.job_id,
-                    job.operation_intent_id,
-                    job.operation_digest,
-                    "succeeded",
-                    None,
-                    now,
+                build_audit_event(
+                    event_id=self._ids.new_id("admin_audit"),
+                    actor=None,
+                    actor_id_override=job.created_by,
+                    actor_role="data_editor",
+                    action="HOLIDAY_CALENDAR_PUBLISHED",
+                    target_type="holiday_calendar",
+                    target_id=calendar.calendar_id,
+                    target_revision=str(calendar.version),
+                    before_digest=None if current is None else current.normalized_digest,
+                    after_digest=calendar.normalized_digest,
+                    reason_code="HOLIDAY_CALENDAR_VALIDATED",
+                    reason_text=f"{job.year} 年中国法定节假日历通过确定性校验并发布",
+                    request_id=job.job_id,
+                    operation_intent_id=job.operation_intent_id,
+                    operation_digest=job.operation_digest,
+                    result="succeeded",
+                    error_code=None,
+                    occurred_at=now,
                 )
             )
             uow.commit()
@@ -805,24 +822,25 @@ class ChinaHolidayCalendarSyncService:
             uow.calendars.update_job(finished)
             action, reason_code, reason_text = _terminal_audit_fields(finished)
             uow.audits.add(
-                AdminAuditEvent(
-                    self._ids.new_id("admin_audit"),
-                    finished.created_by,
-                    "data_editor",
-                    action,
-                    "holiday_calendar_sync_job",
-                    finished.job_id,
-                    None,
-                    None,
-                    finished.source_content_sha256,
-                    reason_code,
-                    reason_text,
-                    finished.job_id,
-                    None,
-                    None,
-                    "succeeded",
-                    None,
-                    finished.finished_at or self._clock.now(),
+                build_audit_event(
+                    event_id=self._ids.new_id("admin_audit"),
+                    actor=None,
+                    actor_id_override=finished.created_by,
+                    actor_role="data_editor",
+                    action=action,
+                    target_type="holiday_calendar_sync_job",
+                    target_id=finished.job_id,
+                    target_revision=None,
+                    before_digest=None,
+                    after_digest=finished.source_content_sha256,
+                    reason_code=reason_code,
+                    reason_text=reason_text,
+                    request_id=finished.job_id,
+                    operation_intent_id=None,
+                    operation_digest=None,
+                    result="succeeded",
+                    error_code=None,
+                    occurred_at=finished.finished_at or self._clock.now(),
                 )
             )
             uow.commit()

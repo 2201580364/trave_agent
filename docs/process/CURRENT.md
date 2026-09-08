@@ -3,11 +3,13 @@
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
 - 更新时间：2026-09-08
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S1–S6 已完成（S6 合并 941578e/fae014e），S8-1/S8-2 已合并（a657504/dc5d1ea），S8-3 实现完成待合并，S7 等待数据批次（12 条中 2 条已发布）`
-- 稳定测试基线：后端 pytest `492/492`；ruff check 全仓清零；admin-web Vitest `46/46` + tsc --noEmit + production build 全过（vitest 4 `fileParallelism` 类型收窄 boolean，vite.config 已改 `false`）；frontend Vitest `19/19` + tsc；Alembic 迁移链至 `0015_holiday_exception_provenance`
-- 最近提交基线：`dc5d1ea feat(scripts): S8-2 OpenAPI schema 快照与 api-contract 契约 diff 门禁（含 CI 集成）`；`a657504 test(frontend): S8-1 引入 Vitest`
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8 全部完成（S8-1 a657504 / S8-2 dc5d1ea / S8-3 361cc37 均已合并），审计规范化 AUD-1～4 实现完成待合并；S7 等待数据批次（12 条中 2 条已发布）`
+- 稳定测试基线：后端 pytest `495/495`（492 + AUD-4 登记表测试 3）；ruff check 全仓清零；admin-web Vitest `46/46` + tsc --noEmit + production build 全过；frontend Vitest `19/19` + tsc；Alembic 迁移链至 `0015_holiday_exception_provenance`
+- 最近提交基线：`361cc37 feat(admin-web): S8-3 生成式 API 类型管线（openapi-typescript 小步落地）`
 
 ## 最近三轮已完成（一行一项）
+
+- 2026-09-08 审计功能规范化 AUD-1～4（评审驱动，实现完成待合并）：评审结论=不引入切面/中间件（审计载荷是业务语义、必须与业务同事务，切面形式是伪需求），问题在「对的做法未制度化」——`_event` 构造器三处三样、摘要哈希三处三样、reason_code 校验仅 review 有、动作码零文档。AUD-1 规范 `.claude/rules/audit-logging.md`（核心纪律四条 + 字段语义 + 动作码命名法与逐码登记表 + target_type 表 + digest 唯一实现 + actor_role 双序记账规则 + 新增端点 checklist）；AUD-2/3 共享模块 `application/admin/audit_events.py`（build_audit_event 全关键字构造器 + canonical_digest 唯一实现 + validate_audit_reason + review/identity 双序 role 解析），service/review 的 `_event` 改薄代理、holiday_calendar_sync 5 处裸传 AdminAuditEvent 位置参数全部改写（消灭 17 字段错位风险）；AUD-4 `tests/application/test_audit_registry.py` 3 项——代码发射的动作码必须登记、登记不得超前于代码、target_type 同查，防规范烂尾。行为零变化，pytest/ruff/layering/check_docs 全过。遗留：O17 模块 5 个码历史上是 reason_code 而非 action（已按双射原则在规范中区分登记）。
 
 - 2026-09-08 S8-3 admin-web 生成式 API 类型·小步落地（transformation-plan，实现完成待合并）：openapi-typescript@7 入库（devDep，npmmirror）+ `npm run generate-api-types`，从 `var/reports/openapi-schema.json` 生成 `admin-web/src/api/api-schema.d.ts`（4941 行）；**勘察关键事实：后端 63/73 响应端点声明 `dict[str, object]` 无结构化 schema，生成器只能覆盖请求侧 47 组件**，AdminActor/PlaceRevision 等 20 个响应类型无生成来源暂留手工（后端补 response_model 另立任务，非 S8 范围）；已验证手工输入类型与生成组件双向兼容，`CreateAdminActorInput` 改为 `components['schemas']` 再导出示范（消费方零改动）；types.ts 头部写明过渡期边界与收尾路径；附带修复 vite.config.ts `fileParallelism: 2→false`（vitest 4 类型收窄，数值写法致 tsc -b/build 报 TS2769，S8-2 提交引入、本轮回归暴露）；回归：admin-web vitest 46/46 + tsc + build 全过。
 
@@ -43,9 +45,9 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| S8-3 admin-web 生成式 API 类型 | dev（S8 会话，同会话接续） | `admin-web/`（package.json/package-lock.json 加 openapi-typescript + script、`src/api/api-schema.d.ts` 新增生成物、`src/api/types.ts` 边界说明 + CreateAdminActorInput 再导出、vite.config.ts fileParallelism 修复）、`docs/process/transformation-plan.md`、`docs/process/CURRENT.md` | 实现完成待合并（2026-09-08：vitest 46/46 + tsc + build 全过；后端响应模型改造另立任务） |
+| AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 实现完成待合并（2026-09-08：全量 pytest 495/495 + ruff + layering + check_docs 全过，行为零变化） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/S8-2 已合并（a657504/dc5d1ea）销账；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。S8 后续遗留：后端 63 个响应端点补 response_model（另立任务，S8-3 勘察发现）。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8 全部完成并已合并（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。遗留任务：① 后端 63 个响应端点补 response_model（S8-3 勘察发现，建议与 S7 拆分同批）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
 
 ## 关键事实速查
 

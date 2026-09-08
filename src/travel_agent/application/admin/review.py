@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from collections.abc import Callable
 from dataclasses import replace
@@ -45,6 +43,12 @@ from travel_agent.domain.place_catalog.holiday_calendar import (
 )
 from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 
+from .audit_events import (
+    build_audit_event,
+    canonical_digest,
+    review_flow_role,
+    validate_audit_reason,
+)
 from .errors import (
     AdminAuthenticationError,
     AdminOperationIntentConflictError,
@@ -3492,38 +3496,32 @@ class PlaceReviewWorkflowService:
         result: str = "succeeded",
         error_code: str | None = None,
     ) -> AdminAuditEvent:
-        return AdminAuditEvent(
-            self._ids.new_id("admin_audit"),
-            actor.admin_actor_id,
-            _reviewer_role(actor.role_keys),
-            action,
-            target_type,
-            target_id,
-            target_revision,
-            before_digest,
-            after_digest,
-            reason_code,
-            reason_text,
-            request_id,
-            operation_intent_id,
-            operation_digest,
-            result,
-            error_code,
-            self._clock.now(),
+        # Thin delegate to the shared constructor (audit-logging.md §1.2);
+        # actor_role follows the review-flow ordering (§6).
+        return build_audit_event(
+            event_id=self._ids.new_id("admin_audit"),
+            actor=actor,
+            actor_role=review_flow_role(actor.role_keys),
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            target_revision=target_revision,
+            before_digest=before_digest,
+            after_digest=after_digest,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            operation_intent_id=operation_intent_id,
+            operation_digest=operation_digest,
+            result=result,
+            error_code=error_code,
+            occurred_at=self._clock.now(),
         )
 
     @staticmethod
     def _validate_reason(reason_code: str, reason_text: str | None) -> str | None:
-        if _REASON_CODE_PATTERN.fullmatch(reason_code) is None:
-            raise ValueError("reason_code must be a stable uppercase code")
-        if reason_text and _SENSITIVE_REASON_PATTERN.search(reason_text):
-            raise ValueError("reason_text must not contain credentials")
-        normalized = reason_text.strip() if reason_text else None
-        if normalized and any(ord(char) < 32 for char in normalized):
-            raise ValueError("reason_text must be printable")
-        if normalized and len(normalized) > 500:
-            raise ValueError("reason_text is too long")
-        return normalized
+        # Single authoritative validation lives in audit_events.py.
+        return validate_audit_reason(reason_code, reason_text)
 
 
 def evaluate_review_readiness(
@@ -3734,10 +3732,7 @@ def _raise_review_error(error_code: str | None) -> None:
 
 
 def _reviewer_role(role_keys: tuple[str, ...]) -> str:
-    for role in ("data_reviewer", "admin_security", "data_editor", "data_publisher"):
-        if role in role_keys:
-            return role
-    return "authenticated_admin"
+    return review_flow_role(role_keys)
 
 
 def _optional_query(value: str | None) -> str | None:
@@ -3824,8 +3819,8 @@ def _evidence_digest(
 
 
 def _digest(value: object) -> str:
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    # Single authoritative implementation lives in audit_events.py.
+    return canonical_digest(value)
 
 
 def _projection_snapshot_payload(projection: SolverPlaceProjection) -> dict[str, object]:
