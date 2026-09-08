@@ -41,6 +41,11 @@ jobs:
       - name: Layering assertions
         run: python scripts/check_layering.py
 
+      - name: OpenAPI contract diff (S8-2)
+        run: |
+          python scripts/export_openapi_schema.py --output var/ci/openapi-schema.json
+          python scripts/check_api_contract.py --schema var/ci/openapi-schema.json
+
       - name: Docs gate
         run: python scripts/check_docs.py
 

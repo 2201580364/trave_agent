@@ -36,6 +36,8 @@
 | `run_gate7_report.py` | Gate 7 证据报告 | 待复查 |
 | `check_docs.py` | 文档门禁 | 已达标（0/1/2 + --json） |
 | `check_layering.py` | 分层断言 | 已达标（0/1/2 + 契约自测） |
+| `check_api_contract.py` | OpenAPI 快照与 api-contract 契约 diff 门禁（S8-2） | 已达标（0=通过/1=输入错误/2=code-only 漂移 + --json；contract-only 为信息性含计划端点；CI backend job 已集成） |
+| `export_openapi_schema.py` | 离线导出 FastAPI OpenAPI 快照（S8-2） | 已达标（写 var/ 属契约第 6 条允许输出；--json + 0/1；CI 与本地均只写 gitignored 路径，无其他副作用） |
 | `sync_agents_docs.py` | AGENTS.md 派生 CLAUDE.md | 特例：写入类但目标文件固定、可重跑（幂等派生），按 L2 收窄为「改 AGENTS.md 后必跑」 |
 
 ### L2 写入类（dry-run + 显式确认）
