@@ -56,13 +56,15 @@ from .errors import (
     ReviewTaskNotFoundError,
     SourceRecordValidationError,
 )
+from .review_evidence import EvidenceMutationSupport
+from .review_geometry import ReviewGeometryService
 from .review_ports import ActorRepository as ActorRepository
 from .review_ports import AuditRepository as AuditRepository
 from .review_ports import ReviewRepository as ReviewRepository
 from .review_ports import ReviewUnitOfWork as ReviewUnitOfWork
 from .review_readiness import evaluate_review_readiness as evaluate_review_readiness
 from .review_sources import ReviewSourceService
-from .review_support import ReviewSupport, _digest, _revision_digest
+from .review_support import _digest, _revision_digest
 from .sources import GovernedSourceCatalog, GovernedSourceChannel
 
 _REASON_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
@@ -99,7 +101,7 @@ class BuiltinHolidayCalendarCatalog:
         return get_holiday_calendar(calendar_id)
 
 
-class PlaceReviewWorkflowService(ReviewSupport):
+class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
     def __init__(
         self,
         uow_factory: Callable[[], ReviewUnitOfWork],
@@ -114,6 +116,7 @@ class PlaceReviewWorkflowService(ReviewSupport):
         self._source_catalog = source_catalog
         self._holiday_calendars = holiday_calendars or BuiltinHolidayCalendarCatalog()
         self._sources = ReviewSourceService(uow_factory, clock, ids, source_catalog)
+        self._geometry = ReviewGeometryService(uow_factory, clock, ids)
 
     def list_holiday_calendars(self, principal: AdminPrincipal) -> tuple[HolidayCalendar, ...]:
         self._require(principal, "place:candidate:read")
@@ -774,41 +777,17 @@ class PlaceReviewWorkflowService(ReviewSupport):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        geometry_id = self._ids.new_id("geometry")
-        payload = {
-            "revision_id": revision_id,
-            "expected_revision_version": expected_revision_version,
-            "geometry_kind": geometry_kind,
-            "geometry": geometry,
-            "source_record_id": source_record_id,
-        }
-        return self._mutate_evidence(
+        return self._geometry.create_geometry(
             principal,
             revision_id=revision_id,
             expected_revision_version=expected_revision_version,
+            geometry_kind=geometry_kind,
+            geometry=geometry,
+            source_record_id=source_record_id,
             operation_intent_id=operation_intent_id,
             reason_code=reason_code,
             reason_text=reason_text,
             request_id=request_id,
-            action="PLACE_GEOMETRY_CREATED",
-            target_id=geometry_id,
-            payload=payload,
-            mutate=lambda uow, revision: (
-                uow.catalog.create_geometry(
-                    PlaceGeometry(
-                        geometry_id,
-                        revision_id,
-                        geometry_kind,
-                        geometry,
-                        source_record_id,
-                        "candidate",
-                        True,
-                        self._clock.now(),
-                    ),
-                    expected_revision_version=expected_revision_version,
-                ),
-                geometry_id,
-            ),
         )
 
     def update_geometry(
@@ -826,54 +805,18 @@ class PlaceReviewWorkflowService(ReviewSupport):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        payload = {
-            "revision_id": revision_id,
-            "geometry_id": geometry_id,
-            "expected_revision_version": expected_revision_version,
-            "geometry_kind": geometry_kind,
-            "geometry": geometry,
-            "source_record_id": source_record_id,
-        }
-
-        def mutate(uow: ReviewUnitOfWork, revision: PlaceRevision) -> tuple[PlaceRevision, str]:
-            evidence = uow.catalog.load_revision_evidence(revision_id)
-            if evidence is None:
-                raise ResourceNotFoundError
-            current = next(
-                (item for item in evidence.geometries if item.geometry_id == geometry_id),
-                None,
-            )
-            if current is None:
-                raise ResourceNotFoundError
-            updated = replace(
-                current,
-                geometry_kind=geometry_kind,
-                geometry=geometry,
-                source_record_id=source_record_id,
-                review_status="candidate",
-                active=True,
-                reviewed_at=None,
-            )
-            return (
-                uow.catalog.update_geometry(
-                    updated,
-                    expected_revision_version=expected_revision_version,
-                ),
-                geometry_id,
-            )
-
-        return self._mutate_evidence(
+        return self._geometry.update_geometry(
             principal,
             revision_id=revision_id,
+            geometry_id=geometry_id,
             expected_revision_version=expected_revision_version,
+            geometry_kind=geometry_kind,
+            geometry=geometry,
+            source_record_id=source_record_id,
             operation_intent_id=operation_intent_id,
             reason_code=reason_code,
             reason_text=reason_text,
             request_id=request_id,
-            action="PLACE_GEOMETRY_UPDATED",
-            target_id=geometry_id,
-            payload=payload,
-            mutate=mutate,
         )
 
     def retire_geometry(
@@ -888,30 +831,15 @@ class PlaceReviewWorkflowService(ReviewSupport):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        payload = {
-            "revision_id": revision_id,
-            "geometry_id": geometry_id,
-            "expected_revision_version": expected_revision_version,
-        }
-        return self._mutate_evidence(
+        return self._geometry.retire_geometry(
             principal,
             revision_id=revision_id,
+            geometry_id=geometry_id,
             expected_revision_version=expected_revision_version,
             operation_intent_id=operation_intent_id,
             reason_code=reason_code,
             reason_text=reason_text,
             request_id=request_id,
-            action="PLACE_GEOMETRY_RETIRED",
-            target_id=geometry_id,
-            payload=payload,
-            mutate=lambda uow, _revision: (
-                uow.catalog.retire_geometry(
-                    geometry_id,
-                    place_revision_id=revision_id,
-                    expected_revision_version=expected_revision_version,
-                ),
-                geometry_id,
-            ),
         )
 
     def create_access_point(
@@ -931,48 +859,20 @@ class PlaceReviewWorkflowService(ReviewSupport):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        access_point_id = self._ids.new_id("access_point")
-        payload = {
-            "revision_id": revision_id,
-            "expected_revision_version": expected_revision_version,
-            "access_point_kind": access_point_kind,
-            "name": name,
-            "lat": str(lat),
-            "lng": str(lng),
-            "source_record_id": source_record_id,
-            "fetched_at": fetched_at.isoformat() if fetched_at else None,
-        }
-        return self._mutate_evidence(
+        return self._geometry.create_access_point(
             principal,
             revision_id=revision_id,
             expected_revision_version=expected_revision_version,
+            access_point_kind=access_point_kind,
+            name=name,
+            lat=lat,
+            lng=lng,
+            source_record_id=source_record_id,
+            fetched_at=fetched_at,
             operation_intent_id=operation_intent_id,
             reason_code=reason_code,
             reason_text=reason_text,
             request_id=request_id,
-            action="PLACE_ACCESS_POINT_CREATED",
-            target_id=access_point_id,
-            payload=payload,
-            mutate=lambda uow, _revision: (
-                uow.catalog.create_access_point(
-                    PlaceAccessPoint(
-                        access_point_id,
-                        revision_id,
-                        access_point_kind,
-                        name,
-                        lat,
-                        lng,
-                        source_record_id,
-                        "candidate",
-                        True,
-                        fetched_at,
-                        None,
-                        self._clock.now(),
-                    ),
-                    expected_revision_version=expected_revision_version,
-                ),
-                access_point_id,
-            ),
         )
 
     def update_access_point(
@@ -993,64 +893,21 @@ class PlaceReviewWorkflowService(ReviewSupport):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        payload = {
-            "revision_id": revision_id,
-            "access_point_id": access_point_id,
-            "expected_revision_version": expected_revision_version,
-            "access_point_kind": access_point_kind,
-            "name": name,
-            "lat": str(lat),
-            "lng": str(lng),
-            "source_record_id": source_record_id,
-            "fetched_at": fetched_at.isoformat() if fetched_at else None,
-        }
-
-        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
-            evidence = uow.catalog.load_revision_evidence(revision_id)
-            if evidence is None:
-                raise ResourceNotFoundError
-            current = next(
-                (
-                    item
-                    for item in evidence.access_points
-                    if item.access_point_id == access_point_id
-                ),
-                None,
-            )
-            if current is None:
-                raise ResourceNotFoundError
-            updated = replace(
-                current,
-                access_point_kind=access_point_kind,
-                name=name,
-                lat=lat,
-                lng=lng,
-                source_record_id=source_record_id,
-                review_status="candidate",
-                active=True,
-                fetched_at=fetched_at,
-                reviewed_at=None,
-            )
-            return (
-                uow.catalog.update_access_point(
-                    updated,
-                    expected_revision_version=expected_revision_version,
-                ),
-                access_point_id,
-            )
-
-        return self._mutate_evidence(
+        return self._geometry.update_access_point(
             principal,
             revision_id=revision_id,
+            access_point_id=access_point_id,
             expected_revision_version=expected_revision_version,
+            access_point_kind=access_point_kind,
+            name=name,
+            lat=lat,
+            lng=lng,
+            source_record_id=source_record_id,
+            fetched_at=fetched_at,
             operation_intent_id=operation_intent_id,
             reason_code=reason_code,
             reason_text=reason_text,
             request_id=request_id,
-            action="PLACE_ACCESS_POINT_UPDATED",
-            target_id=access_point_id,
-            payload=payload,
-            mutate=mutate,
         )
 
     def retire_access_point(
@@ -1065,30 +922,15 @@ class PlaceReviewWorkflowService(ReviewSupport):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        payload = {
-            "revision_id": revision_id,
-            "access_point_id": access_point_id,
-            "expected_revision_version": expected_revision_version,
-        }
-        return self._mutate_evidence(
+        return self._geometry.retire_access_point(
             principal,
             revision_id=revision_id,
+            access_point_id=access_point_id,
             expected_revision_version=expected_revision_version,
             operation_intent_id=operation_intent_id,
             reason_code=reason_code,
             reason_text=reason_text,
             request_id=request_id,
-            action="PLACE_ACCESS_POINT_RETIRED",
-            target_id=access_point_id,
-            payload=payload,
-            mutate=lambda uow, _revision: (
-                uow.catalog.retire_access_point(
-                    access_point_id,
-                    place_revision_id=revision_id,
-                    expected_revision_version=expected_revision_version,
-                ),
-                access_point_id,
-            ),
         )
 
     def create_time_rule(
@@ -1795,83 +1637,6 @@ class PlaceReviewWorkflowService(ReviewSupport):
             payload=payload,
             mutate=mutate,
         )
-
-    def _mutate_evidence(
-        self,
-        principal: AdminPrincipal,
-        *,
-        revision_id: str,
-        expected_revision_version: int,
-        operation_intent_id: str,
-        reason_code: str,
-        reason_text: str | None,
-        request_id: str,
-        action: str,
-        target_id: str,
-        payload: dict[str, object],
-        mutate: Callable[[ReviewUnitOfWork, PlaceRevision], tuple[PlaceRevision, str]],
-    ) -> PlaceRevision:
-        self._require(principal, "place:candidate:write")
-        reason_text = self._validate_reason(reason_code, reason_text)
-        operation_digest = _digest(
-            {**payload, "reason_code": reason_code, "reason_text": reason_text}
-        )
-        with self._uow_factory() as uow:
-            existing = self._replay(uow, operation_intent_id, operation_digest)
-            if existing is not None:
-                revision = uow.reviews.get_revision(revision_id)
-                if revision is None:
-                    raise ResourceNotFoundError
-                return revision
-            actor = self._actor(uow, principal)
-            revision = uow.reviews.get_revision(revision_id)
-            if revision is None:
-                raise ResourceNotFoundError
-            if revision.lifecycle_status != "candidate":
-                raise ReviewRevisionNotCandidateError
-            if revision.revision_version != expected_revision_version:
-                raise PlaceRevisionVersionConflictError
-            try:
-                updated, actual_target_id = mutate(uow, revision)
-            except ValueError as exc:
-                if "version conflict" in str(exc):
-                    raise PlaceRevisionVersionConflictError from exc
-                if "not found" in str(exc):
-                    raise ResourceNotFoundError from exc
-                raise
-            flags_to_clear = _evidence_flags_cleared_by_action(action)
-            if flags_to_clear:
-                cleaned = replace(
-                    updated,
-                    review_flags=tuple(
-                        flag for flag in updated.review_flags if flag not in flags_to_clear
-                    ),
-                )
-                if cleaned != updated:
-                    uow.reviews.update_revision(
-                        cleaned,
-                        expected_revision_number=updated.revision_number,
-                        expected_revision_version=updated.revision_version,
-                    )
-                    updated = cleaned
-            uow.audits.add(
-                self._event(
-                    actor,
-                    action=action,
-                    target_type=_evidence_target_type(action),
-                    target_id=actual_target_id,
-                    target_revision=str(updated.revision_number),
-                    before_digest=_revision_digest(revision),
-                    after_digest=_revision_digest(updated),
-                    reason_code=reason_code,
-                    reason_text=reason_text,
-                    request_id=request_id,
-                    operation_intent_id=operation_intent_id,
-                    operation_digest=operation_digest,
-                )
-            )
-            uow.commit()
-            return updated
 
     def review_evidence(
         self,
@@ -3245,30 +3010,6 @@ def _task_digest(task: PlaceReviewTask) -> str:
             "version": task.version,
         }
     )
-
-
-def _evidence_target_type(action: str) -> str:
-    for marker, target_type in (
-        ("HOLIDAY_EXCEPTIONS", "place_date_exception"),
-        ("DATE_EXCEPTION", "place_date_exception"),
-        ("ACCESS_POINT", "place_access_point"),
-        ("TIME_RULE", "place_time_rule"),
-        ("GEOMETRY", "place_geometry"),
-        ("CLOSURE", "place_closure"),
-    ):
-        if marker in action:
-            return target_type
-    raise ValueError("unknown place evidence action")
-
-
-def _evidence_flags_cleared_by_action(action: str) -> frozenset[str]:
-    if action in {"PLACE_GEOMETRY_CREATED", "PLACE_GEOMETRY_UPDATED"}:
-        return frozenset({"GEOMETRY_UNVERIFIED", "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY"})
-    if action in {"PLACE_ACCESS_POINT_CREATED", "PLACE_ACCESS_POINT_UPDATED"}:
-        return frozenset({"ACCESS_POINT_UNVERIFIED"})
-    if action in {"PLACE_TIME_RULE_CREATED", "PLACE_TIME_RULE_UPDATED"}:
-        return frozenset({"TIME_RULES_NOT_COLLECTED"})
-    return frozenset()
 
 
 def _evidence_digest(

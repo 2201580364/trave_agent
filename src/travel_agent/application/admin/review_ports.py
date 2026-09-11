@@ -8,6 +8,8 @@ from typing import Protocol, Self
 
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent
 from travel_agent.domain.place_catalog import (
+    PlaceAccessPoint,
+    PlaceGeometry,
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
@@ -182,3 +184,52 @@ class SourceReviewUnitOfWork(AuditContext, Protocol):
     ) -> bool | None: ...
 
     def commit(self) -> None: ...
+
+
+class EvidenceReviewUnitOfWork(AuditContext, Protocol):
+    @property
+    def reviews(self) -> SourceRevisionRepository: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None: ...
+
+    def commit(self) -> None: ...
+
+
+class GeometryCatalogRepository(Protocol):
+    def create_geometry(
+        self, geometry: PlaceGeometry, *, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+    def create_access_point(
+        self, access_point: PlaceAccessPoint, *, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+    def update_geometry(
+        self, geometry: PlaceGeometry, *, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+    def update_access_point(
+        self, access_point: PlaceAccessPoint, *, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+    def retire_geometry(
+        self, geometry_id: str, *, place_revision_id: str, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+    def retire_access_point(
+        self, access_point_id: str, *, place_revision_id: str, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None: ...
+
+
+class GeometryReviewUnitOfWork(EvidenceReviewUnitOfWork, Protocol):
+    @property
+    def catalog(self) -> GeometryCatalogRepository: ...

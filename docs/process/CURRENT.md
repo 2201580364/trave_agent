@@ -2,16 +2,18 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-12（S7-1 准备度与来源职责迁移完成待提交）
+- 更新时间：2026-09-12（S7-1 几何/访问点与共享证据事务拆分完成待提交）
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
-- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `524/524`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；累计新增旧导入兼容 1 项、来源审计回滚/重试 2 项；新来源/支持/接口模块 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
-- 最近提交基线：`cec78fd fix(ci): 隔离 OpenAPI 契约测试的快照依赖`，已进入 dev；用户确认远端全部通过，S7-1 开始。
+- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `530/530`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；本轮新增几何/访问点审计回滚重试 6 项；新几何/证据事务及接口模块 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
+- 最近提交基线：`9cc9792 refactor(admin): 拆分审核准备度与来源证据服务`，已进入 dev；本轮几何/访问点切片基于此提交。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-12 S7-1 来源/接口切片（H3，待提交）：5 个来源用例迁至 review_sources（322 行），门面保留同签名转发；review_support（138 行）共享权限/幂等/审计，review_ports（184 行）拆 3 个审核仓储 Protocol 并为来源实际收窄为 2+4 方法接口。累计 review.py 3998→3362 行。新增审计失败回滚与重试/重放两项集成回归；524/524（97.96s）、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc、ruff/分层128文件/API/文档通过，新模块 mypy 通过。旧门面类型债保留，无迁移/研究库写入。
+- 2026-09-12 S7-1 几何/访问点（H3，待提交）：6 用例迁入 review_geometry（361 行）；共享证据事务迁入 review_evidence（124 行）供几何与原时间证据复用，GeometryReviewUnitOfWork 收窄为 7 个仓储方法。门面同签名转发，review.py 3362→3103 行。新增6项审计失败回滚/同intent重试/重放回归。后端530/530（111.81s）、Golden8/8、ruff/分层130文件/API及新模块mypy通过；admin47/47/tsc/build、frontend19/19/tsc、文档门禁通过。无迁移/依赖/研究库写入。
 
-- 2026-09-12 S7-1 准备度首片（H3，待提交）：evaluate_review_readiness / _readiness_check 原样迁入 243 行 review_readiness.py，原 review.py 3998→3764 行，旧公共导入/私有别名兼容；离线报告直接依赖新模块。新增兼容测试，AST 对比所有原函数/类一致。全量 522/522（96.79s）、专项 14/14、Golden 8/8、admin 47/47/tsc/build、frontend 19/19/tsc、ruff/分层/API/文档全过。首轮 WinError 10055 单项及串行全量复跑通过；无研究库写入。其余职责与 Protocol 尚未拆分，S7-1 未整体完成。
+- 2026-09-12 S7-1 来源/接口切片（H3，已进入 dev：9cc9792）：5 个来源用例迁至 review_sources（322 行），门面保留同签名转发；review_support（138 行）共享权限/幂等/审计，review_ports（184 行）拆 3 个审核仓储 Protocol 并为来源实际收窄为 2+4 方法接口。累计 review.py 3998→3362 行。新增审计失败回滚与重试/重放两项集成回归；524/524（97.96s）、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc、ruff/分层128文件/API/文档通过，新模块 mypy 通过。旧门面类型债保留，无迁移/研究库写入。
+
+- 2026-09-12 S7-1 准备度首片（H3，已进入 dev：9cc9792）：evaluate_review_readiness / _readiness_check 原样迁入 243 行 review_readiness.py，原 review.py 3998→3764 行，旧公共导入/私有别名兼容；离线报告直接依赖新模块。新增兼容测试，AST 对比所有原函数/类一致。全量 522/522（96.79s）、专项 14/14、Golden 8/8、admin 47/47/tsc/build、frontend 19/19/tsc、ruff/分层/API/文档全过。首轮 WinError 10055 单项及串行全量复跑通过；无研究库写入。其余职责与 Protocol 尚未拆分，S7-1 未整体完成。
 
 - 2026-09-11 CI 契约测试隔离修复（H3/S8-2，已进入 dev：cec78fd）：测试 fixture 在临时目录真实导出 schema，检查显式传 --schema；当前契约强制 exit 0，缺契约错误隔离验证，只读两次成功且内容不变。专项 7/7、锁定环境全量 521/521（86.72s）、ruff、124 文件分层零违规；文档门禁通过。未改 CI/业务/依赖/研究库，未重跑前端与 Golden，历史基线不冒充本轮结果。用户确认批次排除 027/052，CI 远端已由用户确认全绿。
 
@@ -72,7 +74,8 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| S7-1 准备度职责迁移（H3） | dev | `application/admin/{review,review_readiness,review_ports,review_support,review_sources}.py`、`data_governance/research_readiness.py`、`tests/application/{test_admin_review_readiness,test_review_source_boundary}.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 准备度与来源切片实现完成待提交；524/524、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc；新模块 mypy 通过，S7-1 其余子域待拆分 |
+| S7-1 几何/访问点与证据事务（H3） | dev | `application/admin/{review,review_ports,review_geometry,review_evidence}.py`、`tests/application/test_review_geometry_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 本片完成待提交；530/530、Golden8/8、两端验证通过，S7-1仍进行中 |
+| S7-1 准备度职责迁移（H3） | dev | `application/admin/{review,review_readiness,review_ports,review_support,review_sources}.py`、`data_governance/research_readiness.py`、`tests/application/{test_admin_review_readiness,test_review_source_boundary}.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已进入 dev（9cc9792）；524/524、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc；新模块 mypy 通过，S7-1 其余子域待拆分 |
 | CI 契约测试隔离修复（H3/S8-2） | dev | `tests/scripts/test_openapi_contract.py`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档 | 已进入 dev（cec78fd）；用户确认远端全绿 |
 | S7 前置核对与拆分准备（H3） | dev | `docs/process/{CURRENT,transformation-plan}.md`、`docs/process/status-archive/2026-09.md` | 前置核对完成；批次排除 027/052、用户确认 CI 全绿，S7-1 已启动 |
 | S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 已进入 dev（436bf20）；521/521 + Golden 8/8，两端验证通过；后续 cec78fd 修复后远端全绿（用户确认） |

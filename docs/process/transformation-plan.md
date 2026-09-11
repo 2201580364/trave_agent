@@ -153,7 +153,7 @@
 
 | # | 任务 | 拆分对象 → 目标 | 状态 |
 |---|---|---|---|
-| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源服务、共享支持和仓储 Protocol 拆分完成待提交，后端 524/524；几何/关系/时间/发布等仍待拆分） |
+| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何与访问点、共享证据事务完成待提交，后端530/530与两端回归通过；关系/时间/发布等仍待拆分） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 3–4 个仓储 | 未开始 |
 | S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
@@ -234,3 +234,7 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 在未提交的准备度首片基础上继续：review_sources.py 承载 5 个来源用例，review.py 显式同签名转发；review_support.py 共享权限、actor、幂等重放、审计构造及摘要，仍由用例同一 UoW 写入并提交。review_ports.py 将原 ReviewRepository 分为修订查询/修订写入/审核任务 Protocol，保留兼容聚合；来源用例实际使用仅有 get_revision/update_revision 的 SourceRevisionRepository 和 4 方法 SourceCatalogRepository，通过只读属性组成窄 SourceReviewUnitOfWork。未拆分的用例暂用兼容聚合，不宣称全部窄化完成。新模块分别 322/138/184 行，审核门面累计 3998→3362 行。
 
 补充审计失败回滚与相同 intent 重试/重放回归，覆盖新增来源和冲突裁决；源用例 AST、门面签名和 OpenAPI 保持一致。类型验证：三个新模块 mypy 通过；旧门面仍有既有类型债，不扩大为业务重写。其余 S7-1 子域尚未完成。
+
+### 2026-09-12 S7-1 几何与访问点切片（H3）
+
+6 个新增/编辑/停用用例原样迁至 review_geometry.py，门面同签名显式委托。共享 _mutate_evidence 与动作类型/清理标记 helper 迁至 review_evidence.py，几何与原时间证据路径复用同一泛型事务支持；几何使用窄 GeometryReviewUnitOfWork 与 7 方法仓储，事务支持只依赖修订读写与审计上下文，不获得发布能力。新模块 361/124 行，review_ports 235 行，review.py 3362→3103 行；原行为与 OpenAPI 不变。新增 6 项几何/访问点写入的审计失败回滚、同 intent 重试及重放回归。S7-1 仍未全部完成。
