@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
@@ -18,15 +19,14 @@ from travel_agent.infrastructure.database.place_catalog import (
     PlaceAccessPointRow,
     PlaceRevisionRow,
     PlaceRow,
+    PlaceTimeRuleRow,
     SolverPlaceProjectionRow,
 )
 from travel_agent.local_dev import build_local_dev_app, build_local_hangzhou_catalog
 
 
 def test_local_catalog_is_explicit_and_covers_evening_attraction() -> None:
-    snapshots, catalog = build_local_hangzhou_catalog(
-        reference_date=date(2026, 8, 25)
-    )
+    snapshots, catalog = build_local_hangzhou_catalog(reference_date=date(2026, 8, 25))
 
     published = catalog.load(snapshots.current_version("hangzhou"))
     by_id = {item.external_id: item.attraction for item in published.attractions}
@@ -38,9 +38,7 @@ def test_local_catalog_is_explicit_and_covers_evening_attraction() -> None:
     assert all(item.attraction.data_verified for item in published.attractions)
 
 
-def test_local_app_uses_migrated_database_and_serves_catalog(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_local_app_uses_migrated_database_and_serves_catalog(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "local-dev.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     migration = Config("alembic.ini")
@@ -48,9 +46,7 @@ def test_local_app_uses_migrated_database_and_serves_catalog(
     migration.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(migration, "head")
     monkeypatch.setenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "local.admin")
-    monkeypatch.setenv(
-        "TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "Local-Admin-Password-2026!"
-    )
+    monkeypatch.setenv("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "Local-Admin-Password-2026!")
 
     client = TestClient(
         build_local_dev_app(
@@ -111,7 +107,8 @@ def test_local_app_exposes_holiday_sync_capability_from_environment(
     assert capability.json()["execution_available"] is True
 
 
-def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None:
+@pytest.mark.parametrize("show", [False, True])
+def test_local_app_prefers_database_published_projection(tmp_path: Path, show: bool) -> None:
     database_path = tmp_path / "published.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     migration = Config("alembic.ini")
@@ -121,50 +118,130 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None
     engine = build_engine(DatabaseSettings(url=database_url))
     sessions = build_session_factory(engine)
     with sessions() as session:
-        session.add(PlaceRow(
-            place_id="published-place",
-            city_id="hangzhou",
-            status="active",
-            merged_into_place_id=None,
-            created_at="2026-08-01T00:00:00+00:00",
-            updated_at="2026-08-01T00:00:00+00:00",
-        ))
-        session.add(PlaceRevisionRow(
-            place_revision_id="published-revision",
-            place_id="published-place",
-            revision_number=1,
-            revision_version=1,
-            lifecycle_status="published",
-            canonical_name="数据库发布景点",
-            aliases=[], place_kind="attraction", category="景点", admin_area="杭州",
-            address="杭州", geometry_kind="point", duration_min=30,
-            duration_recommended=90, duration_max=120, internal_travel_min=5,
-            energy_level=2, indoor_outdoor="outdoor", suitable_periods=[],
-            audience_tags=[], rain_suitability="conditional", is_always_open=True,
-            solver_eligible=True, conflicts_resolved=True, source_record_ids=[],
-            created_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
-            published_at="2026-08-30T00:00:00+00:00", review_flags=[],
-            relation_review_status="no_relations",
-        ))
-        session.add(PlaceAccessPointRow(
-            access_point_id="published-access", place_revision_id="published-revision",
-            access_point_kind="visitor_entrance", name="入口", lat=30.25, lng=120.16,
-            source_record_id="missing-source", review_status="human_verified", active=True,
-            fetched_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
-            created_at="2026-08-01T00:00:00+00:00",
-        ))
-        session.add(SolverPlaceProjectionRow(
-            projection_id="published-projection", projection_version="projection-v1",
-            data_snapshot_version="db-published-v1", place_id="published-place",
-            place_revision_id="published-revision", solver_node_id=101,
-            place_kind="attraction", geometry_kind="point",
-            arrival_access_point_id="published-access",
-            departure_access_point_id="published-access",
-            duration_min=30, duration_recommended=90, duration_max=120,
-            internal_travel_min=5, solver_payload={"name": "数据库发布景点"},
-            projection_hash="a" * 64, status="published", gate_reason_codes=[],
-            created_at="2026-08-30T00:00:00+00:00", published_at="2026-08-30T00:00:00+00:00",
-        ))
+        session.add(
+            PlaceRow(
+                place_id="published-place",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at="2026-08-01T00:00:00+00:00",
+                updated_at="2026-08-01T00:00:00+00:00",
+            )
+        )
+        session.add(
+            PlaceRevisionRow(
+                place_revision_id="published-revision",
+                place_id="published-place",
+                revision_number=1,
+                revision_version=1,
+                lifecycle_status="published",
+                canonical_name="数据库发布景点",
+                aliases=[],
+                place_kind="show" if show else "attraction",
+                category="景点",
+                admin_area="杭州",
+                address="杭州",
+                geometry_kind="point",
+                duration_min=30,
+                duration_recommended=90,
+                duration_max=120,
+                internal_travel_min=5,
+                energy_level=2,
+                indoor_outdoor="outdoor",
+                suitable_periods=[],
+                audience_tags=[],
+                rain_suitability="conditional",
+                is_always_open=not show,
+                solver_eligible=True,
+                conflicts_resolved=True,
+                source_record_ids=[],
+                created_at="2026-08-01T00:00:00+00:00",
+                reviewed_at="2026-08-01T00:00:00+00:00",
+                published_at="2026-08-30T00:00:00+00:00",
+                review_flags=[],
+                relation_review_status="no_relations",
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="published-access",
+                place_revision_id="published-revision",
+                access_point_kind="visitor_entrance",
+                name="入口",
+                lat=30.25,
+                lng=120.16,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                fetched_at="2026-08-01T00:00:00+00:00",
+                reviewed_at="2026-08-01T00:00:00+00:00",
+                created_at="2026-08-01T00:00:00+00:00",
+            )
+        )
+        session.add(
+            SolverPlaceProjectionRow(
+                projection_id="published-projection",
+                projection_version="projection-v1",
+                data_snapshot_version="db-published-v1",
+                place_id="published-place",
+                place_revision_id="published-revision",
+                solver_node_id=101,
+                place_kind="show" if show else "attraction",
+                geometry_kind="point",
+                arrival_access_point_id="published-access",
+                departure_access_point_id="published-access",
+                duration_min=30,
+                duration_recommended=90,
+                duration_max=120,
+                internal_travel_min=5,
+                solver_payload={
+                    "name": "数据库发布景点",
+                    **(
+                        {
+                            "fixed_sessions": [
+                                {
+                                    "session_id": "show-early",
+                                    "source_record_id": "reviewed-source",
+                                    "start_min": 1080,
+                                    "end_min": 1140,
+                                    "last_entry_min": 1070,
+                                },
+                                {
+                                    "session_id": "show-late",
+                                    "source_record_id": "reviewed-source",
+                                    "start_min": 1200,
+                                    "end_min": 1260,
+                                },
+                            ]
+                        }
+                        if show
+                        else {}
+                    ),
+                },
+                projection_hash="a" * 64,
+                status="published",
+                gate_reason_codes=[],
+                created_at="2026-08-30T00:00:00+00:00",
+                published_at="2026-08-30T00:00:00+00:00",
+            )
+        )
+        if show:
+            session.add(
+                PlaceTimeRuleRow(
+                    time_rule_id="show-early",
+                    place_revision_id="published-revision",
+                    rule_kind="fixed_session",
+                    weekdays=list(range(1, 8)),
+                    start_minute=1080,
+                    end_minute=1140,
+                    last_entry_minute=1070,
+                    source_record_id="reviewed-source",
+                    review_status="human_verified",
+                    active=True,
+                    created_at="2026-08-01T00:00:00+00:00",
+                    reviewed_at="2026-08-01T00:00:00+00:00",
+                )
+            )
         session.commit()
 
     app = build_local_dev_app(database_url=database_url, reference_date=date(2026, 8, 25))
@@ -174,8 +251,29 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path) -> None
     assert response.status_code == 200
     body = response.json()
     assert body["data_snapshot_version"].startswith("database-hangzhou-")
-    assert body["items"] == [{
-        "attraction_id": "published-place", "name": "数据库发布景点",
-        "suggested_duration_min": 90, "is_always_open": True, "is_indoor": False,
-        "energy_level": 2, "close_days": [], "coordinate": {"lat": 30.25, "lng": 120.16},
-    }]
+    assert body["items"] == [
+        {
+            "attraction_id": "published-place",
+            "name": "数据库发布景点",
+            "suggested_duration_min": 90,
+            "is_always_open": not show,
+            "is_indoor": False,
+            "energy_level": 2,
+            "close_days": [],
+            "coordinate": {"lat": 30.25, "lng": 120.16},
+        }
+    ]
+
+    if show:
+        from travel_agent.infrastructure.solver.database_published import (
+            DatabasePublishedSolverDataProvider,
+        )
+
+        _, fallback = build_local_hangzhou_catalog(reference_date=date(2026, 8, 25))
+        published = DatabasePublishedSolverDataProvider(
+            sessions, city_id="hangzhou", fallback=fallback
+        ).load(body["data_snapshot_version"])
+        attraction = published.attractions[0].attraction
+        assert attraction.time_rules == ()
+        assert [s.session_id for s in attraction.fixed_sessions] == ["show-early", "show-late"]
+        assert attraction.fixed_sessions[0].entry_min == 1070

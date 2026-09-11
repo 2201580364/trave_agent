@@ -308,7 +308,7 @@ def test_gate_rejects_unverified_access_hash_drift_and_overlap() -> None:
     assert "PROJECTION_HASH_MISMATCH" in reasons
 
 
-def test_show_with_multiple_fixed_sessions_is_rejected() -> None:
+def test_show_with_multiple_fixed_sessions_is_publishable() -> None:
     revision = replace(
         _revision(),
         place_kind="show",
@@ -336,7 +336,7 @@ def test_show_with_multiple_fixed_sessions_is_rejected() -> None:
     )
     context = replace(_context(projection=projection), revision=revision, time_rules=sessions)
 
-    assert "FIXED_SESSION_AMBIGUOUS" in evaluate_projection_publication(context)
+    assert not evaluate_projection_publication(context)
 
 
 def test_show_with_only_opening_hours_requires_a_fixed_session() -> None:

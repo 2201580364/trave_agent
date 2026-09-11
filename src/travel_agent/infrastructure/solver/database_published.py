@@ -21,6 +21,7 @@ from travel_agent.infrastructure.database.place_catalog import (
     PlaceRow,
     PlaceTimeRuleRow,
     SolverPlaceProjectionRow,
+    SqlAlchemyPlaceCatalogRepository,
 )
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -32,6 +33,7 @@ from travel_agent.solver import (
     WeatherSeverity,
 )
 
+from .fixed_sessions import parse_fixed_sessions
 from .gateway import PublishedAttraction, PublishedSolverData, PublishedSolverDataProvider
 
 
@@ -113,8 +115,7 @@ class DatabasePublishedSolverDataProvider:
                     continue
                 access_rows = tuple(
                     session.scalars(
-                        select(PlaceAccessPointRow)
-                        .where(
+                        select(PlaceAccessPointRow).where(
                             PlaceAccessPointRow.place_revision_id == revision.place_revision_id,
                             PlaceAccessPointRow.active.is_(True),
                             PlaceAccessPointRow.review_status == "human_verified",
@@ -132,13 +133,35 @@ class DatabasePublishedSolverDataProvider:
                 payload = projection.solver_payload or {}
                 name = str(payload.get("name") or revision.canonical_name)
                 duration = int(payload.get("suggested_duration") or revision.duration_recommended)
-                rules = _time_rules(session, revision.place_revision_id)
+                rules = (
+                    ()
+                    if revision.place_kind == "show"
+                    else _time_rules(session, revision.place_revision_id)
+                )
+                fixed_sessions = ()
+                if revision.place_kind == "show":
+                    from travel_agent.domain.place_catalog.session_payload import (
+                        build_fixed_session_payload,
+                    )
+
+                    session_payload = payload.get("fixed_sessions")
+                    if session_payload is None:
+                        evidence = SqlAlchemyPlaceCatalogRepository(session).load_revision_evidence(
+                            revision.place_revision_id
+                        )
+                        if evidence is None:
+                            raise ValueError("show evidence is missing")
+                        session_payload = build_fixed_session_payload(evidence)
+                    fixed_sessions = parse_fixed_sessions(session_payload)
+                    if not fixed_sessions:
+                        raise ValueError("published show requires a fixed session")
                 attraction = Attraction(
                     solver_node_id,
                     name,
                     close_days=frozenset(_close_days(session, revision.place_revision_id)),
                     open_on_dates=frozenset(
                         _exception_dates(session, revision.place_revision_id, "open_override")
+                        + _exception_dates(session, revision.place_revision_id, "session_override")
                     ),
                     closed_on_dates=frozenset(
                         _exception_dates(session, revision.place_revision_id, "closed")
@@ -149,6 +172,7 @@ class DatabasePublishedSolverDataProvider:
                     is_indoor=revision.indoor_outdoor == "indoor",
                     energy_level=revision.energy_level,
                     data_verified=True,
+                    fixed_sessions=fixed_sessions,
                 )
                 attractions.append(PublishedAttraction(revision.place_id, attraction, coordinate))
             if not attractions:
@@ -260,8 +284,7 @@ def _latest_published_projections(
             select(SolverPlaceProjectionRow)
             .join(
                 PlaceRevisionRow,
-                PlaceRevisionRow.place_revision_id
-                == SolverPlaceProjectionRow.place_revision_id,
+                PlaceRevisionRow.place_revision_id == SolverPlaceProjectionRow.place_revision_id,
             )
             .join(PlaceRow, PlaceRow.place_id == SolverPlaceProjectionRow.place_id)
             .where(

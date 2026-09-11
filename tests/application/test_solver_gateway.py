@@ -49,38 +49,45 @@ def _published() -> PublishedSolverData:
         PublishedAttraction(
             "attr_west_lake",
             Attraction(
-                1, "西湖湖滨", suggested_duration=90,
-                is_always_open=True, energy_level=2, data_verified=True,
+                1,
+                "西湖湖滨",
+                suggested_duration=90,
+                is_always_open=True,
+                energy_level=2,
+                data_verified=True,
             ),
             Coordinate(30.2590, 120.1650),
         ),
         PublishedAttraction(
             "attr_fountain",
             Attraction(
-                2, "湖滨晚间表演", suggested_duration=30,
-                is_always_open=True, energy_level=1, data_verified=True,
+                2,
+                "湖滨晚间表演",
+                suggested_duration=30,
+                is_always_open=True,
+                energy_level=1,
+                data_verified=True,
             ),
             Coordinate(30.2591, 120.1660),
         ),
     )
     coordinates = {
-        item.attraction.id: item.coordinate
-        for item in attractions
-        if item.coordinate is not None
+        item.attraction.id: item.coordinate for item in attractions if item.coordinate is not None
     }
     provider = ApproximateTravelTimeProvider(
         coordinates,
         data_version=VERSION,
         fetched_at=NOW,
     )
-    weather = {
-        TODAY: DailyWeather(
-            TODAY, WeatherBasis.FORECAST, WeatherSeverity.NORMAL, "sunny"
-        )
-    }
+    weather = {TODAY: DailyWeather(TODAY, WeatherBasis.FORECAST, WeatherSeverity.NORMAL, "sunny")}
     return PublishedSolverData(
-        VERSION, "hangzhou", attractions, weather, provider,
-        "approximate", "forecast",
+        VERSION,
+        "hangzhou",
+        attractions,
+        weather,
+        provider,
+        "approximate",
+        "forecast",
     )
 
 
@@ -102,9 +109,7 @@ def _request(
             "last_visit_to_station_min": 0,
             "travel_mode": "normal",
         },
-        "selected_attraction_ids": attraction_ids or [
-            "attr_west_lake", "attr_fountain"
-        ],
+        "selected_attraction_ids": attraction_ids or ["attr_west_lake", "attr_fountain"],
         "visit_period_preferences": [
             {
                 "attraction_id": "attr_fountain",
@@ -114,13 +119,9 @@ def _request(
         ],
         "data_snapshot_version": VERSION,
     }
-    serialized = json.dumps(
-        snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    )
+    serialized = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     snapshot_hash = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-    return SolverRequest(
-        "solver_run_1", "intent_1", snapshot, snapshot_hash, VERSION, 7
-    )
+    return SolverRequest("solver_run_1", "intent_1", snapshot, snapshot_hash, VERSION, 7)
 
 
 def _gateway() -> ProductionSolverGateway:
@@ -182,9 +183,7 @@ def _balanced_gateway() -> ProductionSolverGateway:
         for attraction_id in range(1, 8)
     )
     coordinates = {
-        item.attraction.id: item.coordinate
-        for item in attractions
-        if item.coordinate is not None
+        item.attraction.id: item.coordinate for item in attractions if item.coordinate is not None
     }
     provider = ApproximateTravelTimeProvider(
         coordinates,
@@ -273,8 +272,7 @@ def _od_clustered_gateway() -> ProductionSolverGateway:
             )
             mode = (
                 ODTravelMode.WALKING
-                if frozenset({origin_id, destination_id})
-                in {frozenset({1, 2}), frozenset({3, 7})}
+                if frozenset({origin_id, destination_id}) in {frozenset({1, 2}), frozenset({3, 7})}
                 else ODTravelMode.DRIVING
             )
             results[(origin_id, destination_id)] = TravelTimeResult(
@@ -321,15 +319,11 @@ def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     assert first.result_snapshot_hash == second.result_snapshot_hash
     assert first.result_snapshot["accounting"]["conserved"] is True
     nodes = first.result_snapshot["days"][0]["nodes"]
-    assert {item["attraction_id"] for item in nodes} == {
-        "attr_west_lake", "attr_fountain"
-    }
+    assert {item["attraction_id"] for item in nodes} == {"attr_west_lake", "attr_fountain"}
     assert [item["node_id"] for item in nodes] == [
         item["node_id"] for item in second.result_snapshot["days"][0]["nodes"]
     ]
-    connected_node = next(
-        item for item in nodes if item["travel_from_previous_min"] > 0
-    )
+    connected_node = next(item for item in nodes if item["travel_from_previous_min"] > 0)
     assert connected_node["transport_mode"] == "walking_estimate"
     assert connected_node["travel_basis"] == "approximate"
     assert connected_node["travel_distance_m"] > 0
@@ -392,9 +386,7 @@ def test_gateway_derives_stable_balanced_dates_when_user_has_no_date_preference(
     first_counts = [len(day["nodes"]) for day in first.result_snapshot["days"]]
     second_counts = [len(day["nodes"]) for day in second.result_snapshot["days"]]
     scheduled_ids = {
-        node["attraction_id"]
-        for day in first.result_snapshot["days"]
-        for node in day["nodes"]
+        node["attraction_id"] for day in first.result_snapshot["days"] for node in day["nodes"]
     }
 
     assert first_counts == second_counts
@@ -538,9 +530,7 @@ def test_od_clusters_move_one_visit_when_duration_balance_costs_little_od() -> N
         InMemoryTravelTimeProvider(results),
     )
     cluster_ids = [set(item.id for item in cluster) for cluster in clusters]
-    durations = sorted(
-        sum(item.suggested_duration for item in cluster) for cluster in clusters
-    )
+    durations = sorted(sum(item.suggested_duration for item in cluster) for cluster in clusters)
 
     assert sorted(map(len, clusters)) == [2, 2, 3]
     assert {3, 4, 5} in cluster_ids
@@ -574,3 +564,42 @@ def test_mutated_input_snapshot_is_rejected_by_hash_integrity_check() -> None:
 
     assert raised.value.code == "invalid_solver_input"
     assert raised.value.retryable is False
+
+
+def test_gateway_returns_selected_show_session_and_true_start_time():
+    """H3/C2: the persisted result identifies the actual session, including early entry."""
+    from dataclasses import replace
+
+    from travel_agent.solver.models import FixedSession
+
+    published = _published()
+    show = replace(
+        published.attractions[1],
+        attraction=replace(
+            published.attractions[1].attraction,
+            is_always_open=False,
+            fixed_sessions=(
+                FixedSession("too-early", 480, 510),
+                FixedSession("selected", 1110, 1170, 1100),
+            ),
+        ),
+    )
+    published = replace(published, attractions=(published.attractions[0], show))
+    gateway = ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((published,)), FixedClock()
+    )
+    result = gateway.solve(_request())
+    assert result.quality_gate_passed
+    nodes = result.result_snapshot["days"][0]["nodes"]
+    show_nodes = [n for n in nodes if n["attraction_id"] == "attr_fountain"]
+    assert len(show_nodes) == 1
+    assert show_nodes[0]["selected_session"] == {
+        "session_id": "selected",
+        "start_min": 1110,
+        "end_min": 1170,
+        "entry_min": 1100,
+    }
+    assert show_nodes[0]["timing_kind"] == "fixed_event"
+    assert show_nodes[0]["arrival_min"] == 1100
+    assert show_nodes[0]["leave_min"] == 1170
+    assert result.result_snapshot_hash == gateway.solve(_request()).result_snapshot_hash

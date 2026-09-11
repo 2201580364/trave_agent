@@ -236,7 +236,7 @@ def test_always_open_needs_no_time_rule_but_still_requires_time_exceptions_revie
     assert "time" in with_pending_closure["pending_review_checks"]
 
 
-def test_show_requires_exactly_one_fixed_session() -> None:
+def test_show_requires_at_least_one_active_fixed_session() -> None:
     show = _revision(place_kind="show")
     only_opening_hours = _review_readiness(_evidence(revision=show), None)
     assert _check(only_opening_hours, "time")["collected"] is False
@@ -253,7 +253,14 @@ def test_show_requires_exactly_one_fixed_session() -> None:
         _evidence(revision=show, time_rules=(fixed_session, second_session)),
         None,
     )
-    assert _check(two_sessions, "time")["collected"] is False
+    assert _check(two_sessions, "time")["collected"] is True
+    inactive = replace(fixed_session, active=False, review_status="rejected")
+    assert (
+        _check(_review_readiness(_evidence(revision=show, time_rules=(inactive,)), None), "time")[
+            "collected"
+        ]
+        is False
+    )
 
 
 def test_active_child_evidence_with_inactive_source_is_not_ready() -> None:
@@ -299,3 +306,82 @@ def test_active_relation_must_be_resolved_and_human_verified() -> None:
     verified = replace(resolved, review_status="human_verified", reviewed_at=NOW)
     verified_result = _review_readiness(_evidence(relations=(verified,)), None)
     assert _check(verified_result, "relation")["verified"] is True
+
+
+def test_inactive_bad_time_evidence_does_not_block_readiness():
+    """H3: an inactive child with missing/conflicting source is informational only."""
+    conflict = replace(_source(), source_record_id="old", content_sha256="d" * 64)
+    inactive = replace(_time_rule(source_record_id="old"), active=False, time_rule_id="old-rule")
+    result = _review_readiness(
+        _evidence(sources=(_source(), conflict), time_rules=(_time_rule(), inactive)), None
+    )
+    assert _check(result, "source")["collected"] is True
+    assert _check(result, "time")["verified"] is True
+    result = _review_readiness(_evidence(time_rules=(_time_rule(), inactive)), None)
+    assert _check(result, "time")["verified"] is True
+
+
+def test_incomplete_or_late_entry_session_cannot_pass_readiness():
+    """H3/C2: invalid candidate facts remain editable and cannot be approved."""
+    for changes in ({"end_minute": None}, {"last_entry_minute": 600}):
+        rule = replace(_time_rule(rule_kind="fixed_session"), **changes)
+        result = _review_readiness(
+            _evidence(revision=_revision(place_kind="show"), time_rules=(rule,)), None
+        )
+        assert _check(result, "time")["collected"] is False
+
+
+def test_published_session_payload_applies_override_and_excludes_inactive_rules():
+    """H3/C2: reviewed date overrides replace regular sessions on that date only."""
+    from travel_agent.domain.place_catalog.session_payload import build_fixed_session_payload
+    from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
+
+    day = date(2026, 9, 10)
+    regular = replace(
+        _time_rule(rule_kind="fixed_session"),
+        start_minute=1080,
+        end_minute=1140,
+        last_entry_minute=1070,
+    )
+    override = PlaceDateException(
+        "override",
+        "revision-1",
+        day,
+        "session_override",
+        1200,
+        1260,
+        1190,
+        SOURCE_ID,
+        "human_verified",
+        True,
+        NOW,
+        NOW,
+    )
+    evidence = _evidence(
+        time_rules=(regular, replace(regular, time_rule_id="inactive", active=False)),
+        date_exceptions=(override,),
+    )
+    sessions = parse_fixed_sessions(build_fixed_session_payload(evidence))
+    assert [s.session_id for s in sessions if s.matches(day)] == ["override"]
+    assert [s.session_id for s in sessions if s.matches(date(2026, 9, 11))] == ["time-rule-1"]
+
+
+def test_show_session_respects_separate_last_entry_rule():
+    """H3/C2: multi-session support must not bypass the venue entry cutoff."""
+    from travel_agent.domain.place_catalog.session_payload import build_fixed_session_payload
+    from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
+
+    regular = replace(_time_rule(rule_kind="fixed_session"), start_minute=1080, end_minute=1140)
+    deadline = replace(
+        _time_rule(rule_kind="last_entry"), time_rule_id="deadline", last_entry_minute=1020
+    )
+    sessions = parse_fixed_sessions(
+        build_fixed_session_payload(_evidence(time_rules=(regular, deadline)))
+    )
+    assert not sessions[0].matches(date(2026, 9, 10))
+    sessions = parse_fixed_sessions(
+        build_fixed_session_payload(
+            _evidence(time_rules=(regular, replace(deadline, active=False)))
+        )
+    )
+    assert sessions[0].matches(date(2026, 9, 10))

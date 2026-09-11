@@ -27,7 +27,11 @@ from .models import (
     RouteValidation,
     RouteVisit,
 )
-from .time_windows import DEFAULT_DURATION_RATIO, resolve_effective_window
+from .time_windows import (
+    DEFAULT_DURATION_RATIO,
+    applicable_fixed_sessions,
+    resolve_effective_window,
+)
 from .transport import (
     DEFAULT_TRANSIT_BUFFER_RATIO,
     TravelTimeProvider,
@@ -110,20 +114,12 @@ def route_day(
                 allocations[from_node - 1].attraction.id,
                 terminal_attraction_id,
             )
-            return (
-                travel.travel_min * travel_cost_scale
-                if travel is not None
-                else drop_penalty
-            )
+            return travel.travel_min * travel_cost_scale if travel is not None else drop_penalty
         travel = provider.get_travel_time(
             allocations[from_node - 1].attraction.id,
             allocations[to_node - 1].attraction.id,
         )
-        return (
-            travel.travel_min * travel_cost_scale
-            if travel is not None
-            else drop_penalty
-        )
+        return travel.travel_min * travel_cost_scale if travel is not None else drop_penalty
 
     cost_callback = routing.RegisterTransitCallback(raw_travel_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(cost_callback)
@@ -162,6 +158,39 @@ def route_day(
 
     for node, allocation in enumerate(allocations, start=1):
         index = manager.NodeToIndex(node)
+        if allocation.attraction.fixed_sessions:
+            sessions = tuple(
+                item
+                for item in applicable_fixed_sessions(
+                    allocation.attraction,
+                    day_plan.visit_date,
+                )
+                if day_plan.bounds.start_min <= item.entry_min
+                and item.end_min <= day_plan.bounds.end_min
+                and item.end_min - item.start_min >= allocation.required_duration_min
+            )
+            routing.AddDisjunction([index], drop_penalty)
+            if not sessions:
+                routing.ActiveVar(index).SetValue(0)
+                continue
+            # One routing node, disjoint exact entry times; service covers the complete show.
+            # For identical entry instants, the shortest complete feasible session is canonical.
+            duration_by_entry: dict[int, int] = {}
+            for session in sessions:
+                duration_by_entry.setdefault(session.entry_min, session.end_min - session.entry_min)
+            cumul = time_dimension.CumulVar(index)
+            cumul.SetValues(sorted(duration_by_entry))
+            duration = routing.solver().Sum(
+                [
+                    routing.solver().IsEqualCstVar(cumul, entry) * length
+                    for entry, length in sorted(duration_by_entry.items())
+                ]
+            )
+            routing.solver().Add(
+                time_dimension.SlackVar(index) >= duration - allocation.required_duration_min
+            )
+            routing.AddVariableMinimizedByFinalizer(cumul)
+            continue
         resolution = resolve_effective_window(allocation.attraction, day_plan.visit_date)
         if resolution.window is None:
             routing.AddDisjunction([index], drop_penalty)
@@ -201,9 +230,7 @@ def route_day(
 
     search = pywrapcp.DefaultRoutingSearchParameters()
     search.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
-    search.local_search_metaheuristic = (
-        routing_enums_pb2.LocalSearchMetaheuristic.GREEDY_DESCENT
-    )
+    search.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GREEDY_DESCENT
     search.time_limit.seconds = time_limit_seconds
     executor = search_executor or DefaultRoutingSearchExecutor()
     search_started = perf_counter()
@@ -226,10 +253,7 @@ def route_day(
             day_plan.visit_date,
             day_plan.bounds,
             (),
-            tuple(
-                RouteUnplaced(item.attraction, rejection_code)
-                for item in allocations
-            ),
+            tuple(RouteUnplaced(item.attraction, rejection_code) for item in allocations),
             0,
             0,
             metadata,
@@ -238,8 +262,7 @@ def route_day(
     dropped = {
         node
         for node in range(1, len(allocations) + 1)
-        if solution.Value(routing.NextVar(manager.NodeToIndex(node)))
-        == manager.NodeToIndex(node)
+        if solution.Value(routing.NextVar(manager.NodeToIndex(node))) == manager.NodeToIndex(node)
     }
     unplaced = tuple(
         RouteUnplaced(allocations[node - 1].attraction, RejectionCode.ROUTING_UNPLACED)
@@ -266,8 +289,28 @@ def route_day(
             total_travel += travel.travel_min
             buffered_travel = math.ceil(travel.travel_min * buffer_ratio)
             total_buffered_travel += buffered_travel
+        selected_session = next(
+            (
+                item
+                for item in applicable_fixed_sessions(
+                    allocation.attraction,
+                    day_plan.visit_date,
+                )
+                if item.entry_min == arrival_min
+                and item.end_min - item.start_min >= allocation.required_duration_min
+            ),
+            None,
+        )
+        planned_duration = (
+            selected_session.end_min - selected_session.entry_min
+            if selected_session is not None
+            else allocation.required_duration_min
+        )
         notice = None
-        if allocation.required_duration_min < allocation.attraction.suggested_duration:
+        if (
+            selected_session is None
+            and allocation.required_duration_min < allocation.attraction.suggested_duration
+        ):
             notice = (
                 f"实际可玩 {allocation.required_duration_min} 分钟"
                 f"（建议 {allocation.attraction.suggested_duration} 分钟）"
@@ -276,8 +319,8 @@ def route_day(
             RouteVisit(
                 allocation.attraction,
                 arrival_min,
-                arrival_min + allocation.required_duration_min,
-                allocation.required_duration_min,
+                arrival_min + planned_duration,
+                planned_duration,
                 travel,
                 buffered_travel,
                 notice,
@@ -364,9 +407,17 @@ def validate_routed_day(
                 raise ValueError("weather mapping key must match DailyWeather.day")
             weather_result = evaluate_weather_availability(attraction, weather)
             if weather_result.rejection_code is not None:
-                violations.append(
-                    ConstraintViolation(weather_result.rejection_code, attraction.id)
+                violations.append(ConstraintViolation(weather_result.rejection_code, attraction.id))
+        if attraction.fixed_sessions and not any(
+            item.entry_min == visit.arrival_min and item.end_min == visit.leave_min
+            for item in applicable_fixed_sessions(attraction, routed_day.visit_date)
+        ):
+            violations.append(
+                ConstraintViolation(
+                    RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL,
+                    attraction.id,
                 )
+            )
         resolution = resolve_effective_window(attraction, routed_day.visit_date)
         if resolution.window is None:
             if resolution.rejection_code is not None:
@@ -374,9 +425,7 @@ def validate_routed_day(
         else:
             window = resolution.window
             latest_for_planned_duration = min(
-                window.last_entry_min
-                if window.last_entry_min is not None
-                else window.close_min,
+                window.last_entry_min if window.last_entry_min is not None else window.close_min,
                 window.close_min - visit.planned_duration_min,
             )
             if not window.open_min <= visit.arrival_min <= latest_for_planned_duration:
@@ -386,9 +435,7 @@ def validate_routed_day(
                         attraction.id,
                     )
                 )
-        minimum_duration = math.ceil(
-            attraction.suggested_duration * DEFAULT_DURATION_RATIO
-        )
+        minimum_duration = math.ceil(attraction.suggested_duration * DEFAULT_DURATION_RATIO)
         if (
             visit.planned_duration_min < minimum_duration
             or visit.leave_min != visit.arrival_min + visit.planned_duration_min
@@ -440,8 +487,5 @@ def _remove_missing_od_arcs(
         for destination_node, destination in enumerate(allocations, start=1):
             if origin_node == destination_node:
                 continue
-            if (
-                provider.get_travel_time(origin.attraction.id, destination.attraction.id)
-                is None
-            ):
+            if provider.get_travel_time(origin.attraction.id, destination.attraction.id) is None:
                 routing.NextVar(origin_index).RemoveValue(manager.NodeToIndex(destination_node))

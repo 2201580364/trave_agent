@@ -191,6 +191,10 @@ class TimeRule:
     open_min: int
     close_min: int
     last_entry_min: int | None = None
+    weekdays: frozenset[int] = field(default_factory=lambda: frozenset(range(1, 8)))
+    valid_from: date | None = None
+    valid_to: date | None = None
+    excluded_dates: frozenset[date] = field(default_factory=frozenset)
 
     @classmethod
     def from_strings(
@@ -233,12 +237,73 @@ class TimeRule:
         )
 
     def matches(self, visit_date: date) -> bool:
+        if (
+            visit_date in self.excluded_dates
+            or visit_date.isoweekday() not in self.weekdays
+            or (self.valid_from is not None and visit_date < self.valid_from)
+            or (self.valid_to is not None and visit_date > self.valid_to)
+        ):
+            return False
         current = visit_date.month * 100 + visit_date.day
         start = self.start_month * 100 + self.start_day
         end = self.end_month * 100 + self.end_day
         if start <= end:
             return start <= current <= end
         return current >= start or current <= end
+
+
+@dataclass(frozen=True, slots=True)
+class FixedSession:
+    """An independently selectable, sourced show session (H3/C2, ADR-0025)."""
+
+    session_id: str
+    start_min: int
+    end_min: int
+    last_entry_min: int | None = None
+    weekdays: frozenset[int] = field(default_factory=lambda: frozenset(range(1, 8)))
+    valid_from: date | None = None
+    valid_to: date | None = None
+    excluded_dates: frozenset[date] = field(default_factory=frozenset)
+    opening_hours: tuple[TimeRule, ...] = ()
+    entry_deadlines: tuple[TimeRule, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.session_id or not 0 <= self.start_min < self.end_min <= 2880:
+            raise ValueError("fixed session identity or times are invalid")
+        if self.last_entry_min is not None and not 0 <= self.last_entry_min <= self.start_min:
+            raise ValueError("fixed session last entry must not be after its start")
+        if not self.weekdays or self.weekdays.difference(range(1, 8)):
+            raise ValueError("fixed session weekdays must be ISO weekdays")
+        if self.valid_from and self.valid_to and self.valid_from > self.valid_to:
+            raise ValueError("fixed session date range is invalid")
+
+    @property
+    def entry_min(self) -> int:
+        return self.start_min if self.last_entry_min is None else self.last_entry_min
+
+    def matches(self, day: date) -> bool:
+        return (
+            day.isoweekday() in self.weekdays
+            and (self.valid_from is None or day >= self.valid_from)
+            and (self.valid_to is None or day <= self.valid_to)
+            and day not in self.excluded_dates
+            and all(
+                not rule.matches(day)
+                or rule.last_entry_min is None
+                or self.entry_min <= rule.last_entry_min
+                for rule in self.entry_deadlines
+            )
+            and (
+                not self.opening_hours
+                or any(
+                    rule.matches(day)
+                    and rule.open_min <= self.entry_min
+                    and self.end_min <= rule.close_min
+                    and (rule.last_entry_min is None or self.entry_min <= rule.last_entry_min)
+                    for rule in self.opening_hours
+                )
+            )
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,8 +328,11 @@ class Attraction:
     data_verified: bool = False
     conflict: bool = False
     active: bool = True
+    fixed_sessions: tuple[FixedSession, ...] = ()
 
     def __post_init__(self) -> None:
+        if len({item.session_id for item in self.fixed_sessions}) != len(self.fixed_sessions):
+            raise ValueError("fixed session IDs must be unique")
         invalid_days = self.close_days.difference(range(1, 8))
         if invalid_days:
             raise ValueError(f"close_days must contain ISO weekdays 1..7: {invalid_days}")
@@ -425,9 +493,7 @@ class VisitPeriodPreference:
             raise ValueError("P1 visit-period preference requires one preferred bucket")
         overlap = self.preferred_buckets.intersection(self.acceptable_buckets)
         if overlap:
-            raise ValueError(
-                "preferred and acceptable visit-period buckets must not overlap"
-            )
+            raise ValueError("preferred and acceptable visit-period buckets must not overlap")
         if not self.source_ref.strip():
             raise ValueError("visit-period preference requires a source reference")
 
@@ -676,8 +742,7 @@ class ItineraryPlan:
     def _search_statuses(self) -> tuple[tuple[date, RouteSearchStatus], ...]:
         if self.search_attempts:
             return tuple(
-                (attempt.visit_date, attempt.metadata.status)
-                for attempt in self.search_attempts
+                (attempt.visit_date, attempt.metadata.status) for attempt in self.search_attempts
             )
         return tuple(
             (day.visit_date, day.solve_metadata.status)

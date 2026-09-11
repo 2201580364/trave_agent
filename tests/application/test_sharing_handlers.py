@@ -122,35 +122,27 @@ def _store() -> InMemoryPlanningStore:
 
 
 def _tokens() -> HmacPlanShareTokenCodec:
-    return HmacPlanShareTokenCodec(
-        "test-plan-share-secret-2026-08-28-at-least-32-bytes"
-    )
+    return HmacPlanShareTokenCodec("test-plan-share-secret-2026-08-28-at-least-32-bytes")
 
 
 def test_plan_share_is_redacted_immutable_and_idempotent() -> None:
     store = _store()
     ids = SequenceIdGenerator()
-    handler = CreatePlanShareHandler(
-        InMemoryUnitOfWork(store), FixedClock(), ids, _tokens()
-    )
-    command = CreatePlanShare(
-        "principal_owner", "share_intent_1", "trip_1", "revision_1"
-    )
+    handler = CreatePlanShareHandler(InMemoryUnitOfWork(store), FixedClock(), ids, _tokens())
+    command = CreatePlanShare("principal_owner", "share_intent_1", "trip_1", "revision_1")
 
     created = handler.handle(command)
     repeated = handler.handle(command)
-    published = GetPublishedPlanShareHandler(
-        InMemoryUnitOfWork(store), _tokens()
-    ).handle(created.public_token)
+    published = GetPublishedPlanShareHandler(InMemoryUnitOfWork(store), _tokens()).handle(
+        created.public_token
+    )
 
     assert created.reused is False
     assert repeated.reused is True
     assert repeated.public_token == created.public_token
     assert published.share_snapshot == created.share.share_snapshot
     assert published.share_snapshot["content_kind"] == "planned_itinerary"
-    assert published.share_snapshot["days"][0]["items"][1]["fixed_time"] == (
-        "18:30"
-    )
+    assert published.share_snapshot["days"][0]["items"][1]["fixed_time"] == ("18:30")
     serialized = json.dumps(published.share_snapshot, ensure_ascii=False)
     for forbidden in (
         "principal_id",
@@ -169,17 +161,11 @@ def test_plan_share_intent_cannot_be_reused_for_another_revision() -> None:
     handler = CreatePlanShareHandler(
         InMemoryUnitOfWork(store), FixedClock(), SequenceIdGenerator(), _tokens()
     )
-    handler.handle(
-        CreatePlanShare(
-            "principal_owner", "share_intent_1", "trip_1", "revision_1"
-        )
-    )
+    handler.handle(CreatePlanShare("principal_owner", "share_intent_1", "trip_1", "revision_1"))
 
     with pytest.raises(PlanShareIntentConflictError):
         handler.handle(
-            CreatePlanShare(
-                "principal_owner", "share_intent_1", "trip_1", "revision_other"
-            )
+            CreatePlanShare("principal_owner", "share_intent_1", "trip_1", "revision_other")
         )
 
 
@@ -188,11 +174,7 @@ def test_reference_copy_keeps_attractions_but_drops_private_travel_facts() -> No
     ids = SequenceIdGenerator()
     created = CreatePlanShareHandler(
         InMemoryUnitOfWork(store), FixedClock(), ids, _tokens()
-    ).handle(
-        CreatePlanShare(
-            "principal_owner", "share_intent_1", "trip_1", "revision_1"
-        )
-    )
+    ).handle(CreatePlanShare("principal_owner", "share_intent_1", "trip_1", "revision_1"))
     store.drafts["draft_source"] = store.drafts["draft_source"].replace_selection(
         ("attr_changed_after_revision",),
         (),
@@ -211,3 +193,23 @@ def test_reference_copy_keeps_attractions_but_drops_private_travel_facts() -> No
     )
     assert copied.draft.travel_facts is None
     assert copied.draft.visit_period_preferences == ()
+
+
+def test_share_shows_session_start_and_hides_internal_session_identity():
+    """H3: early entry is not mislabeled as the public show start."""
+    store = _store()
+    revision = store.trip_revisions["revision_1"]
+    node = revision.result_snapshot["days"][0]["nodes"][1]
+    node["arrival_min"] = 1100
+    node["selected_session"] = {
+        "session_id": "internal-session",
+        "start_min": 1110,
+        "end_min": 1140,
+        "entry_min": 1100,
+    }
+    created = CreatePlanShareHandler(
+        InMemoryUnitOfWork(store), FixedClock(), SequenceIdGenerator(), _tokens()
+    ).handle(CreatePlanShare("principal_owner", "session-share", "trip_1", "revision_1"))
+    assert created.share.share_snapshot["days"][0]["items"][1]["fixed_time"] == "18:30"
+    assert "internal-session" not in json.dumps(created.share.share_snapshot)
+    assert "selected_session" not in json.dumps(created.share.share_snapshot)

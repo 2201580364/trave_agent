@@ -48,6 +48,7 @@
 | PLACE_ACCESS_POINT_RETIRED | place_revision | O04 访问点停用 |
 | PLACE_TIME_RULE_CREATED | place_revision | O05 时间规则新增 |
 | PLACE_TIME_RULE_UPDATED | place_revision | O05 时间规则编辑 |
+| PLACE_TIME_RULE_DELETED | place_time_rule | O05 候选修订时间规则删除（H3/C2），与停用保留记录区分 |
 | PLACE_CLOSURE_CREATED | place_revision | O05 闭馆日新增 |
 | PLACE_CLOSURE_UPDATED | place_revision | O05 闭馆日编辑 |
 | PLACE_DATE_EXCEPTION_CREATED | place_revision | O05 日期例外新增 |
@@ -79,7 +80,7 @@
 
 ## 四、target_type 登记表
 
-`admin_actor`、`admin_actor_login`、`admin_session`、`place_revision`、`place_source_record`、`place_relation`、`review_task`、`publication_batch`、`solver_projection`、`holiday_calendar`、`holiday_calendar_sync_job`。新增 target_type 同样先登记本行。
+`admin_actor`、`admin_actor_login`、`admin_session`、`place_revision`、`place_source_record`、`place_relation`、`place_time_rule`、`review_task`、`publication_batch`、`solver_projection`、`holiday_calendar`、`holiday_calendar_sync_job`。新增 target_type 同样先登记本行。
 
 ## 五、摘要哈希（唯一实现）
 

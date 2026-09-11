@@ -12,12 +12,33 @@ from .models import (
     ArrivalEvaluation,
     Attraction,
     EffectiveTimeWindow,
+    FixedSession,
     RejectionCode,
     TimeWindowResolution,
 )
 
 DEFAULT_DURATION_RATIO = 0.6
 MINUTES_PER_DAY = 24 * 60
+
+
+def applicable_fixed_sessions(
+    attraction: Attraction,
+    visit_date: date,
+    *,
+    duration_ratio: float = DEFAULT_DURATION_RATIO,
+) -> tuple[FixedSession, ...]:
+    """Keep actual sessions, never turn the gaps between them into visit windows."""
+    minimum = math.ceil(attraction.suggested_duration * duration_ratio)
+    return tuple(
+        sorted(
+            (
+                item
+                for item in attraction.fixed_sessions
+                if item.matches(visit_date) and item.end_min - item.start_min >= minimum
+            ),
+            key=lambda item: (item.entry_min, item.end_min, item.session_id),
+        )
+    )
 
 
 def resolve_effective_window(
@@ -31,6 +52,19 @@ def resolve_effective_window(
     if not 0 < duration_ratio <= 1:
         raise ValueError("duration_ratio must be within (0, 1]")
 
+    if attraction.fixed_sessions:
+        sessions = applicable_fixed_sessions(attraction, visit_date, duration_ratio=duration_ratio)
+        if not sessions:
+            return TimeWindowResolution(None, RejectionCode.NO_MATCHING_TIME_RULE)
+        # Envelope for coarse classification only. Routing and validation use discrete sessions.
+        return TimeWindowResolution(
+            EffectiveTimeWindow(
+                min(item.entry_min for item in sessions),
+                max(item.end_min for item in sessions),
+                max(item.entry_min for item in sessions),
+                max(item.entry_min for item in sessions),
+            )
+        )
     required_duration = math.ceil(attraction.suggested_duration * duration_ratio)
     if attraction.is_always_open:
         return TimeWindowResolution(
@@ -74,6 +108,24 @@ def evaluate_arrival(
 ) -> ArrivalEvaluation:
     """Evaluate one arrival against C2 and produce the deterministic S1 notice."""
 
+    if attraction.fixed_sessions:
+        sessions = applicable_fixed_sessions(attraction, visit_date, duration_ratio=duration_ratio)
+        session = next((item for item in sessions if arrival_min <= item.entry_min), None)
+        if session is None:
+            return ArrivalEvaluation(
+                False, None, rejection_code=RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL
+            )
+        window = EffectiveTimeWindow(
+            session.entry_min, session.end_min, session.entry_min, session.entry_min
+        )
+        return ArrivalEvaluation(
+            True,
+            window,
+            session.entry_min,
+            session.end_min,
+            session.end_min - session.entry_min,
+            (session.end_min - session.start_min) / attraction.suggested_duration,
+        )
     resolution = resolve_effective_window(
         attraction,
         visit_date,
@@ -103,10 +155,7 @@ def evaluate_arrival(
     actual_ratio = playable_duration / attraction.suggested_duration
     notice = None
     if playable_duration < attraction.suggested_duration:
-        notice = (
-            f"实际可玩 {playable_duration} 分钟"
-            f"（建议 {attraction.suggested_duration} 分钟）"
-        )
+        notice = f"实际可玩 {playable_duration} 分钟（建议 {attraction.suggested_duration} 分钟）"
 
     return ArrivalEvaluation(
         permitted=True,
@@ -117,4 +166,3 @@ def evaluate_arrival(
         duration_ratio=actual_ratio,
         duration_notice=notice,
     )
-

@@ -1,8 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import type { PlaceRevision, PlaceRevisionEvidence, ReviewTask } from '../api/types'
 import { RevisionDetailsPage, parseCoordinateLines, parseTimeInput, timeFormMinutes } from './RevisionDetailsPage'
+
+function actionButtons(label: string): HTMLButtonElement[] {
+  return [...document.querySelectorAll<HTMLButtonElement>('button')]
+    .filter((button) => button.textContent?.replace(/\s/g, '') === label)
+}
 
 const mocks = vi.hoisted(() => ({
   api: {
@@ -16,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     createSourceRecord: vi.fn(),
     detachSourceRecord: vi.fn(),
     reviewEvidence: vi.fn(),
+    deleteTimeRule: vi.fn(),
   },
   permissions: new Set<string>(),
   navigate: vi.fn(),
@@ -248,6 +254,8 @@ describe('RevisionDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('开放时间与固定场次（O05）')).toBeTruthy())
 
+    expect(actionButtons('删除')[0] ?? null).toBeNull()
+    expect(actionButtons('停用')).toHaveLength(2)
     expect(screen.getByText('新增开放规则')).toBeTruthy()
     expect(screen.getByText('新增闭馆日')).toBeTruthy()
     expect(screen.getByText('新增单日例外')).toBeTruthy()
@@ -273,6 +281,8 @@ describe('RevisionDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('开放时间与固定场次（O05）')).toBeTruthy())
 
+    expect(actionButtons('删除')[0]).toBeTruthy()
+    expect(actionButtons('停用')[0] ?? null).toBeNull()
     expect(screen.getByText('返回候选地点')).toBeTruthy()
     expect(screen.getByText('编辑候选')).toBeTruthy()
     expect(screen.queryByText('审核通过')).toBeNull()
@@ -280,6 +290,20 @@ describe('RevisionDetailsPage', () => {
     expect(screen.queryByText('关闭任务')).toBeNull()
     expect(screen.queryAllByText('通过')).toHaveLength(0)
     expect(mocks.api.getReviewTask).not.toHaveBeenCalled()
+
+    mocks.api.deleteTimeRule.mockResolvedValueOnce({ ...revision, revision_version: 2 })
+    mocks.api.getPlaceRevision.mockResolvedValueOnce({ ...revision, revision_version: 2 })
+    mocks.api.getPlaceRevisionEvidence.mockResolvedValueOnce({ ...timeEvidence, time_rules: [] })
+    fireEvent.click(actionButtons('删除')[0])
+    expect(mocks.api.deleteTimeRule).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByText('删除这条开放规则或固定场次？')).toBeTruthy())
+    const deleteButtons = actionButtons('删除')
+    fireEvent.click(deleteButtons[deleteButtons.length - 1])
+    await waitFor(() => expect(mocks.api.deleteTimeRule).toHaveBeenCalledWith(
+      'revision-1', timeEvidence.time_rules[0].time_rule_id,
+      expect.objectContaining({ expected_revision_version: 1, reason_code: 'TIME_RULE_DELETED' }),
+    ))
+    await waitFor(() => expect(actionButtons('删除')[0] ?? null).toBeNull())
   })
 
   it('explains source conflicts and solver prerequisites with actionable locations', async () => {

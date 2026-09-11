@@ -1137,6 +1137,26 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
+        @router.post("/place-revisions/{revision_id}/time-rules/{time_rule_id}/deletions")
+        def delete_place_time_rule(
+            revision_id: str,
+            time_rule_id: str,
+            payload: RetirePlaceEvidenceInput,
+            request: Request,
+            current: AdminPrincipal = principal_dependency,
+        ) -> dict[str, object]:
+            revision = review_workflow.delete_time_rule(
+                current,
+                revision_id=revision_id,
+                time_rule_id=time_rule_id,
+                expected_revision_version=payload.expected_revision_version,
+                operation_intent_id=payload.operation_intent_id,
+                reason_code=payload.reason_code,
+                reason_text=payload.reason_text,
+                request_id=request.state.request_id,
+            )
+            return _revision_response(revision)
+
         @router.delete("/place-revisions/{revision_id}/time-rules/{time_rule_id}")
         def retire_place_time_rule(
             revision_id: str,

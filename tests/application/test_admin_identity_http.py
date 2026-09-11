@@ -783,7 +783,6 @@ def test_time_preview_resolves_exceptions_closures_cross_midnight_and_sessions(
     assert sessions.json()["open"] is True
     assert sessions.json()["reason_codes"] == [
         "CROSS_MIDNIGHT_WINDOW",
-        "FIXED_SESSION_AMBIGUOUS",
     ]
     assert [item["time_rule_id"] for item in sessions.json()["fixed_sessions"]] == [
         "preview-fixed-1",
@@ -2891,3 +2890,113 @@ def test_editing_uncollected_candidate_recommended_duration_establishes_valid_ra
     assert "DURATION_NOT_COLLECTED" not in body["review_flags"]
     assert "NAME_REQUIRES_HUMAN_VERIFICATION" not in body["review_flags"]
     assert "CATEGORY_REQUIRES_HUMAN_VERIFICATION" not in body["review_flags"]
+
+
+@pytest.mark.parametrize("rule_kind", ["opening_hours", "fixed_session"])
+def test_candidate_time_rule_deletion_is_versioned_idempotent_and_distinct_from_retirement(
+    admin_context: AdminTestContext,
+    rule_kind: str,
+) -> None:
+    """H3/C2: deletion removes only a candidate rule, retirement remains visible."""
+    context = admin_context
+    _seed_approvable_candidate(context)
+    with context.sessions() as session:
+        for rule_id in ("delete-rule", "retire-rule"):
+            session.add(
+                PlaceTimeRuleRow(
+                    time_rule_id=rule_id,
+                    place_revision_id="revision-1",
+                    rule_kind=rule_kind,
+                    weekdays=[4],
+                    start_minute=1080,
+                    end_minute=1140,
+                    last_entry_minute=None,
+                    source_record_id="source-revision-1",
+                    review_status="candidate",
+                    active=True,
+                    created_at=NOW.isoformat(),
+                    reviewed_at=None,
+                )
+            )
+        session.commit()
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    base = "/api/v1/admin/place-revisions/revision-1/time-rules"
+    payload = {
+        "expected_revision_version": 1,
+        "operation_intent_id": "delete-time-once",
+        "reason_code": "TIME_RULE_DELETED",
+    }
+    assert context.client.post(f"{base}/delete-rule/deletions", json=payload).status_code == 401
+    missing = context.client.post(
+        f"{base}/other-rule/deletions",
+        headers=headers,
+        json={**payload, "operation_intent_id": "missing-rule"},
+    )
+    assert missing.status_code == 404
+    deleted = context.client.post(f"{base}/delete-rule/deletions", headers=headers, json=payload)
+    assert deleted.status_code == 200
+    assert deleted.json()["revision_version"] == 2
+    assert deleted.json()["solver_eligible"] is False
+    assert (
+        context.client.post(
+            f"{base}/delete-rule/deletions", headers=headers, json=payload
+        ).status_code
+        == 200
+    )
+    conflict = context.client.post(f"{base}/retire-rule/deletions", headers=headers, json=payload)
+    assert conflict.status_code == 409
+    stale = context.client.post(
+        f"{base}/retire-rule/deletions",
+        headers=headers,
+        json={**payload, "operation_intent_id": "stale-version"},
+    )
+    assert stale.status_code == 409
+    retired = context.client.request(
+        "DELETE",
+        f"{base}/retire-rule",
+        headers=headers,
+        json={
+            "expected_revision_version": 2,
+            "operation_intent_id": "retire-rule-once",
+            "reason_code": "TIME_EVIDENCE_RETIRED",
+        },
+    )
+    assert retired.status_code == 200
+    evidence = context.client.get(
+        "/api/v1/admin/place-revisions/revision-1/evidence", headers=headers
+    ).json()
+    assert all(item["time_rule_id"] != "delete-rule" for item in evidence["time_rules"])
+    assert (
+        next(item for item in evidence["time_rules"] if item["time_rule_id"] == "retire-rule")[
+            "active"
+        ]
+        is False
+    )
+    with context.sessions() as session:
+        assert session.get(PlaceTimeRuleRow, "delete-rule") is None
+        audits = list(
+            session.scalars(
+                select(AdminAuditEventRow).where(
+                    AdminAuditEventRow.action == "PLACE_TIME_RULE_DELETED"
+                )
+            )
+        )
+        assert len(audits) == 1
+        assert audits[0].target_id == "delete-rule"
+        row = session.get(PlaceRevisionRow, "revision-1")
+        row.lifecycle_status = "published"
+        row.published_at = NOW.isoformat()
+        row.reviewed_at = NOW.isoformat()
+        session.commit()
+    forbidden = context.client.post(
+        f"{base}/retire-rule/deletions",
+        headers=headers,
+        json={
+            **payload,
+            "expected_revision_version": 3,
+            "operation_intent_id": "published-delete",
+        },
+    )
+    assert forbidden.status_code == 409
+    with context.sessions() as session:
+        assert session.get(PlaceTimeRuleRow, "retire-rule") is not None

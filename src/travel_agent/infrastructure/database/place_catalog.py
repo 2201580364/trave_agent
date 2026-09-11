@@ -15,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    delete,
     or_,
     select,
     update,
@@ -645,6 +646,25 @@ class SqlAlchemyPlaceCatalogRepository:
             raise ValueError("time rule not found")
         return self._require_revision(rule.place_revision_id)
 
+    def delete_time_rule(
+        self,
+        time_rule_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision:
+        """Remove candidate evidence; keep historical revisions and audit intact (H3/C2)."""
+        self._bump_revision(place_revision_id, expected_revision_version)
+        result = self._session.execute(
+            delete(PlaceTimeRuleRow).where(
+                PlaceTimeRuleRow.time_rule_id == time_rule_id,
+                PlaceTimeRuleRow.place_revision_id == place_revision_id,
+            )
+        )
+        if result.rowcount != 1:
+            raise ValueError("time rule not found")
+        return self._require_revision(place_revision_id)
+
     def retire_time_rule(
         self,
         time_rule_id: str,
@@ -1244,9 +1264,9 @@ class SqlAlchemyPlaceCatalogRepository:
             dict.fromkeys(
                 (
                     *revision_row.source_record_ids,
-                    *(row.source_record_id for row in geometry_rows),
-                    *(row.source_record_id for row in access_rows),
-                    *(row.source_record_id for row in time_rule_rows),
+                    *(row.source_record_id for row in geometry_rows if row.active),
+                    *(row.source_record_id for row in access_rows if row.active),
+                    *(row.source_record_id for row in time_rule_rows if row.active),
                 )
             )
         )

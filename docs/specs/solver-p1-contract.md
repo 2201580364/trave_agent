@@ -213,7 +213,7 @@ DEFAULT_SOLVER_P1_CONTRACT
 
 ```text
 contract_version   = solver-p1-v2
-constraint_version = constraints-p1-v5
+constraint_version = constraints-p1-v6
 parameter_version  = parameters-p1-2026-08-26
 result_schema      = trip-result-v2
 
@@ -268,3 +268,14 @@ M1 契约不承诺：
 - 自动专家评分；
 - 酒店和餐厅联合优化（M2 先实现餐厅真实节点和重排）；
 - 实时行中动态重排。
+
+
+## 固定场次增量契约（ADR-0025，H3/C2/C4/C6）
+
+`Attraction.fixed_sessions` 为可选场次列表，包含稳定场次 ID、开始/结束/最晚入场分钟、星期、有效日期范围和日期例外。发布 JSON 同时保留 `source_record_id` 与已核验开放规则；字段为空的历史输入继续使用原时间窗。
+
+同地点只有一个节点，入场域由实际可用场次组成。求解器结合 OD 和首末日锚点选择场次，完整占用提前入场到结束的时间；场次间隙不可排入。同入场时刻依次按最早结束、场次 ID 排序。闭馆日和极端天气仍优先排除。
+
+结果节点增加可选 `selected_session: {session_id, start_min, end_min, entry_min}`，用于复现选择及显示真实开始时间；公开分享只显示时间、不暴露场次 ID。版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v6`，参数版本不变，不改写历史 Revision。
+
+包含显式固定场次的日期使用全天联合求解，保留晚餐软块，暂不执行 DAY_SPREAD/普通景点时长扩展，确保已选场次不会被后处理移动。无显式场次的日期沿用原分段与填充行为。

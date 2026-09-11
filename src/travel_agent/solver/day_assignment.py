@@ -28,7 +28,11 @@ from .models import (
     TripTimeAnchors,
     UnplacedAttraction,
 )
-from .time_windows import DEFAULT_DURATION_RATIO, resolve_effective_window
+from .time_windows import (
+    DEFAULT_DURATION_RATIO,
+    applicable_fixed_sessions,
+    resolve_effective_window,
+)
 from .weather import evaluate_weather_availability
 
 DEFAULT_DURATION_RATIO_BY_MODE = {
@@ -223,6 +227,17 @@ def _date_rejection_reasons(
         latest_start = min(state.bounds.end_min - required_duration, window.latest_arrival_min)
         if earliest_start > latest_start:
             reasons.append(RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL)
+    if (
+        attraction.fixed_sessions
+        and RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL not in reasons
+        and not any(
+            state.bounds.start_min <= item.entry_min and item.end_min <= state.bounds.end_min
+            for item in applicable_fixed_sessions(
+                attraction, visit_date, duration_ratio=duration_ratio
+            )
+        )
+    ):
+        reasons.append(RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL)
     if not reasons and state.used_duration_min + required_duration > state.capacity_min:
         reasons.append(RejectionCode.DAY_CAPACITY_EXCEEDED)
     return reasons

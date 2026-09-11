@@ -8,6 +8,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
+from travel_agent.domain.place_catalog.session_payload import valid_session_timing
+
 from .entities import (
     Place,
     PlaceAccessPoint,
@@ -137,9 +139,7 @@ def evaluate_projection_publication(
     # current-Place set so an existing source from another Place is reported
     # as a provenance mismatch instead of being treated as a valid source (or
     # silently disappearing as a missing one).
-    source_records_by_id = {
-        record.source_record_id: record for record in context.source_records
-    }
+    source_records_by_id = {record.source_record_id: record for record in context.source_records}
     active_source_records = {
         record.source_record_id: record
         for record in context.source_records
@@ -149,10 +149,10 @@ def evaluate_projection_publication(
         dict.fromkeys(
             (
                 *revision.source_record_ids,
-                *(geometry.source_record_id for geometry in context.geometries),
-                *(point.source_record_id for point in context.access_points),
-                *(rule.source_record_id for rule in context.time_rules),
-                *(relation.source_record_id for relation in context.relations),
+                *(geometry.source_record_id for geometry in context.geometries if geometry.active),
+                *(point.source_record_id for point in context.access_points if point.active),
+                *(rule.source_record_id for rule in context.time_rules if rule.active),
+                *(relation.source_record_id for relation in context.relations if relation.active),
             )
         )
     )
@@ -186,9 +186,7 @@ def evaluate_projection_publication(
         reasons.add("MISSING_VERIFIED_GEOMETRY")
 
     access_points = {
-        point.access_point_id: point
-        for point in context.access_points
-        if point.active
+        point.access_point_id: point for point in context.access_points if point.active
     }
     arrival = access_points.get(projection.arrival_access_point_id)
     departure = access_points.get(projection.departure_access_point_id)
@@ -219,16 +217,39 @@ def evaluate_projection_publication(
         reasons.add("TIME_RULE_UNRESOLVED")
     fixed_sessions = [rule for rule in verified_rules if rule.rule_kind == "fixed_session"]
     if revision.place_kind == "show":
+        if any(
+            not valid_session_timing(r.start_minute, r.end_minute, r.last_entry_minute)
+            for r in fixed_sessions
+        ):
+            reasons.add("TIME_RULE_UNRESOLVED")
         if not fixed_sessions:
             # A show is scheduled around a concrete session, not a generic
             # opening-hours window. Keep this reason distinct so operators
             # can correct the rule kind instead of chasing a false missing
             # verification warning.
             reasons.add("FIXED_SESSION_REQUIRED")
-        elif len(fixed_sessions) != 1:
-            reasons.add("FIXED_SESSION_AMBIGUOUS")
 
-    if has_source_content_conflict(context.source_records) and not revision.conflicts_resolved:
+    inactive_only_sources = {
+        item.source_record_id
+        for items in (
+            context.geometries,
+            context.access_points,
+            context.time_rules,
+            context.relations,
+        )
+        for item in items
+        if not item.active
+    } - set(source_record_ids)
+    if (
+        has_source_content_conflict(
+            tuple(
+                item
+                for item in context.source_records
+                if item.source_record_id not in inactive_only_sources
+            )
+        )
+        and not revision.conflicts_resolved
+    ):
         reasons.add("SOURCE_CONFLICT_UNRESOLVED")
     if any(
         relation.active
@@ -237,9 +258,8 @@ def evaluate_projection_publication(
         for relation in context.relations
     ):
         reasons.add("OVERLAPPING_SELECTION_UNRESOLVED")
-    if (
-        revision.relation_review_status == "pending"
-        and not any(relation.active for relation in context.relations)
+    if revision.relation_review_status == "pending" and not any(
+        relation.active for relation in context.relations
     ):
         reasons.add("RELATION_REVIEW_REQUIRED")
     if canonical_projection_sha256(projection) != projection.projection_hash:

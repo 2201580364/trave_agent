@@ -10,7 +10,7 @@ import {
   SafetyCertificateOutlined,
   ExclamationCircleFilled,
 } from '@ant-design/icons'
-import { Alert, App as AntApp, Button, Card, Checkbox, Collapse, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { Alert, App as AntApp, Button, Card, Checkbox, Collapse, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
@@ -812,6 +812,7 @@ function SourceEvidenceCard({ api, evidence, revision, sourceChannels, canEdit, 
   const [form] = Form.useForm<SourceRecordFormValues>()
   const selectedSourceId = Form.useWatch('source_id', form)
   const selectedChannel = sourceChannels.find((item) => item.source_id === selectedSourceId)
+  const reviewContext = new URLSearchParams(useLocation().search).get('from') === 'review'
   const editable = revision.lifecycle_status === 'candidate' && canEdit
 
   const openCreate = () => {
@@ -959,6 +960,7 @@ function EvidenceCard({
   onChanged: () => Promise<void>
   onError: (message: string) => void
 }) {
+  const reviewContext = new URLSearchParams(useLocation().search).get('from') === 'review'
   const editable = revision.lifecycle_status === 'candidate' && canEdit
   const reviewable = revision.lifecycle_status === 'candidate' && canReview
   const [modal, setModal] = useState<'geometry' | 'access' | null>(null)
@@ -1120,7 +1122,7 @@ function EvidenceCard({
               width: 260,
               render: (value: string | null) => formatOptionalDateTime(value),
             },
-            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', render: (_: unknown, item: PlaceGeometryEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openGeometry(item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('geometry', item.geometry_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('geometry', item.geometry_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('geometry', item.geometry_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', render: (_: unknown, item: PlaceGeometryEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openGeometry(item)}>编辑</Button>{reviewContext && item.active && <Button size="small" danger onClick={() => void retire('geometry', item.geometry_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('geometry', item.geometry_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('geometry', item.geometry_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '当前没有几何证据' }}
         />
@@ -1178,7 +1180,7 @@ function EvidenceCard({
                 </Space>
               ),
             },
-            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceAccessPointEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openAccess(item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('access', item.access_point_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('access_point', item.access_point_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('access_point', item.access_point_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, render: (_: unknown, item: PlaceAccessPointEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openAccess(item)}>编辑</Button>{reviewContext && item.active && <Button size="small" danger onClick={() => void retire('access', item.access_point_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('access_point', item.access_point_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('access_point', item.access_point_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '当前没有访问点证据' }}
         />
@@ -1379,6 +1381,7 @@ function TimeEvidenceCard({
   onChanged: () => Promise<void>
   onError: (message: string) => void
 }) {
+  const reviewContext = new URLSearchParams(useLocation().search).get('from') === 'review'
   const editable = revision.lifecycle_status === 'candidate' && canEdit
   const reviewable = revision.lifecycle_status === 'candidate' && canReview
   const [modal, setModal] = useState<'time_rule' | 'closure' | 'date_exception' | 'holiday' | null>(null)
@@ -1540,6 +1543,22 @@ function TimeEvidenceCard({
       setSaving(false)
     }
   }
+  const deleteRule = async (id: string) => {
+    setSaving(true)
+    try {
+      await api.deleteTimeRule(revision.place_revision_id, id, {
+        expected_revision_version: revision.revision_version,
+        operation_intent_id: `time-rule-delete-${crypto.randomUUID()}`,
+        reason_code: 'TIME_RULE_DELETED',
+      })
+      await onChanged()
+      onSuccess('开放规则已删除，修订版本需重新送审')
+    } catch (reason) {
+      onError(adminErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
   const runPreview = async () => {
     if (!previewDate) return
     setPreviewLoading(true)
@@ -1611,7 +1630,7 @@ function TimeEvidenceCard({
             { title: '有效期', key: 'validity', width: 220, render: (_: unknown, item) => `${item.valid_from ?? '不限'} – ${item.valid_to ?? '不限'}` },
             { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
             { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}><Typography.Text>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}</Typography.Text><Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
-            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, fixed: 'right' as const, render: (_: unknown, item: PlaceTimeRuleEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('time_rule', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('time_rule', item.time_rule_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('time_rule', item.time_rule_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('time_rule', item.time_rule_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, fixed: 'right' as const, render: (_: unknown, item: PlaceTimeRuleEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('time_rule', item)}>编辑</Button>{reviewContext && item.active && <Button size="small" danger onClick={() => void retire('time_rule', item.time_rule_id)}>停用</Button>}{!reviewContext && <Popconfirm title="删除这条开放规则或固定场次？" description="删除后不再出现在本修订的规则列表中，操作审计仍保留。" okText="删除" cancelText="取消" onConfirm={() => deleteRule(item.time_rule_id)}><Button size="small" danger disabled={saving}>删除</Button></Popconfirm>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('time_rule', item.time_rule_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('time_rule', item.time_rule_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: evidence.revision.is_always_open ? '全天开放，无需周时间窗' : '尚未采集周规则或固定场次' }}
           />
@@ -1630,7 +1649,7 @@ function TimeEvidenceCard({
             { title: '闭馆星期', dataIndex: 'weekday', render: weekdayLabel },
             { title: '状态', dataIndex: 'review_status', render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
             { title: '来源', key: 'source', render: (_: unknown, item) => <Space size={4}>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
-            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, fixed: 'right' as const, render: (_: unknown, item: PlaceClosureEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('closure', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('closure', item.closure_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('closure', item.closure_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('closure', item.closure_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, fixed: 'right' as const, render: (_: unknown, item: PlaceClosureEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('closure', item)}>编辑</Button>{reviewContext && item.active && <Button size="small" danger onClick={() => void retire('closure', item.closure_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('closure', item.closure_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('closure', item.closure_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '没有固定闭馆日记录' }}
           />
@@ -1653,7 +1672,7 @@ function TimeEvidenceCard({
             { title: '最晚入园', dataIndex: 'last_entry_minute', width: 120, render: minuteLabel },
             { title: '状态', dataIndex: 'review_status', width: 130, render: (value: string, item) => <Space size={4}><Tag color={reviewStatusColor(value)}>{reviewStatusLabel(value)}</Tag>{!item.active && <Tag>已停用</Tag>}</Space> },
             { title: '来源', key: 'source', width: 220, render: (_: unknown, item) => <Space size={4}>{sourceLabelById(evidence, item.source_record_id, sourceChannels)}<Tag color={item.source_record_valid ? 'success' : 'error'}>{item.source_record_valid ? '有效' : '无效'}</Tag></Space> },
-            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, fixed: 'right' as const, render: (_: unknown, item: PlaceDateExceptionEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('date_exception', item)}>编辑</Button>{item.active && <Button size="small" danger onClick={() => void retire('date_exception', item.date_exception_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('date_exception', item.date_exception_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('date_exception', item.date_exception_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
+            ...((editable || reviewable) ? [{ title: '操作', key: 'actions', width: 280, fixed: 'right' as const, render: (_: unknown, item: PlaceDateExceptionEvidence) => <Space>{editable && <><Button size="small" icon={<EditOutlined />} onClick={() => openEditor('date_exception', item)}>编辑</Button>{reviewContext && item.active && <Button size="small" danger onClick={() => void retire('date_exception', item.date_exception_id)}>停用</Button>}</>}{reviewable && item.active && <><Button size="small" type="primary" onClick={() => void review('date_exception', item.date_exception_id, 'human_verified')}>通过</Button><Button size="small" onClick={() => void review('date_exception', item.date_exception_id, 'rejected')}>驳回</Button></>}</Space> }] : []),
           ]}
           locale={{ emptyText: '没有日期例外记录' }}
           />

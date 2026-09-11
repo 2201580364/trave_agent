@@ -228,7 +228,7 @@ export default function TripDetailPage() {
                   )}
                   {day.nodes.map((node, index) => (
                     <View key={node.node_id} className='timeline-item'>
-                      <View className='time-column'>{arrivalLabel(node.arrival_min, node.timing_kind === 'fixed_event')}</View>
+                      <View className='time-column'>{node.selected_session ? `${minuteLabel(node.selected_session.entry_min)} 入场 · ${minuteLabel(node.selected_session.start_min)} 场次` : arrivalLabel(node.arrival_min, node.timing_kind === 'fixed_event')}</View>
                       <View className='timeline-rail'><View className='timeline-dot' /></View>
                       <View className='visit-card'>
                         <View className='section-title'>{node.name}</View>

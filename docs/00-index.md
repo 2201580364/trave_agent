@@ -69,3 +69,5 @@ data/
 - 领域规范变更 → 更新 [domain/](domain/) 并通知数据与求解器两方
 - 管理身份、审核、发布或治理边界变更 → 更新 [product/管理端功能模块设计.md](product/管理端功能模块设计.md) 和对应 ADR/API/数据模型
 - AGENTS.md 正本变更后 → 运行 `python scripts/sync_agents_docs.py` 同步 CLAUDE.md 等派生入口
+
+- [ADR-0025：show 多场次求解与候选时间规则删除](decisions/ADR-0025-show-sessions-and-candidate-time-rule-deletion.md)：H3/C2，多场次选择、候选删除与审核停用边界。

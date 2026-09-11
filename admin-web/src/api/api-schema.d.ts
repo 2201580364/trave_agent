@@ -675,6 +675,23 @@ export interface paths {
         patch: operations["update_place_time_rule_api_v1_admin_place_revisions__revision_id__time_rules__time_rule_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/place-revisions/{revision_id}/time-rules/{time_rule_id}/deletions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Place Time Rule */
+        post: operations["delete_place_time_rule_api_v1_admin_place_revisions__revision_id__time_rules__time_rule_id__deletions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/places/{place_id}/revisions": {
         parameters: {
             query?: never;
@@ -1906,6 +1923,44 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    delete_place_time_rule_api_v1_admin_place_revisions__revision_id__time_rules__time_rule_id__deletions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                revision_id: string;
+                time_rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetirePlaceEvidenceInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_admin_actors_api_v1_admin_admin_actors_get: {
         parameters: {
             query?: {

@@ -637,7 +637,7 @@ offset >= 0，默认 0
 ```json
 {
   "solver_contract_version": "solver-p1-v2",
-    "constraint_version": "constraints-p1-v5",
+    "constraint_version": "constraints-p1-v6",
     "parameter_version": "parameters-p1-2026-08-26",
   "data_snapshot_version": "hangzhou-2026-08-24",
   "weather_basis": "forecast",
@@ -1210,7 +1210,7 @@ O05 的 `GET /api/v1/admin/holiday-calendars` 在生成场景中只返回或只�
 
 每个候选 `item` 同时返回只读 `review_readiness`，用于批量人工审核准备，不改变 Revision 或审核任务状态。准备度固定包含 `basic`、`source`、`geometry`、`access_point`、`time`、`relation` 六项；每项返回 `collected`、`verified`、`total` 和 `verified_count`。顶层返回 `completed_checks`、`verified_checks`、`missing_checks`、`pending_review_checks`、当前开放任务状态以及以下稳定状态：`needs_evidence`、`ready_for_review`、`under_review`、`changes_requested`、`ready_for_approval`；非 candidate Revision 返回其生命周期状态。
 
-准备度计算只接受当前 Place 的 active 来源支持。Provider 候选点不能冒充地点几何；访问点至少一条；非全天开放地点至少一条有效开放规则；`show` 必须恰好一条固定场次；active 闭馆日和日期例外必须逐项核验；存在关系时必须完成裁决并人工核验，无关系时必须登记完成关系检查。无开放审核任务时，即使六项已核验也只能返回 `ready_for_review`；`changes_requested` 优先于历史已核验结果；只有开放审核任务中六项均核验才返回 `ready_for_approval`。
+准备度计算只接受当前 Place 的 active 来源支持。Provider 候选点不能冒充地点几何；访问点至少一条；非全天开放地点至少一条有效开放规则；`show` 必须至少一条有效固定场次（ADR-0025），求解器从多个可行场次中选择一个；active 闭馆日和日期例外必须逐项核验；存在关系时必须完成裁决并人工核验，无关系时必须登记完成关系检查。无开放审核任务时，即使六项已核验也只能返回 `ready_for_review`；`changes_requested` 优先于历史已核验结果；只有开放审核任务中六项均核验才返回 `ready_for_approval`。
 
 几何、访问点、时间规则、来源冲突和地点关系可以作为 Revision 子资源实现，但必须保持 Revision 边界和乐观锁，不能出现绕过 Revision 的无版本 PATCH。
 
@@ -1323,6 +1323,17 @@ Revision 版本并清除求解/审核资格。逐项审核端点的 `evidence_ki
 `409 admin_operation_intent_conflict`。Revision 级 approve 同时检查所有 active 的
 Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_verified`。
 
+候选入口只对常规开放规则/固定场次显示删除确认按钮，移除原停用按钮；审核入口保留停用。
+停用记录仍可见，但不参与场次数量、准备度和求解校验。其他 active 证据和显式关联来源仍必须通过校验。
+
+| 方法 | 路径 | 权限 | 语义 |
+|---|---|---|---|
+| POST | `/admin/place-revisions/{revision_id}/time-rules/{time_rule_id}/deletions` | `place:candidate:write` | 删除当前 candidate 的时间规则；请求沿用版本、intent 和审计理由；返回更新后的 Revision |
+
+旧 `DELETE /time-rules/{time_rule_id}` 继续表示停用。删除与版本递增、资格重置和
+`PLACE_TIME_RULE_DELETED` 审计原子完成；跨 Revision 或不存在规则返回 404，版本/intent/生命周期冲突返回 409。
+入口查询参数仅决定 UI 展示，服务端仍检查权限与生命周期。
+
 ### 15.2.2 O05 指定日期解析预览
 
 `GET /api/v1/admin/place-revisions/{revision_id}/time-preview?service_date=YYYY-MM-DD`
@@ -1331,7 +1342,7 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 关闭结果，日期例外可以覆盖周闭馆。响应包含 `open`、`windows`、`fixed_sessions`、
 `applied_exception_ids`、`rule_ids` 和稳定排序的 `reason_codes`。分钟值大于等于 1440
 表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；演出地点没有已核验固定场次时返回
-`FIXED_SESSION_REQUIRED`；多个固定场次返回 `FIXED_SESSION_AMBIGUOUS`。管理端录入界面使用 `HH:mm` 和“次日”标记，提交时转换为本契约中的分钟值；API/数据库不新增时间字符串字段。跨午夜仍以结束或最晚入园分钟值大于等于 `1440` 表示。
+`FIXED_SESSION_REQUIRED`；多个固定场次完整返回列表，不再因数量大于一返回 `FIXED_SESSION_AMBIGUOUS`（ADR-0025）。管理端录入界面使用 `HH:mm` 和“次日”标记，提交时转换为本契约中的分钟值；API/数据库不新增时间字符串字段。跨午夜仍以结束或最晚入园分钟值大于等于 `1440` 表示。
 
 ### 15.2.3 O06 来源冲突只读面与裁决
 

@@ -2,14 +2,17 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-08
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8 全部完成（S8-1 a657504 / S8-2 dc5d1ea / S8-3 361cc37 均已合并），审计规范化 AUD-1～4 实现完成待合并；S7 等待数据批次（12 条中 2 条已发布）`
-- 稳定测试基线：后端 pytest `495/495`（492 + AUD-4 登记表测试 3）；ruff check 全仓清零；admin-web Vitest `46/46` + tsc --noEmit + production build 全过；frontend Vitest `19/19` + tsc；Alembic 迁移链至 `0015_holiday_exception_provenance`
-- 最近提交基线：`361cc37 feat(admin-web): S8-3 生成式 API 类型管线（openapi-typescript 小步落地）`
+- 更新时间：2026-09-11（O05 多场次与候选时间规则删除，H3/C2/C4/C6；本机验证，尚未提交/部署）
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7 等待数据批次（12 条中 2 条已发布）`
+- 本轮自动验证基线（本机非 uv.lock 环境）：pytest `515/515`、Golden `8/8`；ruff 全仓、layering、API 契约、check_docs 全过；admin-web Vitest `47/47` + typecheck + production build；frontend Vitest `19/19` + tsc；新增模型/场次解析/投影载荷定向 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
+- 最近提交基线：`7dda0f7 fix:修复新增/编辑几何证据问题，点击确认被卡校验，但无提示报错`；上一提交 `04c2d35` 为审计规范化。本轮 O05 改动尚在工作区，未提交；515 为包含本轮新增用例的通过数，不等于 HEAD 或锁定发布环境的基线。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-08 审计功能规范化 AUD-1～4（评审驱动，实现完成待合并）：评审结论=不引入切面/中间件（审计载荷是业务语义、必须与业务同事务，切面形式是伪需求），问题在「对的做法未制度化」——`_event` 构造器三处三样、摘要哈希三处三样、reason_code 校验仅 review 有、动作码零文档。AUD-1 规范 `.claude/rules/audit-logging.md`（核心纪律四条 + 字段语义 + 动作码命名法与逐码登记表 + target_type 表 + digest 唯一实现 + actor_role 双序记账规则 + 新增端点 checklist）；AUD-2/3 共享模块 `application/admin/audit_events.py`（build_audit_event 全关键字构造器 + canonical_digest 唯一实现 + validate_audit_reason + review/identity 双序 role 解析），service/review 的 `_event` 改薄代理、holiday_calendar_sync 5 处裸传 AdminAuditEvent 位置参数全部改写（消灭 17 字段错位风险）；AUD-4 `tests/application/test_audit_registry.py` 3 项——代码发射的动作码必须登记、登记不得超前于代码、target_type 同查，防规范烂尾。行为零变化，pytest/ruff/layering/check_docs 全过。遗留：O17 模块 5 个码历史上是 reason_code 而非 action（已按双射原则在规范中区分登记）。
+- 2026-09-11 O05（H3/C2/C4/C6，ADR-0025，实现完成待用户提交）：show 至少一条有效固定场次，已发布投影固化多场次及日期/开放规则/入园截止；单地点单节点、求解器结合 OD 和锚点选择可行场次，完整保留提前入场至演出结束；候选入口常规开放规则/固定场次删除，审核入口仍停用并保留可见，停用证据不参与校验。删除有角色/生命周期/版本/幂等/同事务审计。结果与分享显示真实场次开始，公开分享不暴露场次 ID。无迁移、未操作研究库。验证详情和操作偏差见本月 status-archive。
+
+
+- 2026-09-08 审计功能规范化 AUD-1～4（评审驱动，已进入 dev：04c2d35）：评审结论=不引入切面/中间件（审计载荷是业务语义、必须与业务同事务，切面形式是伪需求），问题在「对的做法未制度化」——`_event` 构造器三处三样、摘要哈希三处三样、reason_code 校验仅 review 有、动作码零文档。AUD-1 规范 `.claude/rules/audit-logging.md`（核心纪律四条 + 字段语义 + 动作码命名法与逐码登记表 + target_type 表 + digest 唯一实现 + actor_role 双序记账规则 + 新增端点 checklist）；AUD-2/3 共享模块 `application/admin/audit_events.py`（build_audit_event 全关键字构造器 + canonical_digest 唯一实现 + validate_audit_reason + review/identity 双序 role 解析），service/review 的 `_event` 改薄代理、holiday_calendar_sync 5 处裸传 AdminAuditEvent 位置参数全部改写（消灭 17 字段错位风险）；AUD-4 `tests/application/test_audit_registry.py` 3 项——代码发射的动作码必须登记、登记不得超前于代码、target_type 同查，防规范烂尾。行为零变化，pytest/ruff/layering/check_docs 全过。遗留：O17 模块 5 个码历史上是 reason_code 而非 action（已按双射原则在规范中区分登记）。
 
 - 2026-09-08 S8-3 admin-web 生成式 API 类型·小步落地（transformation-plan，实现完成待合并）：openapi-typescript@7 入库（devDep，npmmirror）+ `npm run generate-api-types`，从 `var/reports/openapi-schema.json` 生成 `admin-web/src/api/api-schema.d.ts`（4941 行）；**勘察关键事实：后端 63/73 响应端点声明 `dict[str, object]` 无结构化 schema，生成器只能覆盖请求侧 47 组件**，AdminActor/PlaceRevision 等 20 个响应类型无生成来源暂留手工（后端补 response_model 另立任务，非 S8 范围）；已验证手工输入类型与生成组件双向兼容，`CreateAdminActorInput` 改为 `components['schemas']` 再导出示范（消费方零改动）；types.ts 头部写明过渡期边界与收尾路径；附带修复 vite.config.ts `fileParallelism: 2→false`（vitest 4 类型收窄，数值写法致 tsc -b/build 报 TS2769，S8-2 提交引入、本轮回归暴露）；回归：admin-web vitest 46/46 + tsc + build 全过。
 
@@ -34,8 +37,15 @@
 
 ## 活跃风险
 
+- O05 显式场次日期暂不执行 DAY_SPREAD/普通景点时长扩展，保留最低游览时长和晚餐软块；无显式场次的日期保持原算法。已实现/自动测试通过不等于已部署或用户验收。
+- 本轮未使用 uv.lock 环境：采用本机 Python 3.12（显式路径，默认 python 已指向无 pytest 的 Conda）；Windows 脚本子进程需要 PYTHONUTF8=1。定向新增模型/解析器 mypy 通过，routing 的 OR-Tools 类型存量问题仍在；发布前需在锁定环境复核。
+
+
+- 2026-09-10 提交核对：S6 已实现 sessionStorage + /me 会话恢复，但 ADR-0020 仍禁止持久化且要求新 ADR，当前未见替代决策；最新几何修复在组件中展示客户端校验文案，与 error-messages.md 的全局单一文案源要求存在边界差异。后续相关实现前须先裁决，不能把现有代码自动当作规格变更。
+- 数据数量口径待核实：当前节点记录「12 条中 2 条已发布」，下方研究库总量仍为历史 3 published/69 candidate；本轮未查询数据库，不推算新总量。
+
 - Gate 1 存在真实用户研究补证债务：无真实访谈纪要与可追溯结论，M1 最终决策前必须完成 8–10 名目标用户发现研究，不得倒填。
-- 历史账本记载的测试计数互相矛盾（352/363/367/370/…/432），以最新 424/424 + 39/39 为准；旧计数属阶段性快照，不代表回退。
+- 历史账本记载的测试计数互相矛盾（352/363/367/370/…/432），以本文件顶部稳定测试基线为准；旧计数属阶段性快照，不代表回退。
 - 全仓 strict mypy 存量类型债（数百条/数十文件，mypy 2.3 比建仓时代更严格），未纳入本轮范围；CI 暂不跑 mypy 全量（见 docs/process/ci-troubleshooting.md 已知债务节）；ruff check 债务已清零（2026-09-05），`ruff format` 历史漂移 103 文件为 non-blocking。
 - 服务器真实 MySQL 仍停在已验收的 `0002_anonymous_identity` 基线，下次应用发布前必须依次执行 0003→0015 并重新验证 readiness、备份与隔离恢复。
 - H1–H12 全部「未验证」；自动化测试、Chrome 验收或团队内部判断均不能冒充 H3/H11 的真实用户证据。
@@ -45,14 +55,15 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 实现完成待合并（2026-09-08：全量 pytest 495/495 + ruff + layering + check_docs 全过，行为零变化） |
+| O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 实现完成待用户提交；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；未操作实际研究库 |
+| AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 已进入 dev（04c2d35；2026-09-10 核对销账；原验证记录：pytest 495/495 + ruff + layering + check_docs） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8 全部完成并已合并（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。遗留任务：① 后端 63 个响应端点补 response_model（S8-3 勘察发现，建议与 S7 拆分同批）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest 尚未接入 CI；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。遗留任务：① 后端 63 个响应端点补 response_model（S8-3 勘察发现，建议与 S7 拆分同批）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
 
 ## 关键事实速查
 
 - 研究库 `.local/research.db`：72 条杭州候选（published=3：平湖秋月、浙江省博物馆孤山馆区[第 2 版]、西湖音乐喷泉表演；candidate=69），目录边界审计通过。
-- 求解器契约：`solver-p1-v2 / trip-result-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`；历史 Revision 不迁移、不覆盖、不原地重算。
+- 求解器契约：`solver-p1-v2 / trip-result-v2 / constraints-p1-v6 / parameters-p1-2026-08-26`；历史 Revision 不迁移、不覆盖、不原地重算。
 - Gate 7 protocol 规范化 SHA-256：`b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89`。
 - 正式发布 bundle：`var/published/hangzhou-published-2026-08-27-v1.json`（7 景点 human_verified 坐标 + 42/42 高德 OD + 真实和风三日天气）。
 - 本机禁止部署/启动 MySQL/Redis；本地开发组合根用明确标注的近似 fixture，生产组合根只加载严格验证的 published 快照。

@@ -21,6 +21,7 @@ from travel_agent.solver import (
     WeatherSeverity,
 )
 
+from .fixed_sessions import parse_fixed_sessions
 from .gateway import PublishedAttraction, PublishedSolverData
 
 _SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
@@ -52,9 +53,7 @@ class JsonPublishedSolverDataProvider:
                 raise ValueError("published solver snapshot version mismatch")
             _verify_content_hash(snapshot, payload.get("content_hash"))
             status = snapshot.get("status")
-            if status != "published" and not (
-                self._allow_candidates and status == "candidate"
-            ):
+            if status != "published" and not (self._allow_candidates and status == "candidate"):
                 raise ValueError("published solver snapshot is not published")
             loaded = _parse_snapshot(snapshot, require_human_review=status == "published")
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
@@ -114,9 +113,7 @@ def _parse_snapshot(
     weather_by_date = {item.day: item for item in weather}
     if len(weather_by_date) != len(weather):
         raise ValueError("published solver snapshot weather dates must be unique")
-    od_results = tuple(
-        _parse_od(_mapping(row)) for row in _list(snapshot["od_pairs"])
-    )
+    od_results = tuple(_parse_od(_mapping(row)) for row in _list(snapshot["od_pairs"]))
     attraction_id_set = set(attraction_ids)
     expected_pairs = {
         (origin_id, destination_id)
@@ -150,9 +147,7 @@ def _parse_snapshot(
     )
 
 
-def _parse_attraction(
-    row: dict[str, object], *, require_human_review: bool
-) -> PublishedAttraction:
+def _parse_attraction(row: dict[str, object], *, require_human_review: bool) -> PublishedAttraction:
     coordinate_row = _mapping(row["coordinate"])
     review_status = _text(coordinate_row["review_status"])
     if require_human_review and review_status != "human_verified":
@@ -174,16 +169,12 @@ def _parse_attraction(
     attraction = Attraction(
         _integer(row["id"]),
         _text(row["name"]),
-        close_days=frozenset(
-            _integer(item) for item in _list(row.get("close_days", []))
-        ),
+        close_days=frozenset(_integer(item) for item in _list(row.get("close_days", []))),
         open_on_dates=frozenset(
-            date.fromisoformat(_text(item))
-            for item in _list(row.get("open_on_dates", []))
+            date.fromisoformat(_text(item)) for item in _list(row.get("open_on_dates", []))
         ),
         closed_on_dates=frozenset(
-            date.fromisoformat(_text(item))
-            for item in _list(row.get("closed_on_dates", []))
+            date.fromisoformat(_text(item)) for item in _list(row.get("closed_on_dates", []))
         ),
         suggested_duration=_integer(row["suggested_duration"]),
         time_rules=rules,
@@ -193,6 +184,7 @@ def _parse_attraction(
         data_verified=_boolean(row["data_verified"]),
         conflict=_boolean(row.get("conflict", False)),
         active=_boolean(row.get("active", True)),
+        fixed_sessions=parse_fixed_sessions(row.get("fixed_sessions", [])),
     )
     return PublishedAttraction(
         _text(row["external_id"]),

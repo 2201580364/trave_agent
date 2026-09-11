@@ -91,9 +91,7 @@ def _weather() -> dict[str, Any]:
                 "severity": "normal",
                 "condition": "晴",
                 "condition_code": "100",
-                "source_ref": (
-                    f"qweather:101210101:qweather-published-test-v1:2026-08-{day}"
-                ),
+                "source_ref": (f"qweather:101210101:qweather-published-test-v1:2026-08-{day}"),
                 "fetched_at": "2026-08-27T08:00:00+00:00",
             }
             for day in (27, 28, 29)
@@ -124,9 +122,7 @@ def test_build_published_snapshot_combines_strict_inputs() -> None:
     assert len(attractions) == 2
     assert len(weather) == 3
     assert len(od_pairs) == 2
-    assert attractions[0]["coordinate"]["review_status"] == (
-        "human_verified"
-    )
+    assert attractions[0]["coordinate"]["review_status"] == ("human_verified")
 
 
 def test_build_published_snapshot_rejects_unreviewed_coordinates() -> None:
@@ -169,3 +165,52 @@ def test_build_published_snapshot_rejects_incomplete_od() -> None:
             version="hangzhou-published-test-v1",
             city_id="hangzhou",
         )
+
+
+def test_snapshot_preserves_discrete_session_payload():
+    """H3/C2: the production builder cannot drop new multi-session facts."""
+    from travel_agent.infrastructure.solver.published_json import _parse_attraction
+
+    attractions = _attractions()
+    sessions = [
+        {
+            "session_id": "evening",
+            "source_record_id": "reviewed-source",
+            "start_min": 1080,
+            "end_min": 1140,
+            "last_entry_min": 1070,
+        }
+    ]
+    attractions["records"][1]["fixed_sessions"] = sessions
+    snapshot = build_published_snapshot(
+        attractions, _coordinates(), _od(), _weather(), version="sessions-v1", city_id="hangzhou"
+    )
+    rows = cast(list[dict[str, object]], snapshot["attractions"])
+    assert rows[1]["fixed_sessions"] == sessions
+    attraction = _parse_attraction(rows[1], require_human_review=True).attraction
+    assert attraction.fixed_sessions[0].entry_min == 1070
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [{}],
+        [{"source_record_id": "s", "session_id": "x", "start_min": 1}],
+        [
+            {
+                "source_record_id": "s",
+                "session_id": "x",
+                "start_min": 1,
+                "end_min": 2,
+                "opening_hours": [None],
+            }
+        ],
+    ],
+)
+def test_malformed_session_payload_fails_closed(payload):
+    """H3/C2: malformed published facts produce validation errors."""
+    from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
+
+    with pytest.raises(ValueError):
+        parse_fixed_sessions(payload)

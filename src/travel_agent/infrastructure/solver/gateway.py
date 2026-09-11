@@ -42,6 +42,7 @@ from travel_agent.solver import (
     resolve_effective_window,
     route_itinerary,
 )
+from travel_agent.solver.time_windows import applicable_fixed_sessions
 
 LUNCH_EARLIEST_MIN = 11 * 60 + 30
 LUNCH_LATEST_END_MIN = 14 * 60
@@ -125,9 +126,7 @@ class ProductionSolverGateway:
                 day_count=len(prepared.trip_dates),
             )
             elapsed_ms = max(0, int((perf_counter() - started) * 1000))
-            result = _result_snapshot(
-                request, snapshot, itinerary, quality, degradation
-            )
+            result = _result_snapshot(request, snapshot, itinerary, quality, degradation)
             audit = build_solver_run_audit(
                 itinerary,
                 quality,
@@ -146,9 +145,7 @@ class ProductionSolverGateway:
             )
             partial = bool(itinerary.unplaced or itinerary.data_rejected)
             completion = (
-                CompletionKind.PARTIAL_SUCCESS
-                if partial
-                else CompletionKind.COMPLETE_SUCCESS
+                CompletionKind.PARTIAL_SUCCESS if partial else CompletionKind.COMPLETE_SUCCESS
             )
             return SolverOutcome(
                 completion,
@@ -193,8 +190,7 @@ def _prepare_input(
     start_date = date.fromisoformat(_text(facts["start_date"]))
     end_date = date.fromisoformat(_text(facts["end_date"]))
     trip_dates = tuple(
-        start_date + timedelta(days=offset)
-        for offset in range((end_date - start_date).days + 1)
+        start_date + timedelta(days=offset) for offset in range((end_date - start_date).days + 1)
     )
     arrival = datetime.fromisoformat(_text(facts["arrival_at"]))
     departure = datetime.fromisoformat(_text(facts["departure_at"]))
@@ -207,9 +203,7 @@ def _prepare_input(
     )
     travel_mode = TravelMode(_text(facts["travel_mode"]))
     by_external_id = {item.external_id: item.attraction for item in published.attractions}
-    selected_ids = tuple(
-        _text(item) for item in _list(input_snapshot["selected_attraction_ids"])
-    )
+    selected_ids = tuple(_text(item) for item in _list(input_snapshot["selected_attraction_ids"]))
     attractions = tuple(by_external_id[item] for item in selected_ids)
     preferred_dates = _balanced_default_preferred_dates(
         attractions,
@@ -326,9 +320,7 @@ def _cluster_attractions_by_od(
         (item,) for item in sorted(attractions, key=lambda item: item.id)
     ]
     while len(clusters) > cluster_count:
-        candidates: list[
-            tuple[Fraction, int, tuple[int, ...], int, int]
-        ] = []
+        candidates: list[tuple[Fraction, int, tuple[int, ...], int, int]] = []
         for left_index, left in enumerate(clusters):
             for right_index in range(left_index + 1, len(clusters)):
                 right = clusters[right_index]
@@ -413,9 +405,7 @@ def _rebalance_od_cluster_sizes(
         attraction_id = selected[2]
         donor_index = selected[-2]
         recipient_index = selected[-1]
-        attraction = next(
-            item for item in mutable[donor_index] if item.id == attraction_id
-        )
+        attraction = next(item for item in mutable[donor_index] if item.id == attraction_id)
         mutable[donor_index].remove(attraction)
         mutable[recipient_index].append(attraction)
         mutable[donor_index].sort(key=lambda item: item.id)
@@ -432,10 +422,7 @@ def _average_attraction_cluster_cost(
     cluster: list[Attraction],
     provider: TravelTimeProvider,
 ) -> Fraction:
-    costs = [
-        _symmetric_od_cost(attraction.id, other.id, provider)
-        for other in cluster
-    ]
+    costs = [_symmetric_od_cost(attraction.id, other.id, provider) for other in cluster]
     return Fraction(sum(costs), len(costs))
 
 
@@ -450,14 +437,9 @@ def _rebalance_od_cluster_durations(
     minimum_size = total_count // len(mutable)
     maximum_size = (total_count + len(mutable) - 1) // len(mutable)
     while True:
-        durations = [
-            sum(item.suggested_duration for item in cluster)
-            for cluster in mutable
-        ]
+        durations = [sum(item.suggested_duration for item in cluster) for cluster in mutable]
         current_spread = max(durations) - min(durations)
-        candidates: list[
-            tuple[int, Fraction, int, tuple[int, ...], tuple[int, ...], int, int]
-        ] = []
+        candidates: list[tuple[int, Fraction, int, tuple[int, ...], tuple[int, ...], int, int]] = []
         for donor_index, donor in enumerate(mutable):
             if len(donor) <= minimum_size:
                 continue
@@ -481,10 +463,7 @@ def _rebalance_od_cluster_durations(
                         donor_others,
                         provider,
                     )
-                    if (
-                        od_penalty
-                        > DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN
-                    ):
+                    if od_penalty > DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN:
                         continue
                     candidates.append(
                         (
@@ -503,9 +482,7 @@ def _rebalance_od_cluster_durations(
         attraction_id = selected[2]
         donor_index = selected[-2]
         recipient_index = selected[-1]
-        attraction = next(
-            item for item in mutable[donor_index] if item.id == attraction_id
-        )
+        attraction = next(item for item in mutable[donor_index] if item.id == attraction_id)
         mutable[donor_index].remove(attraction)
         mutable[recipient_index].append(attraction)
         mutable[donor_index].sort(key=lambda item: item.id)
@@ -537,11 +514,7 @@ def _symmetric_od_cost(
 ) -> int:
     forward = provider.get_travel_time(origin_id, destination_id)
     backward = provider.get_travel_time(destination_id, origin_id)
-    available = [
-        item.travel_min
-        for item in (forward, backward)
-        if item is not None
-    ]
+    available = [item.travel_min for item in (forward, backward) if item is not None]
     if len(available) == 2:
         return sum(available)
     if len(available) == 1:
@@ -554,18 +527,14 @@ def _visit_period(raw: dict[str, object] | None) -> VisitPeriodPreference | None
         return None
     return VisitPeriodPreference(
         frozenset({TimeBucket(_text(raw["preferred_bucket"]))}),
-        frozenset(
-            TimeBucket(_text(item)) for item in _list(raw["acceptable_buckets"])
-        ),
+        frozenset(TimeBucket(_text(item)) for item in _list(raw["acceptable_buckets"])),
         VisitPeriodPreferenceSource.USER,
         "generation_input",
     )
 
 
 def _result_snapshot(request, published, itinerary, quality, degradation):
-    external_by_solver_id = {
-        item.attraction.id: item.external_id for item in published.attractions
-    }
+    external_by_solver_id = {item.attraction.id: item.external_id for item in published.attractions}
     days = []
     for day in itinerary.days:
         occurrences: dict[int, int] = {}
@@ -576,10 +545,24 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
                 day.visit_date,
             )
             effective_window = window_resolution.window
+            selected_session = next(
+                (
+                    item
+                    for item in applicable_fixed_sessions(
+                        visit.attraction,
+                        day.visit_date,
+                    )
+                    if item.entry_min == visit.arrival_min and item.end_min == visit.leave_min
+                ),
+                None,
+            )
             timing_kind = (
                 "fixed_event"
-                if effective_window is not None
-                and effective_window.close_min - effective_window.open_min <= 60
+                if selected_session is not None
+                or (
+                    effective_window is not None
+                    and effective_window.close_min - effective_window.open_min <= 60
+                )
                 else "flexible"
             )
             occurrences[visit.attraction.id] = occurrences.get(visit.attraction.id, 0) + 1
@@ -600,9 +583,7 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
                         if visit.travel_from_previous is not None
                         else 0
                     ),
-                    "buffered_travel_from_previous_min": (
-                        visit.buffered_travel_from_previous_min
-                    ),
+                    "buffered_travel_from_previous_min": (visit.buffered_travel_from_previous_min),
                     "travel_basis": (
                         visit.travel_from_previous.basis.value
                         if visit.travel_from_previous is not None
@@ -624,6 +605,18 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
                         else None
                     ),
                     "timing_kind": timing_kind,
+                    **(
+                        {
+                            "selected_session": {
+                                "session_id": selected_session.session_id,
+                                "start_min": selected_session.start_min,
+                                "end_min": selected_session.end_min,
+                                "entry_min": selected_session.entry_min,
+                            }
+                        }
+                        if selected_session is not None
+                        else {}
+                    ),
                     "duration_notice": visit.duration_notice,
                     "visit_period": _jsonable(visit.visit_period),
                 }
@@ -724,9 +717,7 @@ def _lunch_plan(day) -> dict[str, object] | None:
         )
         for previous, current in zip(visits, visits[1:], strict=False)
     )
-    intervals.append(
-        ("after_last_visit", visits[-1].leave_min, day.bounds.end_min)
-    )
+    intervals.append(("after_last_visit", visits[-1].leave_min, day.bounds.end_min))
 
     for duration_min, status in (
         (LUNCH_FULL_DURATION_MIN, "full"),
@@ -802,7 +793,5 @@ def _jsonable(value: object) -> object:
 
 
 def _stable_hash(value: dict[str, object]) -> str:
-    serialized = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    )
+    serialized = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

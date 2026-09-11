@@ -47,9 +47,7 @@ class CreatePlanShareHandler:
 
     def handle(self, command: CreatePlanShare) -> PlanShareResult:
         with self._uow:
-            existing = self._uow.plan_shares.get_by_intent(
-                command.plan_share_intent_id
-            )
+            existing = self._uow.plan_shares.get_by_intent(command.plan_share_intent_id)
             if existing is not None:
                 if existing.principal_id != command.principal_id:
                     raise ResourceNotFoundError
@@ -108,9 +106,7 @@ class GetPublishedPlanShareHandler:
 
     def handle(self, public_token: str) -> PublishedPlanShare:
         with self._uow:
-            share = self._uow.plan_shares.get_by_public_token_hash(
-                self._tokens.hash(public_token)
-            )
+            share = self._uow.plan_shares.get_by_public_token_hash(self._tokens.hash(public_token))
             if share is None or share.status != "published":
                 raise ResourceNotFoundError
             return PublishedPlanShare(
@@ -149,9 +145,7 @@ class CopyPlanShareToDraftHandler:
             )
             trip = self._uow.trips.get(share.trip_id)
             raw_selected = (
-                intent.input_snapshot.get("selected_attraction_ids")
-                if intent is not None
-                else None
+                intent.input_snapshot.get("selected_attraction_ids") if intent is not None else None
             )
             if (
                 revision is None
@@ -207,7 +201,9 @@ def _public_share_snapshot(city_id: str, revision) -> dict[str, object]:
                 "timing_kind": "fixed_event" if fixed else "flexible",
             }
             if fixed:
-                item["fixed_time"] = _minute_label(arrival_min)
+                selected = raw_node.get("selected_session")
+                start = selected.get("start_min") if isinstance(selected, dict) else None
+                item["fixed_time"] = _minute_label(start if isinstance(start, int) else arrival_min)
             items.append(item)
         raw_weather = raw_day.get("weather")
         weather = raw_weather if isinstance(raw_weather, dict) else {}
@@ -221,11 +217,7 @@ def _public_share_snapshot(city_id: str, revision) -> dict[str, object]:
                 "items": items,
             }
         )
-    dates = [
-        day["date"]
-        for day in public_days
-        if isinstance(day.get("date"), str)
-    ]
+    dates = [day["date"] for day in public_days if isinstance(day.get("date"), str)]
     raw_unplaced = result.get("unplaced")
     return {
         "schema_version": "plan-share-v1",

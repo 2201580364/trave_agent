@@ -192,6 +192,7 @@ export interface TripResult {
       travel_distance_m?: number | null
       travel_fallback_reason?: string | null
       transport_mode?: 'walking' | 'transit' | 'driving' | 'walking_estimate' | 'taxi_estimate' | 'transit_or_taxi_estimate' | null
+      selected_session?: { session_id: string; start_min: number; end_min: number; entry_min: number }
       timing_kind?: 'flexible' | 'fixed_event'
     }>
     lunch?: MealBreak | null

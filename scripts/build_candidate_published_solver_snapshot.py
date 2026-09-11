@@ -103,6 +103,7 @@ def build_candidate_snapshot(
                 "closed_on_dates": row.get("closed_on_dates", []),
                 "suggested_duration": row["suggested_duration"],
                 "time_rules": row.get("time_rules", []),
+                **({"fixed_sessions": row["fixed_sessions"]} if "fixed_sessions" in row else {}),
                 "is_always_open": row["is_always_open"],
                 "is_indoor": row["is_indoor"],
                 "energy_level": row["energy_level"],

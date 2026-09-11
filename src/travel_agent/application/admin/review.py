@@ -42,6 +42,10 @@ from travel_agent.domain.place_catalog.holiday_calendar import (
     list_holiday_calendars,
 )
 from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
+from travel_agent.domain.place_catalog.session_payload import (
+    build_fixed_session_payload,
+    valid_session_timing,
+)
 
 from .audit_events import (
     build_audit_event,
@@ -973,6 +977,28 @@ class PlaceReviewWorkflowService:
         last_entry = tuple(r for r in matching if r.rule_kind == "last_entry")
         if len(opening) > 1:
             reasons.append("TIME_RULE_OVERLAP")
+        if not opening and fixed and evidence.revision.place_kind == "show":
+            sessions = [
+                {
+                    "time_rule_id": item.time_rule_id,
+                    "start_minute": item.start_minute,
+                    "end_minute": item.end_minute,
+                    "last_entry_minute": item.last_entry_minute,
+                }
+                for item in fixed
+            ]
+            if any((item.end_minute or 0) >= 1440 for item in fixed):
+                reasons.append("CROSS_MIDNIGHT_WINDOW")
+            return {
+                "revision_id": revision_id,
+                "service_date": service_date.isoformat(),
+                "open": True,
+                "windows": [],
+                "fixed_sessions": sessions,
+                "reason_codes": reasons,
+                "applied_exception_ids": [],
+                "rule_ids": [item.time_rule_id for item in fixed],
+            }
         if not opening:
             reasons.append("TIME_RULE_NOT_MATCHED")
             return {
@@ -1020,8 +1046,6 @@ class PlaceReviewWorkflowService:
             and "CROSS_MIDNIGHT_WINDOW" not in reasons
         ):
             reasons.append("CROSS_MIDNIGHT_WINDOW")
-        if len(sessions) > 1:
-            reasons.append("FIXED_SESSION_AMBIGUOUS")
         return {
             "revision_id": revision_id,
             "service_date": service_date.isoformat(),
@@ -1509,6 +1533,49 @@ class PlaceReviewWorkflowService:
             action="PLACE_TIME_RULE_UPDATED",
             target_id=time_rule_id,
             payload=payload,
+            mutate=mutate,
+        )
+
+    def delete_time_rule(
+        self,
+        principal: AdminPrincipal,
+        *,
+        revision_id: str,
+        time_rule_id: str,
+        expected_revision_version: int,
+        operation_intent_id: str,
+        reason_code: str,
+        reason_text: str | None,
+        request_id: str,
+    ) -> PlaceRevision:
+        """Delete candidate time evidence with versioning and atomic audit (H3/C2)."""
+
+        def mutate(uow: ReviewUnitOfWork, _revision: PlaceRevision) -> tuple[PlaceRevision, str]:
+            return (
+                uow.catalog.delete_time_rule(
+                    time_rule_id,
+                    place_revision_id=revision_id,
+                    expected_revision_version=expected_revision_version,
+                ),
+                time_rule_id,
+            )
+
+        return self._mutate_evidence(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+            action="PLACE_TIME_RULE_DELETED",
+            target_id=time_rule_id,
+            payload={
+                "revision_id": revision_id,
+                "time_rule_id": time_rule_id,
+                "expected_revision_version": expected_revision_version,
+                "operation": "delete",
+            },
             mutate=mutate,
         )
 
@@ -2598,6 +2665,8 @@ class PlaceReviewWorkflowService:
                 "energy_level": revision.energy_level,
                 "data_verified": False,
             }
+            if revision.place_kind == "show":
+                payload["fixed_sessions"] = build_fixed_session_payload(evidence)
             projection = SolverPlaceProjection(
                 self._ids.new_id("solver_projection"),
                 "solver-place-projection-v1",
@@ -3297,9 +3366,7 @@ class PlaceReviewWorkflowService:
                 )
                 if readiness is None or readiness["verified_checks"] != readiness["total_checks"]:
                     missing = readiness["missing_checks"] if readiness is not None else ()
-                    pending = (
-                        readiness["pending_review_checks"] if readiness is not None else ()
-                    )
+                    pending = readiness["pending_review_checks"] if readiness is not None else ()
                     self._reject(
                         uow,
                         actor,
@@ -3534,12 +3601,45 @@ def evaluate_review_readiness(
     active_source_ids = {
         source.source_record_id for source in evidence.source_records if source.status == "active"
     }
-    source_collected = bool(revision.source_record_ids) and not evidence.missing_source_record_ids
+    active_dependency_sources = set(revision.source_record_ids) | {
+        item.source_record_id
+        for items in (
+            evidence.geometries,
+            evidence.access_points,
+            evidence.time_rules,
+            evidence.closures,
+            evidence.date_exceptions,
+            evidence.relations,
+        )
+        for item in items
+        if item.active
+    }
+    inactive_only_sources = {
+        item.source_record_id
+        for items in (
+            evidence.geometries,
+            evidence.access_points,
+            evidence.time_rules,
+            evidence.closures,
+            evidence.date_exceptions,
+            evidence.relations,
+        )
+        for item in items
+        if not item.active
+    } - active_dependency_sources
+    relevant_sources = tuple(
+        item
+        for item in evidence.source_records
+        if item.source_record_id not in inactive_only_sources
+    )
+    source_collected = bool(revision.source_record_ids) and not (
+        set(revision.source_record_ids) & set(evidence.missing_source_record_ids)
+    )
     source_collected = source_collected and all(
         source_id in active_source_ids for source_id in revision.source_record_ids
     )
     source_collected = source_collected and (
-        not has_source_content_conflict(evidence.source_records) or revision.conflicts_resolved
+        not has_source_content_conflict(relevant_sources) or revision.conflicts_resolved
     )
 
     blocking_fact_flags = {
@@ -3604,7 +3704,21 @@ def evaluate_review_readiness(
     fixed_sessions = tuple(item for item in usable_time_rules if item.rule_kind == "fixed_session")
     time_collected = (revision.is_always_open or bool(usable_time_rules)) and time_sources_valid
     if revision.place_kind == "show":
-        time_collected = time_collected and len(fixed_sessions) == 1
+        time_collected = (
+            time_collected
+            and bool(fixed_sessions)
+            and all(
+                valid_session_timing(item.start_minute, item.end_minute, item.last_entry_minute)
+                for item in (
+                    *fixed_sessions,
+                    *(
+                        e
+                        for e in evidence.date_exceptions
+                        if e.active and e.exception_kind == "session_override"
+                    ),
+                )
+            )
+        )
     verified_time_children = sum(
         item.review_status == "human_verified" and item.source_record_id in active_source_ids
         for item in active_time_children

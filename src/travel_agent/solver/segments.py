@@ -65,6 +65,29 @@ def route_segmented_day(
     if not 0 < reduced_dinner_duration_min <= dinner_duration_min:
         raise ValueError("dinner durations are invalid")
 
+    if any(item.attraction.fixed_sessions for item in day_plan.allocations):
+        # Solve all nodes together so daytime/evening preselection cannot discard a
+        # reachable later show session. Keep exact sessions pinned after routing.
+        routed = route_day(
+            day_plan, provider, buffer_ratio=buffer_ratio, search_executor=search_executor
+        )
+        meal = _schedule_meal(
+            routed,
+            daytime_visit_count=len(routed.visits),
+            cross_buffered_min=0,
+            dinner_earliest_min=dinner_earliest_min,
+            dinner_latest_end_min=dinner_latest_end_min,
+            full_duration_min=dinner_duration_min,
+            reduced_duration_min=reduced_dinner_duration_min,
+        )
+        validation = validate_routed_day(
+            routed,
+            provider,
+            weather_by_date=weather_by_date,
+            buffer_ratio=buffer_ratio,
+        )
+        return SegmentedDay(routed, routed, None, meal, None, validation)
+
     daytime_allocations: list[DayAllocation] = []
     evening_allocations: list[DayAllocation] = []
     for allocation in day_plan.allocations:
@@ -310,9 +333,7 @@ def _combine_solve_metadata(
     daytime: RoutedDay | None,
     evening: RoutedDay | None,
 ) -> RouteSolveMetadata:
-    metadata = tuple(
-        route.solve_metadata for route in (daytime, evening) if route is not None
-    )
+    metadata = tuple(route.solve_metadata for route in (daytime, evening) if route is not None)
     if not metadata:
         return RouteSolveMetadata(RouteSearchStatus.EMPTY, 0, 0, False, True)
     statuses = {item.status for item in metadata}

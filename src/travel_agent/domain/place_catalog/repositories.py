@@ -99,6 +99,13 @@ class PlaceCatalogRepository(Protocol):
         *,
         expected_revision_version: int,
     ) -> PlaceRevision: ...
+    def delete_time_rule(
+        self,
+        time_rule_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
     def retire_time_rule(
         self,
         time_rule_id: str,
@@ -183,9 +190,7 @@ class PlaceCatalogRepository(Protocol):
         self, place_revision_id: str
     ) -> SolverPlaceProjection | None: ...
     def next_solver_node_id(self, data_snapshot_version: str, *, minimum: int = 1) -> int: ...
-    def load_revision_evidence(
-        self, place_revision_id: str
-    ) -> PlaceRevisionEvidence | None: ...
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None: ...
     def load_publication_context(
         self, projection_id: str
     ) -> ProjectionPublicationContext | None: ...

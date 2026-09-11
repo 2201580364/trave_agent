@@ -177,6 +177,7 @@ const auditActionLabels: Record<string, string> = {
   PLACE_SOURCE_RECORD_DETACHED: '从当前修订移除来源记录',
   PLACE_TIME_RULE_CREATED: '新增开放时间规则',
   PLACE_TIME_RULE_UPDATED: '修改开放时间规则',
+  PLACE_TIME_RULE_DELETED: '删除开放时间规则',
   PLACE_TIME_RULE_RETIRED: '停用开放时间规则',
   SOLVER_PROJECTION_PREPARED: '准备求解投影',
   PUBLICATION_BATCH_PREVIEWED: '预览发布批次',

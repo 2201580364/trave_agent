@@ -262,6 +262,12 @@ export class AdminApi {
     })
   }
 
+  deleteTimeRule(revisionId: string, timeRuleId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
+    return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-rules/${encodeURIComponent(timeRuleId)}/deletions`, {
+      method: 'POST', body: JSON.stringify(input),
+    })
+  }
+
   retireTimeRule(revisionId: string, timeRuleId: string, input: RetirePlaceEvidenceInput): Promise<PlaceRevision> {
     return this.request(`/place-revisions/${encodeURIComponent(revisionId)}/time-rules/${encodeURIComponent(timeRuleId)}`, {
       method: 'DELETE', body: JSON.stringify(input),

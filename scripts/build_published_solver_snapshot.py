@@ -77,9 +77,7 @@ def build_published_snapshot(
     if not version.strip() or not city_id.strip():
         raise ValueError("published snapshot version and city_id are required")
     attraction_rows = _records(attractions_payload)
-    coordinate_rows = {
-        _integer(row["id"]): row for row in _records(coordinates_payload)
-    }
+    coordinate_rows = {_integer(row["id"]): row for row in _records(coordinates_payload)}
     attraction_ids = {_integer(row["id"]) for row in attraction_rows}
     if set(coordinate_rows) != attraction_ids:
         raise ValueError("reviewed coordinate and attraction ids must match")
@@ -107,6 +105,7 @@ def build_published_snapshot(
                 "closed_on_dates": row.get("closed_on_dates", []),
                 "suggested_duration": row["suggested_duration"],
                 "time_rules": row.get("time_rules", []),
+                **({"fixed_sessions": row["fixed_sessions"]} if "fixed_sessions" in row else {}),
                 "is_always_open": row["is_always_open"],
                 "is_indoor": row["is_indoor"],
                 "energy_level": row["energy_level"],
