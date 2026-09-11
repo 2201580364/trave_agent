@@ -1502,3 +1502,20 @@ Revision evidence 现在同时返回 `relations[]`，按当前 Place 的关系�
 来源有效性、逐项审核状态和 `resolution_status`。逐项 evidence review 的 `evidence_kind`
 支持 `relation`；关系审核沿用 candidate、active、幂等和审计约束。`overlaps`/`same_experience`
 且 `resolution_status=pending` 的关系仍会阻断 Projection 发布，关系裁决写入仍属于 O07 后续切片。
+
+
+### 15.5 地点详情与审核响应模型（H3，响应契约首片）
+
+本节规定 O03/O04/O05/O09 的响应形状来源：HTTP 层 `admin_responses.py` 中的显式 Pydantic 模型。
+修订详情及返回修订的写操作共用 `PlaceRevision`；候选列表使用 `PlaceRevisionPage` 并包含嵌套 `ReviewReadiness`。
+证据列表使用 `PlaceRevisionEvidence`，细分来源、几何、访问点、时间规则、闭馆、日期例外、关系和投影。
+审核任务详情、送审、单项决定与列表分别使用 `ReviewTask` / `ReviewTaskPage`；发布检查使用 `PublicationCheck`。
+
+- 响应模型拒绝未声明字段；`geometry` 的结构化 JSON 保留扩展能力。此校验检查服务端实现偏差，不新增用户业务错误码。
+- 显式 null 保留；可选上下文使用 `response_model_exclude_unset=True`，不凭默认值新增原先省略的字段。
+- 时间与日期保持原序列化字符串，不改写时区或精度。关系检查状态、来源关联标志、关系数组等实际必返字段均在 schema 中声明必填。
+- 时间预览 `fixed_sessions` 元素是两种结构的联合：常规场次含 `time_rule_id`，日期场次覆盖含 `date_exception_id`，均携带开始、结束与最晚入场分钟。
+- 管理端从生成 `components['schemas']` 导出上述类型及列表包装，不再另写同名结构。
+- CI 从锁定后端环境导出 OpenAPI，传给管理端生成类型并检查文件差异；修改上述响应字段须同一变更更新生成文件与兼容性测试。
+
+认证、来源冲突、批量审核结果、发布批次及 O17 等其他响应仍按原契约实现，后续按独立能力片迁移；不能据此宣称全部响应已类型化。

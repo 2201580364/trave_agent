@@ -71,6 +71,7 @@ const revision: PlaceRevision = {
   reviewed_at: null,
   published_at: null,
   review_flags: [],
+  relation_review_status: 'not_required',
 }
 
 const timeEvidence: PlaceRevisionEvidence = {
@@ -85,6 +86,8 @@ const timeEvidence: PlaceRevisionEvidence = {
     source_decision: 'approved',
     observed_at: '2026-08-30T00:00:00Z',
     status: 'active',
+    content_sha256: null,
+    attached_to_revision: true,
   }],
   geometries: [],
   access_points: [],
@@ -128,6 +131,7 @@ const timeEvidence: PlaceRevisionEvidence = {
     created_at: '2026-08-30T00:00:00Z',
     reviewed_at: null,
   }],
+  relations: [],
   projection: null,
   missing_source_record_ids: [],
 }

@@ -1541,6 +1541,44 @@ export interface components {
             /** Holiday Name */
             holiday_name: string;
         };
+        /** OverrideSessionPreview */
+        OverrideSessionPreview: {
+            /** Date Exception Id */
+            date_exception_id: string;
+            /** End Minute */
+            end_minute: number | null;
+            /** Last Entry Minute */
+            last_entry_minute: number | null;
+            /** Start Minute */
+            start_minute: number | null;
+        };
+        /** PlaceAccessPointEvidence */
+        PlaceAccessPointEvidence: {
+            /** Access Point Id */
+            access_point_id: string;
+            /** Access Point Kind */
+            access_point_kind: string;
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Name */
+            name: string;
+            /** Review Status */
+            review_status: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Record Valid */
+            source_record_valid: boolean;
+        };
         /** PlaceAccessPointInput */
         PlaceAccessPointInput: {
             /** Access Point Kind */
@@ -1564,6 +1602,25 @@ export interface components {
             /** Source Record Id */
             source_record_id: string;
         };
+        /** PlaceClosureEvidence */
+        PlaceClosureEvidence: {
+            /** Active */
+            active: boolean;
+            /** Closure Id */
+            closure_id: string;
+            /** Created At */
+            created_at: string;
+            /** Review Status */
+            review_status: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Record Valid */
+            source_record_valid: boolean;
+            /** Weekday */
+            weekday: number;
+        };
         /** PlaceClosureInput */
         PlaceClosureInput: {
             /** Expected Revision Version */
@@ -1578,6 +1635,33 @@ export interface components {
             source_record_id: string;
             /** Weekday */
             weekday: number;
+        };
+        /** PlaceDateExceptionEvidence */
+        PlaceDateExceptionEvidence: {
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** Date Exception Id */
+            date_exception_id: string;
+            /** End Minute */
+            end_minute: number | null;
+            /** Exception Kind */
+            exception_kind: string;
+            /** Last Entry Minute */
+            last_entry_minute: number | null;
+            /** Review Status */
+            review_status: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Service Date */
+            service_date: string;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Record Valid */
+            source_record_valid: boolean;
+            /** Start Minute */
+            start_minute: number | null;
         };
         /** PlaceDateExceptionInput */
         PlaceDateExceptionInput: {
@@ -1605,6 +1689,54 @@ export interface components {
             /** Start Minute */
             start_minute?: number | null;
         };
+        /** PlaceEvidenceSource */
+        PlaceEvidenceSource: {
+            /** Attached To Revision */
+            attached_to_revision: boolean;
+            /** Collection Mode */
+            collection_mode: string;
+            /** Content Sha256 */
+            content_sha256: string | null;
+            /** Observed At */
+            observed_at: string;
+            /** Source Decision */
+            source_decision: string;
+            /** Source Id */
+            source_id: string;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Url */
+            source_url: string;
+            /** Source Url Redacted */
+            source_url_redacted: boolean;
+            /** Status */
+            status: string;
+            /** Target Stage */
+            target_stage: string;
+        };
+        /** PlaceGeometryEvidence */
+        PlaceGeometryEvidence: {
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** Geometry */
+            geometry: {
+                [key: string]: unknown;
+            };
+            /** Geometry Id */
+            geometry_id: string;
+            /** Geometry Kind */
+            geometry_kind: string;
+            /** Review Status */
+            review_status: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Record Valid */
+            source_record_valid: boolean;
+        };
         /** PlaceGeometryInput */
         PlaceGeometryInput: {
             /** Expected Revision Version */
@@ -1623,6 +1755,220 @@ export interface components {
             reason_text?: string | null;
             /** Source Record Id */
             source_record_id: string;
+        };
+        /** PlaceProjectionEvidence */
+        PlaceProjectionEvidence: {
+            /** Arrival Access Point Id */
+            arrival_access_point_id: string;
+            /** Created At */
+            created_at: string;
+            /** Data Snapshot Version */
+            data_snapshot_version: string;
+            /** Departure Access Point Id */
+            departure_access_point_id: string;
+            /** Gate Reason Codes */
+            gate_reason_codes: string[];
+            /** Geometry Kind */
+            geometry_kind: string;
+            /** Place Kind */
+            place_kind: string;
+            /** Projection Hash */
+            projection_hash: string;
+            /** Projection Id */
+            projection_id: string;
+            /** Projection Version */
+            projection_version: string;
+            /** Published At */
+            published_at: string | null;
+            /** Solver Node Id */
+            solver_node_id: number;
+            /** Status */
+            status: string;
+        };
+        /** PlaceRelationEvidence */
+        PlaceRelationEvidence: {
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** Decision Note */
+            decision_note: string | null;
+            /** From Place Id */
+            from_place_id: string;
+            /** From Place Name */
+            from_place_name: string | null;
+            /** Relation Id */
+            relation_id: string;
+            /** Relation Summary */
+            relation_summary: string | null;
+            /** Relation Type */
+            relation_type: string;
+            /** Resolution Status */
+            resolution_status: string;
+            /** Review Status */
+            review_status: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Record Valid */
+            source_record_valid: boolean;
+            /** To Place Id */
+            to_place_id: string;
+            /** To Place Name */
+            to_place_name: string | null;
+        };
+        /** PlaceRevision */
+        PlaceRevision: {
+            /** Address */
+            address: string | null;
+            /** Admin Area */
+            admin_area: string;
+            /** Aliases */
+            aliases: string[];
+            /** Audience Tags */
+            audience_tags: string[];
+            /** Canonical Name */
+            canonical_name: string;
+            /** Category */
+            category: string;
+            /** Conflicts Resolved */
+            conflicts_resolved: boolean;
+            /** Created At */
+            created_at: string;
+            /** Duration Max */
+            duration_max: number;
+            /** Duration Min */
+            duration_min: number;
+            /** Duration Recommended */
+            duration_recommended: number;
+            /** Energy Level */
+            energy_level: number;
+            /** Geometry Kind */
+            geometry_kind: string;
+            /** Indoor Outdoor */
+            indoor_outdoor: string;
+            /** Internal Travel Min */
+            internal_travel_min: number;
+            /** Is Always Open */
+            is_always_open: boolean;
+            /**
+             * Lifecycle Status
+             * @enum {string}
+             */
+            lifecycle_status: "candidate" | "human_verified" | "published" | "retired";
+            /** Place Id */
+            place_id: string;
+            /** Place Kind */
+            place_kind: string;
+            /** Place Revision Id */
+            place_revision_id: string;
+            /** Published At */
+            published_at: string | null;
+            /** Rain Suitability */
+            rain_suitability: string;
+            /**
+             * Relation Review Status
+             * @enum {string}
+             */
+            relation_review_status: "pending" | "no_relations" | "not_required";
+            /** Review Flags */
+            review_flags: string[];
+            review_readiness?: components["schemas"]["ReviewReadiness"] | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Revision Number */
+            revision_number: number;
+            /** Revision Version */
+            revision_version: number;
+            /** Solver Eligible */
+            solver_eligible: boolean;
+            /** Source Record Ids */
+            source_record_ids: string[];
+            /** Suitable Periods */
+            suitable_periods: string[];
+        };
+        /** PlaceRevisionEvidence */
+        PlaceRevisionEvidence: {
+            /** Access Points */
+            access_points: components["schemas"]["PlaceAccessPointEvidence"][];
+            /** Closures */
+            closures: components["schemas"]["PlaceClosureEvidence"][];
+            /** Date Exceptions */
+            date_exceptions: components["schemas"]["PlaceDateExceptionEvidence"][];
+            /** Geometries */
+            geometries: components["schemas"]["PlaceGeometryEvidence"][];
+            /** Missing Source Record Ids */
+            missing_source_record_ids: string[];
+            projection: components["schemas"]["PlaceProjectionEvidence"] | null;
+            /** Relations */
+            relations: components["schemas"]["PlaceRelationEvidence"][];
+            revision: components["schemas"]["PlaceRevision"];
+            /** Sources */
+            sources: components["schemas"]["PlaceEvidenceSource"][];
+            /** Time Rules */
+            time_rules: components["schemas"]["PlaceTimeRuleEvidence"][];
+        };
+        /** PlaceRevisionPage */
+        PlaceRevisionPage: {
+            /** Items */
+            items: components["schemas"]["PlaceRevision"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** PlaceTimePreview */
+        PlaceTimePreview: {
+            /** Applied Exception Ids */
+            applied_exception_ids: string[];
+            /** Fixed Sessions */
+            fixed_sessions: (components["schemas"]["RegularSessionPreview"] | components["schemas"]["OverrideSessionPreview"])[];
+            /** Open */
+            open: boolean;
+            /** Reason Codes */
+            reason_codes: string[];
+            /** Revision Id */
+            revision_id: string;
+            /** Rule Ids */
+            rule_ids: string[];
+            /** Service Date */
+            service_date: string;
+            /** Windows */
+            windows: components["schemas"]["TimeWindowPreview"][];
+        };
+        /** PlaceTimeRuleEvidence */
+        PlaceTimeRuleEvidence: {
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** End Minute */
+            end_minute: number | null;
+            /** Last Entry Minute */
+            last_entry_minute: number | null;
+            /** Review Status */
+            review_status: string;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Rule Kind */
+            rule_kind: string;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Record Valid */
+            source_record_valid: boolean;
+            /** Start Minute */
+            start_minute: number | null;
+            /** Time Rule Id */
+            time_rule_id: string;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /** Weekdays */
+            weekdays: number[];
         };
         /** PlaceTimeRuleInput */
         PlaceTimeRuleInput: {
@@ -1677,6 +2023,15 @@ export interface components {
             /** Reason Text */
             reason_text?: string | null;
         };
+        /** PublicationCheck */
+        PublicationCheck: {
+            /** Publishable */
+            publishable: boolean;
+            /** Reason Codes */
+            reason_codes: string[];
+            /** Revision Id */
+            revision_id: string;
+        };
         /** PublishPlaceRevisionInput */
         PublishPlaceRevisionInput: {
             /** Operation Intent Id */
@@ -1685,6 +2040,17 @@ export interface components {
             reason_code: string;
             /** Reason Text */
             reason_text?: string | null;
+        };
+        /** RegularSessionPreview */
+        RegularSessionPreview: {
+            /** End Minute */
+            end_minute: number | null;
+            /** Last Entry Minute */
+            last_entry_minute: number | null;
+            /** Start Minute */
+            start_minute: number | null;
+            /** Time Rule Id */
+            time_rule_id: string;
         };
         /** ReplaceAdminRolesInput */
         ReplaceAdminRolesInput: {
@@ -1760,6 +2126,89 @@ export interface components {
             /** Review Status */
             review_status: string;
         };
+        /** ReviewReadiness */
+        ReviewReadiness: {
+            /** Checks */
+            checks: components["schemas"]["ReviewReadinessCheck"][];
+            /** Completed Checks */
+            completed_checks: number;
+            /** Missing Checks */
+            missing_checks: ("basic" | "source" | "geometry" | "access_point" | "time" | "relation")[];
+            /** Pending Review Checks */
+            pending_review_checks: ("basic" | "source" | "geometry" | "access_point" | "time" | "relation")[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "needs_evidence" | "ready_for_review" | "under_review" | "changes_requested" | "ready_for_approval" | "human_verified" | "published" | "retired";
+            /** Task Status */
+            task_status: ("draft" | "ready_for_review" | "in_review" | "changes_requested" | "approved" | "closed") | null;
+            /** Total Checks */
+            total_checks: number;
+            /** Verified Checks */
+            verified_checks: number;
+        };
+        /** ReviewReadinessCheck */
+        ReviewReadinessCheck: {
+            /** Collected */
+            collected: boolean;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "basic" | "source" | "geometry" | "access_point" | "time" | "relation";
+            /** Total */
+            total: number;
+            /** Verified */
+            verified: boolean;
+            /** Verified Count */
+            verified_count: number;
+        };
+        /** ReviewTask */
+        ReviewTask: {
+            /** Admin Area */
+            admin_area?: string | null;
+            /** Assigned Reviewer Id */
+            assigned_reviewer_id: string | null;
+            /** Canonical Name */
+            canonical_name?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Created At */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Place Id */
+            place_id?: string | null;
+            /** Place Kind */
+            place_kind?: string | null;
+            /** Place Revision Id */
+            place_revision_id: string;
+            /** Review Task Id */
+            review_task_id: string;
+            /** Revision Number */
+            revision_number?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "ready_for_review" | "in_review" | "changes_requested" | "approved" | "closed";
+            /** Updated At */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** ReviewTaskPage */
+        ReviewTaskPage: {
+            /** Items */
+            items: components["schemas"]["ReviewTask"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
         /** SubmitGenerationInput */
         SubmitGenerationInput: {
             /** Draft Id */
@@ -1810,6 +2259,15 @@ export interface components {
             rating: "reasonable" | "neutral" | "unreasonable";
             /** Revision Id */
             revision_id: string;
+        };
+        /** TimeWindowPreview */
+        TimeWindowPreview: {
+            /** End Minute */
+            end_minute: number | null;
+            /** Last Entry Minute */
+            last_entry_minute: number | null;
+            /** Start Minute */
+            start_minute: number | null;
         };
         /**
          * TransportType
@@ -1923,44 +2381,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    delete_place_time_rule_api_v1_admin_place_revisions__revision_id__time_rules__time_rule_id__deletions_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                revision_id: string;
-                time_rule_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RetirePlaceEvidenceInput"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_admin_actors_api_v1_admin_admin_actors_get: {
         parameters: {
             query?: {
@@ -2143,9 +2563,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevisionPage"];
                 };
             };
             /** @description Validation Error */
@@ -2564,9 +2982,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2603,9 +3019,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2642,9 +3056,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2682,9 +3094,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2722,9 +3132,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2761,9 +3169,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2801,9 +3207,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2841,9 +3245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2880,9 +3282,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2920,9 +3320,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2960,9 +3358,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -2995,9 +3391,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevisionEvidence"];
                 };
             };
             /** @description Validation Error */
@@ -3036,9 +3430,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3075,9 +3467,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3115,9 +3505,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3155,9 +3543,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3194,9 +3580,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3268,9 +3652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PublicationCheck"];
                 };
             };
             /** @description Validation Error */
@@ -3346,9 +3728,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3386,9 +3766,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3425,9 +3803,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReviewTask"];
                 };
             };
             /** @description Validation Error */
@@ -3499,9 +3875,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3538,9 +3912,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3578,9 +3950,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3615,9 +3985,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceTimePreview"];
                 };
             };
             /** @description Validation Error */
@@ -3654,9 +4022,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3694,9 +4060,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3734,9 +4098,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_place_time_rule_api_v1_admin_place_revisions__revision_id__time_rules__time_rule_id__deletions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                revision_id: string;
+                time_rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetirePlaceEvidenceInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3773,9 +4173,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PlaceRevision"];
                 };
             };
             /** @description Validation Error */
@@ -3961,9 +4359,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReviewTaskPage"];
                 };
             };
             /** @description Validation Error */
@@ -4033,9 +4429,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReviewTask"];
                 };
             };
             /** @description Validation Error */
@@ -4107,9 +4501,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReviewTask"];
                 };
             };
             /** @description Validation Error */

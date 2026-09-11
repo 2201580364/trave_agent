@@ -20,36 +20,44 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
 
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+      - name: Install uv
+        run: python -m pip install uv==0.8.15
+
+      - name: Install locked dependencies
+        run: uv sync --locked --extra dev
 
       - name: Ruff
         run: |
-          ruff check src/ scripts/ tests/
-          ruff format --check src/travel_agent/ scripts/ tests/ || echo "format drift exists (non-blocking for now)"
+          uv run --no-sync ruff check src/ scripts/ tests/
+          uv run --no-sync ruff format --check src/travel_agent/ scripts/ tests/ || echo "format drift exists (non-blocking for now)"
 
       - name: Pytest
-        run: pytest
+        run: uv run --no-sync pytest
 
       - name: Golden cases (Gate 6)
-        run: python scripts/run_golden_cases.py --output var/ci/golden-report.json
+        run: uv run --no-sync python scripts/run_golden_cases.py --output var/ci/golden-report.json
 
       - name: Layering assertions
-        run: python scripts/check_layering.py
+        run: uv run --no-sync python scripts/check_layering.py
 
       - name: OpenAPI contract diff (S8-2)
         run: |
-          python scripts/export_openapi_schema.py --output var/ci/openapi-schema.json
-          python scripts/check_api_contract.py --schema var/ci/openapi-schema.json
+          uv run --no-sync python scripts/export_openapi_schema.py --output var/ci/openapi-schema.json
+          uv run --no-sync python scripts/check_api_contract.py --schema var/ci/openapi-schema.json
 
       - name: Docs gate
-        run: python scripts/check_docs.py
+        run: uv run --no-sync python scripts/check_docs.py
+
+      - name: Share locked OpenAPI schema
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-schema
+          path: var/ci/openapi-schema.json
+          if-no-files-found: error
 
   admin-web:
+    needs: backend
     name: admin-web (vitest + tsc + build)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -68,6 +76,17 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Download locked OpenAPI schema
+        uses: actions/download-artifact@v4
+        with:
+          name: openapi-schema
+          path: var/reports
+
+      - name: Check generated API types
+        run: |
+          npm run generate-api-types
+          git diff --exit-code -- src/api/api-schema.d.ts
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -78,6 +97,7 @@ jobs:
         run: npm run build
 
   frontend:
+    # Keep the existing check name for branch-protection compatibility.
     name: frontend (tsc)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -94,7 +114,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Test
+        run: npm test

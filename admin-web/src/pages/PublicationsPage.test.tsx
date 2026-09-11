@@ -53,6 +53,7 @@ const baseRevision: PlaceRevision = {
   reviewed_at: '2026-09-01T01:00:00Z',
   published_at: null,
   review_flags: [],
+  relation_review_status: 'not_required',
 }
 
 describe('PublicationsPage', () => {

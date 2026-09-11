@@ -4,14 +4,14 @@
  * - `api-schema.d.ts` 由 `npm run generate-api-types`（openapi-typescript）从
  *   `var/reports/openapi-schema.json`（后端 `scripts/export_openapi_schema.py`
  *   导出，CI 同链路）生成，是**请求体（Input）类型的权威来源**；
- * - 后端响应端点当前声明为 `dict[str, object]`（无结构化 schema），生成器
- *   无法产出响应类型，因此**响应类型暂留本文件手工维护**；
+ * - 地点修订、证据、审核任务、准备度、时间预览及发布检查已使用后端响应模型，
+ *   对应响应类型从生成文件再导出；认证、O17 等尚未迁移的响应仍暂留手工。
  * - 新增请求体类型：不要在本文件手写——直接使用
  *   `import type { components } from './api-schema'` 中的
  *   `components['schemas']['XxxInput']`；
  * - 本文件中已存在的 `*Input` 类型在过渡期保留（与生成类型双向兼容，S8-3
  *   已验证），待后端补 response_model 后整体迁往生成类型并删除。
- * - 后端补齐 response_model 后的收尾：重跑 generate-api-types → 响应类型
+ * - 后续每个响应能力域补齐 response_model 后：重跑 generate-api-types → 响应类型
  *   改从生成文件取 → 删除本文件对应手工类型。
  */
 import type { components } from './api-schema'
@@ -110,22 +110,7 @@ export type ReviewTaskStatus =
   | 'approved'
   | 'closed'
 
-export type ReviewTask = {
-  review_task_id: string
-  place_revision_id: string
-  status: ReviewTaskStatus
-  assigned_reviewer_id: string | null
-  version: number
-  created_by: string
-  created_at: string
-  updated_at: string
-  place_id?: string
-  revision_number?: number
-  canonical_name?: string
-  admin_area?: string
-  place_kind?: string
-  category?: string
-}
+export type ReviewTask = components['schemas']['ReviewTask']
 
 export type PlaceListFilters = {
   keyword?: string
@@ -151,64 +136,13 @@ export type ReviewDecision = {
   created_at: string
 }
 
-export type PlaceRevision = {
-  place_revision_id: string
-  place_id: string
-  revision_number: number
-  revision_version: number
-  lifecycle_status: 'candidate' | 'human_verified' | 'published' | 'retired'
-  canonical_name: string
-  aliases: string[]
-  place_kind: string
-  category: string
-  admin_area: string
-  address: string | null
-  geometry_kind: string
-  duration_min: number
-  duration_recommended: number
-  duration_max: number
-  internal_travel_min: number
-  energy_level: number
-  indoor_outdoor: string
-  suitable_periods: string[]
-  audience_tags: string[]
-  rain_suitability: string
-  is_always_open: boolean
-  solver_eligible: boolean
-  conflicts_resolved: boolean
-  source_record_ids: string[]
-  created_at: string
-  reviewed_at: string | null
-  published_at: string | null
-  review_flags: string[]
-  relation_review_status?: 'pending' | 'no_relations' | 'not_required'
-  review_readiness?: ReviewReadiness | null
-}
+export type PlaceRevision = components['schemas']['PlaceRevision']
 
-export type ReviewReadinessCheck = {
-  key: 'basic' | 'source' | 'geometry' | 'access_point' | 'time' | 'relation'
-  collected: boolean
-  verified: boolean
-  total: number
-  verified_count: number
-}
+export type ReviewReadinessCheck = components['schemas']['ReviewReadinessCheck']
 
-export type ReviewReadiness = {
-  status: 'needs_evidence' | 'ready_for_review' | 'under_review' | 'changes_requested' | 'ready_for_approval' | 'human_verified' | 'published' | 'retired'
-  completed_checks: number
-  verified_checks: number
-  total_checks: number
-  missing_checks: ReviewReadinessCheck['key'][]
-  pending_review_checks: ReviewReadinessCheck['key'][]
-  task_status: ReviewTaskStatus | null
-  checks: ReviewReadinessCheck[]
-}
+export type ReviewReadiness = components['schemas']['ReviewReadiness']
 
-export type PublicationCheck = {
-  revision_id: string
-  publishable: boolean
-  reason_codes: string[]
-}
+export type PublicationCheck = components['schemas']['PublicationCheck']
 
 export type SourceConflictRecord = {
   source_record_id: string
@@ -264,47 +198,11 @@ export type ResearchSnapshot = {
   payload?: Record<string, unknown>
 }
 
-export type PlaceRevisionEvidence = {
-  revision: PlaceRevision
-  sources: PlaceEvidenceSource[]
-  geometries: PlaceGeometryEvidence[]
-  access_points: PlaceAccessPointEvidence[]
-  time_rules: PlaceTimeRuleEvidence[]
-  closures: PlaceClosureEvidence[]
-  date_exceptions: PlaceDateExceptionEvidence[]
-  relations?: PlaceRelationEvidence[]
-  projection: PlaceProjectionEvidence | null
-  missing_source_record_ids: string[]
-}
+export type PlaceRevisionEvidence = components['schemas']['PlaceRevisionEvidence']
 
-export type PlaceRelationEvidence = {
-  relation_id: string
-  from_place_id: string
-  to_place_id: string
-  from_place_name?: string | null
-  to_place_name?: string | null
-  relation_summary?: string | null
-  relation_type: string
-  source_record_id: string
-  source_record_valid: boolean
-  review_status: string
-  resolution_status: string
-  decision_note: string | null
-  active: boolean
-  created_at: string
-  reviewed_at: string | null
-}
+export type PlaceRelationEvidence = components['schemas']['PlaceRelationEvidence']
 
-export type PlaceTimePreview = {
-  revision_id: string
-  service_date: string
-  open: boolean
-  windows: Array<{ start_minute: number | null; end_minute: number | null; last_entry_minute: number | null }>
-  fixed_sessions: Array<{ time_rule_id: string; start_minute: number; end_minute: number; last_entry_minute: number | null }>
-  reason_codes: string[]
-  applied_exception_ids: string[]
-  rule_ids: string[]
-}
+export type PlaceTimePreview = components['schemas']['PlaceTimePreview']
 
 export type DashboardSummary = {
   revisions: { candidate: number; human_verified: number; published: number }
@@ -312,48 +210,11 @@ export type DashboardSummary = {
   recent_ready_tasks: ReviewTask[]
 }
 
-export type PlaceTimeRuleEvidence = {
-  time_rule_id: string
-  rule_kind: string
-  weekdays: number[]
-  start_minute: number | null
-  end_minute: number | null
-  last_entry_minute: number | null
-  valid_from: string | null
-  valid_to: string | null
-  source_record_id: string
-  source_record_valid: boolean
-  review_status: string
-  active: boolean
-  created_at: string
-  reviewed_at: string | null
-}
+export type PlaceTimeRuleEvidence = components['schemas']['PlaceTimeRuleEvidence']
 
-export type PlaceClosureEvidence = {
-  closure_id: string
-  weekday: number
-  source_record_id: string
-  source_record_valid: boolean
-  review_status: string
-  active: boolean
-  created_at: string
-  reviewed_at: string | null
-}
+export type PlaceClosureEvidence = components['schemas']['PlaceClosureEvidence']
 
-export type PlaceDateExceptionEvidence = {
-  date_exception_id: string
-  service_date: string
-  exception_kind: string
-  start_minute: number | null
-  end_minute: number | null
-  last_entry_minute: number | null
-  source_record_id: string
-  source_record_valid: boolean
-  review_status: string
-  active: boolean
-  created_at: string
-  reviewed_at: string | null
-}
+export type PlaceDateExceptionEvidence = components['schemas']['PlaceDateExceptionEvidence']
 
 export type PlaceGeometryInput = {
   expected_revision_version: number
@@ -512,62 +373,13 @@ export type CreatePlaceSourceRecordInput = {
   reason_text?: string
 }
 
-export type PlaceEvidenceSource = {
-  source_record_id: string
-  source_id: string
-  source_url: string
-  source_url_redacted: boolean
-  collection_mode: string
-  target_stage: string
-  source_decision: string
-  observed_at: string
-  status: string
-  content_sha256?: string | null
-  attached_to_revision?: boolean
-}
+export type PlaceEvidenceSource = components['schemas']['PlaceEvidenceSource']
 
-export type PlaceGeometryEvidence = {
-  geometry_id: string
-  geometry_kind: string
-  geometry: Record<string, unknown>
-  source_record_id: string
-  source_record_valid: boolean
-  review_status: string
-  active: boolean
-  created_at: string
-  reviewed_at: string | null
-}
+export type PlaceGeometryEvidence = components['schemas']['PlaceGeometryEvidence']
 
-export type PlaceAccessPointEvidence = {
-  access_point_id: string
-  access_point_kind: string
-  name: string
-  lat: number
-  lng: number
-  source_record_id: string
-  source_record_valid: boolean
-  review_status: string
-  active: boolean
-  fetched_at: string | null
-  reviewed_at: string | null
-  created_at: string
-}
+export type PlaceAccessPointEvidence = components['schemas']['PlaceAccessPointEvidence']
 
-export type PlaceProjectionEvidence = {
-  projection_id: string
-  projection_version: string
-  data_snapshot_version: string
-  solver_node_id: number
-  place_kind: string
-  geometry_kind: string
-  arrival_access_point_id: string
-  departure_access_point_id: string
-  status: string
-  projection_hash: string
-  gate_reason_codes: string[]
-  created_at: string
-  published_at: string | null
-}
+export type PlaceProjectionEvidence = components['schemas']['PlaceProjectionEvidence']
 
 export type ApiErrorBody = {
   error?: {
@@ -578,3 +390,6 @@ export type ApiErrorBody = {
     request_id?: string
   }
 }
+
+export type PlaceRevisionPage = components['schemas']['PlaceRevisionPage']
+export type ReviewTaskPage = components['schemas']['ReviewTaskPage']

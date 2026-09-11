@@ -1,3 +1,4 @@
+import type { PlaceRevisionPage, ReviewTaskPage } from './types'
 import type {
   AdminActor,
   AdminActorFilters,
@@ -115,7 +116,7 @@ export class AdminApi {
     limit = 50,
     offset = 0,
     filters: PlaceListFilters = {},
-  ): Promise<PageResponse<ReviewTask>> {
+  ): Promise<ReviewTaskPage> {
     const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (status !== undefined) query.set('review_status', status)
     Object.entries(filters).forEach(([key, value]) => {
@@ -129,7 +130,7 @@ export class AdminApi {
     limit = 50,
     offset = 0,
     filters: PlaceListFilters = {},
-  ): Promise<PageResponse<PlaceRevision>> {
+  ): Promise<PlaceRevisionPage> {
     const query = new URLSearchParams({ lifecycle_status: status, limit: String(limit), offset: String(offset) })
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== '') query.set(key, String(value))

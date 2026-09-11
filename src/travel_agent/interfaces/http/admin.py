@@ -41,6 +41,8 @@ from travel_agent.domain.place_catalog.holiday_sync import (
     HolidayCalendarVersion,
 )
 
+from . import admin_responses as responses
+
 
 class CreateAdminSessionInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -710,7 +712,12 @@ def build_admin_router(
                 ]
             }
 
-        @router.post("/places/{place_id}/revisions", status_code=status.HTTP_201_CREATED)
+        @router.post(
+            "/places/{place_id}/revisions",
+            status_code=status.HTTP_201_CREATED,
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def create_place_revision(
             place_id: str,
             payload: CreatePlaceRevisionInput,
@@ -728,7 +735,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch("/place-revisions/{revision_id}")
+        @router.patch(
+            "/place-revisions/{revision_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def update_place_revision(
             revision_id: str,
             payload: UpdatePlaceRevisionInput,
@@ -758,7 +769,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.get("/place-revisions/{revision_id}/publication-checks")
+        @router.get(
+            "/place-revisions/{revision_id}/publication-checks",
+            response_model=responses.PublicationCheck,
+            response_model_exclude_unset=True,
+        )
         def check_place_revision_publication(
             revision_id: str,
             current: AdminPrincipal = principal_dependency,
@@ -770,7 +785,11 @@ def build_admin_router(
                 "reason_codes": list(reasons),
             }
 
-        @router.get("/place-revisions/{revision_id}/evidence")
+        @router.get(
+            "/place-revisions/{revision_id}/evidence",
+            response_model=responses.PlaceRevisionEvidence,
+            response_model_exclude_unset=True,
+        )
         def get_place_revision_evidence(
             revision_id: str,
             current: AdminPrincipal = principal_dependency,
@@ -781,6 +800,8 @@ def build_admin_router(
         @router.post(
             "/place-revisions/{revision_id}/source-records",
             status_code=status.HTTP_201_CREATED,
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
         )
         def create_place_source_record(
             revision_id: str,
@@ -804,7 +825,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete("/place-revisions/{revision_id}/source-records/{source_record_id}")
+        @router.delete(
+            "/place-revisions/{revision_id}/source-records/{source_record_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def detach_place_source_record(
             revision_id: str,
             source_record_id: str,
@@ -851,7 +876,11 @@ def build_admin_router(
                 ],
             }
 
-        @router.post("/place-revisions/{revision_id}/source-conflicts/resolve")
+        @router.post(
+            "/place-revisions/{revision_id}/source-conflicts/resolve",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def resolve_place_source_conflicts(
             revision_id: str,
             payload: ResolveSourceConflictsInput,
@@ -871,7 +900,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/relations/{relation_id}/resolve")
+        @router.post(
+            "/place-revisions/{revision_id}/relations/{relation_id}/resolve",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def resolve_place_relation(
             revision_id: str,
             relation_id: str,
@@ -893,7 +926,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/relations/confirm-none")
+        @router.post(
+            "/place-revisions/{revision_id}/relations/confirm-none",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def confirm_no_place_relations(
             revision_id: str,
             payload: ConfirmNoRelationsInput,
@@ -912,7 +949,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.get("/place-revisions/{revision_id}/time-preview")
+        @router.get(
+            "/place-revisions/{revision_id}/time-preview",
+            response_model=responses.PlaceTimePreview,
+            response_model_exclude_unset=True,
+        )
         def preview_place_revision_time(
             revision_id: str,
             service_date: date = Query(...),
@@ -922,7 +963,11 @@ def build_admin_router(
                 current, revision_id=revision_id, service_date=service_date
             )
 
-        @router.post("/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review")
+        @router.post(
+            "/place-revisions/{revision_id}/evidence/{evidence_kind}/{evidence_id}/review",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def review_place_evidence(
             revision_id: str,
             evidence_kind: Annotated[
@@ -949,7 +994,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/geometries")
+        @router.post(
+            "/place-revisions/{revision_id}/geometries",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def create_place_geometry(
             revision_id: str,
             payload: PlaceGeometryInput,
@@ -970,7 +1019,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch("/place-revisions/{revision_id}/geometries/{geometry_id}")
+        @router.patch(
+            "/place-revisions/{revision_id}/geometries/{geometry_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def update_place_geometry(
             revision_id: str,
             geometry_id: str,
@@ -993,7 +1046,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete("/place-revisions/{revision_id}/geometries/{geometry_id}")
+        @router.delete(
+            "/place-revisions/{revision_id}/geometries/{geometry_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def retire_place_geometry(
             revision_id: str,
             geometry_id: str,
@@ -1013,7 +1070,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/access-points")
+        @router.post(
+            "/place-revisions/{revision_id}/access-points",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def create_place_access_point(
             revision_id: str,
             payload: PlaceAccessPointInput,
@@ -1037,7 +1098,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch("/place-revisions/{revision_id}/access-points/{access_point_id}")
+        @router.patch(
+            "/place-revisions/{revision_id}/access-points/{access_point_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def update_place_access_point(
             revision_id: str,
             access_point_id: str,
@@ -1063,7 +1128,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete("/place-revisions/{revision_id}/access-points/{access_point_id}")
+        @router.delete(
+            "/place-revisions/{revision_id}/access-points/{access_point_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def retire_place_access_point(
             revision_id: str,
             access_point_id: str,
@@ -1083,7 +1152,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/time-rules")
+        @router.post(
+            "/place-revisions/{revision_id}/time-rules",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def create_place_time_rule(
             revision_id: str,
             payload: PlaceTimeRuleInput,
@@ -1109,7 +1182,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch("/place-revisions/{revision_id}/time-rules/{time_rule_id}")
+        @router.patch(
+            "/place-revisions/{revision_id}/time-rules/{time_rule_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def update_place_time_rule(
             revision_id: str,
             time_rule_id: str,
@@ -1137,7 +1214,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/time-rules/{time_rule_id}/deletions")
+        @router.post(
+            "/place-revisions/{revision_id}/time-rules/{time_rule_id}/deletions",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def delete_place_time_rule(
             revision_id: str,
             time_rule_id: str,
@@ -1157,7 +1238,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete("/place-revisions/{revision_id}/time-rules/{time_rule_id}")
+        @router.delete(
+            "/place-revisions/{revision_id}/time-rules/{time_rule_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def retire_place_time_rule(
             revision_id: str,
             time_rule_id: str,
@@ -1177,7 +1262,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/closures")
+        @router.post(
+            "/place-revisions/{revision_id}/closures",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def create_place_closure(
             revision_id: str,
             payload: PlaceClosureInput,
@@ -1197,7 +1286,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/holiday-exceptions")
+        @router.post(
+            "/place-revisions/{revision_id}/holiday-exceptions",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def generate_holiday_exceptions(
             revision_id: str,
             payload: GenerateHolidayExceptionsInput,
@@ -1221,7 +1314,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch("/place-revisions/{revision_id}/closures/{closure_id}")
+        @router.patch(
+            "/place-revisions/{revision_id}/closures/{closure_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def update_place_closure(
             revision_id: str,
             closure_id: str,
@@ -1243,7 +1340,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete("/place-revisions/{revision_id}/closures/{closure_id}")
+        @router.delete(
+            "/place-revisions/{revision_id}/closures/{closure_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def retire_place_closure(
             revision_id: str,
             closure_id: str,
@@ -1263,7 +1364,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.post("/place-revisions/{revision_id}/date-exceptions")
+        @router.post(
+            "/place-revisions/{revision_id}/date-exceptions",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def create_place_date_exception(
             revision_id: str,
             payload: PlaceDateExceptionInput,
@@ -1287,7 +1392,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.patch("/place-revisions/{revision_id}/date-exceptions/{date_exception_id}")
+        @router.patch(
+            "/place-revisions/{revision_id}/date-exceptions/{date_exception_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def update_place_date_exception(
             revision_id: str,
             date_exception_id: str,
@@ -1313,7 +1422,11 @@ def build_admin_router(
             )
             return _revision_response(revision)
 
-        @router.delete("/place-revisions/{revision_id}/date-exceptions/{date_exception_id}")
+        @router.delete(
+            "/place-revisions/{revision_id}/date-exceptions/{date_exception_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def retire_place_date_exception(
             revision_id: str,
             date_exception_id: str,
@@ -1443,7 +1556,11 @@ def build_admin_router(
                 include_payload=True,
             )
 
-        @router.get("/candidates")
+        @router.get(
+            "/candidates",
+            response_model=responses.PlaceRevisionPage,
+            response_model_exclude_unset=True,
+        )
         def list_candidates(
             current: AdminPrincipal = principal_dependency,
             lifecycle_status: str | None = Query(default="candidate", max_length=24),
@@ -1499,7 +1616,11 @@ def build_admin_router(
                 ],
             }
 
-        @router.get("/place-revisions/{revision_id}")
+        @router.get(
+            "/place-revisions/{revision_id}",
+            response_model=responses.PlaceRevision,
+            response_model_exclude_unset=True,
+        )
         def get_place_revision(
             revision_id: str,
             current: AdminPrincipal = principal_dependency,
@@ -1507,7 +1628,11 @@ def build_admin_router(
             revision = review_workflow.get_revision(current, revision_id=revision_id)
             return _revision_response(revision)
 
-        @router.get("/review-tasks")
+        @router.get(
+            "/review-tasks",
+            response_model=responses.ReviewTaskPage,
+            response_model_exclude_unset=True,
+        )
         def list_review_tasks(
             current: AdminPrincipal = principal_dependency,
             review_status: str | None = Query(default=None, max_length=32),
@@ -1547,7 +1672,10 @@ def build_admin_router(
             }
 
         @router.post(
-            "/place-revisions/{revision_id}/review-tasks", status_code=status.HTTP_201_CREATED
+            "/place-revisions/{revision_id}/review-tasks",
+            status_code=status.HTTP_201_CREATED,
+            response_model=responses.ReviewTask,
+            response_model_exclude_unset=True,
         )
         def submit_place_review(
             revision_id: str,
@@ -1565,7 +1693,11 @@ def build_admin_router(
             )
             return _review_task_response(task)
 
-        @router.post("/review-tasks/{task_id}/decisions")
+        @router.post(
+            "/review-tasks/{task_id}/decisions",
+            response_model=responses.ReviewTask,
+            response_model_exclude_unset=True,
+        )
         def decide_place_review(
             task_id: str,
             payload: DecidePlaceReviewInput,
@@ -1584,7 +1716,11 @@ def build_admin_router(
             )
             return _review_task_response(task)
 
-        @router.get("/review-tasks/{task_id}")
+        @router.get(
+            "/review-tasks/{task_id}",
+            response_model=responses.ReviewTask,
+            response_model_exclude_unset=True,
+        )
         def get_review_task(
             task_id: str,
             current: AdminPrincipal = principal_dependency,

@@ -2,14 +2,17 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-11（O05 多场次与候选时间规则删除，H3/C2/C4/C6；本机验证，尚未提交/部署）
+- 更新时间：2026-09-11（S4/S8 CI 收尾与响应模型首片；实现完成，待用户提交/远端 CI 验证）
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7 等待数据批次（12 条中 2 条已发布）`
-- 本轮自动验证基线（本机非 uv.lock 环境）：pytest `515/515`、Golden `8/8`；ruff 全仓、layering、API 契约、check_docs 全过；admin-web Vitest `47/47` + typecheck + production build；frontend Vitest `19/19` + tsc；新增模型/场次解析/投影载荷定向 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
-- 最近提交基线：`7dda0f7 fix:修复新增/编辑几何证据问题，点击确认被卡校验，但无提示报错`；上一提交 `04c2d35` 为审计规范化。本轮 O05 改动尚在工作区，未提交；515 为包含本轮新增用例的通过数，不等于 HEAD 或锁定发布环境的基线。
+- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `521/521`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；新增响应模型 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
+- 最近提交基线：`6e9e463 feat(O05): 支持 show 多场次求解与候选时间规则删除`，已进入 dev；本轮 CI 与响应模型改动尚未提交。521 为本轮工作区锁定环境结果，不代表远端 CI 或部署验收。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-11 O05（H3/C2/C4/C6，ADR-0025，实现完成待用户提交）：show 至少一条有效固定场次，已发布投影固化多场次及日期/开放规则/入园截止；单地点单节点、求解器结合 OD 和锚点选择可行场次，完整保留提前入场至演出结束；候选入口常规开放规则/固定场次删除，审核入口仍停用并保留可见，停用证据不参与校验。删除有角色/生命周期/版本/幂等/同事务审计。结果与分享显示真实场次开始，公开分享不暴露场次 ID。无迁移、未操作研究库。验证详情和操作偏差见本月 status-archive。
+- 2026-09-11 S4/S8 CI 收尾 + 响应契约首片（H3，实现完成待提交）：CI 固定 uv 0.8.15，锁定安装 dev extra，全检查使用 --no-sync；frontend 接入 19 项测试并修正 npm ci 的 legacy-peer-deps；后端 OpenAPI artifact 传给管理端，生成类型差异门禁。34 个地点详情/证据/修订写入/审核任务/准备度/时间预览接口明确响应模型，17 个前端类型改生成再导出。保留 null/省略字段/日期字符串；新增 6 项响应契约测试。锁定环境 521/521 + Golden 8/8；管理端 47/47/tsc/build、用户端 19/19/tsc 全过。无锁文件变更、无迁移、未操作研究库。S7 与 S8-4 前提仍未满足。
+
+
+- 2026-09-11 O05（H3/C2/C4/C6，ADR-0025，已进入 dev：6e9e463）：show 至少一条有效固定场次，已发布投影固化多场次及日期/开放规则/入园截止；单地点单节点、求解器结合 OD 和锚点选择可行场次，完整保留提前入场至演出结束；候选入口常规开放规则/固定场次删除，审核入口仍停用并保留可见，停用证据不参与校验。删除有角色/生命周期/版本/幂等/同事务审计。结果与分享显示真实场次开始，公开分享不暴露场次 ID。无迁移、未操作研究库。验证详情和操作偏差见本月 status-archive。
 
 
 - 2026-09-08 审计功能规范化 AUD-1～4（评审驱动，已进入 dev：04c2d35）：评审结论=不引入切面/中间件（审计载荷是业务语义、必须与业务同事务，切面形式是伪需求），问题在「对的做法未制度化」——`_event` 构造器三处三样、摘要哈希三处三样、reason_code 校验仅 review 有、动作码零文档。AUD-1 规范 `.claude/rules/audit-logging.md`（核心纪律四条 + 字段语义 + 动作码命名法与逐码登记表 + target_type 表 + digest 唯一实现 + actor_role 双序记账规则 + 新增端点 checklist）；AUD-2/3 共享模块 `application/admin/audit_events.py`（build_audit_event 全关键字构造器 + canonical_digest 唯一实现 + validate_audit_reason + review/identity 双序 role 解析），service/review 的 `_event` 改薄代理、holiday_calendar_sync 5 处裸传 AdminAuditEvent 位置参数全部改写（消灭 17 字段错位风险）；AUD-4 `tests/application/test_audit_registry.py` 3 项——代码发射的动作码必须登记、登记不得超前于代码、target_type 同查，防规范烂尾。行为零变化，pytest/ruff/layering/check_docs 全过。遗留：O17 模块 5 个码历史上是 reason_code 而非 action（已按双射原则在规范中区分登记）。
@@ -35,10 +38,18 @@
 3. 实施 R0.2-06 按需真实 OD 子图（候选过滤→锚点真实 OD→缓存→不可变子图 hash→Revision 回放，缺边不填 0）。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；期间 G1 真实用户发现研究补证可与 R0.2–R0.4 并行、R1 前关闭。
 
+## 本地运行验证（2026-09-11）
+
+- 用户要求启动全部本地服务后，已启动 API 8000/8001、管理端 5173、H5 10086、O17 worker；页面及两端代理 `/health/ready` 均 200，两个 API 的 OpenAPI 均含本轮 PlaceRevision 响应模型，H5 编译成功、worker 启动日志确认。
+- 沿用 `.env` 的研究 SQLite，启动前只读确认迁移为 0015，正常应用初始化/worker 队列运行已获本轮启动指令授权；未启动 MySQL/Redis。日志在 `var/reports/services-20260911-170900/` 及 `logs/`。这是本地运行冒烟，不代表完整用户验收或远端 CI 通过。
+
 ## 活跃风险
 
+- CI 配置已改为 `uv sync --locked --extra dev` + `uv run --no-sync`，frontend 增加 Vitest；admin-web 下载 backend schema 并检查生成类型差异。原 job check 名称保留。本地验证通过，实际 GitHub Actions 和 artifact 跨 job 链路待用户提交后验证。
+
+
 - O05 显式场次日期暂不执行 DAY_SPREAD/普通景点时长扩展，保留最低游览时长和晚餐软块；无显式场次的日期保持原算法。已实现/自动测试通过不等于已部署或用户验收。
-- 本轮未使用 uv.lock 环境：采用本机 Python 3.12（显式路径，默认 python 已指向无 pytest 的 Conda）；Windows 脚本子进程需要 PYTHONUTF8=1。定向新增模型/解析器 mypy 通过，routing 的 OR-Tools 类型存量问题仍在；发布前需在锁定环境复核。
+- 上轮非锁定环境缺口已补：本轮新建 `var/venvs/ci-locked-20260911`，以 uv 0.8.15 按 lock 安装，515 原基线和新增响应契约回归全过。默认 python 仍为 Conda，后续使用明确 uv 环境；Windows 子进程设置 PYTHONUTF8=1。
 
 
 - 2026-09-10 提交核对：S6 已实现 sessionStorage + /me 会话恢复，但 ADR-0020 仍禁止持久化且要求新 ADR，当前未见替代决策；最新几何修复在组件中展示客户端校验文案，与 error-messages.md 的全局单一文案源要求存在边界差异。后续相关实现前须先裁决，不能把现有代码自动当作规格变更。
@@ -55,10 +66,11 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 实现完成待用户提交；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；未操作实际研究库 |
+| S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 实现完成待用户提交；34 个接口、17 个响应类型再导出；521/521 + Golden 8/8，两端验证通过；远端 CI 待提交后核实 |
+| O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 已进入 dev（6e9e463，本轮核对销账）；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；未操作实际研究库 |
 | AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 已进入 dev（04c2d35；2026-09-10 核对销账；原验证记录：pytest 495/495 + ruff + layering + check_docs） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest 尚未接入 CI；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。遗留任务：① 后端 63 个响应端点补 response_model（S8-3 勘察发现，建议与 S7 拆分同批）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest CI 配置已完成待提交；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。遗留任务：① 响应模型首片 34 个接口已完成待提交，其余认证/来源冲突/批量审核/发布批次/O17 等按能力片迁移（原 63 为旧勘察计数，不作剩余数量）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
 
 ## 关键事实速查
 

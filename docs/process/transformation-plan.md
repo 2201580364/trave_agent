@@ -20,7 +20,7 @@
 | S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **已完成（2026-09-07，S6-4 合并由用户完成：941578e / fae014e）** | S3 | 1–2 天 |
 | S7 | 上帝类拆分（代码健康切片） | **未开始** | S3、R0.2-07 数据批次完成 | 1–2 周 |
-| S8 | 用户端补测 + 契约对照 | **阶段交付（2026-09-10 核对：S8-1/2/3 已进入 dev；响应类型迁移未完、S8-4 待 R0.3，frontend Vitest 尚未接入 CI）** | S3 | 3–5 天 |
+| S8 | 用户端补测 + 契约对照 | **阶段交付（2026-09-10 核对：S8-1/2/3 已进入 dev；响应类型迁移未完、S8-4 待 R0.3，frontend Vitest CI 配置已完成待提交）** | S3 | 3–5 天 |
 
 > 状态取值：`未开始` → `进行中` → `已完成` / `阻塞`（附原因）。每完成一项，更新本表并在 CURRENT.md 登记一行。
 
@@ -171,7 +171,7 @@
 
 | # | 任务 | 内容 | 状态 |
 |---|---|---|---|
-| S8-1 | frontend 引入 Vitest，覆盖 `entities/planning`、`features/trip-draft` 的 store 与纯函数（核心路径优先） | 测试集 | **已进入 dev（a657504）**：vitest@1.6.0（`--legacy-peer-deps`，Taro 的 `peerOptional vite@^4` 与 vitest 携带的 vite@5 冲突，构建实际走 webpack5 故 vite 版本仅影响 vitest 自身）+ vitest.config.ts（`@` 别名、node 环境）；19 项测试（store 13 + api client 6）全过，`npm run test` script 已加，tsc --noEmit 过；frontend Vitest CI 集成仍未落地（2026-09-10 核对 ci.yml：用户端 job 仅 typecheck） |
+| S8-1 | frontend 引入 Vitest，覆盖 `entities/planning`、`features/trip-draft` 的 store 与纯函数（核心路径优先） | 测试集 | **已进入 dev（a657504）**：vitest@1.6.0（`--legacy-peer-deps`，Taro 的 `peerOptional vite@^4` 与 vitest 携带的 vite@5 冲突，构建实际走 webpack5 故 vite 版本仅影响 vitest 自身）+ vitest.config.ts（`@` 别名、node 环境）；19 项测试（store 13 + api client 6）全过，`npm run test` script 已加，tsc --noEmit 过；frontend Vitest CI 配置已实现待提交（2026-09-11：npm ci --legacy-peer-deps → typecheck → npm test，本地 19/19；远端运行待验证） |
 | S8-2 | CI 导出 FastAPI OpenAPI schema 快照，与 `docs/specs/api-contract.md` 关键字段做 diff 校验 | 契约对照 | **已进入 dev（dc5d1ea）**：`scripts/export_openapi_schema.py`（离线内存 SQLite 组合根完整装配含 admin/O17/O18 路由块，73 路径快照写 `var/reports/openapi-schema.json`，--json 退出 0/1）+ `scripts/check_api_contract.py`（解析契约 4 种登记风格：§4 用户端表、§15.2.x admin 表、行内用户端路径、§15.2.1 O05 聚合句「POST/PATCH/DELETE 分别作用于…」按 REST 语义展开 POST→集合根/PATCH·DELETE→成员路径；code-only=退出 2 门禁、contract-only=信息性含计划端点；契约 §2.1.1 探针 `/api/v1/health/*` 与实际服务 `/health/*` 的前缀差异按文档化别名处理待契约修订）；当前 85 契约/82 实现/code_only=0 PASS；7 项契约测试 `tests/scripts/test_openapi_contract.py`；**ci.yml 已集成（2026-09-07）：backend job 在 layering 之后、docs gate 之前插入 "OpenAPI contract diff (S8-2)" 步骤（export --output var/ci/ → check --schema，本地命令链预演 PASS）** |
 | S8-3 | `admin-web/src/api/types.ts` 改为 openapi-typescript 生成，消除手工同步 | 生成式类型 | **小步落地已进入 dev（361cc37）**：openapi-typescript@7 入库（devDep + `npm run generate-api-types`，从 `var/reports/openapi-schema.json` 生成 `src/api/api-schema.d.ts` 4941 行）；勘察发现后端 63/73 响应端点声明 `dict[str, object]` 无结构化 schema，生成器只能覆盖**请求侧 47 组件**——响应类型（AdminActor/PlaceRevision 等 20 个核心类型）无生成来源，暂留手工；已验证手工输入类型与生成组件双向兼容，`CreateAdminActorInput` 已改为生成类型再导出（消费方零改动）；types.ts 头部写明过渡期边界（新请求体类型直接用 `components['schemas']`，响应类型待后端补 response_model 后整体迁移）；**后端响应模型全量改造超出 S8 范围，另立任务**。附带修复：vite.config.ts `fileParallelism: 2→false`（vitest 4 类型收窄为 boolean，数值写法致 `tsc -b`/build 报 TS2769，S8-2 合并时引入） |
 | S8-4 | （R0.3 部署后）Playwright E2E 覆盖 H5 核心路径：创建草稿→选点→生成→查看→分享 | E2E 套件 | 未开始 |
@@ -204,4 +204,13 @@
 
 ### 2026-09-11 业务改造衔接（H3/C2，ADR-0025）
 
-O05 多固定场次自动选择与候选时间规则删除已实现，尚未提交/部署/用户验收；验证与边界以 CURRENT.md 为准。此为独立业务能力切片，不改变 S8 响应类型迁移、S8-4 E2E 和 S7 数据批次的未完成状态。
+O05 多固定场次自动选择与候选时间规则删除已进入 dev（6e9e463），部署/用户验收尚未确认；验证与边界以 CURRENT.md 为准。此为独立业务能力切片，不改变 S8 响应类型迁移、S8-4 E2E 和 S7 数据批次的未完成状态。
+
+
+### 2026-09-11 S4/S8 收尾与响应契约首片（H3）
+
+- CI 收尾已实现待提交：uv 0.8.15 + `uv sync --locked --extra dev`，检查统一 `uv run --no-sync`；frontend Vitest 接入 CI，安装显式使用 lock 生成时的 `--legacy-peer-deps`。所有现有 job check 名称保留。
+- 响应模型独立首片已实现待提交：`admin_responses.py` 定义地点修订/证据/准备度/任务/时间预览模型，34 个接口接线；管理端 17 个类型（含两种分页）从生成 schema 再导出。新增 6 个契约用例防字段丢失、null/省略混淆、非法枚举和内部字段泄漏。
+- backend 上传锁定环境导出的 schema，admin-web 下载并重生成类型检查 diff；首次真实 Actions 与 artifact 交接待用户提交后验收。本地锁定环境结果见 CURRENT.md。
+- S8-3 原“后端无响应模型”的描述为首轮历史勘察；本片覆盖地点/审核链路，认证、来源冲突、批量审核结果、发布批次及 O17 等仍待迁移，S8 未整体完成。
+- S7 仍以 R0.2-07 数据批次完成为前提；S8-4 仍等 R0.3。本轮未启动模块拆分或服务器 E2E。
