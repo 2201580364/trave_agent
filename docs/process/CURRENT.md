@@ -2,14 +2,18 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-11（S4/S8 CI 收尾与响应模型首片；已提交 436bf20；CI 契约测试隔离修复完成待提交）
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7 前置核对中（用户批准 10 条批次，027/052 已排除；CI 本地修复通过，待远端复核）`
-- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `521/521`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；新增响应模型 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
-- 最近提交基线：`436bf20 feat(contract): 完成地点审核响应模型与锁定环境 CI 门禁`，已进入 dev；521 为该提交的本地锁定环境结果，用户提供远端日志：frontend 通过、backend 519 通过/2 失败、admin-web 因依赖跳过；失败为测试依赖未入库 schema，本轮本地修复通过，待提交推送复核。
+- 更新时间：2026-09-12（S7-1 准备度与来源职责迁移完成待提交）
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
+- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `524/524`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；累计新增旧导入兼容 1 项、来源审计回滚/重试 2 项；新来源/支持/接口模块 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
+- 最近提交基线：`cec78fd fix(ci): 隔离 OpenAPI 契约测试的快照依赖`，已进入 dev；用户确认远端全部通过，S7-1 开始。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-11 CI 契约测试隔离修复（H3/S8-2，待提交）：测试 fixture 在临时目录真实导出 schema，检查显式传 --schema；当前契约强制 exit 0，缺契约错误隔离验证，只读两次成功且内容不变。专项 7/7、锁定环境全量 521/521（86.72s）、ruff、124 文件分层零违规；文档门禁通过。未改 CI/业务/依赖/研究库，未重跑前端与 Golden，历史基线不冒充本轮结果。用户确认批次排除 027/052，CI 远端重跑待用户提交推送。
+- 2026-09-12 S7-1 来源/接口切片（H3，待提交）：5 个来源用例迁至 review_sources（322 行），门面保留同签名转发；review_support（138 行）共享权限/幂等/审计，review_ports（184 行）拆 3 个审核仓储 Protocol 并为来源实际收窄为 2+4 方法接口。累计 review.py 3998→3362 行。新增审计失败回滚与重试/重放两项集成回归；524/524（97.96s）、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc、ruff/分层128文件/API/文档通过，新模块 mypy 通过。旧门面类型债保留，无迁移/研究库写入。
+
+- 2026-09-12 S7-1 准备度首片（H3，待提交）：evaluate_review_readiness / _readiness_check 原样迁入 243 行 review_readiness.py，原 review.py 3998→3764 行，旧公共导入/私有别名兼容；离线报告直接依赖新模块。新增兼容测试，AST 对比所有原函数/类一致。全量 522/522（96.79s）、专项 14/14、Golden 8/8、admin 47/47/tsc/build、frontend 19/19/tsc、ruff/分层/API/文档全过。首轮 WinError 10055 单项及串行全量复跑通过；无研究库写入。其余职责与 Protocol 尚未拆分，S7-1 未整体完成。
+
+- 2026-09-11 CI 契约测试隔离修复（H3/S8-2，已进入 dev：cec78fd）：测试 fixture 在临时目录真实导出 schema，检查显式传 --schema；当前契约强制 exit 0，缺契约错误隔离验证，只读两次成功且内容不变。专项 7/7、锁定环境全量 521/521（86.72s）、ruff、124 文件分层零违规；文档门禁通过。未改 CI/业务/依赖/研究库，未重跑前端与 Golden，历史基线不冒充本轮结果。用户确认批次排除 027/052，CI 远端已由用户确认全绿。
 
 - 2026-09-11 S4/S8 CI 收尾 + 响应契约首片（H3，已进入 dev：436bf20）：CI 固定 uv 0.8.15，锁定安装 dev extra，全检查使用 --no-sync；frontend 接入 19 项测试并修正 npm ci 的 legacy-peer-deps；后端 OpenAPI artifact 传给管理端，生成类型差异门禁。34 个地点详情/证据/修订写入/审核任务/准备度/时间预览接口明确响应模型，17 个前端类型改生成再导出。保留 null/省略字段/日期字符串；新增 6 项响应契约测试。锁定环境 521/521 + Golden 8/8；管理端 47/47/tsc/build、用户端 19/19/tsc 全过。无锁文件变更、无迁移、未操作研究库。S7 与 S8-4 前提仍未满足。
 
@@ -35,7 +39,7 @@
 
 ## 下一步（按顺序）
 
-1. 完成 CI 测试隔离修复并由用户推送验证后推进 S7-1 审核服务拆分；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
+1. 推进 S7-1 审核服务拆分，准备度评估先行，后续收窄仓储 Protocol 并拆出来源/几何/关系/时间/发布职责；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
 2. 稳定后扩展研究目录至 50–75 条 `human_verified`（G7-R1 研究最低目录门槛）。
 3. 实施 R0.2-06 按需真实 OD 子图（候选过滤→锚点真实 OD→缓存→不可变子图 hash→Revision 回放，缺边不填 0）。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；期间 G1 真实用户发现研究补证可与 R0.2–R0.4 并行、R1 前关闭。
@@ -47,7 +51,7 @@
 
 ## 活跃风险
 
-- CI 配置已改为 `uv sync --locked --extra dev` + `uv run --no-sync`，frontend 增加 Vitest；admin-web 下载 backend schema 并检查生成类型差异。原 job check 名称保留。远端 frontend 已通过，backend 两项契约测试依赖缺失快照而失败，admin-web 因 needs 跳过；本轮修复后需推送复核。
+- CI 配置已改为 `uv sync --locked --extra dev` + `uv run --no-sync`，frontend 增加 Vitest；admin-web 下载 backend schema 并检查生成类型差异。原 job check 名称保留。历史缺快照失败已由 cec78fd 修复，用户确认三项远端检查全绿。
 
 
 - O05 显式场次日期暂不执行 DAY_SPREAD/普通景点时长扩展，保留最低游览时长和晚餐软块；无显式场次的日期保持原算法。已实现/自动测试通过不等于已部署或用户验收。
@@ -68,13 +72,14 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| CI 契约测试隔离修复（H3/S8-2） | dev | `tests/scripts/test_openapi_contract.py`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档 | 实现完成待用户提交；专项 7/7、全量 521/521、ruff/分层/文档通过 |
-| S7 前置核对与拆分准备（H3） | dev | `docs/process/{CURRENT,transformation-plan}.md`、`docs/process/status-archive/2026-09.md` | 批次已确认排除 027/052；CI 失败修复优先，尚未修改业务代码或研究库 |
-| S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 已进入 dev（436bf20）；521/521 + Golden 8/8，两端验证通过；远端 backend 519/521、frontend 通过、admin-web 跳过；本轮修复后待远端复核 |
+| S7-1 准备度职责迁移（H3） | dev | `application/admin/{review,review_readiness,review_ports,review_support,review_sources}.py`、`data_governance/research_readiness.py`、`tests/application/{test_admin_review_readiness,test_review_source_boundary}.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 准备度与来源切片实现完成待提交；524/524、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc；新模块 mypy 通过，S7-1 其余子域待拆分 |
+| CI 契约测试隔离修复（H3/S8-2） | dev | `tests/scripts/test_openapi_contract.py`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档 | 已进入 dev（cec78fd）；用户确认远端全绿 |
+| S7 前置核对与拆分准备（H3） | dev | `docs/process/{CURRENT,transformation-plan}.md`、`docs/process/status-archive/2026-09.md` | 前置核对完成；批次排除 027/052、用户确认 CI 全绿，S7-1 已启动 |
+| S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 已进入 dev（436bf20）；521/521 + Golden 8/8，两端验证通过；后续 cec78fd 修复后远端全绿（用户确认） |
 | O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 已进入 dev（6e9e463，本轮核对销账）；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；未操作实际研究库 |
 | AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 已进入 dev（04c2d35；2026-09-10 核对销账；原验证记录：pytest 495/495 + ruff + layering + check_docs） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest CI 配置已进入 dev（436bf20）；S7 用户已确认批准其余 10 条，排除 027/052；先修复 CI 并验证远端全绿。遗留任务：① 响应模型首片 34 个接口已进入 dev（436bf20），其余认证/来源冲突/批量审核/发布批次/O17 等按能力片迁移（原 63 为旧勘察计数，不作剩余数量）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest CI 配置已进入 dev（436bf20）；S7 用户已确认批准其余 10 条，排除 027/052；cec78fd 远端全绿已由用户确认，S7-1 已启动。遗留任务：① 响应模型首片 34 个接口已进入 dev（436bf20），其余认证/来源冲突/批量审核/发布批次/O17 等按能力片迁移（原 63 为旧勘察计数，不作剩余数量）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
 
 ## 关键事实速查
 

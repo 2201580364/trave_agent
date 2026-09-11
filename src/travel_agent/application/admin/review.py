@@ -7,8 +7,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from types import TracebackType
-from typing import Protocol, Self
+from typing import Protocol
 
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ResourceNotFoundError
@@ -25,7 +24,6 @@ from travel_agent.domain.place_catalog import (
     PlaceReviewTask,
     PlaceRevision,
     PlaceRevisionEvidence,
-    PlaceSourceRecord,
     PlaceTimeRule,
     ProjectionPublicationContext,
     ProjectionPublicationError,
@@ -34,29 +32,21 @@ from travel_agent.domain.place_catalog import (
     ResearchSnapshot,
     SolverPlaceProjection,
     evaluate_projection_publication,
-    has_source_content_conflict,
     resolve_holiday_closure_conflicts,
 )
 from travel_agent.domain.place_catalog.holiday_calendar import (
     get_holiday_calendar,
     list_holiday_calendars,
 )
-from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 from travel_agent.domain.place_catalog.session_payload import (
     build_fixed_session_payload,
-    valid_session_timing,
 )
 
 from .audit_events import (
-    build_audit_event,
-    canonical_digest,
     review_flow_role,
-    validate_audit_reason,
 )
 from .errors import (
-    AdminAuthenticationError,
     AdminOperationIntentConflictError,
-    AdminPermissionDeniedError,
     PlaceRevisionVersionConflictError,
     ProjectionPreparationRejectedError,
     PublicationGateRejectedError,
@@ -64,10 +54,16 @@ from .errors import (
     ReviewRevisionNotCandidateError,
     ReviewTaskConflictError,
     ReviewTaskNotFoundError,
-    SourceRecordInUseError,
     SourceRecordValidationError,
 )
-from .sources import GovernedSourceCatalog, GovernedSourceChannel, SourceRecordInputError
+from .review_ports import ActorRepository as ActorRepository
+from .review_ports import AuditRepository as AuditRepository
+from .review_ports import ReviewRepository as ReviewRepository
+from .review_ports import ReviewUnitOfWork as ReviewUnitOfWork
+from .review_readiness import evaluate_review_readiness as evaluate_review_readiness
+from .review_sources import ReviewSourceService
+from .review_support import ReviewSupport, _digest, _revision_digest
+from .sources import GovernedSourceCatalog, GovernedSourceChannel
 
 _REASON_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 _SENSITIVE_REASON_PATTERN = re.compile(
@@ -90,108 +86,6 @@ def _access_rank(kind: str, departure: bool) -> int:
     return order.get(kind, 10)
 
 
-class ReviewRepository(Protocol):
-    def get_task(self, task_id: str) -> PlaceReviewTask | None: ...
-
-    def get_open_task_for_revision(self, revision_id: str) -> PlaceReviewTask | None: ...
-
-    def list_tasks(
-        self,
-        *,
-        status: str | None,
-        keyword: str | None,
-        admin_area: str | None,
-        place_kind: str | None,
-        limit: int,
-        offset: int,
-    ) -> tuple[PlaceReviewTask, ...]: ...
-
-    def count_tasks(
-        self,
-        *,
-        status: str | None,
-        keyword: str | None = None,
-        admin_area: str | None = None,
-        place_kind: str | None = None,
-    ) -> int: ...
-
-    def list_decisions(self, task_id: str) -> tuple[PlaceReviewDecision, ...]: ...
-
-    def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
-
-    def get_revisions(self, revision_ids: tuple[str, ...]) -> tuple[PlaceRevision, ...]: ...
-
-    def get_latest_revision(self, place_id: str) -> PlaceRevision | None: ...
-
-    def list_revisions(
-        self,
-        *,
-        lifecycle_status: str | None,
-        keyword: str | None,
-        admin_area: str | None,
-        place_kind: str | None,
-        limit: int,
-        offset: int,
-    ) -> tuple[PlaceRevision, ...]: ...
-
-    def count_revisions(
-        self,
-        *,
-        lifecycle_status: str | None,
-        keyword: str | None = None,
-        admin_area: str | None = None,
-        place_kind: str | None = None,
-    ) -> int: ...
-
-    def add_task(self, task: PlaceReviewTask) -> None: ...
-
-    def add_decision(self, decision: PlaceReviewDecision) -> None: ...
-
-    def add_revision(self, revision: PlaceRevision) -> None: ...
-
-    def update_revision(
-        self,
-        revision: PlaceRevision,
-        *,
-        expected_revision_number: int,
-        expected_revision_version: int,
-    ) -> None: ...
-
-    def advance_task(
-        self, task: PlaceReviewTask, *, expected_version: int, status: str, now: datetime
-    ) -> None: ...
-
-    def approve_revision(self, revision_id: str, *, reviewed_at: datetime) -> None: ...
-
-
-class AuditRepository(Protocol):
-    def add(self, event: AdminAuditEvent) -> None: ...
-
-    def get_by_operation_intent(self, operation_intent_id: str) -> AdminAuditEvent | None: ...
-
-
-class ActorRepository(Protocol):
-    def get(self, actor_id: str) -> AdminActor | None: ...
-
-
-class ReviewUnitOfWork(Protocol):
-    reviews: ReviewRepository
-    catalog: PlaceCatalogRepository
-    audits: AuditRepository
-    actors: ActorRepository
-
-    def __enter__(self) -> Self: ...
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool | None: ...
-
-    def commit(self) -> None: ...
-
-
 class HolidayCalendarCatalog(Protocol):
     def list_calendars(self) -> tuple[HolidayCalendar, ...]: ...
     def get_calendar(self, calendar_id: str) -> HolidayCalendar: ...
@@ -205,7 +99,7 @@ class BuiltinHolidayCalendarCatalog:
         return get_holiday_calendar(calendar_id)
 
 
-class PlaceReviewWorkflowService:
+class PlaceReviewWorkflowService(ReviewSupport):
     def __init__(
         self,
         uow_factory: Callable[[], ReviewUnitOfWork],
@@ -219,6 +113,7 @@ class PlaceReviewWorkflowService:
         self._ids = ids
         self._source_catalog = source_catalog
         self._holiday_calendars = holiday_calendars or BuiltinHolidayCalendarCatalog()
+        self._sources = ReviewSourceService(uow_factory, clock, ids, source_catalog)
 
     def list_holiday_calendars(self, principal: AdminPrincipal) -> tuple[HolidayCalendar, ...]:
         self._require(principal, "place:candidate:read")
@@ -376,26 +271,7 @@ class PlaceReviewWorkflowService:
     def list_source_conflicts(
         self, principal: AdminPrincipal, *, revision_id: str
     ) -> tuple[dict[str, object], ...]:
-        self._require(principal, "place:candidate:read")
-        with self._uow_factory() as uow:
-            evidence = uow.catalog.load_revision_evidence(revision_id)
-            if evidence is None:
-                raise ResourceNotFoundError
-        groups: dict[str, list[PlaceSourceRecord]] = {}
-        for record in evidence.source_records:
-            groups.setdefault(record.source_id, []).append(record)
-        conflicts = []
-        for source_id, records in sorted(groups.items()):
-            fingerprints = {record.content_sha256 or record.registry_sha256 for record in records}
-            if len(records) > 1 and len(fingerprints) > 1:
-                conflicts.append(
-                    {
-                        "source_id": source_id,
-                        "records": tuple(records),
-                        "resolved": evidence.revision.conflicts_resolved,
-                    }
-                )
-        return tuple(conflicts)
+        return self._sources.list_source_conflicts(principal, revision_id=revision_id)
 
     def resolve_source_conflicts(
         self,
@@ -410,66 +286,17 @@ class PlaceReviewWorkflowService:
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        self._require(principal, "place:candidate:write")
-        reason_text = self._validate_reason(reason_code, reason_text)
-        digest = _digest(
-            {
-                "revision_id": revision_id,
-                "expected_revision_number": expected_revision_number,
-                "expected_revision_version": expected_revision_version,
-                "resolved": resolved,
-                "reason_code": reason_code,
-                "reason_text": reason_text,
-            }
+        return self._sources.resolve_source_conflicts(
+            principal,
+            revision_id=revision_id,
+            expected_revision_number=expected_revision_number,
+            expected_revision_version=expected_revision_version,
+            resolved=resolved,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
         )
-        with self._uow_factory() as uow:
-            existing = self._replay(uow, operation_intent_id, digest)
-            if existing is not None:
-                revision = uow.reviews.get_revision(existing.target_id)
-                if revision is None:
-                    raise ResourceNotFoundError
-                return revision
-            actor = self._actor(uow, principal)
-            current = uow.reviews.get_revision(revision_id)
-            if current is None:
-                raise ResourceNotFoundError
-            if current.lifecycle_status != "candidate":
-                raise ReviewRevisionNotCandidateError
-            if current.revision_number != expected_revision_number:
-                raise ReviewTaskConflictError
-            if current.revision_version != expected_revision_version:
-                raise PlaceRevisionVersionConflictError
-            updated = replace(
-                current,
-                conflicts_resolved=resolved,
-                solver_eligible=False,
-                reviewed_at=None,
-                published_at=None,
-                revision_version=current.revision_version + 1,
-            )
-            uow.reviews.update_revision(
-                updated,
-                expected_revision_number=expected_revision_number,
-                expected_revision_version=expected_revision_version,
-            )
-            uow.audits.add(
-                self._event(
-                    actor,
-                    action="PLACE_SOURCE_CONFLICTS_RESOLVED",
-                    target_type="place_revision",
-                    target_id=revision_id,
-                    target_revision=str(updated.revision_number),
-                    before_digest=_revision_digest(current),
-                    after_digest=_revision_digest(updated),
-                    reason_code=reason_code,
-                    reason_text=reason_text,
-                    request_id=request_id,
-                    operation_intent_id=operation_intent_id,
-                    operation_digest=digest,
-                )
-            )
-            uow.commit()
-            return updated
 
     def resolve_relation(
         self,
@@ -660,8 +487,7 @@ class PlaceReviewWorkflowService:
             return evidence
 
     def list_source_channels(self, principal: AdminPrincipal) -> tuple[GovernedSourceChannel, ...]:
-        self._require(principal, "place:candidate:read")
-        return self._source_catalog.list_channels()
+        return self._sources.list_source_channels(principal)
 
     def create_source_record(
         self,
@@ -679,92 +505,20 @@ class PlaceReviewWorkflowService:
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        self._require(principal, "place:candidate:write")
-        reason_text = self._validate_reason(reason_code, reason_text)
-        normalized_url = source_url.strip()
-        normalized_hash = content_sha256.lower() if content_sha256 else None
-        try:
-            channel = self._source_catalog.require_valid_input(
-                source_id=source_id,
-                source_url=normalized_url,
-                collection_mode=collection_mode,
-            )
-        except SourceRecordInputError as exc:
-            raise SourceRecordValidationError(str(exc)) from exc
-        payload = {
-            "revision_id": revision_id,
-            "expected_revision_version": expected_revision_version,
-            "source_id": source_id,
-            "source_url": normalized_url,
-            "collection_mode": collection_mode,
-            "observed_at": observed_at.isoformat(),
-            "content_sha256": normalized_hash,
-            "reason_code": reason_code,
-            "reason_text": reason_text,
-        }
-        operation_digest = _digest(payload)
-        with self._uow_factory() as uow:
-            existing = self._replay(uow, operation_intent_id, operation_digest)
-            if existing is not None:
-                revision = uow.reviews.get_revision(revision_id)
-                if revision is None:
-                    raise ResourceNotFoundError
-                return revision
-            actor = self._actor(uow, principal)
-            revision = uow.reviews.get_revision(revision_id)
-            if revision is None:
-                raise ResourceNotFoundError
-            if revision.lifecycle_status != "candidate":
-                raise ReviewRevisionNotCandidateError
-            if revision.revision_version != expected_revision_version:
-                raise PlaceRevisionVersionConflictError
-            record = PlaceSourceRecord(
-                source_record_id=self._ids.new_id("place_source_record"),
-                place_id=revision.place_id,
-                source_id=channel.source_id,
-                registry_id=channel.registry_id,
-                registry_sha256=channel.registry_sha256,
-                field_dictionary_id=channel.field_dictionary_id,
-                field_dictionary_sha256=channel.field_dictionary_sha256,
-                source_url=normalized_url,
-                collection_mode=collection_mode,
-                target_stage="staging",
-                source_decision=channel.decision,
-                observed_at=observed_at,
-                content_sha256=normalized_hash,
-                status="active",
-                created_at=self._clock.now(),
-            )
-            try:
-                updated = uow.catalog.create_source_record(
-                    record,
-                    revision_id=revision_id,
-                    expected_revision_version=expected_revision_version,
-                )
-            except ValueError as exc:
-                if "version conflict" in str(exc):
-                    raise PlaceRevisionVersionConflictError from exc
-                if "not found" in str(exc):
-                    raise ResourceNotFoundError from exc
-                raise
-            uow.audits.add(
-                self._event(
-                    actor,
-                    action="PLACE_SOURCE_RECORD_CREATED",
-                    target_type="place_source_record",
-                    target_id=record.source_record_id,
-                    target_revision=str(updated.revision_number),
-                    before_digest=_revision_digest(revision),
-                    after_digest=_revision_digest(updated),
-                    reason_code=reason_code,
-                    reason_text=reason_text,
-                    request_id=request_id,
-                    operation_intent_id=operation_intent_id,
-                    operation_digest=operation_digest,
-                )
-            )
-            uow.commit()
-            return updated
+        return self._sources.create_source_record(
+            principal,
+            revision_id=revision_id,
+            expected_revision_version=expected_revision_version,
+            source_id=source_id,
+            source_url=source_url,
+            collection_mode=collection_mode,
+            observed_at=observed_at,
+            content_sha256=content_sha256,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
+        )
 
     def detach_source_record(
         self,
@@ -778,69 +532,16 @@ class PlaceReviewWorkflowService:
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        self._require(principal, "place:candidate:write")
-        reason_text = self._validate_reason(reason_code, reason_text)
-        operation_digest = _digest(
-            {
-                "revision_id": revision_id,
-                "source_record_id": source_record_id,
-                "expected_revision_version": expected_revision_version,
-                "reason_code": reason_code,
-                "reason_text": reason_text,
-            }
+        return self._sources.detach_source_record(
+            principal,
+            revision_id=revision_id,
+            source_record_id=source_record_id,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
         )
-        with self._uow_factory() as uow:
-            existing = self._replay(uow, operation_intent_id, operation_digest)
-            if existing is not None:
-                revision = uow.reviews.get_revision(revision_id)
-                if revision is None:
-                    raise ResourceNotFoundError
-                return revision
-            actor = self._actor(uow, principal)
-            revision = uow.reviews.get_revision(revision_id)
-            if revision is None:
-                raise ResourceNotFoundError
-            if revision.lifecycle_status != "candidate":
-                raise ReviewRevisionNotCandidateError
-            if revision.revision_version != expected_revision_version:
-                raise PlaceRevisionVersionConflictError
-            if source_record_id not in revision.source_record_ids:
-                raise ResourceNotFoundError
-            references = uow.catalog.source_record_references(
-                source_record_id, revision_id=revision_id
-            )
-            if references:
-                raise SourceRecordInUseError(references)
-            try:
-                updated = uow.catalog.detach_source_record(
-                    source_record_id,
-                    revision_id=revision_id,
-                    expected_revision_version=expected_revision_version,
-                )
-            except ValueError as exc:
-                if "version conflict" in str(exc):
-                    raise PlaceRevisionVersionConflictError from exc
-                if "not attached" in str(exc) or "not found" in str(exc):
-                    raise ResourceNotFoundError from exc
-                raise
-            uow.audits.add(
-                self._event(
-                    actor,
-                    action="PLACE_SOURCE_RECORD_DETACHED",
-                    target_type="place_source_record",
-                    target_id=source_record_id,
-                    target_revision=str(updated.revision_number),
-                    before_digest=_revision_digest(revision),
-                    after_digest=_revision_digest(updated),
-                    reason_code=reason_code,
-                    reason_text=reason_text,
-                    request_id=request_id,
-                    operation_intent_id=operation_intent_id,
-                    operation_digest=operation_digest,
-                )
-            )
-            uow.commit()
-            return updated
 
     def preview_time(
         self, principal: AdminPrincipal, *, revision_id: str, service_date: date
@@ -3474,31 +3175,6 @@ class PlaceReviewWorkflowService:
         return {"succeeded": tuple(succeeded), "failed": tuple(failed), "total": len(items)}
 
     @staticmethod
-    def _require(principal: AdminPrincipal, permission: str) -> None:
-        if not principal.has_permission(permission):
-            raise AdminPermissionDeniedError(permission)
-
-    @staticmethod
-    def _actor(uow: ReviewUnitOfWork, principal: AdminPrincipal) -> AdminActor:
-        actor = uow.actors.get(principal.admin_actor_id)
-        if actor is None:
-            raise AdminAuthenticationError
-        return actor
-
-    @staticmethod
-    def _replay(
-        uow: ReviewUnitOfWork, operation_intent_id: str, operation_digest: str
-    ) -> AdminAuditEvent | None:
-        existing = uow.audits.get_by_operation_intent(operation_intent_id)
-        if existing is None:
-            return None
-        if existing.operation_digest != operation_digest:
-            raise AdminOperationIntentConflictError
-        if existing.result == "rejected":
-            _raise_review_error(existing.error_code)
-        return existing
-
-    @staticmethod
     def _task_for_replay(uow: ReviewUnitOfWork, event: AdminAuditEvent) -> PlaceReviewTask:
         task_id = event.target_id if event.target_type == "review_task" else None
         if task_id is None:
@@ -3545,304 +3221,10 @@ class PlaceReviewWorkflowService:
             )
         )
 
-    def _event(
-        self,
-        actor: AdminActor,
-        *,
-        action: str,
-        target_type: str,
-        target_id: str,
-        reason_code: str,
-        reason_text: str | None,
-        request_id: str,
-        operation_intent_id: str | None,
-        operation_digest: str | None,
-        target_revision: str | None = None,
-        before_digest: str | None = None,
-        after_digest: str | None = None,
-        result: str = "succeeded",
-        error_code: str | None = None,
-    ) -> AdminAuditEvent:
-        # Thin delegate to the shared constructor (audit-logging.md §1.2);
-        # actor_role follows the review-flow ordering (§6).
-        return build_audit_event(
-            event_id=self._ids.new_id("admin_audit"),
-            actor=actor,
-            actor_role=review_flow_role(actor.role_keys),
-            action=action,
-            target_type=target_type,
-            target_id=target_id,
-            target_revision=target_revision,
-            before_digest=before_digest,
-            after_digest=after_digest,
-            reason_code=reason_code,
-            reason_text=reason_text,
-            request_id=request_id,
-            operation_intent_id=operation_intent_id,
-            operation_digest=operation_digest,
-            result=result,
-            error_code=error_code,
-            occurred_at=self._clock.now(),
-        )
-
-    @staticmethod
-    def _validate_reason(reason_code: str, reason_text: str | None) -> str | None:
-        # Single authoritative validation lives in audit_events.py.
-        return validate_audit_reason(reason_code, reason_text)
-
-
-def evaluate_review_readiness(
-    evidence: PlaceRevisionEvidence,
-    task: PlaceReviewTask | None,
-) -> dict[str, object]:
-    """Summarize the six editor/reviewer checks used by the OM1 workbench."""
-
-    revision = evidence.revision
-    active_source_ids = {
-        source.source_record_id for source in evidence.source_records if source.status == "active"
-    }
-    active_dependency_sources = set(revision.source_record_ids) | {
-        item.source_record_id
-        for items in (
-            evidence.geometries,
-            evidence.access_points,
-            evidence.time_rules,
-            evidence.closures,
-            evidence.date_exceptions,
-            evidence.relations,
-        )
-        for item in items
-        if item.active
-    }
-    inactive_only_sources = {
-        item.source_record_id
-        for items in (
-            evidence.geometries,
-            evidence.access_points,
-            evidence.time_rules,
-            evidence.closures,
-            evidence.date_exceptions,
-            evidence.relations,
-        )
-        for item in items
-        if not item.active
-    } - active_dependency_sources
-    relevant_sources = tuple(
-        item
-        for item in evidence.source_records
-        if item.source_record_id not in inactive_only_sources
-    )
-    source_collected = bool(revision.source_record_ids) and not (
-        set(revision.source_record_ids) & set(evidence.missing_source_record_ids)
-    )
-    source_collected = source_collected and all(
-        source_id in active_source_ids for source_id in revision.source_record_ids
-    )
-    source_collected = source_collected and (
-        not has_source_content_conflict(relevant_sources) or revision.conflicts_resolved
-    )
-
-    blocking_fact_flags = {
-        "NAME_REQUIRES_HUMAN_VERIFICATION",
-        "CATEGORY_REQUIRES_HUMAN_VERIFICATION",
-        "DURATION_NOT_COLLECTED",
-    }
-    basic_collected = revision.lifecycle_status in {"human_verified", "published"} or not any(
-        flag in blocking_fact_flags for flag in revision.review_flags
-    )
-
-    active_geometries = tuple(item for item in evidence.geometries if item.active)
-    geometry_sources_valid = all(
-        item.source_record_id in active_source_ids for item in active_geometries
-    )
-    matching_geometries = tuple(
-        item
-        for item in active_geometries
-        if item.geometry_kind == revision.geometry_kind
-        and item.source_record_id in active_source_ids
-    )
-    provider_point_only = "PROVIDER_POINT_IS_NOT_PLACE_GEOMETRY" in revision.review_flags
-    geometry_collected = (
-        bool(matching_geometries) and geometry_sources_valid and not provider_point_only
-    )
-    verified_geometries = sum(
-        item.review_status == "human_verified" and item.source_record_id in active_source_ids
-        for item in active_geometries
-    )
-    geometry_verified = (
-        geometry_collected
-        and verified_geometries == len(active_geometries)
-        and any(item.review_status == "human_verified" for item in matching_geometries)
-    )
-
-    active_access_points = tuple(item for item in evidence.access_points if item.active)
-    access_sources_valid = all(
-        item.source_record_id in active_source_ids for item in active_access_points
-    )
-    usable_access_points = tuple(
-        item for item in active_access_points if item.source_record_id in active_source_ids
-    )
-    access_collected = bool(usable_access_points) and access_sources_valid
-    verified_access_points = sum(
-        item.review_status == "human_verified" and item.source_record_id in active_source_ids
-        for item in active_access_points
-    )
-    access_verified = access_collected and verified_access_points == len(active_access_points)
-
-    active_time_rules = tuple(item for item in evidence.time_rules if item.active)
-    active_time_children = (
-        *active_time_rules,
-        *(item for item in evidence.closures if item.active),
-        *(item for item in evidence.date_exceptions if item.active),
-    )
-    time_sources_valid = all(
-        item.source_record_id in active_source_ids for item in active_time_children
-    )
-    usable_time_rules = tuple(
-        item for item in active_time_rules if item.source_record_id in active_source_ids
-    )
-    fixed_sessions = tuple(item for item in usable_time_rules if item.rule_kind == "fixed_session")
-    time_collected = (revision.is_always_open or bool(usable_time_rules)) and time_sources_valid
-    if revision.place_kind == "show":
-        time_collected = (
-            time_collected
-            and bool(fixed_sessions)
-            and all(
-                valid_session_timing(item.start_minute, item.end_minute, item.last_entry_minute)
-                for item in (
-                    *fixed_sessions,
-                    *(
-                        e
-                        for e in evidence.date_exceptions
-                        if e.active and e.exception_kind == "session_override"
-                    ),
-                )
-            )
-        )
-    verified_time_children = sum(
-        item.review_status == "human_verified" and item.source_record_id in active_source_ids
-        for item in active_time_children
-    )
-    time_verified = time_collected and verified_time_children == len(active_time_children)
-    if not revision.is_always_open:
-        time_verified = time_verified and bool(active_time_rules)
-
-    active_relations = tuple(item for item in evidence.relations if item.active)
-    relation_sources_valid = all(
-        item.source_record_id in active_source_ids for item in active_relations
-    )
-    relation_collected = (
-        relation_sources_valid
-        and all(item.resolution_status != "pending" for item in active_relations)
-        if active_relations
-        else revision.relation_review_status in {"no_relations", "not_required"}
-    )
-    verified_relations = sum(
-        item.review_status == "human_verified" and item.source_record_id in active_source_ids
-        for item in active_relations
-    )
-    relation_verified = relation_collected and verified_relations == len(active_relations)
-
-    checks = (
-        _readiness_check("basic", basic_collected, basic_collected, 1, int(basic_collected)),
-        _readiness_check(
-            "source",
-            source_collected,
-            source_collected,
-            len(revision.source_record_ids),
-            len(revision.source_record_ids) if source_collected else 0,
-        ),
-        _readiness_check(
-            "geometry",
-            geometry_collected,
-            geometry_verified,
-            len(active_geometries),
-            verified_geometries,
-        ),
-        _readiness_check(
-            "access_point",
-            access_collected,
-            access_verified,
-            len(active_access_points),
-            verified_access_points,
-        ),
-        _readiness_check(
-            "time",
-            time_collected,
-            time_verified,
-            len(active_time_children),
-            verified_time_children,
-        ),
-        _readiness_check(
-            "relation",
-            relation_collected,
-            relation_verified,
-            len(active_relations) or 1,
-            verified_relations if active_relations else int(relation_verified),
-        ),
-    )
-    completed_checks = sum(bool(check["collected"]) for check in checks)
-    verified_checks = sum(bool(check["verified"]) for check in checks)
-    total_checks = len(checks)
-    if revision.lifecycle_status != "candidate":
-        status = revision.lifecycle_status
-    elif task is not None and task.status == "changes_requested":
-        status = "changes_requested"
-    elif task is not None:
-        status = "ready_for_approval" if verified_checks == total_checks else "under_review"
-    elif completed_checks == total_checks:
-        status = "ready_for_review"
-    else:
-        status = "needs_evidence"
-    return {
-        "status": status,
-        "completed_checks": completed_checks,
-        "verified_checks": verified_checks,
-        "total_checks": total_checks,
-        "missing_checks": tuple(str(check["key"]) for check in checks if not check["collected"]),
-        "pending_review_checks": tuple(
-            str(check["key"]) for check in checks if check["collected"] and not check["verified"]
-        ),
-        "task_status": task.status if task is not None else None,
-        "checks": checks,
-    }
-
 
 # Backward-compatible private name for existing callers while offline research
 # reporting adopts the explicit public evaluator.
 _review_readiness = evaluate_review_readiness
-
-
-def _readiness_check(
-    key: str,
-    collected: bool,
-    verified: bool,
-    total: int,
-    verified_count: int,
-) -> dict[str, object]:
-    return {
-        "key": key,
-        "collected": collected,
-        "verified": verified,
-        "total": total,
-        "verified_count": verified_count,
-    }
-
-
-def _raise_review_error(error_code: str | None) -> None:
-    if error_code == "review_task_not_found":
-        raise ReviewTaskNotFoundError
-    if error_code == "review_task_conflict":
-        raise ReviewTaskConflictError
-    if error_code == "review_revision_not_approvable":
-        raise ReviewRevisionNotApprovableError(not_candidate=True)
-    if error_code == "review_revision_not_candidate":
-        raise ReviewRevisionNotCandidateError
-    if error_code == "publication_gate_rejected":
-        raise PublicationGateRejectedError(())
-    if error_code == "resource_not_found":
-        raise ResourceNotFoundError
-    raise ValueError("review operation was previously rejected")
 
 
 def _reviewer_role(role_keys: tuple[str, ...]) -> str:
@@ -3861,19 +3243,6 @@ def _task_digest(task: PlaceReviewTask) -> str:
             "place_revision_id": task.place_revision_id,
             "status": task.status,
             "version": task.version,
-        }
-    )
-
-
-def _revision_digest(revision: PlaceRevision) -> str:
-    return _digest(
-        {
-            "place_revision_id": revision.place_revision_id,
-            "revision_number": revision.revision_number,
-            "revision_version": revision.revision_version,
-            "relation_review_status": revision.relation_review_status,
-            "lifecycle_status": revision.lifecycle_status,
-            "canonical_name": revision.canonical_name,
         }
     )
 
@@ -3930,11 +3299,6 @@ def _evidence_digest(
             "active": value.active,
         }
     )
-
-
-def _digest(value: object) -> str:
-    # Single authoritative implementation lives in audit_events.py.
-    return canonical_digest(value)
 
 
 def _projection_snapshot_payload(projection: SolverPlaceProjection) -> dict[str, object]:

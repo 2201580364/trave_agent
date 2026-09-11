@@ -19,7 +19,7 @@
 | S4 | 依赖锁定 + 文档对齐实现 | **已完成（2026-09-05）** | 无（可并行） | 0.5 天 |
 | S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **已完成（2026-09-07，S6-4 合并由用户完成：941578e / fae014e）** | S3 | 1–2 天 |
-| S7 | 上帝类拆分（代码健康切片） | **未开始** | S3、R0.2-07 数据批次完成 | 1–2 周 |
+| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-1 准备度与来源职责）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
 | S8 | 用户端补测 + 契约对照 | **阶段交付（2026-09-10 核对：S8-1/2/3 已进入 dev；响应类型迁移未完、S8-4 待 R0.3，frontend Vitest CI 配置已完成待提交）** | S3 | 3–5 天 |
 
 > 状态取值：`未开始` → `进行中` → `已完成` / `阻塞`（附原因）。每完成一项，更新本表并在 CURRENT.md 登记一行。
@@ -153,7 +153,7 @@
 
 | # | 任务 | 拆分对象 → 目标 | 状态 |
 |---|---|---|---|
-| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 未开始 |
+| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源服务、共享支持和仓储 Protocol 拆分完成待提交，后端 524/524；几何/关系/时间/发布等仍待拆分） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 3–4 个仓储 | 未开始 |
 | S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
@@ -195,7 +195,7 @@
 - **M-a（S1+S1.5+S2+S4 完成）**：✅ 已达成（2026-09-05）——知识库自维护基线——冷启动 ~3k token，文档漂移有脚本拦截，文档与实现无现存矛盾
 - **M-b（S3+S5 完成）**：✅ 已达成（2026-09-07）——工程基础设施完备——CI 全绿门槛 + 工具面契约化，**具备并行开发与安全重构前提**
 - **M-c（S6 完成）**：✅ 已达成（2026-09-07）——并行开发跑通，协作规范 v2 沉淀
-- **M-d（S7+S8 完成）**：未达成（S7 等数据批次；S8-1/2/3 阶段交付，响应类型迁移与 S8-4 未完成）——代码健康达标 + 用户端有回归保护，**具备进入 R0.3 部署与 M2 扩展的基座**
+- **M-d（S7+S8 完成）**：未达成（S7-1 拆分进行中；S8-1/2/3 阶段交付，响应类型迁移与 S8-4 未完成）——代码健康达标 + 用户端有回归保护，**具备进入 R0.3 部署与 M2 扩展的基座**
 
 ---
 
@@ -224,3 +224,13 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 ### 2026-09-11 S8-2 CI 测试隔离修复（H3）
 
 已实现待提交：tests/scripts/test_openapi_contract.py 的检查输入由独立临时 fixture 导出并显式传入 --schema，消除对 var/reports 历史文件的依赖；成功断言收紧为 exit 0 / code_only=[]，缺契约检查使用有效 schema，只读测试连续两次成功且字节不变。专项 7/7、锁定环境全量 521/521，ruff 与分层通过；远端仍需提交推送复核。用户确认 S7 批次已排除 027/052，先恢复 CI 全绿，再进入 S7-1。
+
+### 2026-09-12 S7-1 准备度迁移首片（H3）
+
+真实迁移两个纯评估函数到 application/admin/review_readiness.py，依赖方向为门面→准备度模块→领域；保留 review.evaluate_review_readiness 和 _review_readiness 兼容导出。离线研究报告直接依赖新模块。此为 S7-1 内部首片，不代表 S7-1 整体完成；原 review.py 仍超过 800 行，仓储 Protocol 与其余职责继续拆分。新增旧导入兼容测试，原函数 AST 保持一致，验证结果见 CURRENT.md。
+
+### 2026-09-12 S7-1 来源职责与仓储接口切片（H3）
+
+在未提交的准备度首片基础上继续：review_sources.py 承载 5 个来源用例，review.py 显式同签名转发；review_support.py 共享权限、actor、幂等重放、审计构造及摘要，仍由用例同一 UoW 写入并提交。review_ports.py 将原 ReviewRepository 分为修订查询/修订写入/审核任务 Protocol，保留兼容聚合；来源用例实际使用仅有 get_revision/update_revision 的 SourceRevisionRepository 和 4 方法 SourceCatalogRepository，通过只读属性组成窄 SourceReviewUnitOfWork。未拆分的用例暂用兼容聚合，不宣称全部窄化完成。新模块分别 322/138/184 行，审核门面累计 3998→3362 行。
+
+补充审计失败回滚与相同 intent 重试/重放回归，覆盖新增来源和冲突裁决；源用例 AST、门面签名和 OpenAPI 保持一致。类型验证：三个新模块 mypy 通过；旧门面仍有既有类型债，不扩大为业务重写。其余 S7-1 子域尚未完成。

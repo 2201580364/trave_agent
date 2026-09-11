@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from travel_agent.application.admin.review import evaluate_review_readiness
+from travel_agent.application.admin.review_readiness import evaluate_review_readiness
 from travel_agent.infrastructure.database.place_catalog import (
     SqlAlchemyPlaceCatalogRepository,
 )

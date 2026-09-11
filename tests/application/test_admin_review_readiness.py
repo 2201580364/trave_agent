@@ -4,7 +4,9 @@ from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from travel_agent.application.admin.review import _review_readiness
+from travel_agent.application.admin.review_readiness import (
+    evaluate_review_readiness as _review_readiness,
+)
 from travel_agent.domain.place_catalog import (
     PlaceAccessPoint,
     PlaceClosure,
@@ -385,3 +387,16 @@ def test_show_session_respects_separate_last_entry_rule():
         )
     )
     assert sessions[0].matches(date(2026, 9, 10))
+
+
+def test_legacy_readiness_imports_share_the_extracted_evaluator() -> None:
+    """S7-1 keeps existing callers on the same readiness rules."""
+    from travel_agent.application.admin.review import (
+        _review_readiness as legacy_private,
+    )
+    from travel_agent.application.admin.review import (
+        evaluate_review_readiness as legacy_public,
+    )
+
+    assert legacy_private is _review_readiness
+    assert legacy_public is _review_readiness
