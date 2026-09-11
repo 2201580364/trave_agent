@@ -99,3 +99,12 @@ uv run --no-sync python scripts/check_docs.py
 
 - 全仓 strict mypy 存量错误（见 CURRENT.md 活跃风险）——CI 暂不跑 mypy 全量；新增文件建议本地 `mypy <file>` 自查。
 - `ruff format` 历史漂移（103 文件未格式化）——CI 的 format 检查为 non-blocking，新文件建议 `ruff format <file>` 后再提交。
+
+
+## OpenAPI 契约测试在干净 CI 环境缺少快照（S8-2）
+
+症状：pytest 的 test_current_repo_state_passes / test_code_only_registration_fails_gate 退出码为 1，输出 schema unreadable，指向 var/reports/openapi-schema.json。该目录被 Git 忽略，本地已有产物不能作为测试前提。
+
+契约检查测试必须通过 fixture 在临时目录调用真实 export_openapi_schema.py，并显式传入 --schema；不得依赖手工预生成或其他测试的执行顺序。当前仓库成功断言必须是 exit 0 / status ok / code_only=[]；只读测试必须有真实输入，连续两次检查成功并逐次比较字节内容。缺契约测试使用有效 schema，以确保错误来自缺契约本身。
+
+CI 的正式 schema 导出仍在 pytest 之后，输出 var/ci/openapi-schema.json 并上传 artifact。admin-web 配置 needs: backend，因此 backend 失败时会跳过；后端通过后再验证管理端生成类型、测试与构建。不要通过提交 var/ 产物或放宽退出码修复这一问题。

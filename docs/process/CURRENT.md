@@ -2,14 +2,16 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-11（S4/S8 CI 收尾与响应模型首片；实现完成，待用户提交/远端 CI 验证）
-- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7 等待数据批次（12 条中 2 条已发布）`
+- 更新时间：2026-09-11（S4/S8 CI 收尾与响应模型首片；已提交 436bf20；CI 契约测试隔离修复完成待提交）
+- 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7 前置核对中（用户批准 10 条批次，027/052 已排除；CI 本地修复通过，待远端复核）`
 - 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `521/521`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；新增响应模型 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
-- 最近提交基线：`6e9e463 feat(O05): 支持 show 多场次求解与候选时间规则删除`，已进入 dev；本轮 CI 与响应模型改动尚未提交。521 为本轮工作区锁定环境结果，不代表远端 CI 或部署验收。
+- 最近提交基线：`436bf20 feat(contract): 完成地点审核响应模型与锁定环境 CI 门禁`，已进入 dev；521 为该提交的本地锁定环境结果，用户提供远端日志：frontend 通过、backend 519 通过/2 失败、admin-web 因依赖跳过；失败为测试依赖未入库 schema，本轮本地修复通过，待提交推送复核。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-11 S4/S8 CI 收尾 + 响应契约首片（H3，实现完成待提交）：CI 固定 uv 0.8.15，锁定安装 dev extra，全检查使用 --no-sync；frontend 接入 19 项测试并修正 npm ci 的 legacy-peer-deps；后端 OpenAPI artifact 传给管理端，生成类型差异门禁。34 个地点详情/证据/修订写入/审核任务/准备度/时间预览接口明确响应模型，17 个前端类型改生成再导出。保留 null/省略字段/日期字符串；新增 6 项响应契约测试。锁定环境 521/521 + Golden 8/8；管理端 47/47/tsc/build、用户端 19/19/tsc 全过。无锁文件变更、无迁移、未操作研究库。S7 与 S8-4 前提仍未满足。
+- 2026-09-11 CI 契约测试隔离修复（H3/S8-2，待提交）：测试 fixture 在临时目录真实导出 schema，检查显式传 --schema；当前契约强制 exit 0，缺契约错误隔离验证，只读两次成功且内容不变。专项 7/7、锁定环境全量 521/521（86.72s）、ruff、124 文件分层零违规；文档门禁通过。未改 CI/业务/依赖/研究库，未重跑前端与 Golden，历史基线不冒充本轮结果。用户确认批次排除 027/052，CI 远端重跑待用户提交推送。
+
+- 2026-09-11 S4/S8 CI 收尾 + 响应契约首片（H3，已进入 dev：436bf20）：CI 固定 uv 0.8.15，锁定安装 dev extra，全检查使用 --no-sync；frontend 接入 19 项测试并修正 npm ci 的 legacy-peer-deps；后端 OpenAPI artifact 传给管理端，生成类型差异门禁。34 个地点详情/证据/修订写入/审核任务/准备度/时间预览接口明确响应模型，17 个前端类型改生成再导出。保留 null/省略字段/日期字符串；新增 6 项响应契约测试。锁定环境 521/521 + Golden 8/8；管理端 47/47/tsc/build、用户端 19/19/tsc 全过。无锁文件变更、无迁移、未操作研究库。S7 与 S8-4 前提仍未满足。
 
 
 - 2026-09-11 O05（H3/C2/C4/C6，ADR-0025，已进入 dev：6e9e463）：show 至少一条有效固定场次，已发布投影固化多场次及日期/开放规则/入园截止；单地点单节点、求解器结合 OD 和锚点选择可行场次，完整保留提前入场至演出结束；候选入口常规开放规则/固定场次删除，审核入口仍停用并保留可见，停用证据不参与校验。删除有角色/生命周期/版本/幂等/同事务审计。结果与分享显示真实场次开始，公开分享不暴露场次 ID。无迁移、未操作研究库。验证详情和操作偏差见本月 status-archive。
@@ -33,7 +35,7 @@
 
 ## 下一步（按顺序）
 
-1. 完成上述 12 条的人工补证与 reviewer 逐项审核，再执行 Projection、批次发布和用户端可见性回归。
+1. 完成 CI 测试隔离修复并由用户推送验证后推进 S7-1 审核服务拆分；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
 2. 稳定后扩展研究目录至 50–75 条 `human_verified`（G7-R1 研究最低目录门槛）。
 3. 实施 R0.2-06 按需真实 OD 子图（候选过滤→锚点真实 OD→缓存→不可变子图 hash→Revision 回放，缺边不填 0）。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；期间 G1 真实用户发现研究补证可与 R0.2–R0.4 并行、R1 前关闭。
@@ -45,7 +47,7 @@
 
 ## 活跃风险
 
-- CI 配置已改为 `uv sync --locked --extra dev` + `uv run --no-sync`，frontend 增加 Vitest；admin-web 下载 backend schema 并检查生成类型差异。原 job check 名称保留。本地验证通过，实际 GitHub Actions 和 artifact 跨 job 链路待用户提交后验证。
+- CI 配置已改为 `uv sync --locked --extra dev` + `uv run --no-sync`，frontend 增加 Vitest；admin-web 下载 backend schema 并检查生成类型差异。原 job check 名称保留。远端 frontend 已通过，backend 两项契约测试依赖缺失快照而失败，admin-web 因 needs 跳过；本轮修复后需推送复核。
 
 
 - O05 显式场次日期暂不执行 DAY_SPREAD/普通景点时长扩展，保留最低游览时长和晚餐软块；无显式场次的日期保持原算法。已实现/自动测试通过不等于已部署或用户验收。
@@ -53,7 +55,7 @@
 
 
 - 2026-09-10 提交核对：S6 已实现 sessionStorage + /me 会话恢复，但 ADR-0020 仍禁止持久化且要求新 ADR，当前未见替代决策；最新几何修复在组件中展示客户端校验文案，与 error-messages.md 的全局单一文案源要求存在边界差异。后续相关实现前须先裁决，不能把现有代码自动当作规格变更。
-- 数据数量口径待核实：当前节点记录「12 条中 2 条已发布」，下方研究库总量仍为历史 3 published/69 candidate；本轮未查询数据库，不推算新总量。
+- 2026-09-11 只读核对：原 12 条批次 10 published / 2 candidate（杭州博物馆 027、良渚博物院 052，均无更新版本）；钱江新城灯光秀 048 的 4 条有效固定场次 entry=start+10，不满足当前 valid_session_timing，因此准备度为 5/6。用户已明确排除 027/052，批准批次为其余 10 条；048 时间证据差异单独保留，不自动修改或豁免。
 
 - Gate 1 存在真实用户研究补证债务：无真实访谈纪要与可追溯结论，M1 最终决策前必须完成 8–10 名目标用户发现研究，不得倒填。
 - 历史账本记载的测试计数互相矛盾（352/363/367/370/…/432），以本文件顶部稳定测试基线为准；旧计数属阶段性快照，不代表回退。
@@ -66,15 +68,17 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 实现完成待用户提交；34 个接口、17 个响应类型再导出；521/521 + Golden 8/8，两端验证通过；远端 CI 待提交后核实 |
+| CI 契约测试隔离修复（H3/S8-2） | dev | `tests/scripts/test_openapi_contract.py`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档 | 实现完成待用户提交；专项 7/7、全量 521/521、ruff/分层/文档通过 |
+| S7 前置核对与拆分准备（H3） | dev | `docs/process/{CURRENT,transformation-plan}.md`、`docs/process/status-archive/2026-09.md` | 批次已确认排除 027/052；CI 失败修复优先，尚未修改业务代码或研究库 |
+| S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 已进入 dev（436bf20）；521/521 + Golden 8/8，两端验证通过；远端 backend 519/521、frontend 通过、admin-web 跳过；本轮修复后待远端复核 |
 | O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 已进入 dev（6e9e463，本轮核对销账）；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；未操作实际研究库 |
 | AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 已进入 dev（04c2d35；2026-09-10 核对销账；原验证记录：pytest 495/495 + ruff + layering + check_docs） |
 
-> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest CI 配置已完成待提交；S7 硬前提「R0.2-07 数据批次完成」未满足（12 条批次 2 条已发布、10 条 needs_evidence），暂不入队。遗留任务：① 响应模型首片 34 个接口已完成待提交，其余认证/来源冲突/批量审核/发布批次/O17 等按能力片迁移（原 63 为旧勘察计数，不作剩余数量）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
+> S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest CI 配置已进入 dev（436bf20）；S7 用户已确认批准其余 10 条，排除 027/052；先修复 CI 并验证远端全绿。遗留任务：① 响应模型首片 34 个接口已进入 dev（436bf20），其余认证/来源冲突/批量审核/发布批次/O17 等按能力片迁移（原 63 为旧勘察计数，不作剩余数量）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
 
 ## 关键事实速查
 
-- 研究库 `.local/research.db`：72 条杭州候选（published=3：平湖秋月、浙江省博物馆孤山馆区[第 2 版]、西湖音乐喷泉表演；candidate=69），目录边界审计通过。
+- 研究库 `.local/research.db`：2026-09-11 mode=ro 查询全部 Revision 为 published=13、candidate=59、retired=2（版本数量，非全量 Place 去重统计）；原批次 12 条中 10 published、2 candidate。
 - 求解器契约：`solver-p1-v2 / trip-result-v2 / constraints-p1-v6 / parameters-p1-2026-08-26`；历史 Revision 不迁移、不覆盖、不原地重算。
 - Gate 7 protocol 规范化 SHA-256：`b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89`。
 - 正式发布 bundle：`var/published/hangzhou-published-2026-08-27-v1.json`（7 景点 human_verified 坐标 + 42/42 高德 OD + 真实和风三日天气）。

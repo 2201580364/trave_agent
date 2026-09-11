@@ -16,9 +16,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = PROJECT_ROOT / "scripts"
-SNAPSHOT = PROJECT_ROOT / "var/reports/openapi-schema.json"
 
 
 def _run(script: str, *argv: str) -> subprocess.CompletedProcess[str]:
@@ -30,6 +31,17 @@ def _run(script: str, *argv: str) -> subprocess.CompletedProcess[str]:
         check=False,
         cwd=PROJECT_ROOT,
     )
+
+
+@pytest.fixture
+def schema_path(tmp_path: Path) -> Path:
+    """S8-2: checks own their input, independent of ignored local artifacts."""
+    output = tmp_path / "openapi-schema.json"
+    result = _run("export_openapi_schema.py", "--json", "--output", str(output))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout)["status"] == "ok"
+    assert output.is_file()
+    return output
 
 
 class TestExportOpenApiSchema:
@@ -56,13 +68,12 @@ class TestExportOpenApiSchema:
 
 
 class TestCheckApiContract:
-    def test_current_repo_state_passes(self) -> None:
-        result = _run("check_api_contract.py", "--json")
-        assert result.returncode in (0, 2), result.stderr
+    def test_current_repo_state_passes(self, schema_path: Path) -> None:
+        result = _run("check_api_contract.py", "--json", "--schema", str(schema_path))
+        assert result.returncode == 0, result.stdout + result.stderr
         payload = json.loads(result.stdout)
-        assert payload["status"] in ("ok", "failed")
-        assert payload["status"] == ("ok" if result.returncode == 0 else "failed")
-        assert isinstance(payload["code_only"], list)
+        assert payload["status"] == "ok"
+        assert payload["code_only"] == []
         assert isinstance(payload["contract_only"], list)
         assert payload["contract_endpoint_count"] > 0
 
@@ -77,40 +88,48 @@ class TestCheckApiContract:
         payload = json.loads(result.stdout)
         assert payload["status"] == "error"
 
-    def test_missing_contract_is_runtime_error(self, tmp_path: Path) -> None:
+    def test_missing_contract_is_runtime_error(self, tmp_path: Path, schema_path: Path) -> None:
         result = _run(
             "check_api_contract.py",
             "--json",
+            "--schema",
+            str(schema_path),
             "--contract",
             str(tmp_path / "missing.md"),
         )
         assert result.returncode == 1
         payload = json.loads(result.stdout)
         assert payload["status"] == "error"
+        assert "contract unreadable" in payload["error"]
 
-    def test_code_only_registration_fails_gate(self, tmp_path: Path) -> None:
+    def test_code_only_registration_fails_gate(self, tmp_path: Path, schema_path: Path) -> None:
         # Strip an implemented endpoint from the contract copy: the diff must
         # flag it as code-only and exit 2 (fail-closed on contract drift).
-        contract_text = (PROJECT_ROOT / "docs/specs/api-contract.md").read_text(
-            encoding="utf-8"
-        )
+        contract_text = (PROJECT_ROOT / "docs/specs/api-contract.md").read_text(encoding="utf-8")
         marker = "| POST | `/anonymous-sessions` | 创建匿名主体 | 是 |"
         assert marker in contract_text
         trimmed = contract_text.replace(marker, "")
         contract_copy = tmp_path / "api-contract-trimmed.md"
         contract_copy.write_text(trimmed, encoding="utf-8")
         result = _run(
-            "check_api_contract.py", "--json", "--contract", str(contract_copy)
+            "check_api_contract.py",
+            "--json",
+            "--schema",
+            str(schema_path),
+            "--contract",
+            str(contract_copy),
         )
         assert result.returncode == 2
         payload = json.loads(result.stdout)
         assert payload["status"] == "failed"
         assert "POST /api/v1/anonymous-sessions" in payload["code_only"]
 
-    def test_readonly_no_mutation(self) -> None:
+    def test_readonly_no_mutation(self, schema_path: Path) -> None:
         # L1 read-only gate: running the check twice must not change the
         # snapshot file it consumes.
-        before = SNAPSHOT.read_bytes() if SNAPSHOT.exists() else None
-        _run("check_api_contract.py")
-        after = SNAPSHOT.read_bytes() if SNAPSHOT.exists() else None
-        assert before == after
+        before = schema_path.read_bytes()
+        for _ in range(2):
+            result = _run("check_api_contract.py", "--json", "--schema", str(schema_path))
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert json.loads(result.stdout)["status"] == "ok"
+            assert schema_path.read_bytes() == before
