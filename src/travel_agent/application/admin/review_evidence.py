@@ -8,7 +8,13 @@ from dataclasses import replace
 from travel_agent.application.common.errors import ResourceNotFoundError
 from travel_agent.domain.admin import AdminPrincipal
 from travel_agent.domain.place_catalog import (
+    PlaceAccessPoint,
+    PlaceClosure,
+    PlaceDateException,
+    PlaceGeometry,
+    PlaceRelation,
     PlaceRevision,
+    PlaceTimeRule,
 )
 
 from .errors import (
@@ -122,3 +128,33 @@ def _evidence_flags_cleared_by_action(action: str) -> frozenset[str]:
     if action in {"PLACE_TIME_RULE_CREATED", "PLACE_TIME_RULE_UPDATED"}:
         return frozenset({"TIME_RULES_NOT_COLLECTED"})
     return frozenset()
+
+
+def _evidence_digest(
+    value: PlaceGeometry
+    | PlaceAccessPoint
+    | PlaceTimeRule
+    | PlaceClosure
+    | PlaceDateException
+    | PlaceRelation,
+) -> str:
+    evidence_id = next(
+        getattr(value, name)
+        for name in (
+            "geometry_id",
+            "access_point_id",
+            "time_rule_id",
+            "closure_id",
+            "date_exception_id",
+            "relation_id",
+        )
+        if hasattr(value, name)
+    )
+    return _digest(
+        {
+            "evidence_id": evidence_id,
+            "review_status": value.review_status,
+            "reviewed_at": value.reviewed_at.isoformat() if value.reviewed_at else None,
+            "active": value.active,
+        }
+    )

@@ -153,7 +153,7 @@
 
 | # | 任务 | 拆分对象 → 目标 | 状态 |
 |---|---|---|---|
-| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何与访问点、共享证据事务完成待提交，后端530/530与两端回归通过；关系/时间/发布等仍待拆分） |
+| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系职责完成待提交，532/532与两端回归通过，时间/发布等仍待拆分） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 3–4 个仓储 | 未开始 |
 | S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
@@ -238,3 +238,7 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 ### 2026-09-12 S7-1 几何与访问点切片（H3）
 
 6 个新增/编辑/停用用例原样迁至 review_geometry.py，门面同签名显式委托。共享 _mutate_evidence 与动作类型/清理标记 helper 迁至 review_evidence.py，几何与原时间证据路径复用同一泛型事务支持；几何使用窄 GeometryReviewUnitOfWork 与 7 方法仓储，事务支持只依赖修订读写与审计上下文，不获得发布能力。新模块 361/124 行，review_ports 235 行，review.py 3362→3103 行；原行为与 OpenAPI 不变。新增 6 项几何/访问点写入的审计失败回滚、同 intent 重试及重放回归。S7-1 仍未全部完成。
+
+### 2026-09-12 S7-1 关系职责切片（H3）
+
+关系裁决/无关系确认迁至 ReviewRelationService，门面保留原签名显式转发。RelationReviewUnitOfWork 只暴露关系加载/更新和必要修订审计能力；证据摘要移至 review_evidence，审核与关系共用。新关系模块200行、review.py3103→2954行。业务函数AST与原版一致，OpenAPI保持一致。两个新增事务回归覆盖审计失败回滚、失败后同intent重试和无关系确认重放；已有关系裁决成功重放ID缺陷单独登记CURRENT，未在纯重构中改变。

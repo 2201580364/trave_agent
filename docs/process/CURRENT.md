@@ -2,14 +2,16 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-12（S7-1 几何/访问点与共享证据事务拆分完成待提交）
+- 更新时间：2026-09-12（S7-1 关系职责拆分完成待提交）
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
-- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `530/530`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；本轮新增几何/访问点审计回滚重试 6 项；新几何/证据事务及接口模块 mypy 通过。迁移链仍至 `0015_holiday_exception_provenance`。
-- 最近提交基线：`9cc9792 refactor(admin): 拆分审核准备度与来源证据服务`，已进入 dev；本轮几何/访问点切片基于此提交。
+- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境）：pytest `532/532`、Golden `8/8`；ruff、layering、API 契约、check_docs 全过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；本轮新增关系事务回归2项；关系/证据/接口模块mypy通过。迁移链仍至 `0015_holiday_exception_provenance`。
+- 最近提交基线：`e293a56 refactor(admin): 拆分几何访问点服务与共享证据事务`，已进入 dev；本轮关系切片基于该提交。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-12 S7-1 几何/访问点（H3，待提交）：6 用例迁入 review_geometry（361 行）；共享证据事务迁入 review_evidence（124 行）供几何与原时间证据复用，GeometryReviewUnitOfWork 收窄为 7 个仓储方法。门面同签名转发，review.py 3362→3103 行。新增6项审计失败回滚/同intent重试/重放回归。后端530/530（111.81s）、Golden8/8、ruff/分层130文件/API及新模块mypy通过；admin47/47/tsc/build、frontend19/19/tsc、文档门禁通过。无迁移/依赖/研究库写入。
+- 2026-09-12 S7-1 关系职责（H3，待提交）：关系裁决/无关系确认迁至200行review_relations，仓储收窄为2方法，证据摘要共享。门面3103→2954行，函数AST/签名/OpenAPI一致。新增2项事务回滚/失败重试回归。532/532（75.02s）、Golden8/8、admin47/47/tsc/build、frontend19/19/tsc、ruff/分层131文件/API/文档与相关模块mypy通过。原有关系裁决成功重放404已用HEAD方法与迁移方法在临时库对照复现，不属于拆分回归，本片保留并登记独立修复。
+
+- 2026-09-12 S7-1 几何/访问点（H3，已进入 dev：e293a56）：6 用例迁入 review_geometry（361 行）；共享证据事务迁入 review_evidence（124 行）供几何与原时间证据复用，GeometryReviewUnitOfWork 收窄为 7 个仓储方法。门面同签名转发，review.py 3362→3103 行。新增6项审计失败回滚/同intent重试/重放回归。后端530/530（111.81s）、Golden8/8、ruff/分层130文件/API及新模块mypy通过；admin47/47/tsc/build、frontend19/19/tsc、文档门禁通过。无迁移/依赖/研究库写入。
 
 - 2026-09-12 S7-1 来源/接口切片（H3，已进入 dev：9cc9792）：5 个来源用例迁至 review_sources（322 行），门面保留同签名转发；review_support（138 行）共享权限/幂等/审计，review_ports（184 行）拆 3 个审核仓储 Protocol 并为来源实际收窄为 2+4 方法接口。累计 review.py 3998→3362 行。新增审计失败回滚与重试/重放两项集成回归；524/524（97.96s）、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc、ruff/分层128文件/API/文档通过，新模块 mypy 通过。旧门面类型债保留，无迁移/研究库写入。
 
@@ -53,6 +55,8 @@
 
 ## 活跃风险
 
+- S7-1 关系切片发现原有重放缺陷：resolve_relation 的审计 target_id 是 relation_id，但成功重放用它查询 revision，通常返回404。HEAD e293a56 同样存在；本轮纯迁移保留行为，后续独立修复。来源/无关系确认重放与此不同。
+
 - CI 配置已改为 `uv sync --locked --extra dev` + `uv run --no-sync`，frontend 增加 Vitest；admin-web 下载 backend schema 并检查生成类型差异。原 job check 名称保留。历史缺快照失败已由 cec78fd 修复，用户确认三项远端检查全绿。
 
 
@@ -74,7 +78,8 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| S7-1 几何/访问点与证据事务（H3） | dev | `application/admin/{review,review_ports,review_geometry,review_evidence}.py`、`tests/application/test_review_geometry_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 本片完成待提交；530/530、Golden8/8、两端验证通过，S7-1仍进行中 |
+| S7-1 关系裁决（H3） | dev | `application/admin/{review,review_ports,review_evidence,review_relations}.py`、`tests/application/test_review_relation_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 本片完成待提交；532/532、Golden8/8、两端验证通过；已有关系重放缺陷单独登记 |
+| S7-1 几何/访问点与证据事务（H3） | dev | `application/admin/{review,review_ports,review_geometry,review_evidence}.py`、`tests/application/test_review_geometry_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已进入 dev（e293a56）；530/530、Golden8/8、两端验证通过，S7-1仍进行中 |
 | S7-1 准备度职责迁移（H3） | dev | `application/admin/{review,review_readiness,review_ports,review_support,review_sources}.py`、`data_governance/research_readiness.py`、`tests/application/{test_admin_review_readiness,test_review_source_boundary}.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已进入 dev（9cc9792）；524/524、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc；新模块 mypy 通过，S7-1 其余子域待拆分 |
 | CI 契约测试隔离修复（H3/S8-2） | dev | `tests/scripts/test_openapi_contract.py`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档 | 已进入 dev（cec78fd）；用户确认远端全绿 |
 | S7 前置核对与拆分准备（H3） | dev | `docs/process/{CURRENT,transformation-plan}.md`、`docs/process/status-archive/2026-09.md` | 前置核对完成；批次排除 027/052、用户确认 CI 全绿，S7-1 已启动 |

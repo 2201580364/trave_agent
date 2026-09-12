@@ -15,11 +15,8 @@ from travel_agent.application.planning.ports import IdGenerator
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent, AdminPrincipal
 from travel_agent.domain.place_catalog import (
     HolidayCalendar,
-    PlaceAccessPoint,
     PlaceClosure,
     PlaceDateException,
-    PlaceGeometry,
-    PlaceRelation,
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
@@ -56,13 +53,14 @@ from .errors import (
     ReviewTaskNotFoundError,
     SourceRecordValidationError,
 )
-from .review_evidence import EvidenceMutationSupport
+from .review_evidence import EvidenceMutationSupport, _evidence_digest
 from .review_geometry import ReviewGeometryService
 from .review_ports import ActorRepository as ActorRepository
 from .review_ports import AuditRepository as AuditRepository
 from .review_ports import ReviewRepository as ReviewRepository
 from .review_ports import ReviewUnitOfWork as ReviewUnitOfWork
 from .review_readiness import evaluate_review_readiness as evaluate_review_readiness
+from .review_relations import ReviewRelationService
 from .review_sources import ReviewSourceService
 from .review_support import _digest, _revision_digest
 from .sources import GovernedSourceCatalog, GovernedSourceChannel
@@ -117,6 +115,7 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         self._holiday_calendars = holiday_calendars or BuiltinHolidayCalendarCatalog()
         self._sources = ReviewSourceService(uow_factory, clock, ids, source_catalog)
         self._geometry = ReviewGeometryService(uow_factory, clock, ids)
+        self._relations = ReviewRelationService(uow_factory, clock, ids)
 
     def list_holiday_calendars(self, principal: AdminPrincipal) -> tuple[HolidayCalendar, ...]:
         self._require(principal, "place:candidate:read")
@@ -315,82 +314,18 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        self._require(principal, "place:candidate:write")
-        if resolution_status not in {"resolved", "not_required", "pending"}:
-            raise ValueError("invalid relation resolution status")
-        if resolution_status == "resolved" and not decision_note:
-            raise ValueError("resolved relation requires decision note")
-        reason_text = self._validate_reason(reason_code, reason_text)
-        digest = _digest(
-            {
-                "revision_id": revision_id,
-                "relation_id": relation_id,
-                "expected_revision_version": expected_revision_version,
-                "resolution_status": resolution_status,
-                "decision_note": decision_note,
-                "reason_code": reason_code,
-                "reason_text": reason_text,
-            }
+        return self._relations.resolve_relation(
+            principal,
+            revision_id=revision_id,
+            relation_id=relation_id,
+            expected_revision_version=expected_revision_version,
+            resolution_status=resolution_status,
+            decision_note=decision_note,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
         )
-        with self._uow_factory() as uow:
-            existing = self._replay(uow, operation_intent_id, digest)
-            if existing is not None:
-                revision = uow.reviews.get_revision(existing.target_id)
-                if revision is None:
-                    raise ResourceNotFoundError
-                return revision
-            actor = self._actor(uow, principal)
-            revision = uow.reviews.get_revision(revision_id)
-            evidence = uow.catalog.load_revision_evidence(revision_id)
-            if revision is None or evidence is None:
-                raise ResourceNotFoundError
-            if revision.lifecycle_status != "candidate":
-                raise ReviewRevisionNotCandidateError
-            relation = next(
-                (
-                    item
-                    for item in evidence.relations
-                    if item.relation_id == relation_id and item.active
-                ),
-                None,
-            )
-            if relation is None or revision.place_id not in {
-                relation.from_place_id,
-                relation.to_place_id,
-            }:
-                raise ResourceNotFoundError
-            updated_relation = replace(
-                relation,
-                resolution_status=resolution_status,
-                decision_note=decision_note,
-                # A裁决 changes the relation fact but does not
-                # itself constitute reviewer verification.
-                review_status="candidate",
-                reviewed_at=None,
-            )
-            updated = uow.catalog.update_relation(
-                updated_relation,
-                revision_id=revision_id,
-                expected_revision_version=expected_revision_version,
-            )
-            uow.audits.add(
-                self._event(
-                    actor,
-                    action="PLACE_RELATION_RESOLUTION_UPDATED",
-                    target_type="place_relation",
-                    target_id=relation_id,
-                    target_revision=str(updated.revision_number),
-                    before_digest=_evidence_digest(relation),
-                    after_digest=_evidence_digest(updated_relation),
-                    reason_code=reason_code,
-                    reason_text=reason_text,
-                    request_id=request_id,
-                    operation_intent_id=operation_intent_id,
-                    operation_digest=digest,
-                )
-            )
-            uow.commit()
-            return updated
 
     def confirm_no_relations(
         self,
@@ -404,70 +339,16 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         reason_text: str | None,
         request_id: str,
     ) -> PlaceRevision:
-        """Record that this revision was checked and has no relation evidence to裁决."""
-        self._require(principal, "place:candidate:write")
-        reason_text = self._validate_reason(reason_code, reason_text)
-        digest = _digest(
-            {
-                "revision_id": revision_id,
-                "expected_revision_number": expected_revision_number,
-                "expected_revision_version": expected_revision_version,
-                "reason_code": reason_code,
-                "reason_text": reason_text,
-            }
+        return self._relations.confirm_no_relations(
+            principal,
+            revision_id=revision_id,
+            expected_revision_number=expected_revision_number,
+            expected_revision_version=expected_revision_version,
+            operation_intent_id=operation_intent_id,
+            reason_code=reason_code,
+            reason_text=reason_text,
+            request_id=request_id,
         )
-        with self._uow_factory() as uow:
-            existing = self._replay(uow, operation_intent_id, digest)
-            if existing is not None:
-                revision = uow.reviews.get_revision(existing.target_id)
-                if revision is None:
-                    raise ResourceNotFoundError
-                return revision
-            actor = self._actor(uow, principal)
-            current = uow.reviews.get_revision(revision_id)
-            evidence = uow.catalog.load_revision_evidence(revision_id)
-            if current is None or evidence is None:
-                raise ResourceNotFoundError
-            if current.lifecycle_status != "candidate":
-                raise ReviewRevisionNotCandidateError
-            if current.revision_number != expected_revision_number:
-                raise ReviewTaskConflictError
-            if current.revision_version != expected_revision_version:
-                raise PlaceRevisionVersionConflictError
-            if any(item.active for item in evidence.relations):
-                raise ValueError("当前存在关系记录，请逐条完成关系裁决")
-            updated = replace(
-                current,
-                relation_review_status="no_relations",
-                solver_eligible=False,
-                conflicts_resolved=False,
-                reviewed_at=None,
-                published_at=None,
-                revision_version=current.revision_version + 1,
-            )
-            uow.reviews.update_revision(
-                updated,
-                expected_revision_number=expected_revision_number,
-                expected_revision_version=expected_revision_version,
-            )
-            uow.audits.add(
-                self._event(
-                    actor,
-                    action="PLACE_RELATION_REVIEW_CONFIRMED_NONE",
-                    target_type="place_revision",
-                    target_id=revision_id,
-                    target_revision=str(updated.revision_number),
-                    before_digest=_revision_digest(current),
-                    after_digest=_revision_digest(updated),
-                    reason_code=reason_code,
-                    reason_text=reason_text,
-                    request_id=request_id,
-                    operation_intent_id=operation_intent_id,
-                    operation_digest=digest,
-                )
-            )
-            uow.commit()
-            return updated
 
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
         self._require(principal, "place:candidate:read")
@@ -3008,36 +2889,6 @@ def _task_digest(task: PlaceReviewTask) -> str:
             "place_revision_id": task.place_revision_id,
             "status": task.status,
             "version": task.version,
-        }
-    )
-
-
-def _evidence_digest(
-    value: PlaceGeometry
-    | PlaceAccessPoint
-    | PlaceTimeRule
-    | PlaceClosure
-    | PlaceDateException
-    | PlaceRelation,
-) -> str:
-    evidence_id = next(
-        getattr(value, name)
-        for name in (
-            "geometry_id",
-            "access_point_id",
-            "time_rule_id",
-            "closure_id",
-            "date_exception_id",
-            "relation_id",
-        )
-        if hasattr(value, name)
-    )
-    return _digest(
-        {
-            "evidence_id": evidence_id,
-            "review_status": value.review_status,
-            "reviewed_at": value.reviewed_at.isoformat() if value.reviewed_at else None,
-            "active": value.active,
         }
     )
 

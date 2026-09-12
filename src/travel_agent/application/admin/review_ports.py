@@ -10,6 +10,7 @@ from travel_agent.domain.admin import AdminActor, AdminAuditEvent
 from travel_agent.domain.place_catalog import (
     PlaceAccessPoint,
     PlaceGeometry,
+    PlaceRelation,
     PlaceReviewDecision,
     PlaceReviewTask,
     PlaceRevision,
@@ -233,3 +234,16 @@ class GeometryCatalogRepository(Protocol):
 class GeometryReviewUnitOfWork(EvidenceReviewUnitOfWork, Protocol):
     @property
     def catalog(self) -> GeometryCatalogRepository: ...
+
+
+class RelationCatalogRepository(Protocol):
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None: ...
+
+    def update_relation(
+        self, relation: PlaceRelation, *, revision_id: str, expected_revision_version: int
+    ) -> PlaceRevision: ...
+
+
+class RelationReviewUnitOfWork(EvidenceReviewUnitOfWork, Protocol):
+    @property
+    def catalog(self) -> RelationCatalogRepository: ...
