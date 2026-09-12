@@ -19,7 +19,7 @@
 | S4 | 依赖锁定 + 文档对齐实现 | **已完成（2026-09-05）** | 无（可并行） | 0.5 天 |
 | S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **已完成（2026-09-07，S6-4 合并由用户完成：941578e / fae014e）** | S3 | 1–2 天 |
-| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-1 时间证据职责）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
+| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-1 审核任务职责）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
 | S8 | 用户端补测 + 契约对照 | **阶段交付（2026-09-10 核对：S8-1/2/3 已进入 dev；响应类型迁移未完、S8-4 待 R0.3，frontend Vitest CI 配置已完成待提交）** | S3 | 3–5 天 |
 
 > 状态取值：`未开始` → `进行中` → `已完成` / `阻塞`（附原因）。每完成一项，更新本表并在 CURRENT.md 登记一行。
@@ -153,7 +153,7 @@
 
 | # | 任务 | 拆分对象 → 目标 | 状态 |
 |---|---|---|---|
-| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间写入/只读预览完成待提交，543/543及两端回归通过；审核任务/发布等仍待拆分） |
+| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间已提交 c4fa989；审核任务服务完成待提交，发布及修订生命周期仍待拆分） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 3–4 个仓储 | 未开始 |
 | S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
@@ -251,3 +251,8 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 ### 2026-09-12 S7-1 时间证据切片（H3/O05）
 
 常规开放规则/固定场次、闭馆日、日期例外及节假日例外生成迁至 review_time.py（776 行），只读预览独立为 review_time_preview.py（245 行）。门面保留原签名转发，内置日历及其 Protocol 保留旧导入；时间仓储收窄为 11 方法 TimeCatalogRepository，共享证据事务保持原样。原方法 AST 与保留签名对照一致，review.py 2954→2348 行；新模块均符合 ≤800 行要求，门面仍待继续拆分。新增 11 项审计失败整体回滚、同 intent 重试/重放及载荷冲突回归，含节假日一次生成 9 条例外的事务。最终验证见 CURRENT.md；S7-1 未整体完成。
+
+
+### 2026-09-12 S7-1 审核任务切片（H3）
+
+送审、单项/批量裁决、任务列表/计数/详情/裁决历史及事务辅助方法迁入 review_tasks.py（519行）。门面同签名转发，原9方法AST保持一致，review.py2348→1996行。任务仓储复用8方法ReviewTaskRepository并增加修订读取/通过，catalog仅保留证据读取。新增6项事务回滚/重放回归含批量部分成功。保留4项由旧门面迁入的mypy类型债；独立登记原批量HTTP输入模型不接受task_id的问题，本片不改接口语义。验证见CURRENT.md。

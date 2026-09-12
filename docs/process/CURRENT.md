@@ -2,14 +2,16 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-12（S7-1 时间证据拆分完成待提交）
+- 更新时间：2026-09-12（S7-1 审核任务拆分完成待提交）
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
-- 本轮自动验证基线（Python 3.12 / uv.lock 锁定隔离环境，PYTHONUTF8=1）：pytest `543/543`（70.35s）、Golden `8/8`；ruff、分层133文件零违规、API契约86/83/code_only=0、check_docs通过；admin-web `47/47` + typecheck + production build；frontend `19/19` + typecheck；时间写入/预览/接口模块mypy通过（不代表全仓类型债清零）。迁移链仍至 `0015_holiday_exception_provenance`。
-- 最近提交基线：`38d3518 fix(admin): 修复关系裁决成功重放查询错误`，已进入 dev；本轮推进时间证据职责拆分。
+- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：pytest549/549（76.60s）、Golden8/8；ruff、分层134文件零违规、API契约86/83/code_only=0；admin-web47/47+typecheck+build，frontend19/19+typecheck。任务模块4项及门面18项既有mypy类型债保留。迁移链仍至0015。
+- 最近提交基线：`c4fa989 refactor(admin): 拆分时间证据与节假日服务`，已进入 dev；本轮推进审核任务职责拆分。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-12 S7-1 时间证据（H3/O05，完成待提交）：时间写入/节假日例外生成迁至 review_time（776行），只读预览迁至 review_time_preview（245行）；时间仓储收窄11方法，门面2954→2348行，原方法AST/签名保持。新增11项事务回滚/重试/重放/intent冲突回归；543/543、Golden8/8、两端验证与门禁通过。未改业务规则、研究库、依赖或迁移；审核任务/发布等继续拆分。
+- 2026-09-12 S7-1 审核任务（H3，完成待提交）：9方法迁至519行review_tasks，门面2348→1996行；原AST/签名保持，窄化任务仓储和只读证据接口。新增6项事务回滚/重试/重放与批量部分成功测试；549/549、Golden8/8、两端回归及门禁通过。批量HTTP既有输入缺口独立登记，发布/修订生命周期仍待拆分。
+
+- 2026-09-12 S7-1 时间证据（H3/O05，已提交 c4fa989）：时间写入/节假日例外生成迁至 review_time（776行），只读预览迁至 review_time_preview（245行）；时间仓储收窄11方法，门面2954→2348行，原方法AST/签名保持。新增11项事务回滚/重试/重放/intent冲突回归；543/543、Golden8/8、两端验证与门禁通过。未改业务规则、研究库、依赖或迁移；审核任务/发布等继续拆分。
 
 - 2026-09-12 关系裁决成功重放修复（H3，已提交 38d3518）：审计目标仍为relation_id，重放改用已纳入operation_digest的请求revision_id查询；不修改历史审计。扩展既有事务测试：成功重放200且版本/全状态不变；同intent修改decision_note返回409且状态不变。专项2/2、全量532/532（64.16s）、ruff/分层131文件/相关mypy通过。本轮不重复无关前端/Golden，既有基线沿用上一片。
 
@@ -47,7 +49,7 @@
 
 ## 下一步（按顺序）
 
-1. 继续 S7-1：下一片拆分审核任务（submit/decide/decide_batch 及相关查询），随后处理发布/修订生命周期和门面收口；准备度/来源/几何/关系/时间职责已拆出；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
+1. 继续 S7-1：下一片处理发布职责（检查、准备投影、单项/批次发布、快照），随后修订生命周期和门面收口；准备度/来源/几何/关系/时间职责已拆出；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
 2. 稳定后扩展研究目录至 50–75 条 `human_verified`（G7-R1 研究最低目录门槛）。
 3. 实施 R0.2-06 按需真实 OD 子图（候选过滤→锚点真实 OD→缓存→不可变子图 hash→Revision 回放，缺边不填 0）。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；期间 G1 真实用户发现研究补证可与 R0.2–R0.4 并行、R1 前关闭。
@@ -58,6 +60,9 @@
 - 沿用 `.env` 的研究 SQLite，启动前只读确认迁移为 0015，正常应用初始化/worker 队列运行已获本轮启动指令授权；未启动 MySQL/Redis。日志在 `var/reports/services-20260911-170900/` 及 `logs/`。这是本地运行冒烟，不代表完整用户验收或远端 CI 通过。
 
 ## 活跃风险
+
+- 本轮发现既有批量审核HTTP契约缺口：BatchDecidePlaceReviewInput复用不含task_id的单项模型并禁止额外字段，应用decide_batch却依赖task_id；本片AST保持，未修改该接口。应单独修复并覆盖HTTP契约；应用层批量逐项事务已回归。
+- 审核任务模块保留从旧门面迁入的4项mypy类型债（准备度dict迭代、批量int转换/reason_text），门面剩余18项；不声明mypy整体通过。
 
 - S7-1 关系切片发现原有重放缺陷：resolve_relation 的审计 target_id 是 relation_id，但成功重放用它查询 revision，通常返回404。HEAD e293a56 同样存在；本轮已改用digest绑定的请求revision_id查询，成功重放及不同载荷intent冲突回归通过，修复已提交 38d3518。来源/无关系确认重放与此不同。
 
@@ -83,7 +88,8 @@
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
-| S7-1 时间证据（H3） | dev | `application/admin/{review,review_ports,review_time,review_time_preview}.py`、`tests/application/test_review_time_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 完成待提交；543/543、Golden8/8、两端验证与门禁通过 |
+| S7-1 审核任务（H3） | dev | `application/admin/{review,review_ports,review_tasks}.py`、`tests/application/test_review_task_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 完成待提交；549/549、Golden8/8、两端验证通过 |
+| S7-1 时间证据（H3） | dev | `application/admin/{review,review_ports,review_time,review_time_preview}.py`、`tests/application/test_review_time_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已提交 c4fa989；543/543、Golden8/8、两端验证与门禁通过 |
 | S7-1 关系裁决（H3） | dev | `application/admin/{review,review_ports,review_evidence,review_relations}.py`、`tests/application/test_review_relation_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已提交 b595ecd；532/532、Golden8/8、两端验证通过；已有关系重放缺陷单独登记 |
 | S7-1 几何/访问点与证据事务（H3） | dev | `application/admin/{review,review_ports,review_geometry,review_evidence}.py`、`tests/application/test_review_geometry_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已进入 dev（e293a56）；530/530、Golden8/8、两端验证通过，S7-1仍进行中 |
 | S7-1 准备度职责迁移（H3） | dev | `application/admin/{review,review_readiness,review_ports,review_support,review_sources}.py`、`data_governance/research_readiness.py`、`tests/application/{test_admin_review_readiness,test_review_source_boundary}.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已进入 dev（9cc9792）；524/524、Golden 8/8、admin47/47/tsc/build、frontend19/19/tsc；新模块 mypy 通过，S7-1 其余子域待拆分 |

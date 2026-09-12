@@ -333,3 +333,32 @@ class TimeCatalogRepository(Protocol):
 class TimeReviewUnitOfWork(EvidenceReviewUnitOfWork, Protocol):
     @property
     def catalog(self) -> TimeCatalogRepository: ...
+
+
+class TaskWorkflowRepository(ReviewTaskRepository, Protocol):
+    def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
+
+    def approve_revision(self, revision_id: str, *, reviewed_at: datetime) -> None: ...
+
+
+class TaskEvidenceRepository(Protocol):
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None: ...
+
+
+class ReviewTaskUnitOfWork(AuditContext, Protocol):
+    @property
+    def reviews(self) -> TaskWorkflowRepository: ...
+
+    @property
+    def catalog(self) -> TaskEvidenceRepository: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None: ...
+
+    def commit(self) -> None: ...
