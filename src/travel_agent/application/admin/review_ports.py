@@ -489,3 +489,41 @@ class RevisionLifecycleUnitOfWork(AuditContext, Protocol):
         traceback: TracebackType | None,
     ) -> bool | None: ...
     def commit(self) -> None: ...
+
+
+class ReviewQueryRepository(RevisionQueryRepository, Protocol):
+    def get_open_task_for_revision(self, revision_id: str) -> PlaceReviewTask | None: ...
+
+    def list_tasks(
+        self,
+        *,
+        status: str | None,
+        keyword: str | None,
+        admin_area: str | None,
+        place_kind: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[PlaceReviewTask, ...]: ...
+
+    def count_tasks(
+        self,
+        *,
+        status: str | None,
+        keyword: str | None = None,
+        admin_area: str | None = None,
+        place_kind: str | None = None,
+    ) -> int: ...
+
+
+class ReviewQueryUnitOfWork(Protocol):
+    @property
+    def reviews(self) -> ReviewQueryRepository: ...
+    @property
+    def catalog(self) -> TaskEvidenceRepository: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None: ...

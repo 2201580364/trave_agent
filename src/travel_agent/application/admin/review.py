@@ -8,7 +8,6 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from travel_agent.application.common.clock import Clock
-from travel_agent.application.common.errors import ResourceNotFoundError
 from travel_agent.application.planning.ports import IdGenerator
 from travel_agent.domain.admin import AdminPrincipal
 from travel_agent.domain.place_catalog import (
@@ -17,27 +16,30 @@ from travel_agent.domain.place_catalog import (
     PlaceReviewTask,
     PlaceRevision,
     PlaceRevisionEvidence,
-    PublicationBatchItem,
     ResearchSnapshot,
     SolverPlaceProjection,
 )
 
-from .audit_events import (
-    review_flow_role,
-)
-from .review_evidence import EvidenceMutationSupport
 from .review_geometry import ReviewGeometryService
 from .review_ports import ActorRepository as ActorRepository
 from .review_ports import AuditRepository as AuditRepository
 from .review_ports import ReviewRepository as ReviewRepository
 from .review_ports import ReviewUnitOfWork as ReviewUnitOfWork
 from .review_publication import PublicationService
+from .review_publication import _access_rank as _access_rank
+from .review_publication import _batch_item_response as _batch_item_response
+from .review_publication import _projection_snapshot_payload as _projection_snapshot_payload
+from .review_publication import _snapshot_response as _snapshot_response
+from .review_queries import ReviewQueryService
+from .review_queries import _optional_query as _optional_query
 from .review_readiness import evaluate_review_readiness as evaluate_review_readiness
 from .review_relations import ReviewRelationService
 from .review_revision import RevisionLifecycleService
 from .review_sources import ReviewSourceService
-from .review_support import _digest
+from .review_support import ReviewSupport
 from .review_tasks import ReviewTaskService
+from .review_tasks import _reviewer_role as _reviewer_role
+from .review_tasks import _task_digest as _task_digest
 from .review_time import (
     BuiltinHolidayCalendarCatalog,
     ReviewTimeService,
@@ -54,21 +56,7 @@ _SENSITIVE_REASON_PATTERN = re.compile(
 _OPEN_TASK_STATUSES = frozenset({"ready_for_review", "in_review", "changes_requested"})
 
 
-def _access_rank(kind: str, departure: bool) -> int:
-    order = (
-        {"visitor_exit": 0, "route_end": 1, "visitor_entrance": 2, "route_start": 3}
-        if departure
-        else {
-            "visitor_entrance": 0,
-            "route_start": 1,
-            "performance_location": 2,
-            "area_representative": 3,
-        }
-    )
-    return order.get(kind, 10)
-
-
-class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
+class PlaceReviewWorkflowService(ReviewSupport):
     def __init__(
         self,
         uow_factory: Callable[[], ReviewUnitOfWork],
@@ -89,6 +77,7 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         self._tasks = ReviewTaskService(uow_factory, clock, ids)
         self._publication = PublicationService(uow_factory, clock, ids)
         self._revisions = RevisionLifecycleService(uow_factory, clock, ids)
+        self._queries = ReviewQueryService(uow_factory)
 
     def list_holiday_calendars(self, principal: AdminPrincipal) -> tuple[HolidayCalendar, ...]:
         return self._time.list_holiday_calendars(
@@ -139,13 +128,10 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         *,
         revision_ids: tuple[str, ...],
     ) -> dict[str, PlaceRevision]:
-        self._require(principal, "place:review:read")
-        normalized = tuple(dict.fromkeys(revision_ids))
-        with self._uow_factory() as uow:
-            return {
-                revision.place_revision_id: revision
-                for revision in uow.reviews.get_revisions(normalized)
-            }
+        return self._queries.revisions_by_ids(
+            principal,
+            revision_ids=revision_ids,
+        )
 
     def list_revisions(
         self,
@@ -158,16 +144,15 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         admin_area: str | None = None,
         place_kind: str | None = None,
     ) -> tuple[PlaceRevision, ...]:
-        self._require(principal, "place:candidate:read")
-        with self._uow_factory() as uow:
-            return uow.reviews.list_revisions(
-                lifecycle_status=lifecycle_status,
-                keyword=_optional_query(keyword),
-                admin_area=_optional_query(admin_area),
-                place_kind=_optional_query(place_kind),
-                limit=limit,
-                offset=offset,
-            )
+        return self._queries.list_revisions(
+            principal,
+            lifecycle_status=lifecycle_status,
+            limit=limit,
+            offset=offset,
+            keyword=keyword,
+            admin_area=admin_area,
+            place_kind=place_kind,
+        )
 
     def count_revisions(
         self,
@@ -178,14 +163,13 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         admin_area: str | None = None,
         place_kind: str | None = None,
     ) -> int:
-        self._require(principal, "place:candidate:read")
-        with self._uow_factory() as uow:
-            return uow.reviews.count_revisions(
-                lifecycle_status=lifecycle_status,
-                keyword=_optional_query(keyword),
-                admin_area=_optional_query(admin_area),
-                place_kind=_optional_query(place_kind),
-            )
+        return self._queries.count_revisions(
+            principal,
+            lifecycle_status=lifecycle_status,
+            keyword=keyword,
+            admin_area=admin_area,
+            place_kind=place_kind,
+        )
 
     def review_readiness_by_revision_ids(
         self,
@@ -193,54 +177,15 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         *,
         revision_ids: tuple[str, ...],
     ) -> dict[str, dict[str, object]]:
-        """Return collection/review readiness without mutating workflow state."""
-
-        self._require(principal, "place:candidate:read")
-        normalized = tuple(dict.fromkeys(revision_ids))
-        with self._uow_factory() as uow:
-            result: dict[str, dict[str, object]] = {}
-            for revision_id in normalized:
-                evidence = uow.catalog.load_revision_evidence(revision_id)
-                if evidence is None:
-                    continue
-                result[revision_id] = evaluate_review_readiness(
-                    evidence,
-                    uow.reviews.get_open_task_for_revision(revision_id),
-                )
-            return result
+        return self._queries.review_readiness_by_revision_ids(
+            principal,
+            revision_ids=revision_ids,
+        )
 
     def dashboard_summary(self, principal: AdminPrincipal) -> dict[str, object]:
-        self._require(principal, "place:candidate:read")
-        with self._uow_factory() as uow:
-            candidates = uow.reviews.count_revisions(lifecycle_status="candidate")
-            verified = uow.reviews.count_revisions(lifecycle_status="human_verified")
-            published = uow.reviews.count_revisions(lifecycle_status="published")
-            tasks: dict[str, int] = {}
-            for task_status in (
-                "ready_for_review",
-                "in_review",
-                "changes_requested",
-                "approved",
-                "closed",
-            ):
-                tasks[task_status] = uow.reviews.count_tasks(status=task_status)
-            recent = uow.reviews.list_tasks(
-                status="ready_for_review",
-                keyword=None,
-                admin_area=None,
-                place_kind=None,
-                limit=5,
-                offset=0,
-            )
-            return {
-                "revisions": {
-                    "candidate": candidates,
-                    "human_verified": verified,
-                    "published": published,
-                },
-                "review_tasks": tasks,
-                "recent_ready_tasks": tuple(recent),
-            }
+        return self._queries.dashboard_summary(
+            principal,
+        )
 
     def list_source_conflicts(
         self, principal: AdminPrincipal, *, revision_id: str
@@ -323,24 +268,18 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
         )
 
     def get_revision(self, principal: AdminPrincipal, *, revision_id: str) -> PlaceRevision:
-        self._require(principal, "place:candidate:read")
-        with self._uow_factory() as uow:
-            revision = uow.reviews.get_revision(revision_id)
-            if revision is None:
-                raise ResourceNotFoundError
-            return revision
+        return self._queries.get_revision(
+            principal,
+            revision_id=revision_id,
+        )
 
     def get_revision_evidence(
         self, principal: AdminPrincipal, *, revision_id: str
     ) -> PlaceRevisionEvidence:
-        """Return revision-scoped geometry/access-point evidence for O04."""
-
-        self._require(principal, "place:candidate:read")
-        with self._uow_factory() as uow:
-            evidence = uow.catalog.load_revision_evidence(revision_id)
-            if evidence is None:
-                raise ResourceNotFoundError
-            return evidence
+        return self._queries.get_revision_evidence(
+            principal,
+            revision_id=revision_id,
+        )
 
     def list_source_channels(self, principal: AdminPrincipal) -> tuple[GovernedSourceChannel, ...]:
         return self._sources.list_source_channels(principal)
@@ -1145,84 +1084,3 @@ class PlaceReviewWorkflowService(EvidenceMutationSupport[ReviewUnitOfWork]):
 # Backward-compatible private name for existing callers while offline research
 # reporting adopts the explicit public evaluator.
 _review_readiness = evaluate_review_readiness
-
-
-def _reviewer_role(role_keys: tuple[str, ...]) -> str:
-    return review_flow_role(role_keys)
-
-
-def _optional_query(value: str | None) -> str | None:
-    normalized = value.strip() if value else ""
-    return normalized or None
-
-
-def _task_digest(task: PlaceReviewTask) -> str:
-    return _digest(
-        {
-            "review_task_id": task.review_task_id,
-            "place_revision_id": task.place_revision_id,
-            "status": task.status,
-            "version": task.version,
-        }
-    )
-
-
-def _projection_snapshot_payload(projection: SolverPlaceProjection) -> dict[str, object]:
-    """Return only immutable projection inputs for snapshot hashing."""
-    return {
-        "projection_id": projection.projection_id,
-        "projection_version": projection.projection_version,
-        "data_snapshot_version": projection.data_snapshot_version,
-        "place_id": projection.place_id,
-        "place_revision_id": projection.place_revision_id,
-        "solver_node_id": projection.solver_node_id,
-        "place_kind": projection.place_kind,
-        "geometry_kind": projection.geometry_kind,
-        "arrival_access_point_id": projection.arrival_access_point_id,
-        "departure_access_point_id": projection.departure_access_point_id,
-        "duration_min": projection.duration_min,
-        "duration_recommended": projection.duration_recommended,
-        "duration_max": projection.duration_max,
-        "internal_travel_min": projection.internal_travel_min,
-        "solver_payload": projection.solver_payload,
-        "projection_hash": projection.projection_hash,
-    }
-
-
-def _batch_item_response(
-    item: PublicationBatchItem, revision: PlaceRevision | None = None
-) -> dict[str, object]:
-    response: dict[str, object] = {
-        "batch_item_id": item.batch_item_id,
-        "place_revision_id": item.place_revision_id,
-        "status": item.status,
-        "reason_codes": list(item.reason_codes),
-        "projection_id": item.projection_id,
-        "published_at": item.published_at.isoformat() if item.published_at else None,
-    }
-    if revision is not None:
-        response.update(
-            {
-                "canonical_name": revision.canonical_name,
-                "admin_area": revision.admin_area,
-                "place_kind": revision.place_kind,
-                "category": revision.category,
-                "revision_number": revision.revision_number,
-            }
-        )
-    return response
-
-
-def _snapshot_response(snapshot: ResearchSnapshot | None) -> dict[str, object] | None:
-    if snapshot is None:
-        return None
-    return {
-        "snapshot_id": snapshot.snapshot_id,
-        "data_snapshot_version": snapshot.data_snapshot_version,
-        "city_id": snapshot.city_id,
-        "content_sha256": snapshot.content_sha256,
-        "source_batch_id": snapshot.source_batch_id,
-        "created_at": snapshot.created_at.isoformat(),
-        "status": snapshot.status,
-        "payload": snapshot.snapshot_payload,
-    }

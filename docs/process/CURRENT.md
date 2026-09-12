@@ -2,12 +2,16 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-12（S7-1 修订生命周期拆分进行中）
+- 更新时间：2026-09-12（S7-1 S7-1 查询服务拆分完成待提交）
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
-- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：pytest556/556（100.23s）、Golden8/8；ruff、分层135文件零违规、API契约86/83/code_only=0；admin-web47/47+typecheck+build，frontend19/19+typecheck；发布模块mypy通过。迁移链仍至0015。
-- 最近提交基线：`de19da3 refactor(admin): 拆分发布服务与快照事务边界`，已进入 dev；本轮推进修订生命周期拆分。
+- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：pytest563/563（110.44s）、Golden8/8；ruff、分层137文件零违规、API契约86/83/code_only=0；admin-web47/47+typecheck+build，frontend19/19+typecheck；查询模块mypy通过。迁移链仍至0015。
+- 最近提交基线：`40d4430 refactor(admin): 拆分修订生命周期与证据审核服务`，已进入 dev；本轮完成修订生命周期拆分。
 
 ## 最近三轮已完成（一行一项）
+
+- 2026-09-12 S7-1 查询服务（H3，完成待提交）：修订列表/计数、批量读取、准备度摘要、仪表盘、修订详情与证据详情迁至review_queries（约200行），门面1228→约900行；查询Protocol无写入能力。新增4项读取状态不变回归；563/563、Golden8/8、两端回归与门禁通过。S7-1进入门面收口阶段。
+
+- 2026-09-12 S7-1 修订生命周期（H3，已提交40d4430）：创建修订、编辑修订、证据核验迁至review_revision（437行），门面1568→1228行；新增3项事务回滚/重试/重放回归；pytest559/559、Golden8/8、两端回归和门禁通过。修订模块保留18项原有mypy类型债。
 
 - 2026-09-12 S7-1 发布职责（H3，已提交de19da3）：8方法迁至review_publication（640行），门面1996→1568行；PublicationUnitOfWork收窄目录17方法与修订读取接口，AST/签名保持。新增4项审计失败回滚/重试/重放回归，覆盖投影、发布、批次和快照；556/556、Golden8/8、两端回归与门禁通过。发布/修订生命周期收口仍待完成。
 
@@ -53,7 +57,7 @@
 
 ## 下一步（按顺序）
 
-1. 继续 S7-1：下一片处理剩余查询及门面收口；修订生命周期和发布职责已拆出；准备度/来源/几何/关系/时间职责已拆出；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
+1. 继续 S7-1：下一片完成S7-1门面收口并复核全部Protocol；随后进入S7-2 HTTP路由拆分；准备度/来源/几何/关系/时间职责已拆出；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
 2. 稳定后扩展研究目录至 50–75 条 `human_verified`（G7-R1 研究最低目录门槛）。
 3. 实施 R0.2-06 按需真实 OD 子图（候选过滤→锚点真实 OD→缓存→不可变子图 hash→Revision 回放，缺边不填 0）。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；期间 G1 真实用户发现研究补证可与 R0.2–R0.4 并行、R1 前关闭。
@@ -92,6 +96,7 @@
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
+| S7-1 查询服务（H3） | dev | `application/admin/{review,review_queries,review_ports}.py`、`tests/application/test_review_query_boundary.py`、CURRENT/改造计划/本月归档 | 完成待提交；563/563、Golden8/8、两端验证通过 |
 | S7-1 修订生命周期（H3） | dev | `application/admin/{review,review_revision,review_ports}.py`、`tests/application/test_review_revision_boundary.py`、CURRENT/改造计划/本月归档 | 进行中 |
 | S7-1 发布服务（H3） | dev | `application/admin/{review,review_publication,review_ports}.py`、`tests/application/test_review_publication_boundary.py`、CURRENT/改造计划/本月归档 | 已提交de19da3；556/556、Golden8/8、两端验证通过 |
 | 批量审核HTTP契约修复（H3） | dev | `interfaces/http/admin.py`、`tests/application/test_review_task_boundary.py`、`admin-web/src/api/api-schema.d.ts`、`docs/specs/api-contract.md`、CURRENT/改造计划/本月归档 | 已提交21535b2；552/552、管理端验证通过 |
