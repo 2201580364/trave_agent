@@ -280,7 +280,7 @@ PublicationService承载发布检查、投影准备、单项发布、批次预�
 
 ### 2026-09-12 S7-2 O05请求模型归位（H3）
 
-将PlaceTimeRuleInput、PlaceClosureInput、PlaceDateExceptionInput、GenerateHolidayExceptionsInput迁移至interfaces/http/admin_time_models.py；admin.py通过显式导入保持路由与OpenAPI不变。此为S7-2首个边界小片，后续O04/O05路由注册已拆出，继续拆O07/O08/O09/O17路由模块。pytest563/563、ruff、分层、check_docs通过。
+将PlaceTimeRuleInput、PlaceClosureInput、PlaceDateExceptionInput、GenerateHolidayExceptionsInput迁移至interfaces/http/admin_time_models.py；admin.py通过显式导入保持路由与OpenAPI不变。此为S7-2首个边界小片，后续O04/O05/O07/O08路由注册已拆出，继续拆O09/O17路由模块。pytest563/563、ruff、分层、check_docs通过。
 
 
 ### 2026-09-12 S7-2 O05路由注册拆分（H3）
@@ -291,3 +291,8 @@ PublicationService承载发布检查、投影准备、单项发布、批次预�
 ### 2026-09-12 S7-2 O04路由注册拆分（H3）
 
 将几何与访问点新增/编辑/停用6个路由迁移至admin_o04.py的register_o04_routes函数，admin.py保留注册调用。路径、权限、请求/响应模型和工作流调用保持；管理端HTTP回归、ruff、分层通过。
+
+
+### 2026-09-12 S7-2 O07/O08路由注册拆分（H3）
+
+将关系来源裁决、无关系确认、证据审核、审核任务列表/详情/送审/单项与批量裁决/裁决历史路由迁移至admin_o07_o08.py。通过register_o07_o08_routes注入router、review_workflow、principal_dependency，保持路径、权限、请求与响应契约。既有admin_identity_http回归、ruff、分层和文档门禁通过。

@@ -57,7 +57,7 @@
 
 ## 下一步（按顺序）
 
-1. 继续 S7-1：继续S7-2：按O07/O08、O09、O17分片；O04/O05已拆出；S7-1业务职责已拆出，门面显式兼容转发约1027行；准备度/来源/几何/关系/时间职责已拆出；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
+1. 继续 S7-1：继续S7-2：拆O09发布和O17节假日同步路由；O04/O05/O07/O08已拆出；S7-1业务职责已拆出，门面显式兼容转发约1027行；准备度/来源/几何/关系/时间职责已拆出；本地原批次剩余 027/052 两条 candidate，048 已发布场次的最晚入场晚于开始 10 分钟，需按 ADR-0025 核对。
 2. 稳定后扩展研究目录至 50–75 条 `human_verified`（G7-R1 研究最低目录门槛）。
 3. 实施 R0.2-06 按需真实 OD 子图（候选过滤→锚点真实 OD→缓存→不可变子图 hash→Revision 回放，缺边不填 0）。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；期间 G1 真实用户发现研究补证可与 R0.2–R0.4 并行、R1 前关闭。
@@ -96,6 +96,7 @@
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
+| S7-2 O07/O08路由拆分（H3） | dev | `interfaces/http/{admin,admin_o07_o08}.py`、CURRENT/改造计划/本月归档 | 完成待提交；管理端HTTP回归、ruff、分层141文件、文档门禁通过 |
 | S7-2 O04路由拆分（H3） | dev | `interfaces/http/{admin,admin_o04}.py`、CURRENT/改造计划/本月归档 | 完成待提交；管理端HTTP回归、ruff、分层通过 |
 | S7-2 O05路由拆分（H3） | dev | `interfaces/http/{admin,admin_o05,admin_time_models}.py`、CURRENT/改造计划/本月归档 | 完成待提交；现有管理端HTTP回归、ruff、分层139文件、文档门禁通过 |
 | S7-2 O05请求模型归位（H3） | dev | `interfaces/http/{admin,admin_time_models}.py`、CURRENT/改造计划/本月归档 | 完成待提交；563/563、门禁通过 |
