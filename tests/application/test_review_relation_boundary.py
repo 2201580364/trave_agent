@@ -109,6 +109,17 @@ def test_relation_audit_failure_rolls_back_then_same_intent_can_retry(
             assert relation.resolution_status == "resolved"
             assert relation.review_status == "pending"
             assert relation.reviewed_at is None
+        committed = state()
+        replay = context.client.post(url, headers=headers, json=payload)
+        assert replay.status_code == 200
+        assert replay.json()["revision_version"] == response.json()["revision_version"]
+        assert state() == committed
+        conflict = context.client.post(
+            url, headers=headers, json={**payload, "decision_note": "不同的裁决说明"}
+        )
+        assert conflict.status_code == 409
+        assert conflict.json()["error"]["code"] == "admin_operation_intent_conflict"
+        assert state() == committed
     else:
         assert response.json()["relation_review_status"] == "no_relations"
         committed = state()

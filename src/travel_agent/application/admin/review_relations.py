@@ -65,7 +65,9 @@ class ReviewRelationService(ReviewSupport):
         with self._uow_factory() as uow:
             existing = self._replay(uow, operation_intent_id, digest)
             if existing is not None:
-                revision = uow.reviews.get_revision(existing.target_id)
+                # The audit target is the relation ID; replay returns the
+                # revision being edited, which is the operation's resource.
+                revision = uow.reviews.get_revision(revision_id)
                 if revision is None:
                     raise ResourceNotFoundError
                 return revision

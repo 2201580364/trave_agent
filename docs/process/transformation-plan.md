@@ -242,3 +242,7 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 ### 2026-09-12 S7-1 关系职责切片（H3）
 
 关系裁决/无关系确认迁至 ReviewRelationService，门面保留原签名显式转发。RelationReviewUnitOfWork 只暴露关系加载/更新和必要修订审计能力；证据摘要移至 review_evidence，审核与关系共用。新关系模块200行、review.py3103→2954行。业务函数AST与原版一致，OpenAPI保持一致。两个新增事务回归覆盖审计失败回滚、失败后同intent重试和无关系确认重放；已有关系裁决成功重放ID缺陷单独登记CURRENT，未在纯重构中改变。
+
+### 2026-09-12 关系重放独立修复（H3）
+
+关系拆分已提交b595ecd；成功重放使用请求revision_id（已被operation_digest保护）查询修订，保留审计target_id为relation_id及历史记录。扩展成功重放与不同载荷intent冲突断言，专项2/2、全量532/532通过。修复完成待提交，随后继续时间证据拆分。
