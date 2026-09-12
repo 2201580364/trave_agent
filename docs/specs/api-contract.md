@@ -1359,8 +1359,8 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 
 ### 15.2.4 批量审核与 O07 关系裁决
 
-`POST /api/v1/admin/review-tasks/batch-decisions` 需要 `place:review:decide`，请求最多包含
-100 个与单项决定相同的 payload。批量采用逐项独立提交语义：响应分别返回 `succeeded` 与
+`POST /api/v1/admin/review-tasks/batch-decisions` 需要 `place:review:decide`，请求包含
+1–100 个决定项，每项包含必填 `task_id`（1–64字符）及单项决定字段（含独立 `operation_intent_id`）。单项接口仍从路径读取任务ID，不接受正文 `task_id`。批量采用逐项独立提交语义：响应分别返回 `succeeded` 与
 `failed`，失败项包含 `task_id`、`error_code` 和消息；不会把部分成功伪装为原子全成功。
 admin-web 审核队列提供勾选、统一决定、理由输入和逐项结果提示；失败项不会从用户视图中静默消失。
 admin-web Revision 详情页提供关系列表及 resolution 裁决入口，提交后按 Revision 版本刷新并提示重新送审。

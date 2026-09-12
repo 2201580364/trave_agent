@@ -124,16 +124,6 @@ def test_batch_commits_successful_items_and_retries_only_failed_items(
 ) -> None:
     context = admin_context
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
-    from travel_agent.application.admin.review_tasks import ReviewTaskService
-
-    captured = []
-    submit = ReviewTaskService.submit
-
-    def capture(service, principal, **kwargs):
-        captured.append((service, principal))
-        return submit(service, principal, **kwargs)
-
-    monkeypatch.setattr(ReviewTaskService, "submit", capture)
     items = []
     for index in range(2):
         revision_id = f"revision-batch-boundary-{index}"
@@ -172,10 +162,12 @@ def test_batch_commits_successful_items_and_retries_only_failed_items(
         if event.operation_intent_id == "batch-boundary-0":
             raise RuntimeError("simulated batch item failure")
 
-    service, principal = captured[0]
+    url = "/api/v1/admin/review-tasks/batch-decisions"
     with monkeypatch.context() as patch:
         patch.setattr(SqlAlchemyAdminAuditRepository, "add", fail_first)
-        response = service.decide_batch(principal, items=tuple(items), request_id="batch-test")
+        http_response = context.client.post(url, headers=headers, json={"items": items})
+        assert http_response.status_code == 200, http_response.text
+        response = http_response.json()
     assert len(response["succeeded"]) == len(response["failed"]) == 1
     assert response["failed"][0]["task_id"] == items[0]["task_id"]
     with context.sessions() as session:
@@ -184,9 +176,11 @@ def test_batch_commits_successful_items_and_retries_only_failed_items(
         assert first is not None and second is not None
         assert (first.status, first.version) == ("ready_for_review", 1)
         assert (second.status, second.version) == ("changes_requested", 2)
-    retried = service.decide_batch(principal, items=tuple(items), request_id="batch-retry")
+    http_retry = context.client.post(url, headers=headers, json={"items": items})
+    assert http_retry.status_code == 200, http_retry.text
+    retried = http_retry.json()
     assert len(retried["succeeded"]) == 2
-    assert retried["failed"] == ()
+    assert retried["failed"] == []
     with context.sessions() as session:
         decisions = list(session.scalars(select(PlaceReviewDecisionRow)))
         assert len(decisions) == 2
@@ -199,3 +193,33 @@ def test_batch_commits_successful_items_and_retries_only_failed_items(
                 )
             )
             assert len(audits) == 1
+
+
+@pytest.mark.parametrize("task_id", [None, "", "x" * 65])
+def test_batch_requires_bounded_task_id_before_any_write(
+    admin_context: AdminTestContext, task_id: str | None
+) -> None:
+    context = admin_context
+    _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    item = {
+        "operation_intent_id": "invalid-batch",
+        "expected_version": 1,
+        "decision_kind": "approve",
+        "reason_code": "FACTS_VERIFIED",
+    }
+    if task_id is not None:
+        item["task_id"] = task_id
+    with context.sessions() as session:
+        before = list(
+            session.scalars(select(AdminAuditEventRow.audit_event_id))
+        )
+    response = context.client.post(
+        "/api/v1/admin/review-tasks/batch-decisions", headers=headers, json={"items": [item]}
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "request_validation_failed"
+    with context.sessions() as session:
+        after = list(
+            session.scalars(select(AdminAuditEventRow.audit_event_id))
+        )
+    assert after == before

@@ -153,7 +153,7 @@
 
 | # | 任务 | 拆分对象 → 目标 | 状态 |
 |---|---|---|---|
-| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间已提交 c4fa989；审核任务服务完成待提交，发布及修订生命周期仍待拆分） |
+| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间已提交 c4fa989；审核任务服务已提交929d62a，发布及修订生命周期仍待拆分） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 3–4 个仓储 | 未开始 |
 | S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
@@ -256,3 +256,8 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 ### 2026-09-12 S7-1 审核任务切片（H3）
 
 送审、单项/批量裁决、任务列表/计数/详情/裁决历史及事务辅助方法迁入 review_tasks.py（519行）。门面同签名转发，原9方法AST保持一致，review.py2348→1996行。任务仓储复用8方法ReviewTaskRepository并增加修订读取/通过，catalog仅保留证据读取。新增6项事务回滚/重放回归含批量部分成功。保留4项由旧门面迁入的mypy类型债；独立登记原批量HTTP输入模型不接受task_id的问题，本片不改接口语义。验证见CURRENT.md。
+
+
+### 2026-09-12 批量审核HTTP输入修复（H3）
+
+为批量端点新增BatchDecidePlaceReviewItemInput，继承单项决定字段并要求task_id（1–64字符），单项路径接口保持原输入。同步API契约及生成类型；已有应用层批量事务回归改经HTTP执行，新增缺失/空/超长ID无审计写入测试。逐项权限/版本/准备度/事务/重放均沿用ReviewTaskService。此修复为独立提交片，后续继续发布服务拆分。

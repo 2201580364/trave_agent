@@ -1309,7 +1309,22 @@ export interface components {
         /** BatchDecidePlaceReviewInput */
         BatchDecidePlaceReviewInput: {
             /** Items */
-            items: components["schemas"]["DecidePlaceReviewInput"][];
+            items: components["schemas"]["BatchDecidePlaceReviewItemInput"][];
+        };
+        /** BatchDecidePlaceReviewItemInput */
+        BatchDecidePlaceReviewItemInput: {
+            /** Decision Kind */
+            decision_kind: string;
+            /** Expected Version */
+            expected_version: number;
+            /** Operation Intent Id */
+            operation_intent_id: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Text */
+            reason_text?: string | null;
+            /** Task Id */
+            task_id: string;
         };
         /** ConfirmHolidayCalendarPreviewInput */
         ConfirmHolidayCalendarPreviewInput: {

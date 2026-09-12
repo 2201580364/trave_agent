@@ -2,14 +2,16 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-12（S7-1 审核任务拆分完成待提交）
+- 更新时间：2026-09-12（S7-1 批量审核HTTP契约修复完成待提交）
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
-- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：pytest549/549（76.60s）、Golden8/8；ruff、分层134文件零违规、API契约86/83/code_only=0；admin-web47/47+typecheck+build，frontend19/19+typecheck。任务模块4项及门面18项既有mypy类型债保留。迁移链仍至0015。
-- 最近提交基线：`c4fa989 refactor(admin): 拆分时间证据与节假日服务`，已进入 dev；本轮推进审核任务职责拆分。
+- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：pytest552/552（99.99s）；ruff、分层134文件零违规、API契约86/83/code_only=0；admin-web47/47+typecheck+build。Golden8/8与frontend19/19+typecheck沿用上一片，本片未独立重跑。mypy存量债保留。迁移链仍至0015。
+- 最近提交基线：`929d62a refactor(admin): 拆分审核任务服务与事务边界`，已进入 dev；本轮推进审核任务职责拆分。
 
 ## 最近三轮已完成（一行一项）
 
-- 2026-09-12 S7-1 审核任务（H3，完成待提交）：9方法迁至519行review_tasks，门面2348→1996行；原AST/签名保持，窄化任务仓储和只读证据接口。新增6项事务回滚/重试/重放与批量部分成功测试；549/549、Golden8/8、两端回归及门禁通过。批量HTTP既有输入缺口独立登记，发布/修订生命周期仍待拆分。
+- 2026-09-12 批量审核HTTP契约修复（H3，完成待提交）：批量项新增必填task_id（1–64字符），单项模型不变；同步API契约与生成类型。原应用层批量回归改为真实HTTP，新增缺失/空/超长ID无审计写入3项。专项9/9、全量552/552、管理端47/47+tsc+build及门禁通过。无研究库/迁移/锁文件改动。
+
+- 2026-09-12 S7-1 审核任务（H3，已提交929d62a）：9方法迁至519行review_tasks，门面2348→1996行；原AST/签名保持，窄化任务仓储和只读证据接口。新增6项事务回滚/重试/重放与批量部分成功测试；549/549、Golden8/8、两端回归及门禁通过。批量HTTP既有输入缺口独立登记，发布/修订生命周期仍待拆分。
 
 - 2026-09-12 S7-1 时间证据（H3/O05，已提交 c4fa989）：时间写入/节假日例外生成迁至 review_time（776行），只读预览迁至 review_time_preview（245行）；时间仓储收窄11方法，门面2954→2348行，原方法AST/签名保持。新增11项事务回滚/重试/重放/intent冲突回归；543/543、Golden8/8、两端验证与门禁通过。未改业务规则、研究库、依赖或迁移；审核任务/发布等继续拆分。
 
@@ -61,7 +63,7 @@
 
 ## 活跃风险
 
-- 本轮发现既有批量审核HTTP契约缺口：BatchDecidePlaceReviewInput复用不含task_id的单项模型并禁止额外字段，应用decide_batch却依赖task_id；本片AST保持，未修改该接口。应单独修复并覆盖HTTP契约；应用层批量逐项事务已回归。
+- 批量审核HTTP任务ID缺口已独立修复待提交：专用批量项要求task_id，真实HTTP回归覆盖部分成功/重试；单项输入保持。
 - 审核任务模块保留从旧门面迁入的4项mypy类型债（准备度dict迭代、批量int转换/reason_text），门面剩余18项；不声明mypy整体通过。
 
 - S7-1 关系切片发现原有重放缺陷：resolve_relation 的审计 target_id 是 relation_id，但成功重放用它查询 revision，通常返回404。HEAD e293a56 同样存在；本轮已改用digest绑定的请求revision_id查询，成功重放及不同载荷intent冲突回归通过，修复已提交 38d3518。来源/无关系确认重放与此不同。
@@ -88,7 +90,8 @@
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
-| S7-1 审核任务（H3） | dev | `application/admin/{review,review_ports,review_tasks}.py`、`tests/application/test_review_task_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 完成待提交；549/549、Golden8/8、两端验证通过 |
+| 批量审核HTTP契约修复（H3） | dev | `interfaces/http/admin.py`、`tests/application/test_review_task_boundary.py`、`admin-web/src/api/api-schema.d.ts`、`docs/specs/api-contract.md`、CURRENT/改造计划/本月归档 | 完成待提交；552/552、管理端验证通过 |
+| S7-1 审核任务（H3） | dev | `application/admin/{review,review_ports,review_tasks}.py`、`tests/application/test_review_task_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已提交929d62a；549/549、Golden8/8、两端验证通过 |
 | S7-1 时间证据（H3） | dev | `application/admin/{review,review_ports,review_time,review_time_preview}.py`、`tests/application/test_review_time_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已提交 c4fa989；543/543、Golden8/8、两端验证与门禁通过 |
 | S7-1 关系裁决（H3） | dev | `application/admin/{review,review_ports,review_evidence,review_relations}.py`、`tests/application/test_review_relation_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已提交 b595ecd；532/532、Golden8/8、两端验证通过；已有关系重放缺陷单独登记 |
 | S7-1 几何/访问点与证据事务（H3） | dev | `application/admin/{review,review_ports,review_geometry,review_evidence}.py`、`tests/application/test_review_geometry_boundary.py`、`docs/process/{CURRENT,transformation-plan}.md`、本月归档 | 已进入 dev（e293a56）；530/530、Golden8/8、两端验证通过，S7-1仍进行中 |

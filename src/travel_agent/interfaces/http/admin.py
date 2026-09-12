@@ -90,9 +90,13 @@ class DecidePlaceReviewInput(BaseModel):
     reason_text: str | None = Field(default=None, max_length=500)
 
 
+class BatchDecidePlaceReviewItemInput(DecidePlaceReviewInput):
+    task_id: str = Field(min_length=1, max_length=64)
+
+
 class BatchDecidePlaceReviewInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    items: tuple[DecidePlaceReviewInput, ...] = Field(min_length=1, max_length=100)
+    items: tuple[BatchDecidePlaceReviewItemInput, ...] = Field(min_length=1, max_length=100)
 
 
 class CreatePlaceRevisionInput(BaseModel):
