@@ -95,6 +95,7 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
+| S7-3 仓储职责拆分（H3，完成待门禁） | dev | `infrastructure/database/{place_catalog,place_catalog_reads,place_catalog_ports}.py`、CURRENT/改造计划/本月归档 | 进行中 |
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
 | S7-2 O09路由拆分（H3） | dev | `interfaces/http/{admin,admin_o09}.py`、CURRENT/改造计划/本月归档 | 完成待提交；管理端HTTP回归、ruff、分层通过 |
 | S7-2 O07/O08路由拆分（H3） | dev | `interfaces/http/{admin,admin_o07_o08}.py`、CURRENT/改造计划/本月归档 | 完成待提交；管理端HTTP回归、ruff、分层141文件、文档门禁通过 |
