@@ -156,7 +156,7 @@
 | S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间已提交 c4fa989；审核任务服务已提交929d62a，发布服务已提交de19da3；修订生命周期完成回归收尾；查询已拆出；门面收口仍待完成） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 5 个仓储边界 + 兼容门面 | 实现完成待提交 |
-| S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
+| S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 几何辅助首片完成待提交 |
 | S7-5 | `GET /api/v1/trips` N+1 修复：仓储层批量接口（`get_many` / `count_by_trip_ids`） | app.py:461-480 | 未开始 |
 
 **执行纪律**：每个子任务=独立提交；只搬移不改逻辑；每片完成跑全量（pytest 432 + Vitest 41 + typecheck + build + golden）；违反即回滚该片。
