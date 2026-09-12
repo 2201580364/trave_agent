@@ -9,6 +9,8 @@ from typing import Protocol, Self
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent
 from travel_agent.domain.place_catalog import (
     PlaceAccessPoint,
+    PlaceClosure,
+    PlaceDateException,
     PlaceGeometry,
     PlaceRelation,
     PlaceReviewDecision,
@@ -16,6 +18,7 @@ from travel_agent.domain.place_catalog import (
     PlaceRevision,
     PlaceRevisionEvidence,
     PlaceSourceRecord,
+    PlaceTimeRule,
 )
 from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 
@@ -247,3 +250,86 @@ class RelationCatalogRepository(Protocol):
 class RelationReviewUnitOfWork(EvidenceReviewUnitOfWork, Protocol):
     @property
     def catalog(self) -> RelationCatalogRepository: ...
+
+
+class TimeCatalogRepository(Protocol):
+    def create_time_rule(
+        self,
+        rule: PlaceTimeRule,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def update_time_rule(
+        self,
+        rule: PlaceTimeRule,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def delete_time_rule(
+        self,
+        time_rule_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def retire_time_rule(
+        self,
+        time_rule_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def create_closure(
+        self,
+        closure: PlaceClosure,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def update_closure(
+        self,
+        closure: PlaceClosure,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def retire_closure(
+        self,
+        closure_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def create_date_exception(
+        self,
+        exception: PlaceDateException,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def update_date_exception(
+        self,
+        exception: PlaceDateException,
+        *,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def retire_date_exception(
+        self,
+        date_exception_id: str,
+        *,
+        place_revision_id: str,
+        expected_revision_version: int,
+    ) -> PlaceRevision: ...
+
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None: ...
+
+
+class TimeReviewUnitOfWork(EvidenceReviewUnitOfWork, Protocol):
+    @property
+    def catalog(self) -> TimeCatalogRepository: ...
