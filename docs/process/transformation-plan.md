@@ -296,3 +296,8 @@ PublicationService承载发布检查、投影准备、单项发布、批次预�
 ### 2026-09-12 S7-2 O07/O08路由注册拆分（H3）
 
 将关系来源裁决、无关系确认、证据审核、审核任务列表/详情/送审/单项与批量裁决/裁决历史路由迁移至admin_o07_o08.py。通过register_o07_o08_routes注入router、review_workflow、principal_dependency，保持路径、权限、请求与响应契约。既有admin_identity_http回归、ruff、分层和文档门禁通过。
+
+
+### 2026-09-12 S7-2 O09路由注册拆分（H3）
+
+将单项发布、投影准备、发布批次预览/执行、研究快照列表/详情及发布检查路由迁移至admin_o09.py的register_o09_routes函数。admin.py保留调用点，发布路径、权限、请求/响应和应用服务调用保持；管理端HTTP回归、ruff、分层通过。

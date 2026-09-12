@@ -11,7 +11,6 @@ from fastapi import (
     APIRouter,
     Depends,
     Header,
-    HTTPException,
     Query,
     Request,
     Response,
@@ -24,7 +23,6 @@ from travel_agent.application.admin import (
     AdminIdentityService,
     PlaceReviewWorkflowService,
 )
-from travel_agent.application.admin.errors import AdminPermissionDeniedError
 from travel_agent.application.admin.holiday_calendar_sync import (
     ChinaHolidayCalendarSyncService,
 )
@@ -362,142 +360,9 @@ def build_admin_router(
             "expires_at": current.expires_at.isoformat(),
         }
 
-    if holiday_calendar_sync is not None:
+    from .admin_o17 import register_o17_routes
 
-        @router.get("/holiday-calendar-sync-capability")
-        def get_holiday_calendar_sync_capability(
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:read"):
-                raise AdminPermissionDeniedError
-            return {
-                "execution_available": holiday_calendar_sync.execution_available,
-                "region_code": "CN",
-            }
-
-        @router.post("/holiday-calendar-sync-jobs", status_code=status.HTTP_202_ACCEPTED)
-        def create_holiday_calendar_sync_job(
-            payload: CreateHolidayCalendarSyncJobInput,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:write"):
-                raise AdminPermissionDeniedError
-            if not holiday_calendar_sync.job_submission_available:
-                raise HTTPException(
-                    status.HTTP_503_SERVICE_UNAVAILABLE,
-                    "节假日历自动同步执行服务尚未启用",
-                )
-            job = holiday_calendar_sync.create_job(
-                year=payload.year,
-                mode=payload.mode,
-                operation_intent_id=payload.operation_intent_id,
-                created_by=current.admin_actor_id,
-            )
-            return _holiday_sync_job_response(job)
-
-        @router.get("/holiday-calendar-sync-jobs")
-        def list_holiday_calendar_sync_jobs(
-            year: int | None = Query(default=None, ge=2000, le=2200),
-            job_status: str | None = Query(default=None, alias="status", max_length=32),
-            limit: int = Query(default=50, ge=1, le=100),
-            offset: int = Query(default=0, ge=0),
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:read"):
-                raise AdminPermissionDeniedError
-            jobs = holiday_calendar_sync.list_jobs(
-                year=year, status=job_status, limit=limit, offset=offset
-            )
-            return {
-                "items": [_holiday_sync_job_response(job) for job in jobs],
-                "limit": limit,
-                "offset": offset,
-            }
-
-        @router.get("/holiday-calendar-sync-jobs/{job_id}")
-        def get_holiday_calendar_sync_job(
-            job_id: str,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:read"):
-                raise AdminPermissionDeniedError
-            return _holiday_sync_job_response(holiday_calendar_sync.get_job(job_id))
-
-        @router.post("/holiday-calendar-sync-jobs/{job_id}/cancel")
-        def cancel_holiday_calendar_sync_job(
-            job_id: str,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:write"):
-                raise AdminPermissionDeniedError
-            return _holiday_sync_job_response(
-                holiday_calendar_sync.cancel_job(job_id, cancelled_by=current.admin_actor_id)
-            )
-
-        @router.post("/holiday-calendar-sync-jobs/{job_id}/confirm")
-        def confirm_holiday_calendar_preview(
-            job_id: str,
-            payload: ConfirmHolidayCalendarPreviewInput,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:write"):
-                raise AdminPermissionDeniedError
-            return _holiday_sync_job_response(
-                holiday_calendar_sync.confirm_preview(
-                    job_id=job_id,
-                    periods=[item.model_dump(mode="json") for item in payload.periods],
-                    adjusted_workdays=[
-                        item.model_dump(mode="json") for item in payload.adjusted_workdays
-                    ],
-                    operation_intent_id=payload.operation_intent_id,
-                    confirmed_by=current.admin_actor_id,
-                )
-            )
-
-        @router.get("/holiday-calendars/{calendar_id}")
-        def get_holiday_calendar_detail(
-            calendar_id: str,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:read"):
-                raise AdminPermissionDeniedError
-            return _holiday_calendar_version_response(
-                holiday_calendar_sync.get_calendar(calendar_id)
-            )
-
-        @router.get("/holiday-calendars/{calendar_id}/impact")
-        def get_holiday_calendar_impact(
-            calendar_id: str,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            if not current.has_permission("holiday:calendar:read"):
-                raise AdminPermissionDeniedError
-            impact = holiday_calendar_sync.get_calendar_impact(calendar_id)
-            return {
-                "calendar_id": impact.calendar_id,
-                "compared_calendar_id": impact.compared_calendar_id,
-                "changed_date_count": impact.changed_date_count,
-                "added_holiday_dates": [item.isoformat() for item in impact.added_holiday_dates],
-                "removed_holiday_dates": [
-                    item.isoformat() for item in impact.removed_holiday_dates
-                ],
-                "added_adjusted_workdays": [
-                    item.isoformat() for item in impact.added_adjusted_workdays
-                ],
-                "removed_adjusted_workdays": [
-                    item.isoformat() for item in impact.removed_adjusted_workdays
-                ],
-                "affected_places": [
-                    {
-                        "place_revision_id": item[0],
-                        "place_name": item[1],
-                        "admin_area": item[2],
-                        "materialized_exception_count": item[3],
-                    }
-                    for item in impact.affected_places
-                ],
-                "historical_rows_without_provenance_excluded": True,
-            }
+    register_o17_routes(router, holiday_calendar_sync, principal_dependency)
 
     @router.get("/admin-actors")
     def list_admin_actors(
@@ -807,115 +672,9 @@ def build_admin_router(
 
         register_o05_routes(router, review_workflow, principal_dependency)
 
-        @router.post("/place-revisions/{revision_id}/publications")
-        def publish_place_revision(
-            revision_id: str,
-            payload: PublishPlaceRevisionInput,
-            request: Request,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            projection = review_workflow.publish_revision(
-                current,
-                revision_id=revision_id,
-                operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code,
-                reason_text=payload.reason_text,
-                request_id=request.state.request_id,
-            )
-            return {
-                "projection_id": projection.projection_id,
-                "place_revision_id": projection.place_revision_id,
-                "data_snapshot_version": projection.data_snapshot_version,
-                "status": projection.status,
-                "published_at": (
-                    projection.published_at.isoformat() if projection.published_at else None
-                ),
-            }
+        from .admin_o09 import register_o09_routes
 
-        @router.post("/place-revisions/{revision_id}/projection-preparations")
-        def prepare_place_revision_projection(
-            revision_id: str,
-            payload: PrepareProjectionInput,
-            request: Request,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            projection = review_workflow.prepare_projection(
-                current,
-                revision_id=revision_id,
-                data_snapshot_version=payload.data_snapshot_version,
-                solver_node_id=payload.solver_node_id,
-                operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code,
-                reason_text=payload.reason_text,
-                request_id=request.state.request_id,
-            )
-            return {
-                "projection_id": projection.projection_id,
-                "place_revision_id": projection.place_revision_id,
-                "status": projection.status,
-                "projection_hash": projection.projection_hash,
-                "gate_reason_codes": list(projection.gate_reason_codes),
-            }
-
-        @router.post("/publication-batches/previews", status_code=status.HTTP_201_CREATED)
-        def preview_publication_batch(
-            payload: PreviewPublicationBatchInput,
-            request: Request,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            return review_workflow.preview_publication_batch(
-                current,
-                city_id=payload.city_id,
-                revision_ids=payload.place_revision_ids,
-                operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code,
-                reason_text=payload.reason_text,
-                request_id=request.state.request_id,
-            )
-
-        @router.post("/publication-batches/{batch_id}/execute")
-        def execute_publication_batch(
-            batch_id: str,
-            payload: ExecutePublicationBatchInput,
-            request: Request,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            return review_workflow.execute_publication_batch(
-                current,
-                batch_id=batch_id,
-                operation_intent_id=payload.operation_intent_id,
-                reason_code=payload.reason_code,
-                reason_text=payload.reason_text,
-                request_id=request.state.request_id,
-            )
-
-        @router.get("/research-snapshots")
-        def list_research_snapshots(
-            current: AdminPrincipal = principal_dependency,
-            city_id: str | None = Query(default=None, max_length=64),
-            limit: int = Query(default=50, ge=1, le=100),
-            offset: int = Query(default=0, ge=0),
-        ) -> dict[str, object]:
-            snapshots = review_workflow.list_research_snapshots(
-                current, city_id=city_id, limit=limit, offset=offset
-            )
-            return {
-                "items": [
-                    _snapshot_api_response(item, include_payload=False) for item in snapshots
-                ],
-                "limit": limit,
-                "offset": offset,
-            }
-
-        @router.get("/research-snapshots/{snapshot_id}")
-        def get_research_snapshot(
-            snapshot_id: str,
-            current: AdminPrincipal = principal_dependency,
-        ) -> dict[str, object]:
-            return _snapshot_api_response(
-                review_workflow.get_research_snapshot(current, snapshot_id=snapshot_id),
-                include_payload=True,
-            )
+        register_o09_routes(router, review_workflow, principal_dependency)
 
         @router.get(
             "/candidates",
