@@ -280,4 +280,9 @@ PublicationService承载发布检查、投影准备、单项发布、批次预�
 
 ### 2026-09-12 S7-2 O05请求模型归位（H3）
 
-将PlaceTimeRuleInput、PlaceClosureInput、PlaceDateExceptionInput、GenerateHolidayExceptionsInput迁移至interfaces/http/admin_time_models.py；admin.py通过显式导入保持路由与OpenAPI不变。此为S7-2首个边界小片，后续继续拆O05路由注册。pytest563/563、ruff、分层、check_docs通过。
+将PlaceTimeRuleInput、PlaceClosureInput、PlaceDateExceptionInput、GenerateHolidayExceptionsInput迁移至interfaces/http/admin_time_models.py；admin.py通过显式导入保持路由与OpenAPI不变。此为S7-2首个边界小片，后续O05路由注册已拆出，继续拆O04/O07-O09/O17路由模块。pytest563/563、ruff、分层、check_docs通过。
+
+
+### 2026-09-12 S7-2 O05路由注册拆分（H3）
+
+将O05时间规则、闭馆日、日期例外、节假日生成、预览和审核路由注册函数迁移至admin_o05.py。模块通过register_o05_routes(router, review_workflow, principal_dependency)接收既有装配依赖，admin.py保留调用点，路径、权限、响应和OpenAPI保持。与admin_time_models首片合计完成待提交，后续按同模式拆O04/O07-O09/O17。

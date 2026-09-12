@@ -2,9 +2,9 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-12（S7-2 HTTP路由拆分进行中）
+- 更新时间：2026-09-12（S7-2 HTTP路由拆分进行中（O05首片完成待提交））
 - 当前节点：`M1 后段 / Gate 7 / OM1 / G7-R0.2-05-03 + R0.2-07（多地点审核基线，R0.2-09 O17 已提交）；transformation-plan S8-1/2/3 阶段交付已进入 dev（a657504 / dc5d1ea / 361cc37；响应类型迁移与 S8-4 E2E 未完成），审计规范化 AUD-1～4 已进入 dev（04c2d35），几何证据报错修复已进入 dev（7dda0f7）；S7-1 已启动（用户批准 10 条批次，027/052 已排除；cec78fd 远端全绿由用户确认）`
-- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：pytest563/563（87.45s）；ruff、分层137文件零违规、API契约86/83/code_only=0、check_docs通过；O05模型模块导入与管理端现有HTTP回归通过。迁移链仍至0015。
+- 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：O05路由/模型专项与管理端HTTP回归通过；ruff、分层139文件零违规、check_docs通过。完整后端/Golden/两端基线沿用上一片，迁移链仍至0015。
 - 最近提交基线：`40d4430 refactor(admin): 拆分修订生命周期与证据审核服务`，已进入 dev；本轮完成修订生命周期拆分。
 
 ## 最近三轮已完成（一行一项）
@@ -96,6 +96,7 @@
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
+| S7-2 O05路由拆分（H3） | dev | `interfaces/http/{admin,admin_o05,admin_time_models}.py`、CURRENT/改造计划/本月归档 | 完成待提交；现有管理端HTTP回归、ruff、分层139文件、文档门禁通过 |
 | S7-2 O05请求模型归位（H3） | dev | `interfaces/http/{admin,admin_time_models}.py`、CURRENT/改造计划/本月归档 | 完成待提交；563/563、门禁通过 |
 | S7-1 查询服务（H3） | dev | `application/admin/{review,review_queries,review_ports}.py`、`tests/application/test_review_query_boundary.py`、CURRENT/改造计划/本月归档 | 完成待提交；563/563、Golden8/8、两端验证通过 |
 | S7-1 修订生命周期（H3） | dev | `application/admin/{review,review_revision,review_ports}.py`、`tests/application/test_review_revision_boundary.py`、CURRENT/改造计划/本月归档 | 进行中 |
