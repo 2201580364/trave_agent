@@ -8,6 +8,7 @@ from typing import Protocol, Self
 
 from travel_agent.domain.admin import AdminActor, AdminAuditEvent
 from travel_agent.domain.place_catalog import (
+    Place,
     PlaceAccessPoint,
     PlaceClosure,
     PlaceDateException,
@@ -19,6 +20,11 @@ from travel_agent.domain.place_catalog import (
     PlaceRevisionEvidence,
     PlaceSourceRecord,
     PlaceTimeRule,
+    ProjectionPublicationContext,
+    PublicationBatch,
+    PublicationBatchItem,
+    ResearchSnapshot,
+    SolverPlaceProjection,
 )
 from travel_agent.domain.place_catalog.repositories import PlaceCatalogRepository
 
@@ -351,6 +357,73 @@ class ReviewTaskUnitOfWork(AuditContext, Protocol):
 
     @property
     def catalog(self) -> TaskEvidenceRepository: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None: ...
+
+    def commit(self) -> None: ...
+
+
+class PublicationCatalogRepository(Protocol):
+    def add_publication_batch(self, batch: PublicationBatch) -> None: ...
+
+    def add_publication_batch_item(self, item: PublicationBatchItem) -> None: ...
+
+    def list_publication_batch_items(self, batch_id: str) -> tuple[PublicationBatchItem, ...]: ...
+
+    def update_publication_batch_item(self, item: PublicationBatchItem) -> None: ...
+
+    def update_publication_batch(self, batch: PublicationBatch) -> None: ...
+
+    def add_research_snapshot(self, snapshot: ResearchSnapshot) -> None: ...
+
+    def get_publication_batch(self, batch_id: str) -> PublicationBatch | None: ...
+
+    def get_research_snapshot(self, snapshot_id: str) -> ResearchSnapshot | None: ...
+
+    def list_research_snapshots(
+        self, *, city_id: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[ResearchSnapshot, ...]: ...
+
+    def add_projection(self, projection: SolverPlaceProjection) -> None: ...
+
+    def get_place(self, place_id: str) -> Place | None: ...
+
+    def get_projection(self, projection_id: str) -> SolverPlaceProjection | None: ...
+
+    def get_projection_for_revision(
+        self, place_revision_id: str
+    ) -> SolverPlaceProjection | None: ...
+
+    def next_solver_node_id(self, data_snapshot_version: str, *, minimum: int = 1) -> int: ...
+
+    def load_revision_evidence(self, place_revision_id: str) -> PlaceRevisionEvidence | None: ...
+
+    def load_publication_context(
+        self, projection_id: str
+    ) -> ProjectionPublicationContext | None: ...
+
+    def publish_projection(
+        self, projection_id: str, *, published_at: datetime
+    ) -> SolverPlaceProjection: ...
+
+
+class PublicationRevisionRepository(Protocol):
+    def get_revision(self, revision_id: str) -> PlaceRevision | None: ...
+
+
+class PublicationUnitOfWork(AuditContext, Protocol):
+    @property
+    def reviews(self) -> PublicationRevisionRepository: ...
+
+    @property
+    def catalog(self) -> PublicationCatalogRepository: ...
 
     def __enter__(self) -> Self: ...
 

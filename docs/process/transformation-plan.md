@@ -19,7 +19,7 @@
 | S4 | 依赖锁定 + 文档对齐实现 | **已完成（2026-09-05）** | 无（可并行） | 0.5 天 |
 | S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **已完成（2026-09-07，S6-4 合并由用户完成：941578e / fae014e）** | S3 | 1–2 天 |
-| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-1 审核任务职责）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
+| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-1 发布职责）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
 | S8 | 用户端补测 + 契约对照 | **阶段交付（2026-09-10 核对：S8-1/2/3 已进入 dev；响应类型迁移未完、S8-4 待 R0.3，frontend Vitest CI 配置已完成待提交）** | S3 | 3–5 天 |
 
 > 状态取值：`未开始` → `进行中` → `已完成` / `阻塞`（附原因）。每完成一项，更新本表并在 CURRENT.md 登记一行。
@@ -153,7 +153,7 @@
 
 | # | 任务 | 拆分对象 → 目标 | 状态 |
 |---|---|---|---|
-| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间已提交 c4fa989；审核任务服务已提交929d62a，发布及修订生命周期仍待拆分） |
+| S7-1 | `application/admin/review.py`（3443 行）→ 按子域拆为 review_readiness / review_sources / review_geometry / review_relations / publication / retirement；`PlaceReviewWorkflowService` 退化为编排门面；`ReviewRepository` 按子域收窄为多个 Protocol | 6 个模块 | 进行中（2026-09-12：准备度首片完成；来源/准备度已提交 9cc9792；几何/访问点已提交 e293a56；关系已提交 b595ecd，重放修复已提交 38d3518；时间已提交 c4fa989；审核任务服务已提交929d62a，发布服务已迁移并回归收尾；修订生命周期/查询与门面收口仍待完成） |
 | S7-2 | `interfaces/http/admin.py`（2011 行）→ 按 O00/O04/O07/O09/O17 路由分文件 + Pydantic 模型归位各路由模块 | 5 个路由模块 | 未开始 |
 | S7-3 | `infrastructure/database/place_catalog.py`（1706 行）→ 按聚合根拆仓储 | 3–4 个仓储 | 未开始 |
 | S7-4 | `admin-web/src/pages/RevisionDetailsPage.tsx`（1999 行）→ 按证据面板拆组件（来源/几何/访问点/开放时间/关系/发布准备区） | 6+ 组件 | 未开始 |
@@ -261,3 +261,8 @@ S7-1 拆分准备：review.py 已增长至约 4,000 行，不能沿用原 3,443 
 ### 2026-09-12 批量审核HTTP输入修复（H3）
 
 为批量端点新增BatchDecidePlaceReviewItemInput，继承单项决定字段并要求task_id（1–64字符），单项路径接口保持原输入。同步API契约及生成类型；已有应用层批量事务回归改经HTTP执行，新增缺失/空/超长ID无审计写入测试。逐项权限/版本/准备度/事务/重放均沿用ReviewTaskService。此修复为独立提交片，后续继续发布服务拆分。
+
+
+### 2026-09-12 S7-1 发布职责切片（H3）
+
+PublicationService承载发布检查、投影准备、单项发布、批次预览/执行及快照查询，原8方法AST保持；新模块640行，门面1996→1568行，公开签名保持转发。PublicationUnitOfWork限制修订接口为get_revision，目录接口为实际使用的17方法。新增4项审计异常回滚/同intent重试/成功重放测试，覆盖修订、投影、批次、批次项及快照同事务。保留发布门禁与原幂等逻辑，最终验证见CURRENT.md。
