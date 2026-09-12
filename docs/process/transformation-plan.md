@@ -19,7 +19,7 @@
 | S4 | 依赖锁定 + 文档对齐实现 | **已完成（2026-09-05）** | 无（可并行） | 0.5 天 |
 | S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **已完成（2026-09-07，S6-4 合并由用户完成：941578e / fae014e）** | S3 | 1–2 天 |
-| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-1 门面收口）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
+| S7 | 上帝类拆分（代码健康切片） | **进行中（S7-2 HTTP路由拆分）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
 | S8 | 用户端补测 + 契约对照 | **阶段交付（2026-09-10 核对：S8-1/2/3 已进入 dev；响应类型迁移未完、S8-4 待 R0.3，frontend Vitest CI 配置已完成待提交）** | S3 | 3–5 天 |
 
 > 状态取值：`未开始` → `进行中` → `已完成` / `阻塞`（附原因）。每完成一项，更新本表并在 CURRENT.md 登记一行。
@@ -276,3 +276,8 @@ PublicationService承载发布检查、投影准备、单项发布、批次预�
 ### 2026-09-12 S7-1 查询职责切片（H3）
 
 只读查询迁至review_queries：revisions_by_ids、list/count_revisions、review_readiness_by_revision_ids、dashboard_summary、get_revision、get_revision_evidence。查询服务无写仓储能力，门面同签名转发，新增4项HTTP读取状态不变测试。review.py降至约900行，S7-1尚差门面收口与Protocol复核。
+
+
+### 2026-09-12 S7-2 O05请求模型归位（H3）
+
+将PlaceTimeRuleInput、PlaceClosureInput、PlaceDateExceptionInput、GenerateHolidayExceptionsInput迁移至interfaces/http/admin_time_models.py；admin.py通过显式导入保持路由与OpenAPI不变。此为S7-2首个边界小片，后续继续拆O05路由注册。pytest563/563、ruff、分层、check_docs通过。
