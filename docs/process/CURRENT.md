@@ -97,7 +97,7 @@
 |---|---|---|---|
 | S7-4 O04完整组件迁移（H3） | dev | `admin-web/src/pages/{GeometryAccessEvidenceCard,RevisionDetailsPage,revisionDetailFields}.tsx`、`revisionDetailDisplay.ts`、CURRENT/改造计划/本月归档 | 实现完成待提交；47/47、typecheck、build通过 |
 | S7-4 来源证据组件（H3） | dev | `admin-web/src/pages/{RevisionDetailsPage,SourceEvidenceCard,revisionDetailFields}.tsx`、`revisionDetailDisplay.ts`、CURRENT/改造计划/本月归档 | 进行中 |
-| S7-3 仓储职责拆分（H3，已提交 bca173f）；S7-4 管理端详情页拆分进行中（O04 几何/访问点完整组件迁移已提交；O05 时间证据完整组件迁移已提交；O07 关系证据完整组件迁移已提交；O06 来源冲突与验证汇总组件完成待提交） | dev | `infrastructure/database/{place_catalog,place_catalog_reads,place_catalog_ports}.py`、CURRENT/改造计划/本月归档 | 进行中 |
+| S7-3 仓储职责拆分（H3，已提交 bca173f）；S7-4 管理端详情页拆分进行中（O04 几何/访问点完整组件迁移已提交；O05 时间证据完整组件迁移已提交；O07 关系证据完整组件迁移已提交；O06 来源冲突与验证汇总组件已提交；发布阻断计算组件完成待提交） | dev | `infrastructure/database/{place_catalog,place_catalog_reads,place_catalog_ports}.py`、CURRENT/改造计划/本月归档 | 进行中 |
 | 关系裁决重放修复（H3） | dev | `application/admin/review_relations.py`、`tests/application/test_review_relation_boundary.py`、CURRENT/改造计划/本月归档 | 已提交 38d3518；专项2/2、后端532/532、ruff/分层/mypy通过 |
 | S7-2 O09路由拆分（H3） | dev | `interfaces/http/{admin,admin_o09}.py`、CURRENT/改造计划/本月归档 | 完成待提交；管理端HTTP回归、ruff、分层通过 |
 | S7-2 O07/O08路由拆分（H3） | dev | `interfaces/http/{admin,admin_o07_o08}.py`、CURRENT/改造计划/本月归档 | 完成待提交；管理端HTTP回归、ruff、分层141文件、文档门禁通过 |
