@@ -28,6 +28,7 @@ from travel_agent.solver import (
     AttractionPreference,
     Coordinate,
     DailyWeather,
+    OnDemandODSubgraphBuilder,
     TimeBucket,
     TravelMode,
     TravelTimeProvider,
@@ -106,6 +107,11 @@ class ProductionSolverGateway:
             if _stable_hash(request.input_snapshot) != request.input_snapshot_hash:
                 raise ValueError("generation input snapshot hash does not match")
             prepared = _prepare_input(request.input_snapshot, snapshot)
+            subgraph = OnDemandODSubgraphBuilder().build(
+                tuple(item.id for item in prepared.attractions),
+                snapshot.travel_time_provider,
+                created_at=self._clock.now(),
+            )
             step1 = assign_days(
                 prepared.preferences,
                 trip_dates=prepared.trip_dates,
@@ -115,7 +121,7 @@ class ProductionSolverGateway:
             )
             itinerary = route_itinerary(
                 step1,
-                snapshot.travel_time_provider,
+                subgraph.provider(),
                 weather_by_date=prepared.weather,
             )
             quality = evaluate_solver_quality(itinerary, prepared.attractions)
@@ -143,6 +149,9 @@ class ProductionSolverGateway:
                 elapsed_ms=elapsed_ms,
                 created_at=self._clock.now(),
             )
+            audit_payload = audit.to_dict()
+            audit_payload["od_subgraph_hash"] = subgraph.snapshot_hash
+            audit_payload["od_subgraph_edge_count"] = len(subgraph.entries)
             partial = bool(itinerary.unplaced or itinerary.data_rejected)
             completion = (
                 CompletionKind.PARTIAL_SUCCESS if partial else CompletionKind.COMPLETE_SUCCESS
@@ -157,7 +166,7 @@ class ProductionSolverGateway:
                 SOLVER_CONTRACT_VERSION,
                 CONSTRAINT_VERSION,
                 PARAMETER_VERSION,
-                audit.to_dict(),
+                audit_payload,
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise SolverExecutionError("invalid_solver_input", retryable=False) from exc

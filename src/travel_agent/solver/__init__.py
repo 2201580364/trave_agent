@@ -110,6 +110,7 @@ from .routing import (
     validate_routed_day,
 )
 from .segments import route_segmented_day
+from .subgraph import ODSubgraphSnapshot, OnDemandODSubgraphBuilder
 from .time_windows import evaluate_arrival, resolve_effective_window
 from .transport import (
     ApproximateTravelTimeProvider,
@@ -201,6 +202,8 @@ __all__ = [
     "TravelMode",
     "TravelTimeProvider",
     "TravelTimeResult",
+    "ODSubgraphSnapshot",
+    "OnDemandODSubgraphBuilder",
     "TripTimeAnchors",
     "UnplacedAttraction",
     "VisitExpectation",
