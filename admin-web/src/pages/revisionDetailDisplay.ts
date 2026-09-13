@@ -60,3 +60,14 @@ export function sourceRecordReferences(evidence: PlaceRevisionEvidence | null, s
 export function isFormValidationError(value: unknown): boolean {
   return typeof value === 'object' && value !== null && 'errorFields' in value
 }
+
+export function reviewStatusColor(value: string): string | undefined {
+  if (value === 'human_verified') return 'success'
+  if (value === 'rejected') return 'error'
+  return undefined
+}
+
+
+export function formatOptionalDateTime(value: string | null): string {
+  return value ? formatDateTime(value) : '未发生'
+}

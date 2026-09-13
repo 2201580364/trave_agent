@@ -17,3 +17,7 @@ export function SourceRecordField({ sources = [], sourceChannels, required = tru
   const options = [...sources.map((source) => ({ value: source.source_record_id, label: sourceRecordBusinessLabel(source, sourceChannels) })), ...(extraOption ? [extraOption] : [])]
   return <Form.Item name="source_record_id" label={<FieldLabel label="来源记录" hint="普通证据选择当前地点的有效来源；按法定节假日历生成时，可直接使用该年度日历的官方来源。" />} rules={required ? [{ required: true }] : []}><Select showSearch optionFilterProp="label" options={options} placeholder={extraOption ? '可选择地点来源，也可使用法定节假日历官方来源' : '选择当前地点的有效来源'} /></Form.Item>
 }
+
+export function InstructionHint({ text }: { text: string }) {
+  return <Tooltip title={text}><ExclamationCircleFilled style={{ color: '#d89614', fontSize: 17, cursor: 'help' }} aria-label="填写提示" /></Tooltip>
+}
