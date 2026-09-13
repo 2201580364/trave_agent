@@ -112,11 +112,7 @@ class InMemoryTripRepository(_InMemoryAddRepository):
         offset: int,
     ) -> tuple[Trip, ...]:
         matching = sorted(
-            (
-                trip
-                for trip in self._trip_records.values()
-                if trip.principal_id == principal_id
-            ),
+            (trip for trip in self._trip_records.values() if trip.principal_id == principal_id),
             key=lambda trip: (-trip.updated_at.timestamp(), trip.trip_id),
         )
         return tuple(matching[offset : offset + limit])
@@ -130,10 +126,7 @@ class InMemoryTripRepository(_InMemoryAddRepository):
         current = self._trip_records.get(record.trip_id)
         if current is None:
             raise ValueError("trip_id does not exist")
-        if (
-            expected_revision_id is not None
-            and current.current_revision_id != expected_revision_id
-        ):
+        if expected_revision_id is not None and current.current_revision_id != expected_revision_id:
             raise TripRevisionConflictError
         self._trip_records[record.trip_id] = record
 
@@ -142,6 +135,14 @@ class InMemoryTripRevisionRepository(_InMemoryAddRepository):
     def __init__(self, records: dict[str, TripRevision]) -> None:
         super().__init__(records, "trip_revision_id")
         self._revision_records = records
+
+    def count_by_trip_ids(self, trip_ids: tuple[str, ...]) -> dict[str, int]:
+        return {
+            trip_id: sum(
+                1 for revision in self._revision_records.values() if revision.trip_id == trip_id
+            )
+            for trip_id in trip_ids
+        }
 
     def list_by_trip(self, trip_id: str) -> tuple[TripRevision, ...]:
         return tuple(
@@ -235,6 +236,7 @@ class InMemoryFeedbackRepository:
             raise FeedbackIntentConflictError
         self._records[feedback.feedback_id] = feedback
 
+
 class InMemoryUnitOfWork:
     def __init__(self, store: InMemoryPlanningStore) -> None:
         self._store = store
@@ -255,12 +257,8 @@ class InMemoryUnitOfWork:
             self._working.generation_intents
         )
         self.trips = InMemoryTripRepository(self._working.trips)
-        self.trip_revisions = InMemoryTripRevisionRepository(
-            self._working.trip_revisions
-        )
-        self.solver_runs = _InMemoryAddRepository(
-            self._working.solver_runs, "solver_run_id"
-        )
+        self.trip_revisions = InMemoryTripRevisionRepository(self._working.trip_revisions)
+        self.solver_runs = _InMemoryAddRepository(self._working.solver_runs, "solver_run_id")
         self.plan_shares = InMemoryPlanShareRepository(self._working.plan_shares)
         self.feedbacks = InMemoryFeedbackRepository(self._working.feedbacks)
         self._committed = False

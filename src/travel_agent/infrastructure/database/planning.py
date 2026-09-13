@@ -7,7 +7,7 @@ from datetime import date, datetime
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import JSON, Boolean, Integer, String, UniqueConstraint, select, update
+from sqlalchemy import JSON, Boolean, Integer, String, UniqueConstraint, func, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import (
@@ -293,6 +293,17 @@ class SqlAlchemyTripRevisionRepository(
 ):
     def __init__(self, session: Session) -> None:
         super().__init__(session, TripRevisionRow, _revision_from_row, _revision_values)
+
+    def count_by_trip_ids(self, trip_ids: tuple[str, ...]) -> dict[str, int]:
+        if not trip_ids:
+            return {}
+        rows = self._session.execute(
+            select(TripRevisionRow.trip_id, func.count(TripRevisionRow.trip_revision_id))
+            .where(TripRevisionRow.trip_id.in_(trip_ids))
+            .group_by(TripRevisionRow.trip_id)
+        )
+        counts = {trip_id: int(count) for trip_id, count in rows}
+        return {trip_id: counts.get(trip_id, 0) for trip_id in trip_ids}
 
     def list_by_trip(self, trip_id: str) -> tuple[TripRevision, ...]:
         rows = self._session.scalars(

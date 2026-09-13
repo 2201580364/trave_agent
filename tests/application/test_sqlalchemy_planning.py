@@ -201,10 +201,14 @@ def test_trip_and_revision_queries_are_owned_ordered_and_paginated(
             "principal_1", limit=2, offset=2
         )
         trip_revisions = uow.trip_revisions.list_by_trip("trip_b")
+        revision_counts = uow.trip_revisions.count_by_trip_ids(
+            ("trip_a", "trip_b", "trip_missing")
+        )
 
     assert [trip.trip_id for trip in first_page] == ["trip_a", "trip_b"]
     assert [trip.trip_id for trip in second_page] == ["trip_old"]
     assert [revision.revision_number for revision in trip_revisions] == [2, 1]
+    assert revision_counts == {"trip_a": 0, "trip_b": 2, "trip_missing": 0}
 
 
 def test_uncommitted_completion_products_are_rolled_back(tmp_path: Path) -> None:

@@ -181,14 +181,17 @@ class SubmitNodeFeedbackInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     feedback_intent_id: str = Field(min_length=1, max_length=64)
     rating: Literal["like", "dislike"]
-    reason_code: Literal[
-        "arrangement_good",
-        "time_too_tight",
-        "travel_too_far",
-        "time_period_wrong",
-        "duration_wrong",
-        "attraction_data_error",
-    ] | None = None
+    reason_code: (
+        Literal[
+            "arrangement_good",
+            "time_too_tight",
+            "travel_too_far",
+            "time_period_wrong",
+            "duration_wrong",
+            "attraction_data_error",
+        ]
+        | None
+    ) = None
     comment: str | None = Field(default=None, max_length=500)
 
 
@@ -315,15 +318,13 @@ def create_app(container: HttpContainer) -> FastAPI:
         payload: CreateDraftInput,
         principal: str = Depends(principal_id),
     ) -> dict[str, object]:
-        result = CreateDraftHandler(
-            container.uow_factory(), container.clock, container.ids
-        ).handle(CreateDraft(principal, payload.city_id))
+        result = CreateDraftHandler(container.uow_factory(), container.clock, container.ids).handle(
+            CreateDraft(principal, payload.city_id)
+        )
         return _draft_response(result.draft)
 
     @app.get("/api/v1/trip-drafts/{draft_id}")
-    def get_draft(
-        draft_id: str, principal: str = Depends(principal_id)
-    ) -> dict[str, object]:
+    def get_draft(draft_id: str, principal: str = Depends(principal_id)) -> dict[str, object]:
         with container.uow_factory() as uow:
             draft = uow.drafts.get(draft_id)
             if draft is None or draft.principal_id != principal:
@@ -373,9 +374,7 @@ def create_app(container: HttpContainer) -> FastAPI:
             )
             for item in payload.visit_period_preferences
         )
-        result = ReplaceAttractionSelectionHandler(
-            container.uow_factory(), container.clock
-        ).handle(
+        result = ReplaceAttractionSelectionHandler(container.uow_factory(), container.clock).handle(
             ReplaceAttractionSelection(
                 principal,
                 draft_id,
@@ -387,9 +386,7 @@ def create_app(container: HttpContainer) -> FastAPI:
         return _draft_response(result.draft)
 
     @app.get("/api/v1/trip-drafts/{draft_id}/review")
-    def review_draft(
-        draft_id: str, principal: str = Depends(principal_id)
-    ) -> dict[str, object]:
+    def review_draft(draft_id: str, principal: str = Depends(principal_id)) -> dict[str, object]:
         with container.uow_factory() as uow:
             draft = uow.drafts.get(draft_id)
             if draft is None or draft.principal_id != principal:
@@ -471,12 +468,15 @@ def create_app(container: HttpContainer) -> FastAPI:
                 offset=offset,
             )
             visible = trips[:limit]
+            revision_counts = uow.trip_revisions.count_by_trip_ids(
+                tuple(trip.trip_id for trip in visible)
+            )
             items = []
             for trip in visible:
                 revision = uow.trip_revisions.get(trip.current_revision_id)
                 if revision is None or revision.trip_id != trip.trip_id:
                     raise RuntimeError("trip current revision invariant is broken")
-                revision_count = len(uow.trip_revisions.list_by_trip(trip.trip_id))
+                revision_count = revision_counts.get(trip.trip_id, 0)
                 items.append(_trip_summary_response(trip, revision, revision_count))
         return {
             "items": items,
@@ -486,9 +486,7 @@ def create_app(container: HttpContainer) -> FastAPI:
         }
 
     @app.get("/api/v1/trips/{trip_id}")
-    def get_trip(
-        trip_id: str, principal: str = Depends(principal_id)
-    ) -> dict[str, object]:
+    def get_trip(trip_id: str, principal: str = Depends(principal_id)) -> dict[str, object]:
         with container.uow_factory() as uow:
             trip = uow.trips.get(trip_id)
             if trip is None or trip.principal_id != principal:
@@ -672,9 +670,7 @@ def create_app(container: HttpContainer) -> FastAPI:
             "revision_id": result.share.revision_id,
             "share_schema_version": result.share.share_schema_version,
             "share_token": result.public_token,
-            "share_path": (
-                "/pages/plan-share-view/index?token=" f"{result.public_token}"
-            ),
+            "share_path": (f"/pages/plan-share-view/index?token={result.public_token}"),
             "published_at": result.share.published_at.isoformat(),
             "reused": result.reused,
             "content": result.share.share_snapshot,
@@ -826,26 +822,16 @@ def _revision_summary_response(
 def _snapshot_overview(snapshot: dict[str, object]) -> dict[str, object]:
     raw_days = snapshot.get("days")
     days = (
-        [item for item in raw_days if isinstance(item, dict)]
-        if isinstance(raw_days, list)
-        else []
+        [item for item in raw_days if isinstance(item, dict)] if isinstance(raw_days, list) else []
     )
-    dates = [
-        item["date"]
-        for item in days
-        if isinstance(item.get("date"), str)
-    ]
+    dates = [item["date"] for item in days if isinstance(item.get("date"), str)]
     raw_summary = snapshot.get("summary")
     summary = raw_summary if isinstance(raw_summary, dict) else {}
     raw_scheduled = summary.get("scheduled_count")
     scheduled_count = (
         raw_scheduled
         if isinstance(raw_scheduled, int) and not isinstance(raw_scheduled, bool)
-        else sum(
-            len(nodes)
-            for day in days
-            if isinstance((nodes := day.get("nodes")), list)
-        )
+        else sum(len(nodes) for day in days if isinstance((nodes := day.get("nodes")), list))
     )
     raw_unplaced = snapshot.get("unplaced")
     unplaced_count = len(raw_unplaced) if isinstance(raw_unplaced, list) else 0
