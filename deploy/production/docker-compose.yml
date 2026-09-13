@@ -1,6 +1,47 @@
-name: travel-agent-infra
+name: travel-agent
 
 services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/production/api.Dockerfile
+    restart: unless-stopped
+    expose: ["8000"]
+    env_file: [/etc/travel-agent/app.env]
+    networks: [backend, frontend]
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  migrate:
+    build:
+      context: ../..
+      dockerfile: deploy/production/api.Dockerfile
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    profiles: ["tools"]
+    env_file: [/etc/travel-agent/migrate.env]
+    networks: [backend]
+    depends_on:
+      mysql: { condition: service_healthy }
+  user-h5:
+    build:
+      context: ../..
+      dockerfile: deploy/production/web.Dockerfile
+    restart: unless-stopped
+    networks: [frontend]
+  admin-web:
+    build:
+      context: ../..
+      dockerfile: deploy/production/admin-web.Dockerfile
+    restart: unless-stopped
+    networks: [frontend]
+  edge:
+    image: caddy:2.9.1-alpine
+    restart: unless-stopped
+    ports: ["80:80"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [frontend]
+    depends_on: [api, user-h5, admin-web]
   mysql:
     image: mysql:8.0
     container_name: travel-agent-mysql
@@ -82,6 +123,9 @@ services:
       - backend
 
 networks:
+  frontend:
+    name: travel-agent-frontend
+    driver: bridge
   backend:
     name: travel-agent-backend
     driver: bridge

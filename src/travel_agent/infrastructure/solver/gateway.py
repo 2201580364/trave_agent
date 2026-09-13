@@ -152,6 +152,7 @@ class ProductionSolverGateway:
             audit_payload = audit.to_dict()
             audit_payload["od_subgraph_hash"] = subgraph.snapshot_hash
             audit_payload["od_subgraph_edge_count"] = len(subgraph.entries)
+            audit_payload["od_subgraph_snapshot"] = subgraph.to_dict()
             partial = bool(itinerary.unplaced or itinerary.data_rejected)
             completion = (
                 CompletionKind.PARTIAL_SUCCESS if partial else CompletionKind.COMPLETE_SUCCESS

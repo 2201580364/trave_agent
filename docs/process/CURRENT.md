@@ -2,7 +2,7 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-13（R0.2-06 按需 OD 子图首片实现中）
+- 更新时间：2026-09-13（R0.2-06 回放与 R0.3 Compose 首片完成，待服务器参数）
 - 当前节点：`M1 后段 / Gate 7 / OM1；S7-1~S7-5 全部完成；G7-R0.2-05-03/R0.2-07 批次与 R0.2-06 按需 OD 子图推进中；S8-1/2/3 阶段交付，S8-4 E2E 未完成`
 - 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：O05路由/模型专项与管理端HTTP回归通过；ruff、分层139文件零违规、check_docs通过。完整后端/Golden/两端基线沿用上一片，迁移链仍至0015。
 - 最近提交基线：用户已提交此前 S7 分片；本轮补齐 S7-5 批量计数回归、S7-4 地点资料卡组件与全量账本收口，尚未执行 Git 提交。
@@ -62,7 +62,7 @@
 3. 实施 R0.2-06 按需真实有向 OD 子图：候选过滤、真实 OD 获取、缓存、不可变子图 hash、Revision 回放，缺边不填 0。
 4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；G1 真实用户发现研究可并行准备，并在 R1 外部招募前关闭。
 
-本轮已实现 R0.2-06 首片并接入真实求解路径：`OnDemandODSubgraphBuilder` 根据实际输入节点提取有向 OD，求解器仅使用该子图，保留缺失边、拒绝混合 data version，并生成 SHA-256 snapshot hash；hash 与边数写入 SolverRun 审计载荷。专项子图/求解器回归 13/13 通过。后续需增加不可变子图持久化表与历史回放读取入口。
+本轮完成 R0.2-06 求解接入与回放快照，专项子图/求解器回归 13/13 通过；新增 R0.3 首片 `api.Dockerfile`、`web.Dockerfile`、`admin-web.Dockerfile`、`Caddyfile`，并将 Compose 扩展为 api/user-h5/admin-web/edge 与 MySQL/Redis 同一项目。Docker 未安装于本机，Compose 构建/健康检查待服务器执行。
 
 ## 本地运行验证（2026-09-11）
 

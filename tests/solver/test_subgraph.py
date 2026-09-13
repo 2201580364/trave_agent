@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from travel_agent.solver import (
     InMemoryTravelTimeProvider,
     ODBasis,
+    ODSubgraphSnapshot,
     ODTravelMode,
     OnDemandODSubgraphBuilder,
     TravelTimeResult,
@@ -30,6 +31,7 @@ def test_on_demand_subgraph_is_deterministic_and_keeps_missing_edges_missing() -
     assert first.snapshot_hash
     assert first.provider().get_travel_time(1, 3) is None
     assert first.provider().get_travel_time(1, 2).travel_min == 8
+    assert ODSubgraphSnapshot.from_dict(first.to_dict()) == first
 
 
 def test_subgraph_rejects_mixed_versions() -> None:
