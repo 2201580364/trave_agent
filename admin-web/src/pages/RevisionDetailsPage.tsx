@@ -1,3 +1,4 @@
+import { RevisionActionBar } from './RevisionActionBar'
 import { formatDateTime } from './revisionDetailDisplay'
 import { SourceConflictCard, VerificationSummaryCard } from './SourceConflictAndSummary'
 import { RelationEvidenceCard } from './RelationEvidenceCard'
@@ -337,6 +338,7 @@ export function RevisionDetailsPage() {
             O03：核对候选地点的业务事实、生命周期和当前发布阻断摘要。
           </Typography.Paragraph>
         </div>
+        <RevisionActionBar>
         <Space wrap>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(reviewContext ? '/review' : '/candidates')}>
             {reviewContext ? '返回地点审核' : '返回候选地点'}
@@ -405,6 +407,7 @@ export function RevisionDetailsPage() {
             刷新
           </Button>
         </Space>
+        </RevisionActionBar>
       </div>
 
       {error !== null && <ErrorNotice message={error} onClose={() => setError(null)} />}
