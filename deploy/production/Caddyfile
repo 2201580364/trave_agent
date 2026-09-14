@@ -9,8 +9,16 @@
     X-Frame-Options DENY
     Referrer-Policy no-referrer
   }
-  handle_path /api/* { reverse_proxy api:8000 }
-  handle /health/* { reverse_proxy api:8000 }
-  handle_path /admin/* { reverse_proxy admin-web:80 }
-  handle { reverse_proxy user-h5:80 }
+  handle_path /api/* {
+    reverse_proxy api:8000
+  }
+  handle /health/* {
+    reverse_proxy api:8000
+  }
+  handle_path /admin/* {
+    reverse_proxy admin-web:80
+  }
+  handle {
+    reverse_proxy user-h5:80
+  }
 }

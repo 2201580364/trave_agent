@@ -6,4 +6,4 @@ COPY frontend ./
 RUN npm run build:h5
 FROM caddy:2.9.1-alpine
 COPY --from=build /app/dist /srv/user
-COPY deploy/production/Caddyfile /etc/caddy/Caddyfile
+RUN printf '%s\n' ':80 {' '    root * /srv/user' '    try_files {path} /index.html' '    file_server' '}' > /etc/caddy/Caddyfile

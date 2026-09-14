@@ -9,8 +9,8 @@ slow_query_log=ON
 long_query_time=1
 slow_query_log_file=/var/lib/mysql/slow-query.log
 
-max_connections=50
-innodb_buffer_pool_size=256M
+max_connections=20
+innodb_buffer_pool_size=128M
 innodb_flush_log_at_trx_commit=1
 sync_binlog=1
 

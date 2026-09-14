@@ -2,20 +2,18 @@ name: travel-agent
 
 services:
   api:
-    build:
-      context: ../..
-      dockerfile: deploy/production/api.Dockerfile
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260914
     restart: unless-stopped
     expose: ["8000"]
     env_file: [/etc/travel-agent/app.env]
+    volumes:
+      - /srv/travel-agent/data/published:/srv/travel-agent/data/published:ro
     networks: [backend, frontend]
     depends_on:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
   migrate:
-    build:
-      context: ../..
-      dockerfile: deploy/production/api.Dockerfile
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260914
     command: ["python", "-m", "alembic", "upgrade", "head"]
     profiles: ["tools"]
     env_file: [/etc/travel-agent/migrate.env]
@@ -23,21 +21,17 @@ services:
     depends_on:
       mysql: { condition: service_healthy }
   user-h5:
-    build:
-      context: ../..
-      dockerfile: deploy/production/web.Dockerfile
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:user-h5-20260914
     restart: unless-stopped
     networks: [frontend]
   admin-web:
-    build:
-      context: ../..
-      dockerfile: deploy/production/admin-web.Dockerfile
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:admin-web-20260914
     restart: unless-stopped
     networks: [frontend]
   edge:
     image: caddy:2.9.1-alpine
     restart: unless-stopped
-    ports: ["80:80"]
+    ports: ["${TRAVEL_AGENT_EDGE_BIND:-0.0.0.0}:${TRAVEL_AGENT_EDGE_PORT:-18080}:80"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     networks: [frontend]
@@ -46,9 +40,9 @@ services:
     image: mysql:8.0
     container_name: travel-agent-mysql
     restart: unless-stopped
-    mem_limit: 768m
-    mem_reservation: 384m
-    cpus: 1.5
+    mem_limit: 384m
+    mem_reservation: 192m
+    cpus: 1.0
     pids_limit: 256
     stop_grace_period: 60s
     environment:
@@ -86,9 +80,9 @@ services:
     image: redis:7.4-alpine
     container_name: travel-agent-redis
     restart: unless-stopped
-    mem_limit: 192m
-    mem_reservation: 64m
-    cpus: 0.5
+    mem_limit: 96m
+    mem_reservation: 32m
+    cpus: 0.25
     pids_limit: 128
     stop_grace_period: 30s
     user: "999:999"
