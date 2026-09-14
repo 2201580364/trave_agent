@@ -13,7 +13,6 @@ from fastapi import FastAPI
 
 from travel_agent.infrastructure.database import DatabaseSettings
 from travel_agent.infrastructure.holiday_sync import HolidaySyncSettings
-from travel_agent.infrastructure.memory import FixedDataSnapshotVersionProvider
 from travel_agent.infrastructure.solver import JsonPublishedSolverDataProvider
 from travel_agent.runtime_config import load_runtime_environment
 
@@ -115,7 +114,7 @@ class ProductionHttpSettings:
 
 
 def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
-    """Build the HTTP application from a current or explicit fallback snapshot."""
+    """Build HTTP app backed by the live published database catalog."""
 
     published_data = JsonPublishedSolverDataProvider(
         settings.published_snapshot.root,
@@ -131,27 +130,14 @@ def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
             candidate = published_data.load(version)
             if candidate.city_id != settings.published_snapshot.city_id:
                 raise ValueError(f"published solver snapshot city mismatch: {version}")
+            selected = candidate
+            break
         except (LookupError, ValueError) as exc:
             failures.append(str(exc))
-            continue
-        selected = candidate
-        break
     if selected is None:
-        detail = "; ".join(failures)
-        raise ValueError(f"no valid published solver snapshot is available: {detail}")
-    fallback_used = selected.version != settings.published_snapshot.version
-    if fallback_used:
-        logger.error(
-            "published snapshot fallback activated",
-            extra={
-                "component": "http.production",
-                "requested_snapshot_version": settings.published_snapshot.version,
-                "selected_snapshot_version": selected.version,
-            },
-        )
-    snapshot_versions = FixedDataSnapshotVersionProvider(
-        {settings.published_snapshot.city_id: selected.version}
-    )
+        raise ValueError(f"no valid published solver snapshot is available: {'; '.join(failures)}")
+    # JSON remains an empty-database fallback; published rows are resolved per request.
+    fallback_version = selected.version
     app = cast(
         FastAPI,
         build_http_app(
@@ -162,11 +148,15 @@ def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
                 settings.admin_bootstrap_password,
                 settings.holiday_sync,
             ),
-            snapshot_versions,
-            published_data,
+            None,
+            published_fallback=published_data,
+            published_city_id=settings.published_snapshot.city_id,
+            published_fallback_version=fallback_version,
         ),
     )
     app.state.published_snapshot_requested_version = settings.published_snapshot.version
     app.state.published_snapshot_selected_version = selected.version
-    app.state.published_snapshot_fallback_used = fallback_used
+    app.state.published_snapshot_fallback_used = (
+        selected.version != settings.published_snapshot.version
+    )
     return app

@@ -387,7 +387,7 @@ def test_alembic_head_adds_admin_tables_and_seeds_role_catalog(tmp_path: Path) -
             for row in connection.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
         }
 
-    assert revision == "0015_holiday_exception_provenance"
+        assert revision == "0016_expand_alembic_version"
     assert set(roles) == {
         "admin_security",
         "content_moderator",

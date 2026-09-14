@@ -38,7 +38,7 @@ const HolidayCalendarsPage = lazy(() =>
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/admin">
       <AdminSessionProvider>
         <Suspense
           fallback={

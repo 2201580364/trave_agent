@@ -42,6 +42,8 @@ from travel_agent.infrastructure.ids import UuidIdGenerator
 from travel_agent.infrastructure.memory import SystemClock
 from travel_agent.infrastructure.sharing import HmacPlanShareTokenCodec
 from travel_agent.infrastructure.solver import (
+    DatabasePublishedSnapshotVersionProvider,
+    DatabasePublishedSolverDataProvider,
     ProductionSolverGateway,
     PublishedSolverDataProvider,
 )
@@ -85,12 +87,31 @@ class HttpSettings:
 
 def build_http_app(
     settings: HttpSettings,
-    snapshots: DataSnapshotVersionProvider,
-    published_data: PublishedSolverDataProvider,
+    snapshots: DataSnapshotVersionProvider | None,
+    published_data: PublishedSolverDataProvider | None = None,
+    *,
+    published_fallback: PublishedSolverDataProvider | None = None,
+    published_city_id: str = "hangzhou",
+    published_fallback_version: str = "hangzhou-local-v1",
 ):
     engine = build_engine(settings.database)
     sessions = build_session_factory(engine)
+    if published_data is None:
+        if published_fallback is None:
+            raise ValueError("published fallback provider is required")
+        published_data = DatabasePublishedSolverDataProvider(
+            sessions,
+            city_id=published_city_id,
+            fallback=published_fallback,
+            fallback_version=published_fallback_version,
+        )
+        snapshots = DatabasePublishedSnapshotVersionProvider(
+            sessions,
+            fallback_version=published_fallback_version,
+        )
     ensure_builtin_holiday_calendar_seeds(sessions)
+    if snapshots is None:
+        raise ValueError("snapshot version provider is required")
     clock = SystemClock()
     ids = UuidIdGenerator()
 
