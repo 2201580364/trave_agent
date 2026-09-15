@@ -210,6 +210,6 @@ def test_share_shows_session_start_and_hides_internal_session_identity():
     created = CreatePlanShareHandler(
         InMemoryUnitOfWork(store), FixedClock(), SequenceIdGenerator(), _tokens()
     ).handle(CreatePlanShare("principal_owner", "session-share", "trip_1", "revision_1"))
-    assert created.share.share_snapshot["days"][0]["items"][1]["fixed_time"] == "18:30"
+    assert created.share.share_snapshot["days"][0]["items"][1]["fixed_time"] == "18:20 入场 · 18:30"
     assert "internal-session" not in json.dumps(created.share.share_snapshot)
     assert "selected_session" not in json.dumps(created.share.share_snapshot)

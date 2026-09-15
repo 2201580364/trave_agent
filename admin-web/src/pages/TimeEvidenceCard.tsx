@@ -251,8 +251,10 @@ export function TimeEvidenceCard({
           <Alert
             showIcon
             type="warning"
-            title="演出地点必须使用固定场次规则"
-            description="开放时间只能说明可营业时段；演出、灯光秀等地点还需要明确的开始时间和结束时间，并将规则类型设置为“固定场次”。"
+            title={evidence?.time_rules.some((item) => item.active) ? '演出地点需核验固定场次' : '演出地点必须使用固定场次规则'}
+            description={evidence?.time_rules.some((item) => item.active)
+              ? '当前已有固定场次记录；请逐条核对其来源和时间，确认最晚入场早于结束时间后再送审。'
+              : '开放时间只能说明可营业时段；演出、灯光秀等地点需要新增明确开始和结束时间的“固定场次”规则。'}
           />
         )}
         <div className="time-preview-toolbar">

@@ -203,7 +203,13 @@ def _public_share_snapshot(city_id: str, revision) -> dict[str, object]:
             if fixed:
                 selected = raw_node.get("selected_session")
                 start = selected.get("start_min") if isinstance(selected, dict) else None
-                item["fixed_time"] = _minute_label(start if isinstance(start, int) else arrival_min)
+                public_start = start if isinstance(start, int) else arrival_min
+                entry = selected.get("entry_min") if isinstance(selected, dict) else None
+                item["fixed_time"] = (
+                    f"{_minute_label(entry)} 入场 · {_minute_label(public_start)}"
+                    if isinstance(entry, int) and entry != public_start
+                    else _minute_label(public_start)
+                )
             items.append(item)
         raw_weather = raw_day.get("weather")
         weather = raw_weather if isinstance(raw_weather, dict) else {}
