@@ -400,7 +400,7 @@ def _rebalance_od_cluster_sizes(
         largest = max(map(len, mutable))
         smallest = min(map(len, mutable))
         candidates: list[
-            tuple[Fraction, Fraction, int, tuple[int, ...], tuple[int, ...], int, int]
+            tuple[int, Fraction, Fraction, int, tuple[int, ...], tuple[int, ...], int, int]
         ] = []
         for donor_index, donor in enumerate(mutable):
             if len(donor) != largest:
@@ -416,12 +416,15 @@ def _rebalance_od_cluster_sizes(
                         provider,
                     )
                     gained_affinity = _average_attraction_cluster_cost(
-                        attraction,
-                        recipient,
-                        provider,
+                        attraction, recipient, provider
                     )
+                    protected_pair = bool(donor_others) and min(
+                        _symmetric_od_cost(attraction.id, other.id, provider)
+                        for other in donor_others
+                    ) <= 10
                     candidates.append(
                         (
+                            int(protected_pair),
                             gained_affinity - lost_affinity,
                             gained_affinity,
                             attraction.id,
@@ -431,10 +434,13 @@ def _rebalance_od_cluster_sizes(
                             recipient_index,
                         )
                     )
+        unprotected = [item for item in candidates if item[0] == 0]
+        if unprotected:
+            candidates = unprotected
         if not candidates:
             raise RuntimeError("unable to rebalance OD clusters")
         selected = min(candidates)
-        attraction_id = selected[2]
+        attraction_id = selected[3]
         donor_index = selected[-2]
         recipient_index = selected[-1]
         attraction = next(item for item in mutable[donor_index] if item.id == attraction_id)
@@ -486,6 +492,11 @@ def _rebalance_od_cluster_durations(
                     if improvement <= 0:
                         continue
                     donor_others = [item for item in donor if item.id != attraction.id]
+                    if donor_others and min(
+                        _symmetric_od_cost(attraction.id, other.id, provider)
+                        for other in donor_others
+                    ) <= 10:
+                        continue
                     od_penalty = _average_attraction_cluster_cost(
                         attraction,
                         recipient,

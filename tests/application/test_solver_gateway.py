@@ -570,6 +570,36 @@ def test_od_clusters_move_one_visit_when_duration_balance_costs_little_od() -> N
     assert durations == [210, 290, 300]
 
 
+def test_hangzhou_landmark_cluster_keeps_adjacent_pairs_together() -> None:
+    """Regression for the seven-place user report (灵隐/飞来峰 and 西湖 pair)."""
+    coordinates = {
+        1: Coordinate(30.258255, 120.152633),  # 平湖秋月
+        2: Coordinate(30.264614, 120.158261),  # 断桥残雪
+        3: Coordinate(30.257361, 120.150259),  # 孤山馆区
+        4: Coordinate(30.246861, 120.111776),  # 灵隐寺
+        5: Coordinate(30.246768, 120.111615),  # 飞来峰
+        6: Coordinate(30.272668, 120.052628),  # 西溪
+        7: Coordinate(30.243454, 120.177818),  # 清河坊
+    }
+    attractions = tuple(
+        Attraction(index, f"landmark-{index}", suggested_duration=60, data_verified=True)
+        for index in coordinates
+    )
+    provider = ApproximateTravelTimeProvider(
+        coordinates,
+        speed_kmh=18,
+        detour_ratio=1.6,
+        minimum_travel_min=5,
+        data_version="hangzhou-regression-od-v1",
+        fetched_at=NOW,
+    )
+    clusters = _cluster_attractions_by_od(attractions, 3, provider)
+    cluster_ids = [set(item.id for item in cluster) for cluster in clusters]
+
+    assert any({1, 2}.issubset(cluster) for cluster in cluster_ids)
+    assert any({4, 5}.issubset(cluster) for cluster in cluster_ids)
+
+
 def test_missing_published_snapshot_is_retryable() -> None:
     gateway = ProductionSolverGateway(InMemoryPublishedSolverDataProvider(()), FixedClock())
 
