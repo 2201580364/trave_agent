@@ -71,3 +71,4 @@ data/
 - AGENTS.md 正本变更后 → 运行 `python scripts/sync_agents_docs.py` 同步 CLAUDE.md 等派生入口
 
 - [ADR-0025：show 多场次求解与候选时间规则删除](decisions/ADR-0025-show-sessions-and-candidate-time-rule-deletion.md)：H3/C2，多场次选择、候选删除与审核停用边界。
+- [ADR-0026：固定场次允许开场后入场](decisions/ADR-0026-fixed-session-late-entry.md)：H3/C2/C4/C6，入场与实际观看开始早于结束，保留原始时间。

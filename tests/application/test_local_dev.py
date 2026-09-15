@@ -283,7 +283,7 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path, show: b
         attraction = published.attractions[0].attraction
         assert attraction.time_rules == ()
         assert [s.session_id for s in attraction.fixed_sessions] == ["show-early", "show-late"]
-        assert attraction.fixed_sessions[0].entry_min == 1080
+        assert attraction.fixed_sessions[0].entry_min == 1090
 
 
 def test_database_published_provider_loads_reviewed_selection_constraints(tmp_path: Path) -> None:

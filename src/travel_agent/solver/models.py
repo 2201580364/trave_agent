@@ -270,8 +270,8 @@ class FixedSession:
     def __post_init__(self) -> None:
         if not self.session_id or not 0 <= self.start_min < self.end_min <= 2880:
             raise ValueError("fixed session identity or times are invalid")
-        if self.last_entry_min is not None and not 0 <= self.last_entry_min <= self.start_min:
-            raise ValueError("fixed session last entry must not be after its start")
+        if self.last_entry_min is not None and not 0 <= self.last_entry_min < self.end_min:
+            raise ValueError("fixed session last entry must be before its end")
         if not self.weekdays or self.weekdays.difference(range(1, 8)):
             raise ValueError("fixed session weekdays must be ISO weekdays")
         if self.valid_from and self.valid_to and self.valid_from > self.valid_to:

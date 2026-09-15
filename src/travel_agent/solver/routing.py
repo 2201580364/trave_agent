@@ -96,7 +96,10 @@ def route_day(
         minimum_duration = math.ceil(
             allocation.attraction.suggested_duration * DEFAULT_DURATION_RATIO
         )
-        if allocation.required_duration_min < minimum_duration:
+        if (
+            not allocation.attraction.fixed_sessions
+            and allocation.required_duration_min < minimum_duration
+        ):
             raise ValueError("allocation duration must satisfy the C2 minimum ratio")
 
     manager = pywrapcp.RoutingIndexManager(len(allocations) + 1, 1, 0)
@@ -128,6 +131,8 @@ def route_day(
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
         service_min = allocations[from_node - 1].required_duration_min if from_node else 0
+        if from_node and allocations[from_node - 1].attraction.fixed_sessions:
+            service_min = 1
         if from_node == 0 or to_node == 0:
             return service_min
         travel = provider.get_travel_time(
@@ -167,13 +172,12 @@ def route_day(
                 )
                 if day_plan.bounds.start_min <= item.entry_min
                 and item.end_min <= day_plan.bounds.end_min
-                and item.end_min - item.start_min >= allocation.required_duration_min
             )
             routing.AddDisjunction([index], drop_penalty)
             if not sessions:
                 routing.ActiveVar(index).SetValue(0)
                 continue
-            # One routing node, disjoint exact entry times; service covers the complete show.
+            # One node, discrete entry instants; reserve entry until the session end.
             # For identical entry instants, the shortest complete feasible session is canonical.
             duration_by_entry: dict[int, int] = {}
             for session in sessions:
@@ -187,7 +191,7 @@ def route_day(
                 ]
             )
             routing.solver().Add(
-                time_dimension.SlackVar(index) >= duration - allocation.required_duration_min
+                time_dimension.SlackVar(index) >= duration - 1
             )
             routing.AddVariableMinimizedByFinalizer(cumul)
             continue
@@ -297,7 +301,6 @@ def route_day(
                     day_plan.visit_date,
                 )
                 if item.entry_min == arrival_min
-                and item.end_min - item.start_min >= allocation.required_duration_min
             ),
             None,
         )
@@ -435,7 +438,10 @@ def validate_routed_day(
                         attraction.id,
                     )
                 )
-        minimum_duration = math.ceil(attraction.suggested_duration * DEFAULT_DURATION_RATIO)
+        minimum_duration = (
+            1 if attraction.fixed_sessions
+            else math.ceil(attraction.suggested_duration * DEFAULT_DURATION_RATIO)
+        )
         if (
             visit.planned_duration_min < minimum_duration
             or visit.leave_min != visit.arrival_min + visit.planned_duration_min

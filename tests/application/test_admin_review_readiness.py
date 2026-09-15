@@ -323,9 +323,9 @@ def test_inactive_bad_time_evidence_does_not_block_readiness():
     assert _check(result, "time")["verified"] is True
 
 
-def test_incomplete_or_late_entry_session_cannot_pass_readiness():
+def test_incomplete_or_entry_at_end_session_cannot_pass_readiness():
     """H3/C2: invalid candidate facts remain editable and cannot be approved."""
-    for changes in ({"end_minute": None}, {"last_entry_minute": 600}):
+    for changes in ({"end_minute": None}, {"last_entry_minute": 2880}):
         rule = replace(_time_rule(rule_kind="fixed_session"), **changes)
         result = _review_readiness(
             _evidence(revision=_revision(place_kind="show"), time_rules=(rule,)), None
@@ -366,6 +366,21 @@ def test_published_session_payload_applies_override_and_excludes_inactive_rules(
     sessions = parse_fixed_sessions(build_fixed_session_payload(evidence))
     assert [s.session_id for s in sessions if s.matches(day)] == ["override"]
     assert [s.session_id for s in sessions if s.matches(date(2026, 9, 11))] == ["time-rule-1"]
+
+
+def test_show_late_entry_passes_readiness_and_survives_projection_payload():
+    """H3/C2 ADR-0026: retain the reviewed 18:40 deadline for an 18:30 show."""
+    from travel_agent.domain.place_catalog.session_payload import build_fixed_session_payload
+    from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
+
+    rule = replace(_time_rule(rule_kind="fixed_session"), start_minute=1110,
+                   end_minute=1170, last_entry_minute=1120)
+    evidence = _evidence(revision=_revision(place_kind="show"), time_rules=(rule,))
+    assert _check(_review_readiness(evidence, None), "time")["verified"] is True
+    assert parse_fixed_sessions(build_fixed_session_payload(evidence))[0].entry_min == 1120
+    for entry in (1170, 1171):
+        invalid = replace(evidence, time_rules=(replace(rule, last_entry_minute=entry),))
+        assert _check(_review_readiness(invalid, None), "time")["collected"] is False
 
 
 def test_show_session_respects_separate_last_entry_rule():

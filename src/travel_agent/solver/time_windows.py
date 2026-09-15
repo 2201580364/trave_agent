@@ -28,13 +28,12 @@ def applicable_fixed_sessions(
     duration_ratio: float = DEFAULT_DURATION_RATIO,
 ) -> tuple[FixedSession, ...]:
     """Keep actual sessions, never turn the gaps between them into visit windows."""
-    minimum = math.ceil(attraction.suggested_duration * duration_ratio)
     return tuple(
         sorted(
             (
                 item
                 for item in attraction.fixed_sessions
-                if item.matches(visit_date) and item.end_min - item.start_min >= minimum
+                if item.matches(visit_date) and max(item.start_min, item.entry_min) < item.end_min
             ),
             key=lambda item: (item.entry_min, item.end_min, item.session_id),
         )
@@ -124,7 +123,8 @@ def evaluate_arrival(
             session.entry_min,
             session.end_min,
             session.end_min - session.entry_min,
-            (session.end_min - session.start_min) / attraction.suggested_duration,
+            (session.end_min - max(session.start_min, session.entry_min))
+            / attraction.suggested_duration,
         )
     resolution = resolve_effective_window(
         attraction,

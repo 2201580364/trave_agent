@@ -637,7 +637,7 @@ offset >= 0，默认 0
 ```json
 {
   "solver_contract_version": "solver-p1-v2",
-    "constraint_version": "constraints-p1-v6",
+    "constraint_version": "constraints-p1-v7",
     "parameter_version": "parameters-p1-2026-08-26",
   "data_snapshot_version": "hangzhou-2026-08-24",
   "weather_basis": "forecast",
@@ -1342,7 +1342,7 @@ Geometry、AccessPoint、TimeRule、Closure 和 DateException 均为 `human_veri
 关闭结果，日期例外可以覆盖周闭馆。响应包含 `open`、`windows`、`fixed_sessions`、
 `applied_exception_ids`、`rule_ids` 和稳定排序的 `reason_codes`。分钟值大于等于 1440
 表示次日，并返回 `CROSS_MIDNIGHT_WINDOW`；演出地点没有已核验固定场次时返回
-`FIXED_SESSION_REQUIRED`；多个固定场次完整返回列表，不再因数量大于一返回 `FIXED_SESSION_AMBIGUOUS`（ADR-0025）。管理端录入界面使用 `HH:mm` 和“次日”标记，提交时转换为本契约中的分钟值；API/数据库不新增时间字符串字段。跨午夜仍以结束或最晚入园分钟值大于等于 `1440` 表示。
+`FIXED_SESSION_REQUIRED`；多个固定场次完整返回列表，不再因数量大于一返回 `FIXED_SESSION_AMBIGUOUS`（ADR-0025）。ADR-0026 要求开始 < 结束、最晚入场 < 结束，允许开场后入场，发布与读取不得将最晚入场截断为开场。实际观看开始 max(入场, 开场) 必须早于结束，固定场次不受建议时长 60% 的硬限制。管理端录入界面使用 `HH:mm` 和“次日”标记，提交时转换为本契约中的分钟值；API/数据库不新增时间字符串字段。跨午夜仍以结束或最晚入园分钟值大于等于 `1440` 表示。
 
 ### 15.2.3 O06 来源冲突只读面与裁决
 

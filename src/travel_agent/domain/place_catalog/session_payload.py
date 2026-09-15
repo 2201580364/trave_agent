@@ -94,5 +94,5 @@ def build_fixed_session_payload(evidence: PlaceRevisionEvidence) -> list[dict[st
 def valid_session_timing(start: int | None, end: int | None, entry: int | None) -> bool:
     """H3/C2: incomplete candidates remain editable but cannot pass readiness."""
     return (
-        start is not None and end is not None and start < end and (entry is None or entry <= start)
+        start is not None and end is not None and start < end and (entry is None or entry < end)
     )

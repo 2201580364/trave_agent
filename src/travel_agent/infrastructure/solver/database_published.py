@@ -154,7 +154,6 @@ class DatabasePublishedSolverDataProvider:
                         if evidence is None:
                             raise ValueError("show evidence is missing")
                         session_payload = build_fixed_session_payload(evidence)
-                    session_payload = _safe_fixed_session_payload(session_payload)
                     try:
                         fixed_sessions = parse_fixed_sessions(session_payload)
                     except ValueError:
@@ -327,35 +326,6 @@ def _selection_exclusion_groups(
 def _clock(minutes: int) -> str:
     minutes %= 24 * 60
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
-
-
-def _safe_fixed_session_payload(payload: object) -> object:
-    """Keep legacy published show rows usable without widening their window.
-
-    Two early published projections recorded ``last_entry_min`` after the
-    session start.  Such a row cannot be scheduled safely.  Clamping the
-    arrival deadline to the session start preserves the hard constraint and
-    keeps the published place visible while the source record remains the
-    audit authority.
-    """
-    if not isinstance(payload, list):
-        return payload
-    result: list[dict[str, object]] = []
-    for raw in payload:
-        if not isinstance(raw, dict):
-            result.append(raw)  # type: ignore[arg-type]
-            continue
-        row = dict(raw)
-        start = row.get("start_min")
-        entry = row.get("last_entry_min")
-        if isinstance(start, int) and isinstance(entry, int) and entry > start:
-            row["last_entry_min"] = start
-        for key in ("opening_hours", "entry_deadlines"):
-            nested = row.get(key)
-            if isinstance(nested, list):
-                row[key] = _safe_fixed_session_payload(nested)
-        result.append(row)
-    return result
 
 
 def _local_weather(today: date) -> dict[date, DailyWeather]:

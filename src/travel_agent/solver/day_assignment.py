@@ -116,6 +116,10 @@ def assign_days(
     for preference in eligible_preferences:
         attraction = preference.attraction
         required_duration = math.ceil(attraction.suggested_duration * ratio)
+        if attraction.fixed_sessions:
+            required_duration = min(
+                item.end_min - item.entry_min for item in attraction.fixed_sessions
+            )
         date_rejections: list[DateRejection] = []
         candidates: list[_DayState] = []
 

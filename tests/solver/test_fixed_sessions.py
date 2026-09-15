@@ -3,6 +3,8 @@
 from dataclasses import replace
 from datetime import UTC, date, datetime
 
+import pytest
+
 from travel_agent.solver import (
     Attraction,
     AttractionPreference,
@@ -23,6 +25,36 @@ from travel_agent.solver.routing import validate_routed_day
 
 DAY = date(2026, 9, 10)
 WEATHER = {DAY: DailyWeather(DAY, WeatherBasis.FORECAST, WeatherSeverity.NORMAL)}
+
+
+@pytest.mark.parametrize("entry", [1110, 1120, 1169])
+def test_entry_after_show_start_is_allowed_until_before_end(entry):
+    """H3/C2: even a short remaining visit is valid under ADR-0026."""
+    show = Attraction(1, "Show", suggested_duration=60, data_verified=True,
+                      fixed_sessions=(FixedSession("late-entry", 1110, 1170, entry),))
+    result, provider = solve((show,), start=entry, end=1200)
+    visit = result.days[0].visits[0]
+    assert (visit.arrival_min, visit.leave_min) == (entry, 1170)
+    assert visit.planned_duration_min == 1170 - entry
+    invalid = replace(result.days[0], visits=(replace(visit, arrival_min=1170),))
+    assert not validate_routed_day(invalid, provider, weather_by_date=WEATHER).valid
+
+
+@pytest.mark.parametrize("entry", [1170, 1171])
+def test_entry_at_or_after_show_end_is_rejected(entry):
+    with pytest.raises(ValueError, match="before its end"):
+        FixedSession("invalid", 1110, 1170, entry)
+
+
+def test_late_entry_still_reserves_transport_and_return_boundary():
+    show = Attraction(1, "Show", suggested_duration=60, data_verified=True,
+                      fixed_sessions=(FixedSession("late-entry", 1110, 1170, 1160),))
+    next_show = Attraction(2, "Next", suggested_duration=60, data_verified=True,
+                           fixed_sessions=(FixedSession("next", 1180, 1240),))
+    result, _ = solve((show, next_show), start=1150, end=1250, travel=30)
+    assert sum(len(day.visits) for day in result.days) == 1
+    result, _ = solve((show,), start=1150, end=1169)
+    assert result.unplaced
 
 
 def solve(attractions, start=720, end=1200, travel=30):
