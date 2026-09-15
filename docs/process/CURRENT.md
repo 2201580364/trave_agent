@@ -2,7 +2,7 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-15（R0.3 发布目录与用户端体验收口，本地与线上链路复验）
+- 更新时间：2026-09-15（ADR-0026 固定场次晚入场、三地点生命周期浏览器验收与问题收口）
 - 当前节点：`M1 后段 / Gate 7 / OM1；发布目录动态数据库接入已部署；用户端按请求读取最新 published Projection，无需重启；关系裁决形成的互斥组进入选点与求解约束；游客规划→选点→求解→行程详情已本地与线上验收`
 - 线上验收：API 使用 `api-20260915-ui11`，用户端使用 `user-h5-20260915-ui11`；修复 MySQL `INT` random_seed 溢出、静态资源缓存后，杭州 3 日行程生成成功，质量门禁通过，0 条未排入；用户端首页已显示“登录 / 注册”，用户端与管理端自有容器均保持运行。
 - 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：后端全量回归、O05路由/模型专项与管理端HTTP回归通过；ruff（src/tests/scripts）、分层与 check_docs 通过，迁移链核对至0016。
@@ -87,7 +87,8 @@
 
 
 - 2026-09-10 提交核对：S6 已实现 sessionStorage + /me 会话恢复，但 ADR-0020 仍禁止持久化且要求新 ADR，当前未见替代决策；最新几何修复在组件中展示客户端校验文案，与 error-messages.md 的全局单一文案源要求存在边界差异。后续相关实现前须先裁决，不能把现有代码自动当作规格变更。
-- 2026-09-11 只读核对：原 12 条批次 10 published / 2 candidate（杭州博物馆 027、良渚博物院 052，均无更新版本）；钱江新城灯光秀 048 的 4 条有效固定场次 entry=start+10，不满足当前 valid_session_timing，因此准备度为 5/6。用户已明确排除 027/052，批准批次为其余 10 条；048 时间证据差异单独保留，不自动修改或豁免。
+- 2026-09-15 业务流程验收与问题收口：三地点两轮候选→审核→投影→发布已完成；用户端3安排/0未排入，喷泉显示18:40入场·18:30场次。管理端固定场次提示和分享卡晚入场展示已修复并通过回归；平湖秋月仍等待真实来源补齐基础事实，严格mypy存量债务继续单独治理。详情见 `docs/test/reports/admin-lifecycle-review-20260915.md` 与 `var/reports/admin-issue-ledger-20260915.json`。
+- 2026-09-11 只读核对：原 12 条批次 10 published / 2 candidate（杭州博物馆 027、良渚博物院 052，均无更新版本）；钱江新城灯光秀 048 的时间证据差异单独保留，不自动修改或豁免。
 
 - Gate 1 存在真实用户研究补证债务：无真实访谈纪要与可追溯结论，M1 最终决策前必须完成 8–10 名目标用户发现研究，不得倒填。
 - 历史账本记载的测试计数互相矛盾（352/363/367/370/…/432），以本文件顶部稳定测试基线为准；旧计数属阶段性快照，不代表回退。
@@ -100,6 +101,7 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
+| 固定场次允许开场后入场及三地点生命周期验收（H3/C2，2026-09-15） | dev | `domain/place_catalog/session_payload.py`、`solver/{models,time_windows,routing,day_assignment,contract}.py`、`infrastructure/solver/database_published.py`、相关 tests、ADR/规格、CURRENT、本月归档、验收报告；本地 research.db 经业务接口写入 | 已完成验收；实现与文档待用户手动提交；账本剩余2项：平湖秋月真实事实补证、全仓mypy存量债 |
 | S7-4 O04完整组件迁移（H3） | dev | `admin-web/src/pages/{GeometryAccessEvidenceCard,RevisionDetailsPage,revisionDetailFields}.tsx`、`revisionDetailDisplay.ts`、CURRENT/改造计划/本月归档 | 实现完成待提交；47/47、typecheck、build通过 |
 | S7-4 来源证据组件（H3） | dev | `admin-web/src/pages/{RevisionDetailsPage,SourceEvidenceCard,revisionDetailFields}.tsx`、`revisionDetailDisplay.ts`、CURRENT/改造计划/本月归档 | 进行中 |
 | S7-3 仓储职责拆分（H3，已提交 bca173f）；S7-4 管理端详情页拆分进行中（O04 几何/访问点完整组件迁移已提交；O05 时间证据完整组件迁移已提交；O07 关系证据完整组件迁移已提交；O06 来源冲突与验证汇总组件已提交；发布阻断计算组件已提交；修订操作区组件已提交；发布准备组件完成待提交） | dev | `infrastructure/database/{place_catalog,place_catalog_reads,place_catalog_ports}.py`、CURRENT/改造计划/本月归档 | 进行中 |
@@ -121,7 +123,7 @@
 | CI 契约测试隔离修复（H3/S8-2） | dev | `tests/scripts/test_openapi_contract.py`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档 | 已进入 dev（cec78fd）；用户确认远端全绿 |
 | S7 前置核对与拆分准备（H3） | dev | `docs/process/{CURRENT,transformation-plan}.md`、`docs/process/status-archive/2026-09.md` | 前置核对完成；批次排除 027/052、用户确认 CI 全绿，S7-1 已启动 |
 | S4/S8 CI 收尾与响应契约首片（H3 / transformation-plan） | dev | `.github/workflows/ci.yml`、`docs/process/{CURRENT,transformation-plan,ci-troubleshooting}.md`、本月归档；`interfaces/http/{admin,admin_responses}.py`、`admin-web/src/api/{adminApi,types}.ts`、`api-schema.d.ts`、相关页面测试、`tests/application/test_admin_response_contract.py`、API 规格 | 已进入 dev（436bf20）；521/521 + Golden 8/8，两端验证通过；后续 cec78fd 修复后远端全绿（用户确认） |
-| O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 已进入 dev（6e9e463，本轮核对销账）；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；未操作实际研究库 |
+| O05 多场次与候选时间规则删除（H3/C2） | dev | `application/admin/review.py`、`domain/place_catalog/{projection,repositories}.py`、`infrastructure/database/place_catalog.py`、`interfaces/http/admin.py`、`admin-web/src/{api,pages}` 相关文件及测试、API/领域规格、ADR、审计规则 | 已进入 dev（6e9e463，本轮核对销账）；另含 solver、infrastructure/solver、frontend 行程展示、sharing、快照脚本、生成 API 类型和对应测试；本轮已按 ADR-0026 完成晚入场规则实现与三地点实际生命周期验收 |
 | AUD 审计规范化 | dev（同会话接续 S8-3） | `.claude/rules/audit-logging.md`（新增规范）、`src/travel_agent/application/admin/audit_events.py`（新增共享模块）、`service.py`/`review.py`/`holiday_calendar_sync.py`（构造器/摘要/校验收敛）、`tests/application/test_audit_registry.py`（新增 3 项）、`docs/process/CURRENT.md` | 已进入 dev（04c2d35；2026-09-10 核对销账；原验证记录：pytest 495/495 + ruff + layering + check_docs） |
 
 > S1–S6 全部完成并已合并销账（S5=`941578e`、S6=`fae014e`）；S8-1/2/3 阶段交付已进入 dev（S8-1=`a657504`、S8-2=`dc5d1ea`、S8-3=`361cc37`）；S8-4 等 R0.3，响应类型仍待迁移，frontend Vitest CI 配置已进入 dev（436bf20）；S7 用户已确认批准其余 10 条，排除 027/052；cec78fd 远端全绿已由用户确认，S7-1 已启动。遗留任务：① 响应模型首片 34 个接口已进入 dev（436bf20），其余认证/来源冲突/批量审核/发布批次/O17 等按能力片迁移（原 63 为旧勘察计数，不作剩余数量）；② O17 模块 5 个 reason_code 与 action 命名法的历史混用已登记规范，重构顺延到下次触碰 holiday_calendar_sync 时处理。
@@ -129,7 +131,7 @@
 ## 关键事实速查
 
 - 研究库 `.local/research.db`：2026-09-11 mode=ro 查询全部 Revision 为 published=13、candidate=59、retired=2（版本数量，非全量 Place 去重统计）；原批次 12 条中 10 published、2 candidate。
-- 求解器契约：`solver-p1-v2 / trip-result-v2 / constraints-p1-v6 / parameters-p1-2026-08-26`；历史 Revision 不迁移、不覆盖、不原地重算。
+- 求解器契约：`solver-p1-v2 / trip-result-v2 / constraints-p1-v7 / parameters-p1-2026-08-26`；历史 Revision 不迁移、不覆盖、不原地重算。
 - Gate 7 protocol 规范化 SHA-256：`b791f0558dfc93af4cc919ec6dd9b09d1251f8f1d54b7bc0bb8809eade742d89`。
 - 正式发布 bundle：`var/published/hangzhou-published-2026-08-27-v1.json`（7 景点 human_verified 坐标 + 42/42 高德 OD + 真实和风三日天气）。
 - 本机禁止部署/启动 MySQL/Redis；本地开发组合根用明确标注的近似 fixture，生产组合根只加载严格验证的 published 快照。
