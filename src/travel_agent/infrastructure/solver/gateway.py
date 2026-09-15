@@ -56,6 +56,7 @@ class PublishedAttraction:
     external_id: str
     attraction: Attraction
     coordinate: Coordinate | None = None
+    selection_exclusion_group_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +214,9 @@ def _prepare_input(
     )
     travel_mode = TravelMode(_text(facts["travel_mode"]))
     by_external_id = {item.external_id: item.attraction for item in published.attractions}
+    published_by_external_id = {item.external_id: item for item in published.attractions}
     selected_ids = tuple(_text(item) for item in _list(input_snapshot["selected_attraction_ids"]))
+    _validate_selection_constraints(selected_ids, published_by_external_id)
     attractions = tuple(by_external_id[item] for item in selected_ids)
     preferred_dates = _balanced_default_preferred_dates(
         attractions,
@@ -236,6 +239,25 @@ def _prepare_input(
     )
     weather = {day: published.weather_by_date[day] for day in trip_dates}
     return _PreparedInput(attractions, preferences, trip_dates, weather, anchors, travel_mode)
+
+
+def _validate_selection_constraints(
+    selected_ids: tuple[str, ...],
+    published: dict[str, PublishedAttraction],
+) -> None:
+    """Reject a user selection that violates an adjudicated exclusion group."""
+    groups: dict[str, list[str]] = {}
+    for external_id in selected_ids:
+        item = published[external_id]
+        for group_id in item.selection_exclusion_group_ids:
+            groups.setdefault(group_id, []).append(external_id)
+    conflicts = {
+        group_id: tuple(sorted(ids))
+        for group_id, ids in groups.items()
+        if len(ids) > 1
+    }
+    if conflicts:
+        raise ValueError("selected attractions violate reviewed exclusion groups")
 
 
 def _balanced_default_preferred_dates(

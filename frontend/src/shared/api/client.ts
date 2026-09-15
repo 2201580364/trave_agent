@@ -23,6 +23,7 @@ const CODE_FALLBACKS: Record<string, string> = {
   invalid_state_transition: '当前状态不允许执行该操作，请刷新页面后重试。',
   trip_revision_conflict: '行程已生成更新版本，请先恢复最新版本后再调整。',
   invalid_attraction_replacement: '暂时无法替换该景点，请刷新页面后重试。',
+  selection_conflict: '所选地点存在重叠体验，请只保留其中一个后再继续。',
   draft_not_ready: '行程草稿还有未完成的条件，请先补齐后再生成。',
   plan_share_intent_conflict: '该分享标识已用于其他行程内容，请重新创建分享。',
   feedback_intent_conflict: '该反馈已提交过，请勿重复提交。',

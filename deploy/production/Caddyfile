@@ -20,6 +20,8 @@
     reverse_proxy admin-web:80
   }
   handle {
-    reverse_proxy user-h5:80
+    reverse_proxy user-h5:80 {
+      header_down Cache-Control "no-store"
+    }
   }
 }

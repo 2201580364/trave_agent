@@ -1,5 +1,8 @@
-.hero-card { display: flex; align-items: center; gap: 16px; }
+.hero-card { display: flex; align-items: center; gap: 16px; position: relative; overflow: hidden; }
+.auth-link { display: block; width: max-content; min-height: 30px; margin-left: auto; padding: 0 12px; background: var(--brand-soft); color: var(--brand-dark); border-radius: 999px; font-size: 12px; line-height: 30px; }
+.hero-card::after { content: '✦'; position: absolute; right: 20px; top: 12px; color: #d6a84f; font-size: 22px; transform: rotate(12deg); }
 .hero-mark { width: 58px; height: 58px; display: flex; align-items: center; justify-content: center; border-radius: 18px; background: var(--brand); color: #fff; font-size: 24px; font-weight: 800; }
 .promise-list { display: grid; gap: 13px; color: #405048; font-size: 14px; }
 .home-primary { margin-top: 24px; }
-.home-secondary { width: 100%; margin-top: 12px; }
+.home-secondary { width: 100%; margin-top: 12px; color: var(--brand-dark); line-height: 44px; text-align: center; box-sizing: border-box; }
+.home-secondary Text, .home-primary Text { display: block; width: 100%; }

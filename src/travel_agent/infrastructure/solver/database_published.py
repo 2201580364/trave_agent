@@ -20,6 +20,8 @@ from travel_agent.infrastructure.database.place_catalog import (
     PlaceRevisionRow,
     PlaceRow,
     PlaceTimeRuleRow,
+    SelectionExclusionGroupRow,
+    SelectionExclusionMemberRow,
     SolverPlaceProjectionRow,
     SqlAlchemyPlaceCatalogRepository,
 )
@@ -152,7 +154,15 @@ class DatabasePublishedSolverDataProvider:
                         if evidence is None:
                             raise ValueError("show evidence is missing")
                         session_payload = build_fixed_session_payload(evidence)
-                    fixed_sessions = parse_fixed_sessions(session_payload)
+                    session_payload = _safe_fixed_session_payload(session_payload)
+                    try:
+                        fixed_sessions = parse_fixed_sessions(session_payload)
+                    except ValueError:
+                        # Keep the public catalog available when an old
+                        # projection contains invalid show timing data. The
+                        # revision remains visible to reviewers and is
+                        # excluded from solver eligibility until corrected.
+                        continue
                     if not fixed_sessions:
                         raise ValueError("published show requires a fixed session")
                 attraction = Attraction(
@@ -177,6 +187,21 @@ class DatabasePublishedSolverDataProvider:
                 attractions.append(PublishedAttraction(revision.place_id, attraction, coordinate))
             if not attractions:
                 raise LookupError("published projections have no usable access points")
+            exclusion_groups = _selection_exclusion_groups(
+                session,
+                self._city_id,
+                {item.external_id: item.external_id for item in attractions},
+            )
+            if exclusion_groups:
+                attractions = [
+                    PublishedAttraction(
+                        item.external_id,
+                        item.attraction,
+                        item.coordinate,
+                        tuple(sorted(exclusion_groups.get(item.external_id, ()))),
+                    )
+                    for item in attractions
+                ]
             today = date.today()
             return PublishedSolverData(
                 version=version,
@@ -261,9 +286,76 @@ def _exception_dates(session: Session, revision_id: str, kind: str) -> tuple[dat
     )
 
 
+def _selection_exclusion_groups(
+    session: Session,
+    city_id: str,
+    place_by_external_id: dict[str, str],
+) -> dict[str, set[str]]:
+    """Load only reviewed active selection groups for the current catalog.
+
+    Relation rows are evidence; an exclusion group is the reviewed, explicit
+    solver decision that turns an overlap/same-experience relation into a
+    hard selection constraint.  Candidate or retired groups never enter a
+    published solver snapshot.
+    """
+    rows = tuple(
+        session.execute(
+            select(SelectionExclusionMemberRow, SelectionExclusionGroupRow)
+            .join(
+                SelectionExclusionGroupRow,
+                SelectionExclusionGroupRow.exclusion_group_id
+                == SelectionExclusionMemberRow.exclusion_group_id,
+            )
+            .where(
+                SelectionExclusionGroupRow.city_id == city_id,
+                SelectionExclusionGroupRow.status == "active",
+                SelectionExclusionGroupRow.review_status == "human_verified",
+            )
+        )
+    )
+    place_to_external = {
+        place_id: external_id for external_id, place_id in place_by_external_id.items()
+    }
+    result: dict[str, set[str]] = {}
+    for member, group in rows:
+        external_id = place_to_external.get(member.place_id)
+        if external_id is not None:
+            result.setdefault(external_id, set()).add(group.exclusion_group_id)
+    return result
+
+
 def _clock(minutes: int) -> str:
     minutes %= 24 * 60
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def _safe_fixed_session_payload(payload: object) -> object:
+    """Keep legacy published show rows usable without widening their window.
+
+    Two early published projections recorded ``last_entry_min`` after the
+    session start.  Such a row cannot be scheduled safely.  Clamping the
+    arrival deadline to the session start preserves the hard constraint and
+    keeps the published place visible while the source record remains the
+    audit authority.
+    """
+    if not isinstance(payload, list):
+        return payload
+    result: list[dict[str, object]] = []
+    for raw in payload:
+        if not isinstance(raw, dict):
+            result.append(raw)  # type: ignore[arg-type]
+            continue
+        row = dict(raw)
+        start = row.get("start_min")
+        entry = row.get("last_entry_min")
+        if isinstance(start, int) and isinstance(entry, int) and entry > start:
+            row["last_entry_min"] = start
+        for key in ("opening_hours", "entry_deadlines"):
+            nested = row.get(key)
+            if isinstance(nested, list):
+                row[key] = _safe_fixed_session_payload(nested)
+        result.append(row)
+    return result
 
 
 def _local_weather(today: date) -> dict[date, DailyWeather]:

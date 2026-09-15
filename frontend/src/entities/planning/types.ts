@@ -13,6 +13,7 @@ export interface Attraction {
   energy_level: number
   close_days: number[]
   coordinate: { lat: number; lng: number } | null
+  selection_exclusion_group_ids?: string[]
 }
 
 export interface Draft {

@@ -190,6 +190,7 @@ def _parse_attraction(row: dict[str, object], *, require_human_review: bool) -> 
         _text(row["external_id"]),
         attraction,
         Coordinate(_number(coordinate_row["lat"]), _number(coordinate_row["lng"])),
+        tuple(_text(item) for item in _list(row.get("selection_exclusion_group_ids", []))),
     )
 
 

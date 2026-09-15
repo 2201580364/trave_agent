@@ -1,4 +1,4 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 
 export function StepHeader({
@@ -21,7 +21,7 @@ export function StepHeader({
 
   return (
     <View className='step-row'>
-      <Button className='step-back' onClick={goBack}>‹ {backLabel}</Button>
+      <View className='step-back' onClick={goBack}>‹ {backLabel}</View>
       <Text className='eyebrow'>{step}/3 {title}</Text>
       <View className='step-track' aria-label={`步骤 ${step}/3`}>
         <View className='step-fill' style={{ width: `${(step / 3) * 100}%` }} />

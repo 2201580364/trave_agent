@@ -1,4 +1,4 @@
-import { Button, Input, Text, View } from '@tarojs/components'
+import { Input, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 
@@ -20,11 +20,29 @@ export default function AttractionSelectPage() {
 
   useDidShow(() => {
     if (!store.token) return
-    apiRequest<{ items: Attraction[] }>('/api/v1/attractions?city_id=hangzhou', {
-      token: store.token
-    })
+    const load = async (token: string) => apiRequest<{ items: Attraction[] }>(
+      '/api/v1/attractions?city_id=hangzhou',
+      { token }
+    )
+    load(store.token)
       .then((response) => setItems(response.items))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : '景点加载失败。'))
+      .catch(async (cause) => {
+        if (cause instanceof Error && 'status' in cause && (cause as { status: number }).status === 401) {
+          try {
+            const session = await apiRequest<{ access_token: string; principal_id: string }>(
+              '/api/v1/anonymous-sessions',
+              { method: 'POST', data: { device_installation_id: `h5_${Date.now()}` } }
+            )
+            store.setSession(session.access_token, session.principal_id)
+            const response = await load(session.access_token)
+            setItems(response.items)
+            return
+          } catch (renewalError) {
+            cause = renewalError
+          }
+        }
+        setError(cause instanceof Error ? cause.message : '景点加载失败。')
+      })
   })
 
   const filtered = useMemo(
@@ -35,6 +53,18 @@ export default function AttractionSelectPage() {
   )
 
   const toggle = (id: string) => {
+    const target = items.find((item) => item.attraction_id === id)
+    const groups = target?.selection_exclusion_group_ids ?? []
+    const blocked = items.some((item) => (
+      store.selectedAttractionIds.includes(item.attraction_id)
+      && item.attraction_id !== id
+      && groups.some((group) => item.selection_exclusion_group_ids?.includes(group))
+    ))
+    if (blocked) {
+      setError('这两个地点属于同一体验范围，请只选择其中一个。')
+      return
+    }
+    setError('')
     const selected = store.selectedAttractionIds.includes(id)
       ? store.selectedAttractionIds.filter((item) => item !== id)
       : [...store.selectedAttractionIds, id]
@@ -76,9 +106,9 @@ export default function AttractionSelectPage() {
 
         <View className='card search-card'>
           <Input className='input' value={keyword} placeholder='搜索景点名称' onInput={(event) => setKeyword(event.detail.value)} />
-          <Button className={`filter-chip ${indoorOnly ? 'filter-chip--active' : ''}`} onClick={() => setIndoorOnly(!indoorOnly)}>
+          <View className={`filter-chip ${indoorOnly ? 'filter-chip--active' : ''}`} onClick={() => setIndoorOnly(!indoorOnly)}>
             {indoorOnly ? '✓ ' : ''}只看室内
-          </Button>
+          </View>
         </View>
 
         {error && <View className='error'>{error}</View>}
@@ -101,6 +131,9 @@ export default function AttractionSelectPage() {
                   <View className='field-help'>
                     {item.is_always_open ? '全天开放信息已验证' : item.close_days.length ? `每周闭馆：${item.close_days.join('、')}` : '开放时间以发布数据为准'}
                   </View>
+                  {item.selection_exclusion_group_ids?.length ? (
+                    <View className='field-help relation-note'>同一体验范围，系统会避免重复安排</View>
+                  ) : null}
                 </View>
                 <View className={`select-mark ${selected ? 'select-mark--active' : ''}`}>
                   {selected ? '✓' : '+'}

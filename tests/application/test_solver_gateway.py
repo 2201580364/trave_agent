@@ -333,6 +333,39 @@ def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     assert first.audit_payload["data_snapshot_version"] == VERSION
 
 
+def test_gateway_rejects_selection_from_same_reviewed_exclusion_group() -> None:
+    published = _published()
+    constrained = PublishedSolverData(
+        published.version,
+        published.city_id,
+        (
+            PublishedAttraction(
+                published.attractions[0].external_id,
+                published.attractions[0].attraction,
+                published.attractions[0].coordinate,
+                ("group-westlake",),
+            ),
+            PublishedAttraction(
+                published.attractions[1].external_id,
+                published.attractions[1].attraction,
+                published.attractions[1].coordinate,
+                ("group-westlake",),
+            ),
+        ),
+        published.weather_by_date,
+        published.travel_time_provider,
+        published.od_basis,
+        published.weather_basis,
+    )
+    gateway = ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((constrained,)),
+        FixedClock(),
+    )
+
+    with pytest.raises(SolverExecutionError, match="invalid_solver_input"):
+        gateway.solve(_request())
+
+
 def test_gateway_maps_gaode_mode_and_road_distance_into_v2_result() -> None:
     outcome = _gateway_with_od(
         basis=ODBasis.GAODE,

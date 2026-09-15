@@ -19,7 +19,11 @@ from travel_agent.application.admin.holiday_calendar_sync import (
     ChinaHolidayCalendarSyncService,
 )
 from travel_agent.application.common.clock import Clock
-from travel_agent.application.common.errors import ApplicationError, ResourceNotFoundError
+from travel_agent.application.common.errors import (
+    ApplicationError,
+    ResourceNotFoundError,
+    SelectionConflictError,
+)
 from travel_agent.application.common.unit_of_work import UnitOfWork
 from travel_agent.application.feedback import (
     SubmitNodeFeedback,
@@ -366,6 +370,13 @@ def create_app(container: HttpContainer) -> FastAPI:
         payload: AttractionSelectionInput,
         principal: str = Depends(principal_id),
     ) -> dict[str, object]:
+        with container.uow_factory() as uow:
+            draft = uow.drafts.get(draft_id)
+            if draft is None or draft.principal_id != principal:
+                raise ResourceNotFoundError
+            city_id = draft.city_id
+        snapshot = _published_snapshot(container, city_id)
+        _ensure_selection_constraints(snapshot, payload.attraction_ids)
         preferences = tuple(
             VisitPeriodPreferenceInput(
                 item.attraction_id,
@@ -924,7 +935,7 @@ def _published_snapshot(container: HttpContainer, city_id: str):
 
 def _attraction_response(item) -> dict[str, object]:
     attraction = item.attraction
-    return {
+    response = {
         "attraction_id": item.external_id,
         "name": attraction.name,
         "suggested_duration_min": attraction.suggested_duration,
@@ -938,6 +949,22 @@ def _attraction_response(item) -> dict[str, object]:
             else None
         ),
     }
+    if item.selection_exclusion_group_ids:
+        response["selection_exclusion_group_ids"] = list(item.selection_exclusion_group_ids)
+    return response
+
+
+def _ensure_selection_constraints(snapshot, selected_ids: tuple[str, ...]) -> None:
+    by_id = {item.external_id: item for item in snapshot.attractions}
+    groups: dict[str, int] = {}
+    for attraction_id in selected_ids:
+        item = by_id.get(attraction_id)
+        if item is None:
+            continue
+        for group_id in item.selection_exclusion_group_ids:
+            groups[group_id] = groups.get(group_id, 0) + 1
+    if any(count > 1 for count in groups.values()):
+        raise SelectionConflictError()
 
 
 def _error_response(

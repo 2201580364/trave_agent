@@ -1,4 +1,4 @@
-import { Button, Picker, Text, View } from '@tarojs/components'
+import { Picker, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
 
@@ -72,6 +72,11 @@ export default function TripTimePage() {
       store.setDraftVersion(draft.draft_version)
       Taro.navigateTo({ url: '/pages/attraction-select/index' })
     } catch (cause) {
+      if (cause instanceof Error && 'code' in cause && ['resource_not_found', 'draft_version_conflict'].includes((cause as { code: string }).code)) {
+        store.reset()
+        Taro.navigateTo({ url: '/pages/auth/index' })
+        return
+      }
       setError(cause instanceof Error ? cause.message : '保存旅行时间失败。')
     } finally {
       setLoading(false)
@@ -107,9 +112,9 @@ export default function TripTimePage() {
           <View className='section-title'>怎样到杭州</View>
           <View className='choice-grid field'>
             {transportOptions.map(([value, label]) => (
-              <Button key={value} className={`choice ${transport === value ? 'choice--active' : ''}`} onClick={() => setTransport(value)}>
+              <View key={value} className={`choice ${transport === value ? 'choice--active' : ''}`} onClick={() => setTransport(value)}>
                 {transport === value ? '✓ ' : ''}{label}
-              </Button>
+              </View>
             ))}
           </View>
           <View className='field'>

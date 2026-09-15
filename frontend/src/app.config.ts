@@ -1,6 +1,7 @@
 export default defineAppConfig({
   pages: [
     'pages/home/index',
+    'pages/auth/index',
     'pages/trip-time/index',
     'pages/attraction-select/index',
     'pages/attraction-replace/index',

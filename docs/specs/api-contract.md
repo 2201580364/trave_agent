@@ -1413,6 +1413,7 @@ O07 裁决写入：`POST /api/v1/admin/place-revisions/{revision_id}/relations/{
 | 422 | `conditional_source_staging_only` | conditional 来源不能进入 published |
 | 422 | `source_record_validation_failed` | 来源渠道、URL、采集方式或治理边界校验失败 |
 | 422 | `overlap_resolution_required` | 地点重叠或互斥尚未裁决 |
+| 409 | `selection_conflict` | 用户选择了同一已裁决互斥组中的多个地点 |
 
 `publication_gate_rejected` 的 `details.reason_codes` 直接使用 PlaceCatalog 稳定拒绝码，不由前端将错误字符串猜成状态。
 

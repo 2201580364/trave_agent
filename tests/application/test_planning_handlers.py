@@ -202,6 +202,23 @@ def test_submit_generation_is_idempotent_and_submits_executor_once() -> None:
     assert len(store.generation_intents) == 1
 
 
+def test_submit_generation_derives_seed_within_mysql_integer_range() -> None:
+    store = InMemoryPlanningStore()
+    clock = _clock()
+    draft_id, version = _ready_draft(store, clock)
+    handler = SubmitGenerationHandler(
+        InMemoryUnitOfWork(store),
+        clock,
+        FixedDataSnapshotVersionProvider({"hangzhou": "hangzhou-2026-08-24"}),
+        InMemoryGenerationExecutor(),
+    )
+
+    handler.handle(SubmitGeneration("principal_1", "gen_1", draft_id, version))
+
+    seed = store.generation_intents["gen_1"].random_seed
+    assert 0 <= seed < 2_147_483_647
+
+
 def test_existing_intent_cannot_be_reused_for_other_draft_version() -> None:
     store = InMemoryPlanningStore()
     clock = _clock()

@@ -1,4 +1,4 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useState } from 'react'
 
@@ -65,6 +65,7 @@ export default function HomePage() {
     <View className='page-shell'>
       <View className='content'>
         <Text className='eyebrow'>TRAVEL WITH CONFIDENCE</Text>
+        <Text className='auth-link' onClick={() => Taro.navigateTo({ url: '/pages/auth/index' })}>登录 / 注册</Text>
         <View className='title'>少一点来回折腾，{`\n`}多一点杭州好时光</View>
         <View className='subtitle'>
           系统会检查闭馆、开放时间、到离边界、天气和交通衔接，先给你一份真正能走的行程。
@@ -87,17 +88,17 @@ export default function HomePage() {
         {error && <View className='error'>{error}</View>}
         {store.draftId && <View className='notice'>发现未完成的规划，可以从上次保存的位置继续。</View>}
 
-        <Button className='primary home-primary' loading={loading} onClick={() => start()}>
-          {store.draftId ? '继续规划' : '规划杭州行程'}
-        </Button>
+        <View className={`primary home-primary ${loading ? 'primary--disabled' : ''}`} onClick={() => !loading && start()}>
+          <Text>{loading ? '正在准备…' : store.draftId ? '继续规划' : '规划杭州行程'}</Text>
+        </View>
         {store.draftId && (
-          <Button className='secondary home-secondary' disabled={loading} onClick={() => start(true)}>
-            新建行程
-          </Button>
+          <View className={`secondary home-secondary ${loading ? 'primary--disabled' : ''}`} onClick={() => !loading && start(true)}>
+            <Text>新建行程</Text>
+          </View>
         )}
-        <Button className='secondary home-secondary' disabled={loading} onClick={openTrips}>
-          我的行程
-        </Button>
+        <View className={`secondary home-secondary ${loading ? 'primary--disabled' : ''}`} onClick={() => !loading && openTrips()}>
+          <Text>我的行程</Text>
+        </View>
       </View>
     </View>
   )

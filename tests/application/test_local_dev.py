@@ -20,7 +20,12 @@ from travel_agent.infrastructure.database.place_catalog import (
     PlaceRevisionRow,
     PlaceRow,
     PlaceTimeRuleRow,
+    SelectionExclusionGroupRow,
+    SelectionExclusionMemberRow,
     SolverPlaceProjectionRow,
+)
+from travel_agent.infrastructure.solver.database_published import (
+    DatabasePublishedSnapshotVersionProvider,
 )
 from travel_agent.local_dev import build_local_dev_app, build_local_hangzhou_catalog
 
@@ -204,7 +209,9 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path, show: b
                                     "source_record_id": "reviewed-source",
                                     "start_min": 1080,
                                     "end_min": 1140,
-                                    "last_entry_min": 1070,
+                                    # Legacy published data once recorded an
+                                    # entry deadline after the session start.
+                                    "last_entry_min": 1090,
                                 },
                                 {
                                     "session_id": "show-late",
@@ -276,4 +283,71 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path, show: b
         attraction = published.attractions[0].attraction
         assert attraction.time_rules == ()
         assert [s.session_id for s in attraction.fixed_sessions] == ["show-early", "show-late"]
-        assert attraction.fixed_sessions[0].entry_min == 1070
+        assert attraction.fixed_sessions[0].entry_min == 1080
+
+
+def test_database_published_provider_loads_reviewed_selection_constraints(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'published-groups.db').as_posix()}"
+    migration = Config("alembic.ini")
+    migration.attributes["skip_dotenv"] = True
+    migration.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(migration, "head")
+    engine = build_engine(DatabaseSettings(url=database_url))
+    sessions = build_session_factory(engine)
+    with sessions() as session:
+        session.add(PlaceRow(
+            place_id="group-place", city_id="hangzhou", status="active", merged_into_place_id=None,
+            created_at="2026-08-01T00:00:00+00:00", updated_at="2026-08-01T00:00:00+00:00",
+        ))
+        session.add(PlaceRevisionRow(
+            place_revision_id="group-revision", place_id="group-place", revision_number=1,
+            revision_version=1, lifecycle_status="published", canonical_name="互斥景点",
+            aliases=[], place_kind="attraction", category="景点", admin_area="杭州", address="杭州",
+            geometry_kind="point", duration_min=30, duration_recommended=60, duration_max=90,
+            internal_travel_min=5, energy_level=1, indoor_outdoor="outdoor", suitable_periods=[],
+            audience_tags=[], rain_suitability="conditional", is_always_open=True,
+            solver_eligible=True, conflicts_resolved=True, source_record_ids=[],
+            created_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
+            published_at="2026-08-30T00:00:00+00:00", review_flags=[],
+            relation_review_status="no_relations",
+        ))
+        session.add(PlaceAccessPointRow(
+            access_point_id="group-access", place_revision_id="group-revision",
+            access_point_kind="visitor_entrance", name="入口", lat=30.25, lng=120.16,
+            source_record_id="missing-source", review_status="human_verified", active=True,
+            fetched_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
+            created_at="2026-08-01T00:00:00+00:00",
+        ))
+        session.add(SolverPlaceProjectionRow(
+            projection_id="group-projection", projection_version="projection-v1",
+            data_snapshot_version="db-group-v1", place_id="group-place",
+            place_revision_id="group-revision",
+            solver_node_id=201, place_kind="attraction", geometry_kind="point",
+            arrival_access_point_id="group-access", departure_access_point_id="group-access",
+            duration_min=30, duration_recommended=60, duration_max=90, internal_travel_min=5,
+            solver_payload={"name": "互斥景点", "suggested_duration": 60}, projection_hash="a" * 64,
+            status="published", gate_reason_codes=[], created_at="2026-08-30T00:00:00+00:00",
+            published_at="2026-08-30T00:00:00+00:00",
+        ))
+        session.add(SelectionExclusionGroupRow(
+            exclusion_group_id="group-1", city_id="hangzhou", name="同一体验",
+            status="active", review_status="human_verified", decision_note="已裁决",
+            created_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-02T00:00:00+00:00",
+        ))
+        session.add(SelectionExclusionMemberRow(
+            exclusion_group_id="group-1", place_id="group-place",
+            created_at="2026-08-01T00:00:00+00:00",
+        ))
+        session.commit()
+
+    from travel_agent.infrastructure.solver.database_published import (
+        DatabasePublishedSolverDataProvider,
+    )
+
+    _, fallback = build_local_hangzhou_catalog(reference_date=date(2026, 8, 25))
+    provider = DatabasePublishedSolverDataProvider(sessions, city_id="hangzhou", fallback=fallback)
+    version = DatabasePublishedSnapshotVersionProvider(
+        sessions, fallback_version="fallback"
+    ).current_version("hangzhou")
+    published = provider.load(version)
+    assert published.attractions[0].selection_exclusion_group_ids == ("group-1",)

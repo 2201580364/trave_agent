@@ -2,7 +2,7 @@ name: travel-agent
 
 services:
   api:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260914
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260915-ui11
     restart: unless-stopped
     expose: ["8000"]
     env_file: [/etc/travel-agent/app.env]
@@ -13,7 +13,7 @@ services:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
   migrate:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260914
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260915-ui11
     command: ["python", "-m", "alembic", "upgrade", "head"]
     profiles: ["tools"]
     env_file: [/etc/travel-agent/migrate.env]
@@ -21,7 +21,7 @@ services:
     depends_on:
       mysql: { condition: service_healthy }
   user-h5:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:user-h5-20260914
+    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:user-h5-20260915-ui11
     restart: unless-stopped
     networks: [frontend]
   admin-web:

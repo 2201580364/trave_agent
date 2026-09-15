@@ -54,6 +54,7 @@ PLANNING_ISSUE_MESSAGES: Mapping[str, str] = {
     "arrival_transport_unconfirmed": "到达交通还未确认",
     "departure_transport_unconfirmed": "离开交通还未确认",
     "attraction_selection_empty": "还未选择任何景点",
+    "selection_conflict": "所选地点存在重叠体验，请只保留其中一个后再继续。",
 }
 
 

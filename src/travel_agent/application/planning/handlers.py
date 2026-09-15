@@ -53,6 +53,18 @@ from .ports import (
     SolverRequest,
 )
 
+# ``generation_intents.random_seed`` is persisted as a signed MySQL INT by the
+# original planning schema.  Keep the deterministic seed derived from the
+# immutable input snapshot inside that column's range until a deliberate schema
+# migration changes the storage contract.
+_MYSQL_SIGNED_INT_MAX = 2_147_483_647
+
+
+def _random_seed_from_snapshot_hash(snapshot_hash: str) -> int:
+    """Return a stable, database-safe seed for one canonical input snapshot."""
+
+    return int(snapshot_hash[:15], 16) % _MYSQL_SIGNED_INT_MAX
+
 
 class CreateDraftHandler:
     def __init__(self, uow: UnitOfWork, clock: Clock, ids: IdGenerator) -> None:
@@ -148,7 +160,7 @@ class SubmitGenerationHandler:
                 input_snapshot=snapshot,
                 input_snapshot_hash=snapshot_hash,
                 data_snapshot_version=data_version,
-                random_seed=int(snapshot_hash[:15], 16),
+                random_seed=_random_seed_from_snapshot_hash(snapshot_hash),
                 submitted_at=now,
                 updated_at=now,
             )
@@ -261,7 +273,7 @@ class ReplaceTripAttractionHandler:
                 input_snapshot=snapshot,
                 input_snapshot_hash=snapshot_hash,
                 data_snapshot_version=data_version,
-                random_seed=int(snapshot_hash[:15], 16),
+                random_seed=_random_seed_from_snapshot_hash(snapshot_hash),
                 submitted_at=now,
                 updated_at=now,
                 target_trip_id=trip.trip_id,

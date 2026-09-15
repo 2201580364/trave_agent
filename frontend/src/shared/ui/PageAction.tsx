@@ -1,4 +1,4 @@
-import { Button, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import type { PropsWithChildren } from 'react'
 
 export function PageAction({
@@ -15,17 +15,13 @@ export function PageAction({
   return (
     <View className='action-bar'>
       <View className='action-inner'>
-        <Button
+        <View
           className={`primary ${isDisabled ? 'primary--disabled' : ''}`}
-          disabled={isDisabled}
-          loading={loading}
           aria-disabled={isDisabled}
-          onClick={() => {
-            if (!isDisabled) onClick()
-          }}
+          onClick={() => { if (!isDisabled) onClick() }}
         >
-          {children}
-        </Button>
+          <Text>{loading ? '处理中…' : children}</Text>
+        </View>
       </View>
     </View>
   )

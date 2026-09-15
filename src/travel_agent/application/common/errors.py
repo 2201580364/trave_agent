@@ -89,6 +89,11 @@ class InvalidAttractionReplacementError(ApplicationError):
         )
 
 
+class SelectionConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("selection_conflict", admin_error_message("selection_conflict"))
+
+
 class PlanShareIntentConflictError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
