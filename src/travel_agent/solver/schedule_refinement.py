@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .models import RoutedDay, RouteVisit
+from .quality_refinement import refine_ordered_schedule
 from .time_windows import resolve_effective_window
 from .visit_periods import evaluate_visit_period
 
@@ -37,7 +38,7 @@ def refine_daytime_schedule(
     The refinement is deliberately conservative:
 
     * a single daytime visit is only moved when a fixed evening segment exists;
-    * two or more daytime visits keep the conservative incremental spread;
+    * two or more daytime visits use the meal-aware fixed-order refinement;
     * the OR-Tools order and all OD edges remain unchanged;
     * a full dinner gap before an evening segment is preserved;
     * candidates that no longer fit an attraction window are discarded;
@@ -47,6 +48,9 @@ def refine_daytime_schedule(
     if daytime_visit_count > len(route.visits):
         return route
 
+    if daytime_visit_count >= 2:
+        return refine_ordered_schedule(route)
+
     route = _expand_evening_durations(route, daytime_visit_count)
     if daytime_visit_count == 1:
         return _expand_single_daytime_duration(
@@ -54,55 +58,7 @@ def refine_daytime_schedule(
             cross_buffered_min=cross_buffered_min,
             dinner_duration_min=dinner_duration_min,
         )
-    if daytime_visit_count < 2:
-        return route
-
-    daytime = route.visits[:daytime_visit_count]
-    evening = route.visits[daytime_visit_count:]
-    deadline = route.bounds.end_min
-    if evening:
-        dinner_safe_deadline = (
-            evening[0].arrival_min - cross_buffered_min - dinner_duration_min
-        )
-        minimum_finish = _minimum_finish(daytime)
-        if dinner_safe_deadline >= minimum_finish:
-            deadline = min(deadline, dinner_safe_deadline)
-        else:
-            deadline = min(deadline, evening[0].arrival_min - cross_buffered_min)
-
-    candidates: list[tuple[tuple[int, int, int, int], RoutedDay]] = []
-    for expand_duration in (True, False):
-        for preserve_lunch in (True, False):
-            refined_daytime = _build_candidate(
-                daytime,
-                expand_duration=expand_duration,
-                preserve_lunch=preserve_lunch,
-                deadline=deadline,
-            )
-            if refined_daytime is None:
-                continue
-            candidate = replace(route, visits=(*refined_daytime, *evening))
-            if not _times_fit(candidate):
-                continue
-            lunch_minutes = _lunch_gap_minutes(refined_daytime)
-            duration_gain = sum(
-                visit.planned_duration_min for visit in refined_daytime
-            ) - sum(visit.planned_duration_min for visit in daytime)
-            spread_target = min(DEFAULT_DAY_SPREAD_TARGET_END_MIN, deadline)
-            # Prefer a genuine lunch gap first, then fuller visits and afternoon
-            # coverage near the stable 16:00 target.  Earlier finish is only a
-            # final tie-breaker after equally well-spread candidates.
-            score = (
-                int(lunch_minutes >= DEFAULT_LUNCH_DURATION_MIN),
-                duration_gain,
-                -abs(refined_daytime[-1].leave_min - spread_target),
-                -refined_daytime[-1].leave_min,
-            )
-            candidates.append((score, candidate))
-
-    if not candidates:
-        return route
-    return max(candidates, key=lambda item: item[0])[1]
+    return route
 
 
 def _expand_evening_durations(route: RoutedDay, daytime_visit_count: int) -> RoutedDay:
@@ -222,66 +178,6 @@ def _expand_single_daytime_duration(
     return candidate if _times_fit(candidate) else expanded
 
 
-def _build_candidate(
-    visits: tuple[RouteVisit, ...],
-    *,
-    expand_duration: bool,
-    preserve_lunch: bool,
-    deadline: int,
-) -> tuple[RouteVisit, ...] | None:
-    built: list[RouteVisit] = []
-    lunch_inserted = False
-    for index, visit in enumerate(visits):
-        duration = (
-            max(visit.planned_duration_min, visit.attraction.suggested_duration)
-            if expand_duration
-            else visit.planned_duration_min
-        )
-        if index == 0:
-            arrival = visit.arrival_min
-        else:
-            previous = built[-1]
-            base_arrival = (
-                previous.leave_min + visit.buffered_travel_from_previous_min
-            )
-            arrival = max(base_arrival, visit.arrival_min)
-            if preserve_lunch and not lunch_inserted:
-                lunch_start = previous.leave_min
-                lunch_end = base_arrival + DEFAULT_LUNCH_DURATION_MIN
-                if (
-                    lunch_start <= DEFAULT_LUNCH_LATEST_END_MIN
-                    and lunch_end >= DEFAULT_LUNCH_EARLIEST_MIN
-                    and base_arrival < DEFAULT_LUNCH_LATEST_END_MIN
-                ):
-                    arrival = max(
-                        lunch_end,
-                        DEFAULT_LUNCH_TARGET_END_MIN,
-                    )
-                    lunch_inserted = True
-
-        candidate = _reschedule_visit(visit, arrival, duration)
-        built.append(candidate)
-
-    if preserve_lunch and not lunch_inserted:
-        return None
-
-    target_end = min(DEFAULT_DAY_SPREAD_TARGET_END_MIN, deadline)
-    if built[-1].leave_min < target_end:
-        delay = min(
-            target_end - built[-1].leave_min,
-            DEFAULT_DAY_SPREAD_MAX_DELAY_MIN,
-        )
-        built[-1] = _reschedule_visit(
-            built[-1],
-            built[-1].arrival_min + delay,
-            built[-1].planned_duration_min,
-        )
-
-    if built[-1].leave_min > deadline:
-        return None
-    return tuple(built)
-
-
 def _reschedule_visit(visit: RouteVisit, arrival: int, duration: int) -> RouteVisit:
     notice = None
     if duration < visit.attraction.suggested_duration:
@@ -302,27 +198,6 @@ def _reschedule_visit(visit: RouteVisit, arrival: int, duration: int) -> RouteVi
         duration_notice=notice,
         visit_period=period,
     )
-
-
-def _minimum_finish(visits: tuple[RouteVisit, ...]) -> int:
-    current = visits[0].arrival_min
-    for index, visit in enumerate(visits):
-        if index:
-            current += visit.buffered_travel_from_previous_min
-        current += visit.planned_duration_min
-    return current
-
-
-def _lunch_gap_minutes(visits: tuple[RouteVisit, ...]) -> int:
-    best = 0
-    for previous, current in zip(visits, visits[1:], strict=False):
-        gap_start = max(previous.leave_min, DEFAULT_LUNCH_EARLIEST_MIN)
-        gap_end = min(
-            current.arrival_min - current.buffered_travel_from_previous_min,
-            DEFAULT_LUNCH_LATEST_END_MIN,
-        )
-        best = max(best, gap_end - gap_start)
-    return max(0, best)
 
 
 def _times_fit(route: RoutedDay) -> bool:

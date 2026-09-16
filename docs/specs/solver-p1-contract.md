@@ -16,6 +16,8 @@
 → 构造 AttractionPreference + TripTimeAnchors
 → assign_days()
 → route_itinerary()
+→ improve_default_days()（仅自动分天；ADR-0027）
+→ route_itinerary()（分配变化时重新校验）
 → evaluate_solver_quality()
 → evaluate_itinerary_degradation()
 → presentation mapper / persistence / audit
@@ -278,4 +280,15 @@ M1 契约不承诺：
 
 结果节点增加可选 `selected_session: {session_id, start_min, end_min, entry_min}`，用于复现选择及显示真实开始时间；公开分享只显示时间、不暴露场次 ID。版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v7`，参数版本不变，不改写历史 Revision。
 
-包含显式固定场次的日期使用全天联合求解，保留晚餐软块，暂不执行 DAY_SPREAD/普通景点时长扩展，确保已选场次不会被后处理移动。无显式场次的日期沿用原分段与填充行为。
+上述 v7 的显式场次日跳过精修行为由 ADR-0027 替代：全天路由后仍执行用餐、普通建议时长和日间展开精修；场次只能改选当日另一条真实有效场次，不能平移或跨场拼接。
+
+
+## 整段行程质量增量契约（ADR-0027，H3）
+
+版本升级为 `constraints-p1-v8 / parameters-p1-2026-09-16`，请求/结果 schema 不变，历史 Revision 不覆盖。默认分天的初始数量均衡不作为最终数量差承诺；可行性恢复后按用餐、完整时长、晚间余量及按日容量归一化的游览加缓冲交通负载优化，保护原同日强近邻。候选必须全量守恒并重新通过硬校验。
+
+每日精修优先完整午晚餐、普通发布建议时长、首站原到达、晚间额外余量、后续日间节点下午覆盖，最后紧凑时序；交通占用不能重复作为用餐。两处以上普通日间节点不再受旧 60 分钟后移上限约束。博物馆等建议时长仍来自结构化发布事实，固定航次仍按真实场次结束。
+
+`schedule_quality_parameters` 纳入契约快照：路由缓存预算1024、最多6轮、最多4日日期排列、平衡容差200‰、近邻双向OD合计10分钟、晚间额外15分钟、CP-SAT每级确定性时间0.1。详见 [ADR-0027](../decisions/ADR-0027-whole-trip-schedule-quality.md)。全局搜索只作用于默认派生日期；直接求解器调用的显式日期分配不被重写。预算耗尽保留已验证最佳候选，不保证全局最优。
+
+数据库投影适配普通开放时间必须保留星期、有效日期和最晚入场；固定场次不限 show 类别。多条实际匹配的普通规则仍报冲突，不合并连续窗口绕过证据问题。

@@ -45,6 +45,8 @@ from travel_agent.solver import (
 )
 from travel_agent.solver.time_windows import applicable_fixed_sessions
 
+from .schedule_quality import improve_default_days
+
 LUNCH_EARLIEST_MIN = 11 * 60 + 30
 LUNCH_LATEST_END_MIN = 14 * 60
 LUNCH_FULL_DURATION_MIN = 60
@@ -125,6 +127,11 @@ class ProductionSolverGateway:
                 subgraph.provider(),
                 weather_by_date=prepared.weather,
             )
+            improved = improve_default_days(step1, itinerary, subgraph.provider(), prepared.weather)
+            if improved != step1:
+                itinerary = route_itinerary(
+                    improved, subgraph.provider(), weather_by_date=prepared.weather,
+                )
             quality = evaluate_solver_quality(itinerary, prepared.attractions)
             degradation = evaluate_itinerary_degradation(
                 itinerary,

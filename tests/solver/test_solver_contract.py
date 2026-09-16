@@ -12,8 +12,11 @@ def test_p1_contract_versions_and_parameters_are_frozen() -> None:
     contract = DEFAULT_SOLVER_P1_CONTRACT
 
     assert contract.contract_version == SOLVER_CONTRACT_VERSION == "solver-p1-v2"
-    assert contract.constraint_version == CONSTRAINT_VERSION == "constraints-p1-v7"
-    assert contract.parameter_version == PARAMETER_VERSION == "parameters-p1-2026-08-26"
+    assert contract.constraint_version == CONSTRAINT_VERSION == "constraints-p1-v8"
+    assert contract.parameter_version == PARAMETER_VERSION == "parameters-p1-2026-09-16"
+    quality = dict(contract.schedule_quality_parameters)
+    assert quality["QUALITY_ROUTE_BUDGET"] == 1024
+    assert quality["QUALITY_EVENING_REST_MIN"] == 15
     assert dict(contract.duration_ratios) == {
         "speed": 0.6,
         "normal": 0.6,

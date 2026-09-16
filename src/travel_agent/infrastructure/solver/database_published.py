@@ -141,7 +141,14 @@ class DatabasePublishedSolverDataProvider:
                     else _time_rules(session, revision.place_revision_id)
                 )
                 fixed_sessions = ()
-                if revision.place_kind == "show":
+                if revision.place_kind == "show" or session.scalar(
+                    select(PlaceTimeRuleRow.time_rule_id).where(
+                        PlaceTimeRuleRow.place_revision_id == revision.place_revision_id,
+                        PlaceTimeRuleRow.rule_kind == "fixed_session",
+                        PlaceTimeRuleRow.active.is_(True),
+                        PlaceTimeRuleRow.review_status == "human_verified",
+                    ).limit(1)
+                ) is not None:
                     from travel_agent.domain.place_catalog.session_payload import (
                         build_fixed_session_payload,
                     )
@@ -232,26 +239,17 @@ def _time_rules(session: Session, revision_id: str) -> tuple[TimeRule, ...]:
             .order_by(PlaceTimeRuleRow.created_at.asc(), PlaceTimeRuleRow.time_rule_id.asc())
         )
     )
-    # The solver's recurring rule is date-range based.  Published weekly rows
-    # with identical hours are therefore collapsed into one year-wide rule.
-    unique = {(row.start_minute, row.end_minute, row.last_entry_minute) for row in rows}
-    result: list[TimeRule] = []
-    for start, end, last_entry in sorted(
-        unique,
-        key=lambda value: tuple(-1 if item is None else item for item in value),
-    ):
-        if start is None or end is None:
-            continue
-        result.append(
-            TimeRule.from_strings(
-                ("01-01", "12-31"),
-                _clock(start),
-                _clock(end),
-                _clock(last_entry) if last_entry is not None else None,
-                crosses_midnight=end >= 1440,
-            )
+    # Preserve evidence kind and calendar applicability. Fixed departures are
+    # loaded as discrete sessions, never flattened into opening hours (H3/C2).
+    return tuple(
+        TimeRule(
+            1, 1, 12, 31, row.start_minute, row.end_minute,
+            row.last_entry_minute, frozenset(row.weekdays), row.valid_from, row.valid_to,
         )
-    return tuple(result)
+        for row in rows
+        if row.rule_kind == "opening_hours"
+        and row.start_minute is not None and row.end_minute is not None
+    )
 
 
 def _close_days(session: Session, revision_id: str) -> tuple[int, ...]:
@@ -321,11 +319,6 @@ def _selection_exclusion_groups(
         if external_id is not None:
             result.setdefault(external_id, set()).add(group.exclusion_group_id)
     return result
-
-
-def _clock(minutes: int) -> str:
-    minutes %= 24 * 60
-    return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
 def _local_weather(today: date) -> dict[date, DailyWeather]:

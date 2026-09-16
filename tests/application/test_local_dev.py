@@ -112,8 +112,8 @@ def test_local_app_exposes_holiday_sync_capability_from_environment(
     assert capability.json()["execution_available"] is True
 
 
-@pytest.mark.parametrize("show", [False, True])
-def test_local_app_prefers_database_published_projection(tmp_path: Path, show: bool) -> None:
+@pytest.mark.parametrize("show", [False, True, "cruise"])
+def test_local_app_prefers_database_published_projection(tmp_path: Path, show: bool | str) -> None:
     database_path = tmp_path / "published.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     migration = Config("alembic.ini")
@@ -142,7 +142,7 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path, show: b
                 lifecycle_status="published",
                 canonical_name="数据库发布景点",
                 aliases=[],
-                place_kind="show" if show else "attraction",
+                place_kind="show" if show is True else "attraction",
                 category="景点",
                 admin_area="杭州",
                 address="杭州",
@@ -191,7 +191,7 @@ def test_local_app_prefers_database_published_projection(tmp_path: Path, show: b
                 place_id="published-place",
                 place_revision_id="published-revision",
                 solver_node_id=101,
-                place_kind="show" if show else "attraction",
+                place_kind="show" if show is True else "attraction",
                 geometry_kind="point",
                 arrival_access_point_id="published-access",
                 departure_access_point_id="published-access",
@@ -351,3 +351,36 @@ def test_database_published_provider_loads_reviewed_selection_constraints(tmp_pa
     ).current_version("hangzhou")
     published = provider.load(version)
     assert published.attractions[0].selection_exclusion_group_ids == ("group-1",)
+
+
+def test_database_opening_rules_preserve_calendar_and_exclude_sessions() -> None:
+    """H3/C2: seasonal and weekday evidence must survive the database adapter."""
+    from sqlalchemy.orm import Session
+
+    from travel_agent.infrastructure.database.planning import Base
+    from travel_agent.infrastructure.solver.database_published import _time_rules
+
+    engine = build_engine(DatabaseSettings(url="sqlite:///:memory:"))
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        for rule_id, kind, weekdays, start, end in (
+            ("summer", "opening_hours", [1, 3, 5], date(2026, 6, 1), date(2026, 9, 30)),
+            ("winter", "opening_hours", [2, 4, 6], date(2026, 10, 1), date(2026, 12, 31)),
+            ("departure", "fixed_session", [1, 3, 5], None, None),
+        ):
+            session.add(PlaceTimeRuleRow(
+                time_rule_id=rule_id, place_revision_id="revision", rule_kind=kind,
+                weekdays=weekdays, valid_from=start, valid_to=end,
+                start_minute=540, end_minute=1080, last_entry_minute=1020,
+                source_record_id="source", review_status="human_verified", active=True,
+                created_at="2026-09-16T00:00:00+00:00",
+            ))
+        session.flush()
+        rules = _time_rules(session, "revision")
+        assert len(rules) == 2
+        assert rules[0].matches(date(2026, 9, 30))
+        assert not rules[0].matches(date(2026, 9, 29))
+        assert not rules[0].matches(date(2026, 10, 2))
+        assert rules[1].matches(date(2026, 10, 1))
+        assert not rules[1].matches(date(2026, 9, 29))
+        assert all(rule.last_entry_min == 1020 for rule in rules)

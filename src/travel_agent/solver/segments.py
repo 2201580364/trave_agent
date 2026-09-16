@@ -29,6 +29,7 @@ from .models import (
     TravelMode,
     TravelTimeResult,
 )
+from .quality_refinement import refine_ordered_schedule
 from .routing import RoutingSearchExecutor, route_day, validate_routed_day
 from .schedule_refinement import refine_daytime_schedule
 from .time_windows import resolve_effective_window
@@ -67,10 +68,11 @@ def route_segmented_day(
 
     if any(item.attraction.fixed_sessions for item in day_plan.allocations):
         # Solve all nodes together so daytime/evening preselection cannot discard a
-        # reachable later show session. Keep exact sessions pinned after routing.
+        # reachable later show session. Refinement only selects actual reviewed sessions.
         routed = route_day(
             day_plan, provider, buffer_ratio=buffer_ratio, search_executor=search_executor
         )
+        routed = refine_ordered_schedule(routed)
         meal = _schedule_meal(
             routed,
             daytime_visit_count=len(routed.visits),
@@ -394,6 +396,13 @@ def _schedule_meal(
             )
         )
     if visits:
+        for previous, following in zip(visits, visits[1:], strict=False):
+            intervals.append((
+                MealPlacement.BETWEEN_SEGMENTS,
+                previous.leave_min,
+                following.arrival_min - following.buffered_travel_from_previous_min,
+                True,
+            ))
         intervals.append(
             (
                 MealPlacement.AFTER_LAST_VISIT,

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from . import quality_policy
 from .anchors import DEFAULT_DAY_END_MIN, DEFAULT_DAY_START_MIN
 from .day_assignment import DEFAULT_DURATION_RATIO_BY_MODE
 from .models import RejectionCode, RouteSearchStatus, TravelMode
@@ -34,8 +35,8 @@ from .transport import DEFAULT_TRANSIT_BUFFER_RATIO
 
 LEGACY_SOLVER_CONTRACT_VERSION = "solver-p1-v1"
 SOLVER_CONTRACT_VERSION = "solver-p1-v2"
-CONSTRAINT_VERSION = "constraints-p1-v7"
-PARAMETER_VERSION = "parameters-p1-2026-08-26"
+CONSTRAINT_VERSION = "constraints-p1-v8"
+PARAMETER_VERSION = "parameters-p1-2026-09-16"
 DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN = 10
 
 
@@ -68,6 +69,7 @@ class SolverP1Contract:
     soft_objectives: tuple[str, ...]
     search_statuses: tuple[str, ...]
     rejection_codes: tuple[str, ...]
+    schedule_quality_parameters: tuple[tuple[str, int | float], ...]
 
     def __post_init__(self) -> None:
         if not self.contract_version or not self.parameter_version:
@@ -86,6 +88,10 @@ class SolverP1Contract:
 
 
 DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
+    schedule_quality_parameters=tuple(
+        (name, getattr(quality_policy, name)) for name in sorted(vars(quality_policy))
+        if name.startswith("QUALITY_")
+    ),
     contract_version=SOLVER_CONTRACT_VERSION,
     constraint_version=CONSTRAINT_VERSION,
     parameter_version=PARAMETER_VERSION,

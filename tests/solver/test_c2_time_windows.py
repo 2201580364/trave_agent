@@ -137,6 +137,25 @@ def test_c2_rejects_overlapping_matching_rules() -> None:
     assert resolution.rejection_code is RejectionCode.TIME_RULE_CONFLICT
 
 
+def test_c2_never_erases_entry_deadlines_by_merging_service_slots() -> None:
+    attraction = Attraction(
+        1,
+        "连续场次景点",
+        suggested_duration=110,
+        time_rules=(
+            TimeRule.from_strings(("01-01", "12-31"), "18:30", "19:30", "18:30"),
+            TimeRule.from_strings(("01-01", "12-31"), "19:30", "20:30", "19:30"),
+            TimeRule.from_strings(("01-01", "12-31"), "20:20", "21:30", "20:20"),
+        ),
+        data_verified=True,
+    )
+
+    resolution = resolve_effective_window(attraction, date(2026, 8, 1))
+
+    assert resolution.window is None
+    assert resolution.rejection_code is RejectionCode.TIME_RULE_CONFLICT
+
+
 def test_c2_always_open_skips_time_rule_requirement() -> None:
     attraction = Attraction(
         1,
@@ -176,4 +195,3 @@ def test_c2_requires_explicit_cross_midnight_flag() -> None:
 def test_c2_rejects_last_entry_after_close() -> None:
     with pytest.raises(ValueError, match="last_entry"):
         TimeRule.from_strings(("01-01", "12-31"), "09:00", "17:00", "18:00")
-
