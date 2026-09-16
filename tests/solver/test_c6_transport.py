@@ -76,6 +76,24 @@ def test_c6_missing_od_is_not_assumed_zero() -> None:
     assert evaluation.rejection_code is RejectionCode.OD_DATA_MISSING
 
 
+def test_approximate_provider_uses_departure_endpoint_for_origin() -> None:
+    provider = ApproximateTravelTimeProvider(
+        {1: Coordinate(30.0000, 120.0000), 2: Coordinate(30.0000, 120.0100)},
+        departure_coordinates={1: Coordinate(30.0000, 120.0300)},
+        speed_kmh=30,
+        detour_ratio=1,
+        minimum_travel_min=1,
+        data_version="approx-v1",
+        fetched_at=NOW,
+    )
+
+    result = provider.get_travel_time(1, 2)
+
+    assert result is not None
+    assert result.distance_m > 1000
+    assert provider.get_travel_time(2, 1) is None
+
+
 def test_c6_same_node_has_zero_travel_time() -> None:
     provider = InMemoryTravelTimeProvider({}, default_basis=ODBasis.GAODE)
 

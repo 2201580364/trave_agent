@@ -76,6 +76,7 @@ class ApproximateTravelTimeProvider:
         self,
         coordinates: Mapping[int, Coordinate],
         *,
+        departure_coordinates: Mapping[int, Coordinate] | None = None,
         speed_kmh: float = 30.0,
         walking_threshold_m: int = 0,
         walking_speed_kmh: float = 4.5,
@@ -95,6 +96,9 @@ class ApproximateTravelTimeProvider:
         if fetched_at.tzinfo is None:
             raise ValueError("fetched_at must be timezone-aware")
         self.coordinates = dict(coordinates)
+        self.departure_coordinates = dict(
+            coordinates if departure_coordinates is None else departure_coordinates
+        )
         self.speed_kmh = speed_kmh
         self.walking_threshold_m = walking_threshold_m
         self.walking_speed_kmh = walking_speed_kmh
@@ -118,7 +122,7 @@ class ApproximateTravelTimeProvider:
                 fetched_at=self.fetched_at,
                 distance_m=0,
             )
-        origin = self.coordinates.get(origin_id)
+        origin = self.departure_coordinates.get(origin_id)
         destination = self.coordinates.get(destination_id)
         if origin is None or destination is None:
             return None

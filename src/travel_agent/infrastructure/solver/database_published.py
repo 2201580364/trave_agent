@@ -112,6 +112,7 @@ class DatabasePublishedSolverDataProvider:
                 raise LookupError("database published catalog version is no longer current")
             attractions: list[PublishedAttraction] = []
             coordinates: dict[int, Coordinate] = {}
+            departure_coordinates: dict[int, Coordinate] = {}
             for solver_node_id, projection in enumerate(projections, start=1):
                 revision = session.get(PlaceRevisionRow, projection.place_revision_id)
                 if revision is None:
@@ -126,13 +127,15 @@ class DatabasePublishedSolverDataProvider:
                     )
                 )
                 by_id = {row.access_point_id: row for row in access_rows}
-                arrival = by_id.get(projection.arrival_access_point_id) or (
-                    access_rows[0] if access_rows else None
-                )
-                if arrival is None:
+                arrival = by_id.get(projection.arrival_access_point_id)
+                departure = by_id.get(projection.departure_access_point_id)
+                if arrival is None or departure is None:
                     continue
                 coordinate = Coordinate(float(arrival.lat), float(arrival.lng))
                 coordinates[solver_node_id] = coordinate
+                departure_coordinates[solver_node_id] = Coordinate(
+                    float(departure.lat), float(departure.lng)
+                )
                 payload = projection.solver_payload or {}
                 name = str(payload.get("name") or revision.canonical_name)
                 duration = int(payload.get("suggested_duration") or revision.duration_recommended)
@@ -223,6 +226,7 @@ class DatabasePublishedSolverDataProvider:
                 weather_by_date=self._weather_factory(today),
                 travel_time_provider=ApproximateTravelTimeProvider(
                     coordinates,
+                    departure_coordinates=departure_coordinates,
                     speed_kmh=18,
                     walking_threshold_m=2000,
                     walking_speed_kmh=4.5,

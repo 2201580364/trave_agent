@@ -2,13 +2,13 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-17（邻近质量修复已提交、问题清单收口与内置Chrome页签复测）
-- 当前节点：`M1 后段 / Gate 7 / OM1；发布目录动态数据库接入已部署；用户端按请求读取最新 published Projection；关系裁决形成的互斥组进入选点与求解约束；OD近邻分天保护与十景点整段质量修复已提交；问题清单剩余项已收口`
+- 更新时间：2026-09-17（M1工程收尾：OD出入园端点接入与全量回归）
+- 当前节点：`M1 后段 / Gate 7 / OM1；发布目录动态数据库接入已部署；用户端按请求读取最新 published Projection；关系裁决形成的互斥组进入选点与求解约束；OD近邻分天保护与十景点整段质量修复已提交；12 条代表性候选已完成审核、批次发布与用户可见性回归；问题清单剩余项已收口`
 - 线上验收：API 使用 `api-20260915-ui11`，用户端使用 `user-h5-20260915-ui11`；修复 MySQL `INT` random_seed 溢出、静态资源缓存后，杭州 3 日行程生成成功，质量门禁通过，0 条未排入；用户端首页已显示“登录 / 注册”，用户端与管理端自有容器均保持运行。
 - 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：后端全量 pytest 通过（本轮代码修复后）；Golden9/9；ruff（src/tests/scripts）、全仓mypy 242文件、153文件分层、check_docs通过。新增投影/O17/OD定向回归通过。无新增迁移。
 - 本轮本地服务复测：API8000、管理端5173、用户端H5 10086已恢复；内置Chrome新开用户端页签完成“什么时候去”→“想去哪里”→“确认并生成”，页面边界为09-30至10-02、09:00开始、18:00结束。页面真实显示3天、10已安排/0未排入；切换三天并刷新后仍能恢复同一行程。
 - 已有关系约束基线：已发布且 `human_verified` 的 `selection_exclusion_groups` 随数据库目录加载到 `PublishedAttraction`；选点接口与 `ProductionSolverGateway` 双层拒绝同组重复选择，已有数据库/求解器回归随本轮全量通过。
-- 最近提交基线：HEAD `90c94fd`（邻近室外景点同日质量修复与问题清单收口已由用户提交）；当前工作区无待提交改动。
+- 最近提交基线：HEAD `90c94fd`（邻近室外景点同日质量修复与问题清单收口已由用户提交）；本轮 M1 收尾改动待用户手动提交。
 
 ## 最近三轮已完成
 
@@ -18,10 +18,9 @@
 
 ## 下一步（按顺序）
 
-1. 完成 G7-R0.2-05-03 / R0.2-07：对已选定的 12 条代表性候选完成六项审核准备度、Projection、批次发布与用户端可见性回归。
-2. 扩展研究目录至 50–75 条 `human_verified` Place，达到 G7-R1 研究最低目录门槛。
-3. 实施 R0.2-06 按需真实有向 OD 子图：候选过滤、真实 OD 获取、缓存、不可变子图 hash、Revision 回放，缺边不填 0。
-4. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；G1 真实用户发现研究可并行准备，并在 R1 外部招募前关闭。
+1. 对 72 条杭州研究目录做初步扩张和覆盖复核；暂不以批量扩张至 50–75 条 `human_verified` 作为当前退出条件。
+2. 收尾 R0.2-06 按需真实有向 OD 子图：现有版本化适配器、文件/Redis 缓存、不可变子图 hash 和回放已通过定向回归；仍需补齐数据库发布目录的出园→入园端点建模、真实受控凭证/环境与部署级验收。
+3. 进入 R0.3 服务器全栈 Compose/HTTPS/环境锁定；真实用户访谈和研究结论按用户安排后置，待其余 M1 工程项收尾后再启动。
 
 ## 本地运行验证（2026-09-16）
 
@@ -32,9 +31,9 @@
 - `SOLVER-QUALITY-005` 新观察：平湖秋月与断桥残雪已同日，但同日内方向仍由近似OD决定，当前可能为断桥→平湖；未违反 C1/C2/C4/C5/C6，待真实有向OD或显式西湖游线规则支持后优化。
 - 本地近似OD仍不是实时路网；本轮只修正“未知近似短边误展示为步行”的标签与缓冲，不替代R0.2-06真实有向OD子图。
 - 2026-09-10 提交核对仍需裁决：S6 sessionStorage + /me 会话恢复与 ADR-0020 持久化禁令存在边界差异；几何修复的客户端文案与 error-messages.md 单一文案源存在边界差异。
-- 2026-09-11 只读核对：原 12 条批次 10 published / 2 candidate（杭州博物馆 027、良渚博物院 052，均无更新版本）；钱江新城灯光秀 048 的时间证据差异单独保留，不自动修改或豁免。
+- 2026-09-17 复核确认：12 条代表性候选已完成六项审核准备度、Projection、批次发布和用户端可见性回归；研究目录当前只做初步扩张，不启动大规模 `human_verified` 扩张。钱江新城灯光秀 048 的时间证据差异仍单独保留，不自动修改或豁免。
 
-- Gate 1 存在真实用户研究补证债务：无真实访谈纪要与可追溯结论，M1 最终决策前必须完成 8–10 名目标用户发现研究，不得倒填。
+- Gate 1 真实用户研究补证按用户安排后置：当前先完成其余 M1 工程项和可供用户体验的受控环境；M1 最终决策前仍需补齐 8–10 名目标用户访谈、去标识结论和 assumptions 回写。
 - 历史账本记载的测试计数互相矛盾（352/363/367/370/…/432），以本文件顶部稳定测试基线为准；旧计数属阶段性快照，不代表回退。
 - 服务器真实 MySQL 已通过 readiness 核对至 `0016_expand_alembic_version`；后续迁移或部署仍需保留 readiness、备份与隔离恢复核对。
 - H1–H12 全部「未验证」；自动化测试、Chrome 验收或团队内部判断均不能冒充 H3/H11 的真实用户证据。
@@ -44,7 +43,8 @@
 
 | 任务 | 分支 | 触碰文件 | 状态 |
 |---|---|---|---|
-| 问题清单剩余四项收口（H3，接续本会话） | dev | `src/`、`tests/`存量类型修复；交通Provider与展示适配/参数及对应测试；地点发布通过业务接口；CURRENT/归档/改造计划/报告 | 已完成待提交；TYPE-001/OD-QUALITY-001/ADMIN-DATA-001/DATA-PLACE-002/SOLVER-QUALITY-004关闭；SOLVER-QUALITY-005登记后续 |
+| M1 收尾 R0.2-06 出入园端点（H3/C6） | dev | `infrastructure/solver/{gaode,database_published}.py`、`solver/transport.py`、相关 tests、CURRENT、project-roadmap | 已完成本地实现与回归；真实高德凭证、服务器缓存和部署级验收仍待受控环境 |
+| 问题清单收口（H3） | dev | `src/`、`tests/`、状态文档与问题清单 | 已提交；15 条 resolved，SOLVER-QUALITY-005 为非阻塞观察 |
 | 十景点整体排程质量（H3/C2/C4/C6） | dev | `solver/{schedule_refinement,quality_refinement,quality_policy,segments,time_windows,contract}.py`、`infrastructure/solver/{gateway,database_published,schedule_quality}.py`、相关tests、ADR-0027、solver规格、CURRENT/改造计划/本月归档、质量报告；研究库仅页面新建行程 | 已完成本地工程验收，待用户手动提交及人工复测，未线上部署 |
 | 固定场次允许开场后入场及三地点生命周期验收（H3/C2，2026-09-15） | dev | `domain/place_catalog/session_payload.py`、`solver/{models,time_windows,routing,day_assignment,contract}.py`、`infrastructure/solver/database_published.py`、相关 tests、ADR/规格、CURRENT、本月归档、验收报告；本地 research.db 经业务接口写入 | 已完成验收；实现与文档待用户手动提交；账本剩余2项：平湖秋月真实事实补证、全仓mypy存量债 |
 | S7-4 O04完整组件迁移（H3） | dev | `admin-web/src/pages/{GeometryAccessEvidenceCard,RevisionDetailsPage,revisionDetailFields}.tsx`、`revisionDetailDisplay.ts`、CURRENT/改造计划/本月归档 | 实现完成待提交；47/47、typecheck、build通过 |

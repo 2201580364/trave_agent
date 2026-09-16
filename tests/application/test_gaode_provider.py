@@ -353,6 +353,42 @@ def test_gaode_builder_materializes_both_directions_and_selects_walking() -> Non
     assert transport.calls[0][1]["origin"] != transport.calls[2][1]["origin"]
 
 
+def test_gaode_builder_uses_explicit_departure_coordinates_for_directed_edges() -> None:
+    transport = FakeTransport(
+        {
+            "/v3/direction/walking": _payload(duration_seconds=600, distance_m=900),
+        }
+    )
+    settings = GaodeSettings("secret", enabled_modes=(ODTravelMode.WALKING,))
+    client = GaodeRouteClient(settings, FixedClock(), transport=transport)
+    arrival = {1: ORIGIN, 2: DESTINATION}
+    departure = {1: Coordinate(30.2600, 120.1660), 2: Coordinate(30.2535, 120.1505)}
+
+    built = GaodeODSnapshotBuilder(settings, client).build(
+        arrival,
+        departure_coordinates=departure,
+        selected_node_ids=(1, 2),
+    )
+
+    assert built.report.complete
+    assert transport.calls[0][1]["origin"] == "120.166000,30.260000"
+    assert transport.calls[0][1]["destination"] == "120.149500,30.252500"
+    assert transport.calls[1][1]["origin"] == "120.150500,30.253500"
+    assert transport.calls[1][1]["destination"] == "120.165000,30.259000"
+
+
+def test_gaode_builder_rejects_selected_node_without_both_endpoints() -> None:
+    settings = GaodeSettings("secret", enabled_modes=(ODTravelMode.WALKING,))
+    client = GaodeRouteClient(settings, FixedClock(), transport=FakeTransport({}))
+
+    with pytest.raises(ValueError, match="arrival and departure"):
+        GaodeODSnapshotBuilder(settings, client).build(
+            {1: ORIGIN, 2: DESTINATION},
+            departure_coordinates={1: ORIGIN},
+            selected_node_ids=(1, 2),
+        )
+
+
 def test_gaode_builder_prefers_transit_when_close_to_driving_time() -> None:
     transport = FakeTransport(
         {

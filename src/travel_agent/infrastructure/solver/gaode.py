@@ -516,8 +516,16 @@ class GaodeODSnapshotBuilder:
         coordinates: Mapping[int, Coordinate],
         *,
         fallback: TravelTimeProvider | None = None,
+        departure_coordinates: Mapping[int, Coordinate] | None = None,
+        selected_node_ids: tuple[int, ...] | None = None,
     ) -> GaodeSnapshotBuild:
-        ordered = tuple(sorted(coordinates.items()))
+        # ADR-0018 / R0.2-06: an area's exit need not be its entrance.
+        # Legacy point snapshots explicitly keep one coordinate for both roles.
+        node_ids = set(coordinates) if selected_node_ids is None else set(selected_node_ids)
+        departures = coordinates if departure_coordinates is None else departure_coordinates
+        if not node_ids.issubset(coordinates) or not node_ids.issubset(departures):
+            raise ValueError("selected OD nodes require arrival and departure coordinates")
+        ordered = tuple((node_id, coordinates[node_id]) for node_id in sorted(node_ids))
         results: dict[tuple[int, int], TravelTimeResult] = {}
         failures: dict[str, int] = {}
         failure_details: list[GaodeFailureDetail] = []
@@ -525,7 +533,8 @@ class GaodeODSnapshotBuilder:
         fallback_count = 0
         missing_count = 0
         fetched_times: list[datetime] = []
-        for origin_id, origin in ordered:
+        for origin_id, _arrival in ordered:
+            origin = departures[origin_id]
             for destination_id, destination in ordered:
                 if origin_id == destination_id:
                     continue
