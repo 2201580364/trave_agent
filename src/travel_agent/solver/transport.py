@@ -14,6 +14,7 @@ from .models import (
     ConnectionEvaluation,
     Coordinate,
     ODBasis,
+    ODTravelMode,
     RejectionCode,
     TravelTimeResult,
 )
@@ -76,11 +77,15 @@ class ApproximateTravelTimeProvider:
         coordinates: Mapping[int, Coordinate],
         *,
         speed_kmh: float = 30.0,
+        walking_threshold_m: int = 0,
+        walking_speed_kmh: float = 4.5,
         detour_ratio: float = 1.3,
         minimum_travel_min: int = 1,
         data_version: str,
         fetched_at: datetime,
     ) -> None:
+        if walking_threshold_m < 0 or walking_speed_kmh <= 0:
+            raise ValueError("walking parameters must be non-negative/positive")
         if speed_kmh <= 0:
             raise ValueError("speed_kmh must be positive")
         if detour_ratio < 1:
@@ -91,6 +96,8 @@ class ApproximateTravelTimeProvider:
             raise ValueError("fetched_at must be timezone-aware")
         self.coordinates = dict(coordinates)
         self.speed_kmh = speed_kmh
+        self.walking_threshold_m = walking_threshold_m
+        self.walking_speed_kmh = walking_speed_kmh
         self.detour_ratio = detour_ratio
         self.minimum_travel_min = minimum_travel_min
         self.data_version = data_version
@@ -116,9 +123,12 @@ class ApproximateTravelTimeProvider:
         if origin is None or destination is None:
             return None
         distance_km = _haversine_km(origin, destination)
+        distance_m = max(1, math.ceil(distance_km * self.detour_ratio * 1000))
+        walking = 0 < distance_m <= self.walking_threshold_m
+        speed = self.walking_speed_kmh if walking else self.speed_kmh
         travel_min = max(
             self.minimum_travel_min,
-            math.ceil(distance_km * self.detour_ratio / self.speed_kmh * 60),
+            math.ceil(distance_km * self.detour_ratio / speed * 60),
         )
         return TravelTimeResult(
             origin_id=origin_id,
@@ -127,7 +137,8 @@ class ApproximateTravelTimeProvider:
             basis=ODBasis.APPROXIMATE,
             data_version=self.data_version,
             fetched_at=self.fetched_at,
-            distance_m=max(1, math.ceil(distance_km * self.detour_ratio * 1000)),
+            distance_m=distance_m,
+            travel_mode=ODTravelMode.WALKING if walking else None,
         )
 
 

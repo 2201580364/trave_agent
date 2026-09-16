@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Path, Query, Request
 
+from travel_agent.application.admin import PlaceReviewWorkflowService
 from travel_agent.domain.admin import AdminPrincipal
 
 from . import admin_responses as responses
@@ -20,7 +21,9 @@ from .admin import (
 )
 
 
-def register_o07_o08_routes(router: APIRouter, review_workflow, principal_dependency) -> None:
+def register_o07_o08_routes(
+    router: APIRouter, review_workflow: PlaceReviewWorkflowService, principal_dependency: Any
+) -> None:
     @router.get("/place-revisions/{revision_id}/source-conflicts")
     def list_place_source_conflicts(
         revision_id: str,

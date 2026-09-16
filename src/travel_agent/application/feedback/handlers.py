@@ -12,6 +12,7 @@ from travel_agent.application.common.errors import (
 from travel_agent.application.common.unit_of_work import UnitOfWork
 from travel_agent.application.planning.ports import IdGenerator
 from travel_agent.domain.feedback import Feedback, validate_feedback_payload
+from travel_agent.domain.planning import TripRevision
 
 from .commands import SubmitNodeFeedback, SubmitTripFeedback
 
@@ -157,15 +158,15 @@ def _submit_feedback(
     return FeedbackResult(feedback, reused=False, deduplicated=False)
 
 
-def _revision_contains_node(revision, node_id: str) -> bool:
+def _revision_contains_node(revision: TripRevision, node_id: str) -> bool:
     raw_days = revision.result_snapshot.get("days")
     if not isinstance(raw_days, list):
         return False
     return any(
         isinstance(node, dict) and node.get("node_id") == node_id
         for day in raw_days
-        if isinstance(day, dict)
-        for node in (day.get("nodes") if isinstance(day.get("nodes"), list) else [])
+        if isinstance(day, dict) and isinstance((nodes := day.get("nodes")), list)
+        for node in nodes
     )
 
 

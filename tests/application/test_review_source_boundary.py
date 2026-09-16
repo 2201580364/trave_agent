@@ -33,7 +33,7 @@ def test_source_write_rolls_back_with_audit_then_retries_once(
     revision_id = "revision-source-boundary"
     _seed_candidate_revision(context, revision_id)
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
-    payload = {
+    payload: dict[str, object] = {
         "expected_revision_version": 1,
         "operation_intent_id": "source-boundary-retry",
         "reason_code": "SOURCE_EVIDENCE_CONFIRMED",

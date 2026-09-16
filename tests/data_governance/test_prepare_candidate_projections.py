@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests" / "place_catalog"))
 
-from prepare_candidate_projections import build_candidate_projection  # noqa: E402, I001
-from test_place_catalog import (  # noqa: E402
+from scripts.prepare_candidate_projections import build_candidate_projection  # noqa: E402, I001
+from tests.place_catalog.test_place_catalog import (  # noqa: E402
     _access_points,
     _geometry,
     _place,

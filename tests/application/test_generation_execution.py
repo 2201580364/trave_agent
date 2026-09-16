@@ -50,9 +50,18 @@ def _store() -> InMemoryPlanningStore:
         draft_id="draft_1", principal_id="principal_1", city_id="hangzhou", now=NOW
     )
     intent = GenerationIntent(
-        "intent_1", "principal_1", "draft_1", 1, GenerationStatus.QUEUED,
-        "generation-input-v1", {"city_id": "hangzhou"}, "a" * 64,
-        "hangzhou-2026-08-24-v1", 7, NOW, NOW,
+        "intent_1",
+        "principal_1",
+        "draft_1",
+        1,
+        GenerationStatus.QUEUED,
+        "generation-input-v1",
+        {"city_id": "hangzhou"},
+        "a" * 64,
+        "hangzhou-2026-08-24-v1",
+        7,
+        NOW,
+        NOW,
     )
     return InMemoryPlanningStore(
         drafts={draft.draft_id: draft},
@@ -87,6 +96,8 @@ def test_success_atomically_creates_run_trip_and_immutable_revision() -> None:
 
     assert result.status is GenerationStatus.COMPLETED
     assert len(store.solver_runs) == len(store.trips) == len(store.trip_revisions) == 1
+    assert result.trip_id is not None
+    assert result.trip_revision_id is not None
     trip = store.trips[result.trip_id]
     revision = store.trip_revisions[result.trip_revision_id]
     assert trip.current_revision_id == revision.trip_revision_id
@@ -112,10 +123,10 @@ def test_revision_intent_appends_to_existing_trip_without_mutating_history() -> 
     store = _store()
     gateway = FakeGateway(_outcome())
     ids = SequenceIdGenerator()
-    handler = ExecuteGenerationHandler(
-        InMemoryUnitOfWork(store), FixedClock(), ids, gateway
-    )
+    handler = ExecuteGenerationHandler(InMemoryUnitOfWork(store), FixedClock(), ids, gateway)
     first = handler.handle("intent_1")
+    assert first.trip_id is not None
+    assert first.trip_revision_id is not None
     old_revision = store.trip_revisions[first.trip_revision_id]
     source = store.drafts["draft_1"]
     replacement_draft = TripDraft(
@@ -155,15 +166,16 @@ def test_revision_intent_appends_to_existing_trip_without_mutating_history() -> 
     assert len(store.trips) == 1
     assert len(store.trip_revisions) == 2
     assert store.trip_revisions[first.trip_revision_id] == old_revision
+    assert second.trip_revision_id is not None
     assert store.trip_revisions[second.trip_revision_id].revision_number == 2
     assert store.trips[first.trip_id].current_revision_id == second.trip_revision_id
 
 
 def test_running_intent_cannot_be_claimed_by_a_second_worker() -> None:
     store = _store()
-    store.generation_intents["intent_1"] = store.generation_intents[
-        "intent_1"
-    ].claim_running(now=NOW)
+    store.generation_intents["intent_1"] = store.generation_intents["intent_1"].claim_running(
+        now=NOW
+    )
 
     with pytest.raises(InvalidStateTransitionError):
         _handler(store, FakeGateway(_outcome())).handle("intent_1")

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import httpx
 import pytest
 
@@ -13,7 +15,7 @@ from travel_agent.infrastructure.holiday_sync import (
 )
 
 
-def _client(handler) -> httpx.Client:
+def _client(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
@@ -56,9 +58,7 @@ def test_discoverer_accepts_only_exact_state_council_office_notice() -> None:
 
 def test_discoverer_returns_not_found_only_after_successful_official_search() -> None:
     client = _client(
-        lambda request: httpx.Response(
-            200, json={"code": 200, "searchVO": {"catMap": {}}}
-        )
+        lambda request: httpx.Response(200, json={"code": 200, "searchVO": {"catMap": {}}})
     )
 
     assert GovCnAnnouncementDiscoverer(client).discover(year=2027) is None
@@ -78,9 +78,7 @@ def test_fetcher_rejects_official_redirect_to_external_domain() -> None:
             return httpx.Response(302, headers={"location": "https://example.com/file"})
         return httpx.Response(200, headers={"content-type": "text/html"}, content=b"bad")
 
-    announcement = OfficialHolidayAnnouncement(
-        "https://www.gov.cn/holiday", "notice", "source"
-    )
+    announcement = OfficialHolidayAnnouncement("https://www.gov.cn/holiday", "notice", "source")
     with pytest.raises(ValueError, match="redirected outside"):
         GovCnAnnouncementFetcher(_client(handler)).fetch(announcement)
 
@@ -93,8 +91,6 @@ def test_fetcher_accepts_bounded_official_html() -> None:
             content="国务院办公厅节假日通知".encode(),
         )
     )
-    announcement = OfficialHolidayAnnouncement(
-        "https://www.gov.cn/holiday", "notice", "source"
-    )
+    announcement = OfficialHolidayAnnouncement("https://www.gov.cn/holiday", "notice", "source")
 
     assert GovCnAnnouncementFetcher(client).fetch(announcement)

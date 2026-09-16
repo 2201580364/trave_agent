@@ -39,7 +39,10 @@ def test_task_audit_failure_rolls_back_and_allows_idempotent_retry(
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
     submit_url = f"/api/v1/admin/place-revisions/{revision_id}/review-tasks"
     url = submit_url
-    payload = {"operation_intent_id": "task-boundary-retry", "reason_code": "FACTS_VERIFIED"}
+    payload: dict[str, object] = {
+        "operation_intent_id": "task-boundary-retry",
+        "reason_code": "FACTS_VERIFIED",
+    }
     expected_status = "ready_for_review"
     expected_version = 1
     if operation != "submit":
@@ -80,7 +83,7 @@ def test_task_audit_failure_rolls_back_and_allows_idempotent_retry(
                 [
                     dict(row)
                     for row in session.execute(
-                        select(model.__table__).order_by(*model.__table__.primary_key.columns)
+                        select(model.__table__).order_by(*model.__table__.primary_key)
                     ).mappings()
                 ]
                 for model in (
@@ -210,16 +213,12 @@ def test_batch_requires_bounded_task_id_before_any_write(
     if task_id is not None:
         item["task_id"] = task_id
     with context.sessions() as session:
-        before = list(
-            session.scalars(select(AdminAuditEventRow.audit_event_id))
-        )
+        before = list(session.scalars(select(AdminAuditEventRow.audit_event_id)))
     response = context.client.post(
         "/api/v1/admin/review-tasks/batch-decisions", headers=headers, json={"items": [item]}
     )
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "request_validation_failed"
     with context.sessions() as session:
-        after = list(
-            session.scalars(select(AdminAuditEventRow.audit_event_id))
-        )
+        after = list(session.scalars(select(AdminAuditEventRow.audit_event_id)))
     assert after == before

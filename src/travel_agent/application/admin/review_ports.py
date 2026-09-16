@@ -124,10 +124,14 @@ class ActorRepository(Protocol):
 
 
 class ReviewUnitOfWork(Protocol):
-    reviews: ReviewRepository
-    catalog: PlaceCatalogRepository
-    audits: AuditRepository
-    actors: ActorRepository
+    @property
+    def reviews(self) -> ReviewRepository: ...
+    @property
+    def catalog(self) -> PlaceCatalogRepository: ...
+    @property
+    def audits(self) -> AuditRepository: ...
+    @property
+    def actors(self) -> ActorRepository: ...
 
     def __enter__(self) -> Self: ...
 

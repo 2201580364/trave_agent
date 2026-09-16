@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import IntEnum
-from typing import Any
+from typing import Any, TypeGuard
 
 ALLOWED_CATEGORIES = frozenset(
     {
@@ -77,9 +77,7 @@ class AttractionDataValidation:
         if tuple(item.rule for item in self.rules) != tuple(DataRule):
             raise ValueError("validation must contain each data rule exactly once")
         expected_structure = all(
-            item.passed
-            for item in self.rules
-            if item.rule is not DataRule.SOLVER_ELIGIBILITY
+            item.passed for item in self.rules if item.rule is not DataRule.SOLVER_ELIGIBILITY
         )
         if self.structurally_valid != expected_structure:
             raise ValueError("structural validation result is inconsistent")
@@ -184,9 +182,7 @@ def _time_order_errors(rules: tuple[_ParsedTimeRule, ...]) -> list[str]:
     for index, rule in enumerate(rules):
         if rule.crosses_midnight:
             if rule.close_min > rule.open_min:
-                errors.append(
-                    f"time_rules[{index}] crosses_midnight requires next-day close"
-                )
+                errors.append(f"time_rules[{index}] crosses_midnight requires next-day close")
         elif rule.close_min <= rule.open_min:
             errors.append(f"time_rules[{index}] close must be after open")
     return errors
@@ -303,7 +299,7 @@ def _mapping_sequence(value: object) -> tuple[Mapping[str, Any], ...]:
     return tuple(item for item in value if isinstance(item, Mapping))
 
 
-def _is_sequence(value: object) -> bool:
+def _is_sequence(value: object) -> TypeGuard[Sequence[Any]]:
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
 
 
@@ -354,7 +350,7 @@ def _valid_timestamp(value: object) -> bool:
     return parsed.tzinfo is not None
 
 
-def _is_number(value: object) -> bool:
+def _is_number(value: object) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 

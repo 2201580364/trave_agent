@@ -858,6 +858,85 @@ def test_holiday_calendar_sync_job_api_creates_lists_and_reads_job(
     assert calendar.json()["periods"]
 
 
+def test_holiday_calendar_o17_routes_return_403_for_authenticated_actor_without_permission(
+    admin_context: AdminTestContext,
+) -> None:
+    _, root_headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
+    created = admin_context.client.post(
+        "/api/v1/admin/admin-actors",
+        headers=root_headers,
+        json={
+            "operation_intent_id": "op-create-content-moderator-1",
+            "login_name": "content.moderator",
+            "initial_password": EDITOR_PASSWORD,
+            "role_keys": ["content_moderator"],
+            "reason_code": "OM1_TEAM_PROVISIONING",
+            "reason_text": "为社区内容处理建立最小权限账号",
+        },
+    )
+    assert created.status_code == 201
+    _, headers = _login(admin_context.client, "content.moderator", EDITOR_PASSWORD)
+
+    read_responses = [
+        admin_context.client.get("/api/v1/admin/holiday-calendar-sync-capability", headers=headers),
+        admin_context.client.get("/api/v1/admin/holiday-calendar-sync-jobs", headers=headers),
+        admin_context.client.get(
+            "/api/v1/admin/holiday-calendar-sync-jobs/sync-job-missing",
+            headers=headers,
+        ),
+        admin_context.client.get(
+            "/api/v1/admin/holiday-calendars/cn-mainland-2026",
+            headers=headers,
+        ),
+        admin_context.client.get(
+            "/api/v1/admin/holiday-calendars/cn-mainland-2026/impact",
+            headers=headers,
+        ),
+    ]
+    write_responses = [
+        admin_context.client.post(
+            "/api/v1/admin/holiday-calendar-sync-jobs",
+            headers=headers,
+            json={
+                "year": 2027,
+                "mode": "sync",
+                "operation_intent_id": "forbidden-sync-create",
+            },
+        ),
+        admin_context.client.post(
+            "/api/v1/admin/holiday-calendar-sync-jobs/sync-job-missing/cancel",
+            headers=headers,
+        ),
+        admin_context.client.post(
+            "/api/v1/admin/holiday-calendar-sync-jobs/sync-job-missing/confirm",
+            headers=headers,
+            json={
+                "operation_intent_id": "forbidden-sync-confirm",
+                "periods": [
+                    {
+                        "name": "元旦",
+                        "start": "2027-01-01",
+                        "end": "2027-01-01",
+                        "evidence_quote": "国务院办公厅通知原文摘录",
+                    }
+                ],
+                "adjusted_workdays": [],
+            },
+        ),
+    ]
+
+    for response in read_responses:
+        assert response.status_code == 403
+        error = response.json()["error"]
+        assert error["code"] == "admin_permission_denied"
+        assert error["details"]["required_permission"] == "holiday:calendar:read"
+    for response in write_responses:
+        assert response.status_code == 403
+        error = response.json()["error"]
+        assert error["code"] == "admin_permission_denied"
+        assert error["details"]["required_permission"] == "holiday:calendar:write"
+
+
 def test_holiday_exception_generation_is_audited_and_materializes_only_conflicts(
     admin_context: AdminTestContext,
 ) -> None:
@@ -990,6 +1069,7 @@ def test_projection_preparation_api_is_verified_idempotent_and_does_not_publish(
     assert prepared is not None
     assert prepared.status == "candidate"
     assert prepared.solver_node_id == 1
+    assert prepared.solver_payload["data_verified"] is True
 
     replay = context.client.post(
         "/api/v1/admin/place-revisions/revision-projection/projection-preparations",
@@ -1760,6 +1840,7 @@ def test_reviewer_can_decide_each_active_evidence_with_idempotency_and_audit(
         )
     assert geometry is not None
     assert geometry.review_status == "human_verified"
+    assert geometry.reviewed_at is not None
     assert datetime.fromisoformat(geometry.reviewed_at) == NOW
     assert len(audits) == 1
     assert audits[0].action == "PLACE_EVIDENCE_REVIEWED"
@@ -2984,6 +3065,7 @@ def test_candidate_time_rule_deletion_is_versioned_idempotent_and_distinct_from_
         assert len(audits) == 1
         assert audits[0].target_id == "delete-rule"
         row = session.get(PlaceRevisionRow, "revision-1")
+        assert row is not None
         row.lifecycle_status = "published"
         row.published_at = NOW.isoformat()
         row.reviewed_at = NOW.isoformat()

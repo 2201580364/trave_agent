@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from types import TracebackType
-from typing import Self
+from typing import Any, Self, cast
 
 from sqlalchemy import (
     JSON,
     ForeignKey,
     Integer,
+    Select,
     String,
     UniqueConstraint,
     delete,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
@@ -63,9 +65,7 @@ class AdminRoleRow(Base):
 class AdminActorRoleRow(Base):
     __tablename__ = "admin_actor_roles"
     __table_args__ = (
-        UniqueConstraint(
-            "admin_actor_id", "role_key", name="uq_admin_actor_roles_actor_role"
-        ),
+        UniqueConstraint("admin_actor_id", "role_key", name="uq_admin_actor_roles_actor_role"),
         {
             "mysql_engine": "InnoDB",
             "mysql_charset": "utf8mb4",
@@ -180,8 +180,7 @@ class SqlAlchemyAdminActorRepository:
                 )
             )
         rows = self._session.scalars(
-            statement
-            .distinct()
+            statement.distinct()
             .order_by(AdminActorRow.created_at.asc(), AdminActorRow.admin_actor_id.asc())
             .limit(limit)
             .offset(offset)
@@ -257,7 +256,7 @@ class SqlAlchemyAdminActorRepository:
                 updated_at=actor.updated_at.isoformat(),
             )
         )
-        if self._session.execute(statement).rowcount != 1:
+        if cast(CursorResult[Any], self._session.execute(statement)).rowcount != 1:
             current = self._session.scalar(
                 select(AdminActorRow.version).where(
                     AdminActorRow.admin_actor_id == actor.admin_actor_id
@@ -355,9 +354,7 @@ class SqlAlchemyAdminSessionRepository:
                 session_version=session.session_version,
                 expires_at=session.expires_at.isoformat(),
                 revoked_at=(
-                    session.revoked_at.isoformat()
-                    if session.revoked_at is not None
-                    else None
+                    session.revoked_at.isoformat() if session.revoked_at is not None else None
                 ),
                 client_ip_hash=session.client_ip_hash,
                 user_agent_hash=session.user_agent_hash,
@@ -376,7 +373,7 @@ class SqlAlchemyAdminSessionRepository:
             .values(revoked_at=revoked_at.isoformat())
         )
         result = self._session.execute(statement)
-        return bool(result.rowcount == 1)
+        return bool(cast(CursorResult[Any], result).rowcount == 1)
 
 
 class SqlAlchemyAdminAuditRepository:
@@ -410,9 +407,7 @@ class SqlAlchemyAdminAuditRepository:
         except IntegrityError as exc:
             raise AdminOperationIntentConflictError from exc
 
-    def get_by_operation_intent(
-        self, operation_intent_id: str
-    ) -> AdminAuditEvent | None:
+    def get_by_operation_intent(self, operation_intent_id: str) -> AdminAuditEvent | None:
         row = self._session.scalar(
             select(AdminAuditEventRow).where(
                 AdminAuditEventRow.operation_intent_id == operation_intent_id
@@ -486,7 +481,7 @@ class SqlAlchemyAdminAuditRepository:
         result: str | None,
         keyword: str | None,
         count: bool = False,
-    ):
+    ) -> Select[Any]:
         statement = (
             select(func.count()).select_from(AdminAuditEventRow)
             if count
@@ -508,9 +503,7 @@ class SqlAlchemyAdminAuditRepository:
             if value is not None:
                 statement = statement.where(column == value)
         if actor_login_name is not None:
-            statement = statement.where(
-                AdminActorRow.login_name.ilike(f"%{actor_login_name}%")
-            )
+            statement = statement.where(AdminActorRow.login_name.ilike(f"%{actor_login_name}%"))
         if keyword is not None:
             pattern = f"%{keyword}%"
             statement = statement.where(

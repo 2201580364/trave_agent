@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .place_catalog import SqlAlchemyPlaceCatalogRepository
+
 from datetime import datetime
 
-from travel_agent.domain.place_catalog import PlaceRevision
+from travel_agent.domain.place_catalog import PlaceRelation, PlaceRevision
 
 
 class SqlAlchemyPlaceCatalogReviewRepository:
-    def __init__(self, owner):
+    def __init__(self, owner: SqlAlchemyPlaceCatalogRepository) -> None:
         self._owner = owner
 
     def review_evidence(
@@ -31,7 +36,7 @@ class SqlAlchemyPlaceCatalogReviewRepository:
         )
 
     def update_relation(
-        self, relation, *, revision_id: str, expected_revision_version: int
+        self, relation: PlaceRelation, *, revision_id: str, expected_revision_version: int
     ) -> PlaceRevision:
         return self._owner.update_relation(
             relation, revision_id=revision_id, expected_revision_version=expected_revision_version

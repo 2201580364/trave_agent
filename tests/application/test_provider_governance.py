@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 import fakeredis
 import pytest
@@ -29,7 +31,7 @@ class FixedClock:
 
 
 def _policy(**overrides: object) -> ProviderGovernancePolicy:
-    values: dict[str, object] = {
+    values: dict[str, Any] = {
         "provider": "gaode",
         "daily_request_budget": 3,
         "minimum_interval_seconds": 1.0,
@@ -38,10 +40,10 @@ def _policy(**overrides: object) -> ProviderGovernancePolicy:
         "circuit_failure_codes": frozenset({"timeout", "http_error"}),
     }
     values.update(overrides)
-    return ProviderGovernancePolicy(**values)  # type: ignore[arg-type]
+    return ProviderGovernancePolicy(**values)
 
 
-def test_governor_tracks_credential_free_usage_and_shared_instances(tmp_path) -> None:
+def test_governor_tracks_credential_free_usage_and_shared_instances(tmp_path: Path) -> None:
     path = tmp_path / "provider-governance.json"
     clock = FixedClock()
     first = JsonProviderRequestGovernor(path, _policy(), clock)
@@ -65,7 +67,7 @@ def test_governor_tracks_credential_free_usage_and_shared_instances(tmp_path) ->
     assert read_provider_usage(path) == (snapshot,)
 
 
-def test_governor_enforces_cross_process_request_interval(tmp_path) -> None:
+def test_governor_enforces_cross_process_request_interval(tmp_path: Path) -> None:
     clock = FixedClock()
     governor = JsonProviderRequestGovernor(
         tmp_path / "state.json",
@@ -81,7 +83,7 @@ def test_governor_enforces_cross_process_request_interval(tmp_path) -> None:
     assert raised.value.retry_at == NOW + timedelta(seconds=1)
 
 
-def test_governor_blocks_after_daily_safety_budget(tmp_path) -> None:
+def test_governor_blocks_after_daily_safety_budget(tmp_path: Path) -> None:
     clock = FixedClock()
     governor = JsonProviderRequestGovernor(
         tmp_path / "state.json",
@@ -97,7 +99,7 @@ def test_governor_blocks_after_daily_safety_budget(tmp_path) -> None:
     assert raised.value.code is ProviderBlockCode.DAILY_BUDGET_EXHAUSTED
 
 
-def test_governor_opens_and_recovers_circuit(tmp_path) -> None:
+def test_governor_opens_and_recovers_circuit(tmp_path: Path) -> None:
     clock = FixedClock()
     governor = JsonProviderRequestGovernor(
         tmp_path / "state.json",
@@ -123,7 +125,7 @@ def test_governor_opens_and_recovers_circuit(tmp_path) -> None:
     assert governor.snapshot().circuit_open_until is None
 
 
-def test_rate_limit_opens_circuit_immediately(tmp_path) -> None:
+def test_rate_limit_opens_circuit_immediately(tmp_path: Path) -> None:
     governor = JsonProviderRequestGovernor(
         tmp_path / "state.json",
         _policy(minimum_interval_seconds=0),
@@ -138,7 +140,7 @@ def test_rate_limit_opens_circuit_immediately(tmp_path) -> None:
     assert raised.value.code is ProviderBlockCode.CIRCUIT_OPEN
 
 
-def test_daily_counts_roll_over_without_erasing_active_circuit(tmp_path) -> None:
+def test_daily_counts_roll_over_without_erasing_active_circuit(tmp_path: Path) -> None:
     clock = FixedClock()
     governor = JsonProviderRequestGovernor(
         tmp_path / "state.json",
@@ -163,13 +165,13 @@ def test_redis_governor_shares_budget_and_circuit_across_clients() -> None:
     second_client = fakeredis.FakeRedis(server=server, decode_responses=True)
     clock = FixedClock()
     first = RedisProviderRequestGovernor(
-        first_client,  # type: ignore[arg-type]
+        first_client,
         _policy(minimum_interval_seconds=0),
         clock,
         key_prefix="test-travel-agent",
     )
     second = RedisProviderRequestGovernor(
-        second_client,  # type: ignore[arg-type]
+        second_client,
         _policy(minimum_interval_seconds=0),
         clock,
         key_prefix="test-travel-agent",
@@ -186,7 +188,7 @@ def test_redis_governor_shares_budget_and_circuit_across_clients() -> None:
     assert raised.value.code is ProviderBlockCode.CIRCUIT_OPEN
     assert second.snapshot().request_count == 2
     assert read_redis_provider_usage(
-        first_client,  # type: ignore[arg-type]
+        first_client,
         key_prefix="test-travel-agent",
     ) == (second.snapshot(),)
 
@@ -194,7 +196,7 @@ def test_redis_governor_shares_budget_and_circuit_across_clients() -> None:
 def test_redis_governor_does_not_store_credentials() -> None:
     client = fakeredis.FakeRedis(decode_responses=True)
     governor = RedisProviderRequestGovernor(
-        client,  # type: ignore[arg-type]
+        client,
         _policy(provider="qweather", minimum_interval_seconds=0),
         FixedClock(),
         key_prefix="test-travel-agent",

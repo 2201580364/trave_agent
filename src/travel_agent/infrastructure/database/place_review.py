@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import Integer, String, func, or_, select, update
+from sqlalchemy import Integer, Select, String, func, or_, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -79,9 +81,7 @@ class SqlAlchemyPlaceReviewRepository:
         )
         return _revision_from_row(row) if row is not None else None
 
-    def get_revisions(
-        self, revision_ids: tuple[str, ...]
-    ) -> tuple[PlaceRevision, ...]:
+    def get_revisions(self, revision_ids: tuple[str, ...]) -> tuple[PlaceRevision, ...]:
         if not revision_ids:
             return ()
         rows = self._session.scalars(
@@ -115,7 +115,7 @@ class SqlAlchemyPlaceReviewRepository:
             )
             .values(**_revision_values(revision))
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("candidate revision version conflict")
 
     def list_revisions(
@@ -169,16 +169,14 @@ class SqlAlchemyPlaceReviewRepository:
         admin_area: str | None,
         place_kind: str | None,
         count: bool = False,
-    ):
+    ) -> Select[Any]:
         statement = (
             select(func.count()).select_from(PlaceRevisionRow)
             if count
             else select(PlaceRevisionRow)
         )
         if lifecycle_status is not None:
-            statement = statement.where(
-                PlaceRevisionRow.lifecycle_status == lifecycle_status
-            )
+            statement = statement.where(PlaceRevisionRow.lifecycle_status == lifecycle_status)
         if admin_area is not None:
             statement = statement.where(PlaceRevisionRow.admin_area == admin_area)
         if place_kind is not None:
@@ -261,7 +259,7 @@ class SqlAlchemyPlaceReviewRepository:
         admin_area: str | None,
         place_kind: str | None,
         count: bool = False,
-    ):
+    ) -> Select[Any]:
         statement = (
             select(func.count()).select_from(PlaceReviewTaskRow)
             if count
@@ -345,7 +343,7 @@ class SqlAlchemyPlaceReviewRepository:
             )
             .values(status=status, version=task.version + 1, updated_at=now.isoformat())
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("review task version conflict")
 
     def approve_revision(self, revision_id: str, *, reviewed_at: datetime) -> None:
@@ -361,7 +359,7 @@ class SqlAlchemyPlaceReviewRepository:
                 solver_eligible=True,
             )
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("candidate revision is not approvable")
 
 

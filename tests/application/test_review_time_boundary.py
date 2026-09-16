@@ -52,7 +52,7 @@ def test_time_write_rolls_back_and_retries_without_duplicate_audit(
         "date_exception": "date-exceptions",
         "holiday": "holiday-exceptions",
     }
-    fields = {
+    fields: dict[str, dict[str, object]] = {
         "time_rule": {
             "rule_kind": "fixed_session",
             "weekdays": [1, 2, 3, 4, 5, 6, 7],
@@ -106,7 +106,7 @@ def test_time_write_rolls_back_and_retries_without_duplicate_audit(
         version = revision.revision_version
         revision.review_flags = ["TIME_RULE_UNVERIFIED"]
         session.commit()
-    payload = {
+    payload: dict[str, object] = {
         "expected_revision_version": version,
         "operation_intent_id": "time-boundary-retry",
         "reason_code": "EVIDENCE_UPDATED",
@@ -121,7 +121,7 @@ def test_time_write_rolls_back_and_retries_without_duplicate_audit(
                 [
                     dict(row)
                     for row in session.execute(
-                        select(model.__table__).order_by(*model.__table__.primary_key.columns)
+                        select(model.__table__).order_by(*model.__table__.primary_key)
                     ).mappings()
                 ]
                 for model in (

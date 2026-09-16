@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TypedDict
 
 from travel_agent.application.common.errors import ResourceNotFoundError
 from travel_agent.domain.admin import AdminPrincipal
-from travel_agent.domain.place_catalog import PlaceRevision, PlaceRevisionEvidence
+from travel_agent.domain.place_catalog import PlaceReviewTask, PlaceRevision, PlaceRevisionEvidence
 
 from .review_ports import ReviewQueryUnitOfWork
-from .review_readiness import evaluate_review_readiness
+from .review_readiness import ReviewReadiness, evaluate_review_readiness
 from .review_support import ReviewSupport
+
+
+class DashboardSummary(TypedDict):
+    revisions: dict[str, int]
+    review_tasks: dict[str, int]
+    recent_ready_tasks: tuple[PlaceReviewTask, ...]
 
 
 class ReviewQueryService(ReviewSupport):
@@ -76,13 +83,13 @@ class ReviewQueryService(ReviewSupport):
         principal: AdminPrincipal,
         *,
         revision_ids: tuple[str, ...],
-    ) -> dict[str, dict[str, object]]:
+    ) -> dict[str, ReviewReadiness]:
         """Return collection/review readiness without mutating workflow state."""
 
         self._require(principal, "place:candidate:read")
         normalized = tuple(dict.fromkeys(revision_ids))
         with self._uow_factory() as uow:
-            result: dict[str, dict[str, object]] = {}
+            result: dict[str, ReviewReadiness] = {}
             for revision_id in normalized:
                 evidence = uow.catalog.load_revision_evidence(revision_id)
                 if evidence is None:
@@ -93,7 +100,7 @@ class ReviewQueryService(ReviewSupport):
                 )
             return result
 
-    def dashboard_summary(self, principal: AdminPrincipal) -> dict[str, object]:
+    def dashboard_summary(self, principal: AdminPrincipal) -> DashboardSummary:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
             candidates = uow.reviews.count_revisions(lifecycle_status="candidate")

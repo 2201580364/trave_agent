@@ -45,12 +45,7 @@ _REASON_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 _SENSITIVE_REASON_PATTERN = re.compile(
     r"(?i)(api[ _-]?key|access[ _-]?token|password|passwd|cookie|secret|私钥|密码|令牌)"
 )
-_DUMMY_ADMIN_CREDENTIAL = (
-    "scrypt$16384$8$1$"
-    + ("00" * 16)
-    + "$"
-    + ("00" * 32)
-)
+_DUMMY_ADMIN_CREDENTIAL = "scrypt$16384$8$1$" + ("00" * 16) + "$" + ("00" * 32)
 
 ROLE_CATALOG = (
     AdminRole("data_editor", "编辑候选地点和 Revision", "OM1"),
@@ -113,9 +108,7 @@ class AdminSessionRepository(Protocol):
 class AdminAuditRepository(Protocol):
     def add(self, event: AdminAuditEvent) -> None: ...
 
-    def get_by_operation_intent(
-        self, operation_intent_id: str
-    ) -> AdminAuditEvent | None: ...
+    def get_by_operation_intent(self, operation_intent_id: str) -> AdminAuditEvent | None: ...
 
     def list(
         self,
@@ -145,10 +138,14 @@ class AdminAuditRepository(Protocol):
 
 
 class AdminUnitOfWork(Protocol):
-    actors: AdminActorRepository
-    roles: AdminRoleRepository
-    sessions: AdminSessionRepository
-    audits: AdminAuditRepository
+    @property
+    def actors(self) -> AdminActorRepository: ...
+    @property
+    def roles(self) -> AdminRoleRepository: ...
+    @property
+    def sessions(self) -> AdminSessionRepository: ...
+    @property
+    def audits(self) -> AdminAuditRepository: ...
 
     def __enter__(self) -> Self: ...
 
@@ -248,11 +245,7 @@ class AdminIdentityService:
                 password,
                 actor.credential_digest if actor is not None else _DUMMY_ADMIN_CREDENTIAL,
             )
-            valid = (
-                actor is not None
-                and actor.status == "active"
-                and password_matches
-            )
+            valid = actor is not None and actor.status == "active" and password_matches
             if not valid:
                 if actor is not None:
                     uow.audits.add(
@@ -416,9 +409,7 @@ class AdminIdentityService:
                 if (
                     existing.operation_digest != operation_digest
                     or actor is None
-                    or not verify_admin_password(
-                        initial_password, actor.credential_digest
-                    )
+                    or not verify_admin_password(initial_password, actor.credential_digest)
                 ):
                     raise AdminOperationIntentConflictError
                 return actor, True
@@ -735,9 +726,7 @@ class AdminIdentityService:
 def hash_admin_password(password: str) -> str:
     _validate_password(password)
     salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(
-        password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=32
-    )
+    digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=32)
     return f"scrypt$16384$8$1${salt.hex()}${digest.hex()}"
 
 
@@ -749,11 +738,7 @@ def verify_admin_password(password: str, encoded: str) -> bool:
         n_value, r_value, p_value = int(n), int(r), int(p)
         salt = bytes.fromhex(salt_hex)
         expected = bytes.fromhex(digest_hex)
-        if (
-            (n_value, r_value, p_value) != (2**14, 8, 1)
-            or len(salt) != 16
-            or len(expected) != 32
-        ):
+        if (n_value, r_value, p_value) != (2**14, 8, 1) or len(salt) != 16 or len(expected) != 32:
             return False
         actual = hashlib.scrypt(
             password.encode("utf-8"),

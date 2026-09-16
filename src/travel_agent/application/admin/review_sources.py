@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
+from typing import TypedDict
 
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ResourceNotFoundError
@@ -27,6 +28,12 @@ from .review_support import ReviewSupport, _digest, _revision_digest
 from .sources import GovernedSourceCatalog, GovernedSourceChannel, SourceRecordInputError
 
 
+class SourceConflict(TypedDict):
+    source_id: str
+    records: tuple[PlaceSourceRecord, ...]
+    resolved: bool
+
+
 class ReviewSourceService(ReviewSupport):
     def __init__(
         self,
@@ -42,7 +49,7 @@ class ReviewSourceService(ReviewSupport):
 
     def list_source_conflicts(
         self, principal: AdminPrincipal, *, revision_id: str
-    ) -> tuple[dict[str, object], ...]:
+    ) -> tuple[SourceConflict, ...]:
         self._require(principal, "place:candidate:read")
         with self._uow_factory() as uow:
             evidence = uow.catalog.load_revision_evidence(revision_id)
@@ -51,7 +58,7 @@ class ReviewSourceService(ReviewSupport):
         groups: dict[str, list[PlaceSourceRecord]] = {}
         for record in evidence.source_records:
             groups.setdefault(record.source_id, []).append(record)
-        conflicts = []
+        conflicts: list[SourceConflict] = []
         for source_id, records in sorted(groups.items()):
             fingerprints = {record.content_sha256 or record.registry_sha256 for record in records}
             if len(records) > 1 and len(fingerprints) > 1:

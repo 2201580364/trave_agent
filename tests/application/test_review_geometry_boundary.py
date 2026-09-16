@@ -46,7 +46,7 @@ def test_geometry_write_rolls_back_and_retries_without_duplicate_audit(
         version = revision.revision_version
         revision.review_flags = ["GEOMETRY_UNVERIFIED", "ACCESS_POINT_UNVERIFIED"]
         session.commit()
-    payload = {
+    payload: dict[str, object] = {
         "expected_revision_version": version,
         "operation_intent_id": "geometry-boundary-retry",
         "reason_code": "EVIDENCE_UPDATED",
@@ -68,7 +68,7 @@ def test_geometry_write_rolls_back_and_retries_without_duplicate_audit(
                 [
                     dict(row)
                     for row in session.execute(
-                        select(model.__table__).order_by(*model.__table__.primary_key.columns)
+                        select(model.__table__).order_by(*model.__table__.primary_key)
                     ).mappings()
                 ]
                 for model in (

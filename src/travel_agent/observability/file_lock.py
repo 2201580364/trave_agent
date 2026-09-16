@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from types import TracebackType
 from typing import BinaryIO, Self
@@ -55,7 +56,7 @@ class InterProcessFileLock:
             self._file = None
 
 
-if os.name == "nt":
+if sys.platform == "win32":
     import msvcrt
 
     def _lock_file(file: BinaryIO) -> None:
@@ -72,4 +73,3 @@ else:
 
     def _unlock_file(file: BinaryIO) -> None:
         fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-

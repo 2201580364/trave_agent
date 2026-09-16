@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -145,9 +146,7 @@ def load_research_readiness(
                         verified_checks=_readiness_int(readiness, "verified_checks"),
                         total_checks=_readiness_int(readiness, "total_checks"),
                         missing_checks=_readiness_keys(readiness, "missing_checks"),
-                        pending_review_checks=_readiness_keys(
-                            readiness, "pending_review_checks"
-                        ),
+                        pending_review_checks=_readiness_keys(readiness, "pending_review_checks"),
                     )
                 )
     finally:
@@ -215,18 +214,16 @@ def _revision_id(value: str) -> str:
     raise ValueError(f"invalid Hangzhou candidate ID: {value}")
 
 
-def _readiness_int(payload: dict[str, object], key: str) -> int:
+def _readiness_int(payload: Mapping[str, object], key: str) -> int:
     value = payload.get(key)
     if not isinstance(value, int):
         raise ValueError(f"review readiness {key} must be an integer")
     return value
 
 
-def _readiness_keys(payload: dict[str, object], key: str) -> tuple[str, ...]:
+def _readiness_keys(payload: Mapping[str, object], key: str) -> tuple[str, ...]:
     value = payload.get(key)
-    if not isinstance(value, (tuple, list)) or not all(
-        isinstance(item, str) for item in value
-    ):
+    if not isinstance(value, (tuple, list)) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"review readiness {key} must be a string sequence")
     return tuple(value)
 
@@ -236,9 +233,12 @@ def _render_counts(counts: dict[str, int]) -> str:
 
 
 def _render_check_counts(counts: dict[str, int]) -> str:
-    return "、".join(
-        f"{READINESS_CHECK_LABELS.get(key, key)} {value}" for key, value in counts.items()
-    ) or "无"
+    return (
+        "、".join(
+            f"{READINESS_CHECK_LABELS.get(key, key)} {value}" for key, value in counts.items()
+        )
+        or "无"
+    )
 
 
 def _render_checks(checks: tuple[str, ...]) -> str:

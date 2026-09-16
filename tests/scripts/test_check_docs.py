@@ -22,7 +22,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-import check_docs  # noqa: E402
+from scripts import check_docs  # noqa: E402
 
 
 @pytest.fixture()
@@ -44,14 +44,17 @@ def kb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         adr_body.replace("ADR-0001", "ADR-0002"), encoding="utf-8"
     )
 
-    current = "\n".join(
-        [
-            "# CURRENT — 当前状态滚动快照",
-            "",
-            "- 更新时间：2026-09-05",
-            "- 当前节点：`M1 / Gate 7 / G7-R0.2-05-03`",
-        ]
-    ) + "\n"
+    current = (
+        "\n".join(
+            [
+                "# CURRENT — 当前状态滚动快照",
+                "",
+                "- 更新时间：2026-09-05",
+                "- 当前节点：`M1 / Gate 7 / G7-R0.2-05-03`",
+            ]
+        )
+        + "\n"
+    )
     (process / "CURRENT.md").write_text(current, encoding="utf-8")
 
     claude = (

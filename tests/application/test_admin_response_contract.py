@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 import pytest
+from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import ResponseValidationError
 
@@ -16,11 +17,14 @@ from tests.application.test_admin_identity_http import (
 from tests.application.test_admin_identity_http import (
     admin_context as admin_context,
 )
+from travel_agent.domain.place_catalog import PlaceRevision
 from travel_agent.infrastructure.database.place_catalog import SqlAlchemyPlaceCatalogRepository
 from travel_agent.interfaces.http import admin
 
 
-def test_typed_detail_and_evidence_preserve_existing_wire_payload(admin_context: AdminTestContext):
+def test_typed_detail_and_evidence_preserve_existing_wire_payload(
+    admin_context: AdminTestContext,
+) -> None:
     """No timestamp reformatting, lost nulls, new defaults, or dropped evidence fields."""
     _seed_approvable_candidate(admin_context)
     _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
@@ -48,13 +52,13 @@ def test_invalid_success_payload_is_rejected_instead_of_silently_published(
     admin_context: AdminTestContext,
     monkeypatch: pytest.MonkeyPatch,
     change: str,
-):
+) -> None:
     """An HTTP handler drift must fail even when the underlying use case succeeds."""
     _seed_approvable_candidate(admin_context)
     _, headers = _login(admin_context.client, ROOT_LOGIN, ROOT_PASSWORD)
     serializer = admin._revision_response
 
-    def broken(revision):
+    def broken(revision: PlaceRevision) -> dict[str, object]:
         result = deepcopy(serializer(revision))
         if change == "missing":
             result.pop("relation_review_status")
@@ -73,8 +77,10 @@ def test_invalid_success_payload_is_rejected_instead_of_silently_published(
 
 def test_openapi_exposes_nested_readiness_and_both_fixed_session_identifiers(
     admin_context: AdminTestContext,
-):
-    schema = admin_context.client.app.openapi()
+) -> None:
+    app = admin_context.client.app
+    assert isinstance(app, FastAPI)
+    schema = app.openapi()
     paths = schema["paths"]
     for path, model in (
         ("/place-revisions/{revision_id}", "PlaceRevision"),

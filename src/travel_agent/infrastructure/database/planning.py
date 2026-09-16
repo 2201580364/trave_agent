@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, datetime
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from sqlalchemy import JSON, Boolean, Integer, String, UniqueConstraint, func, select, update
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import CursorResult, Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -84,9 +84,7 @@ class GenerationIntentRow(Base):
     trip_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     trip_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    target_trip_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, index=True
-    )
+    target_trip_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     base_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
@@ -105,9 +103,7 @@ class TripRow(Base):
 class TripRevisionRow(Base):
     __tablename__ = "trip_revisions"
     __table_args__ = (
-        UniqueConstraint(
-            "trip_id", "revision_number", name="uq_trip_revisions_trip_number"
-        ),
+        UniqueConstraint("trip_id", "revision_number", name="uq_trip_revisions_trip_number"),
         {
             "mysql_engine": "InnoDB",
             "mysql_charset": "utf8mb4",
@@ -170,11 +166,9 @@ class SqlAlchemyTripDraftRepository:
             )
             .values(**values)
         )
-        if self._session.execute(statement).rowcount != 1:
+        if cast(CursorResult[Any], self._session.execute(statement)).rowcount != 1:
             current = self._session.scalar(
-                select(TripDraftRow.draft_version).where(
-                    TripDraftRow.draft_id == draft.draft_id
-                )
+                select(TripDraftRow.draft_version).where(TripDraftRow.draft_id == draft.draft_id)
             )
             raise DraftVersionConflictError(
                 expected_version=expected_version,
@@ -201,13 +195,12 @@ class SqlAlchemyGenerationIntentRepository:
         statement = (
             update(GenerationIntentRow)
             .where(
-                GenerationIntentRow.generation_intent_id
-                == intent.generation_intent_id,
+                GenerationIntentRow.generation_intent_id == intent.generation_intent_id,
                 GenerationIntentRow.status == expected_status,
             )
             .values(**_intent_values(intent))
         )
-        if self._session.execute(statement).rowcount != 1:
+        if cast(CursorResult[Any], self._session.execute(statement)).rowcount != 1:
             raise ValueError("generation intent status conflict")
 
 
@@ -247,10 +240,13 @@ class SqlAlchemyTripRepository:
     ) -> None:
         statement = update(TripRow).where(TripRow.trip_id == trip.trip_id)
         if expected_revision_id is not None:
-            statement = statement.where(
-                TripRow.current_revision_id == expected_revision_id
-            )
-        if self._session.execute(statement.values(**_trip_values(trip))).rowcount != 1:
+            statement = statement.where(TripRow.current_revision_id == expected_revision_id)
+        if (
+            cast(
+                CursorResult[Any], self._session.execute(statement.values(**_trip_values(trip)))
+            ).rowcount
+            != 1
+        ):
             if expected_revision_id is not None:
                 raise TripRevisionConflictError
             raise ValueError("trip_id does not exist")
@@ -279,6 +275,7 @@ class _SqlAlchemyRepository[EntityT, RowT: Base]:
 
     def save(self, entity: EntityT) -> None:
         identity = self._row_type.__mapper__.primary_key[0].key
+        assert identity is not None
         record_id = getattr(entity, identity)
         row = self._session.get(self._row_type, record_id)
         if row is None:
@@ -288,9 +285,7 @@ class _SqlAlchemyRepository[EntityT, RowT: Base]:
         self._session.flush()
 
 
-class SqlAlchemyTripRevisionRepository(
-    _SqlAlchemyRepository[TripRevision, TripRevisionRow]
-):
+class SqlAlchemyTripRevisionRepository(_SqlAlchemyRepository[TripRevision, TripRevisionRow]):
     def __init__(self, session: Session) -> None:
         super().__init__(session, TripRevisionRow, _revision_from_row, _revision_values)
 
@@ -465,8 +460,12 @@ def _trip_values(trip: Trip) -> dict[str, Any]:
 
 def _trip_from_row(row: TripRow) -> Trip:
     return Trip(
-        row.trip_id, row.principal_id, row.city_id, row.source_draft_id,
-        row.current_revision_id, datetime.fromisoformat(row.created_at),
+        row.trip_id,
+        row.principal_id,
+        row.city_id,
+        row.source_draft_id,
+        row.current_revision_id,
+        datetime.fromisoformat(row.created_at),
         datetime.fromisoformat(row.updated_at),
     )
 
@@ -488,10 +487,16 @@ def _revision_values(revision: TripRevision) -> dict[str, Any]:
 
 def _revision_from_row(row: TripRevisionRow) -> TripRevision:
     return TripRevision(
-        row.trip_revision_id, row.trip_id, row.revision_number,
-        row.generation_intent_id, CompletionKind(row.completion_kind),
-        row.has_soft_degradation, row.result_schema_version, row.result_snapshot,
-        row.result_snapshot_hash, datetime.fromisoformat(row.created_at),
+        row.trip_revision_id,
+        row.trip_id,
+        row.revision_number,
+        row.generation_intent_id,
+        CompletionKind(row.completion_kind),
+        row.has_soft_degradation,
+        row.result_schema_version,
+        row.result_snapshot,
+        row.result_snapshot_hash,
+        datetime.fromisoformat(row.created_at),
     )
 
 
@@ -511,9 +516,15 @@ def _run_values(run: SolverRun) -> dict[str, Any]:
 
 def _run_from_row(row: SolverRunRow) -> SolverRun:
     return SolverRun(
-        row.solver_run_id, row.generation_intent_id, row.status,
-        row.quality_gate_passed, row.solver_version, row.constraint_version,
-        row.parameter_version, row.audit_payload, datetime.fromisoformat(row.created_at),
+        row.solver_run_id,
+        row.generation_intent_id,
+        row.status,
+        row.quality_gate_passed,
+        row.solver_version,
+        row.constraint_version,
+        row.parameter_version,
+        row.audit_payload,
+        datetime.fromisoformat(row.created_at),
     )
 
 

@@ -193,6 +193,7 @@ def _projection() -> SolverPlaceProjection:
 
 def _context(
     *,
+    source_records: tuple[PlaceSourceRecord, ...] | None = None,
     access_points: tuple[PlaceAccessPoint, ...] | None = None,
     relations: tuple[PlaceRelation, ...] = (),
     projection: SolverPlaceProjection | None = None,
@@ -200,7 +201,7 @@ def _context(
     return ProjectionPublicationContext(
         _place(),
         _revision(),
-        (_source(),),
+        source_records if source_records is not None else (_source(),),
         (_geometry(),),
         access_points if access_points is not None else _access_points(),
         (_time_rule(),),
@@ -306,6 +307,101 @@ def test_gate_rejects_unverified_access_hash_drift_and_overlap() -> None:
     assert "ACCESS_POINT_NOT_HUMAN_VERIFIED" in reasons
     assert "OVERLAPPING_SELECTION_UNRESOLVED" in reasons
     assert "PROJECTION_HASH_MISMATCH" in reasons
+
+
+def test_relation_source_may_belong_to_related_place_without_blocking_publication() -> None:
+    parent_source = replace(
+        _source("place_parent"),
+        source_record_id="source_parent_relation",
+        content_sha256="d" * 64,
+    )
+    relation = PlaceRelation(
+        "relation_parent_child",
+        "place_parent",
+        "place_westlake",
+        "contains",
+        "source_parent_relation",
+        "human_verified",
+        "resolved",
+        "父子地点边界已人工裁决。",
+        True,
+        NOW,
+        NOW,
+    )
+    context = _context(
+        source_records=(_source(), parent_source),
+        relations=(relation,),
+    )
+
+    assert evaluate_projection_publication(context) == ()
+
+
+def test_gate_rejects_relation_source_missing_or_unrelated_to_relation() -> None:
+    relation = PlaceRelation(
+        "relation_missing_source",
+        "place_parent",
+        "place_westlake",
+        "contains",
+        "source_parent_relation",
+        "human_verified",
+        "resolved",
+        "父子地点边界已人工裁决。",
+        True,
+        NOW,
+        NOW,
+    )
+
+    missing_reasons = evaluate_projection_publication(
+        _context(source_records=(_source(),), relations=(relation,))
+    )
+    unrelated_reasons = evaluate_projection_publication(
+        _context(
+            source_records=(
+                _source(),
+                replace(
+                    _source("place_third"),
+                    source_record_id="source_parent_relation",
+                    content_sha256="e" * 64,
+                ),
+            ),
+            relations=(relation,),
+        )
+    )
+
+    assert "MISSING_SOURCE_RECORD" in missing_reasons
+    assert "SOURCE_RECORD_PLACE_MISMATCH" in unrelated_reasons
+
+
+def test_related_place_relation_source_does_not_create_current_place_conflict() -> None:
+    parent_source = replace(
+        _source("place_parent"),
+        source_record_id="source_parent_relation",
+        content_sha256="d" * 64,
+    )
+    parent_source_newer = replace(
+        parent_source,
+        source_record_id="source_parent_relation_newer",
+        content_sha256="e" * 64,
+    )
+    relation = PlaceRelation(
+        "relation_parent_child",
+        "place_parent",
+        "place_westlake",
+        "contains",
+        "source_parent_relation",
+        "human_verified",
+        "resolved",
+        "父子地点边界已人工裁决。",
+        True,
+        NOW,
+        NOW,
+    )
+    context = _context(
+        source_records=(_source(), parent_source, parent_source_newer),
+        relations=(relation,),
+    )
+
+    assert "SOURCE_CONFLICT_UNRESOLVED" not in evaluate_projection_publication(context)
 
 
 def test_show_with_multiple_fixed_sessions_is_publishable() -> None:
@@ -473,6 +569,58 @@ def test_sqlalchemy_publication_context_rejects_cross_place_source(tmp_path: Pat
             uow.place_catalog.publish_projection("projection_westlake_1", published_at=NOW)
 
     assert "SOURCE_RECORD_PLACE_MISMATCH" in exc_info.value.reason_codes
+
+
+def test_sqlalchemy_publication_context_loads_related_place_relation_source(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "relation-source.db"
+    engine = create_engine(f"sqlite:///{database}")
+    create_schema(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    parent_source = replace(
+        _source("place_parent"),
+        source_record_id="source_parent_relation",
+        content_sha256="d" * 64,
+    )
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        uow.place_catalog.add_place(_place())
+        uow.place_catalog.add_place(_place("place_parent"))
+        uow.place_catalog.add_source_record(_source())
+        uow.place_catalog.add_source_record(parent_source)
+        uow.place_catalog.add_revision(_revision())
+        uow.place_catalog.add_geometry(_geometry())
+        for point in _access_points():
+            uow.place_catalog.add_access_point(point)
+        uow.place_catalog.add_time_rule(_time_rule())
+        uow.place_catalog.add_relation(
+            PlaceRelation(
+                "relation_parent_child",
+                "place_parent",
+                "place_westlake",
+                "contains",
+                "source_parent_relation",
+                "human_verified",
+                "resolved",
+                "父子地点边界已人工裁决。",
+                True,
+                NOW,
+                NOW,
+            )
+        )
+        uow.place_catalog.add_projection(_projection())
+
+        context = uow.place_catalog.load_publication_context("projection_westlake_1")
+        assert context is not None
+        assert {source.source_record_id for source in context.source_records} == {
+            "source_westlake_1",
+            "source_parent_relation",
+        }
+        published = uow.place_catalog.publish_projection("projection_westlake_1", published_at=NOW)
+        uow.commit()
+
+    assert published.status == "published"
 
 
 def test_repository_rejects_direct_published_inserts(tmp_path: Path) -> None:

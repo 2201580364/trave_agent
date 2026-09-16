@@ -30,14 +30,15 @@ from .review_publication import _access_rank as _access_rank
 from .review_publication import _batch_item_response as _batch_item_response
 from .review_publication import _projection_snapshot_payload as _projection_snapshot_payload
 from .review_publication import _snapshot_response as _snapshot_response
-from .review_queries import ReviewQueryService
+from .review_queries import DashboardSummary, ReviewQueryService
 from .review_queries import _optional_query as _optional_query
+from .review_readiness import ReviewReadiness
 from .review_readiness import evaluate_review_readiness as evaluate_review_readiness
 from .review_relations import ReviewRelationService
 from .review_revision import RevisionLifecycleService
-from .review_sources import ReviewSourceService
+from .review_sources import ReviewSourceService, SourceConflict
 from .review_support import ReviewSupport
-from .review_tasks import ReviewTaskService
+from .review_tasks import BatchDecisionResult, ReviewTaskService
 from .review_tasks import _reviewer_role as _reviewer_role
 from .review_tasks import _task_digest as _task_digest
 from .review_time import (
@@ -176,20 +177,20 @@ class PlaceReviewWorkflowService(ReviewSupport):
         principal: AdminPrincipal,
         *,
         revision_ids: tuple[str, ...],
-    ) -> dict[str, dict[str, object]]:
+    ) -> dict[str, ReviewReadiness]:
         return self._queries.review_readiness_by_revision_ids(
             principal,
             revision_ids=revision_ids,
         )
 
-    def dashboard_summary(self, principal: AdminPrincipal) -> dict[str, object]:
+    def dashboard_summary(self, principal: AdminPrincipal) -> DashboardSummary:
         return self._queries.dashboard_summary(
             principal,
         )
 
     def list_source_conflicts(
         self, principal: AdminPrincipal, *, revision_id: str
-    ) -> tuple[dict[str, object], ...]:
+    ) -> tuple[SourceConflict, ...]:
         return self._sources.list_source_conflicts(principal, revision_id=revision_id)
 
     def resolve_source_conflicts(
@@ -1073,7 +1074,7 @@ class PlaceReviewWorkflowService(ReviewSupport):
 
     def decide_batch(
         self, principal: AdminPrincipal, *, items: tuple[dict[str, object], ...], request_id: str
-    ) -> dict[str, object]:
+    ) -> BatchDecisionResult:
         return self._tasks.decide_batch(
             principal,
             items=items,

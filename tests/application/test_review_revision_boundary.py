@@ -13,6 +13,7 @@ from tests.application.test_admin_identity_http import (
     _seed_approvable_candidate,
 )
 from tests.application.test_admin_identity_http import admin_context as admin_context
+from travel_agent.domain.admin import AdminAuditEvent
 from travel_agent.infrastructure.database.admin_identity import (
     AdminAuditEventRow,
     SqlAlchemyAdminAuditRepository,
@@ -35,7 +36,7 @@ def test_revision_lifecycle_audit_failure_rolls_back_and_retries(
     _seed_approvable_candidate(context, "revision-lifecycle-base")
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
     create_url = "/api/v1/admin/places/place-1/revisions"
-    create_payload = {
+    create_payload: dict[str, object] = {
         "base_revision_id": "revision-lifecycle-base",
         "operation_intent_id": "lifecycle-create",
         "reason_code": "PLACE_FACTS_REFRESH",
@@ -72,7 +73,7 @@ def test_revision_lifecycle_audit_failure_rolls_back_and_retries(
             }
         status = 200
 
-    def state():
+    def state() -> list[list[dict[str, object]]]:
         with context.sessions() as session:
             return [
                 [dict(row) for row in session.execute(select(model.__table__)).mappings()]
@@ -91,7 +92,7 @@ def test_revision_lifecycle_audit_failure_rolls_back_and_retries(
     before = state()
     add = SqlAlchemyAdminAuditRepository.add
 
-    def fail(repository, event):
+    def fail(repository: SqlAlchemyAdminAuditRepository, event: AdminAuditEvent) -> None:
         add(repository, event)
         raise RuntimeError("simulated lifecycle audit failure")
 

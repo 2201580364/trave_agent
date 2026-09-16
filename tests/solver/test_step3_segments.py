@@ -87,9 +87,7 @@ def _weather(*days: date) -> dict[date, DailyWeather]:
 def test_step3_1830_light_show_is_kept_and_meal_is_scheduled_before_it() -> None:
     daytime = _attraction(1, DAY_RULE)
     light_show = _attraction(2, SHOW_RULE, duration=30)
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)})
 
     result = route_segmented_day(
         _day(daytime, light_show),
@@ -103,6 +101,7 @@ def test_step3_1830_light_show_is_kept_and_meal_is_scheduled_before_it() -> None
     assert result.routed_day.visits[1].planned_duration_min == 30
     assert result.meal_plan.status is MealStatus.FULL
     assert result.meal_plan.placement is MealPlacement.BETWEEN_SEGMENTS
+    assert result.meal_plan.end_min is not None
     assert result.meal_plan.end_min <= 18 * 60 + 30 - 12
     assert result.validation.valid
 
@@ -137,9 +136,7 @@ def test_step3_spreads_two_daytime_visits_across_lunch_before_1830_show() -> Non
     assert visits[2].arrival_min == 18 * 60 + 30
     assert visits[2].planned_duration_min == 30
     lunch_gap = (
-        visits[1].arrival_min
-        - visits[1].buffered_travel_from_previous_min
-        - visits[0].leave_min
+        visits[1].arrival_min - visits[1].buffered_travel_from_previous_min - visits[0].leave_min
     )
     assert lunch_gap >= 60
     assert result.meal_plan.status is MealStatus.FULL
@@ -149,9 +146,7 @@ def test_step3_spreads_two_daytime_visits_across_lunch_before_1830_show() -> Non
 def test_step3_spreads_single_daytime_visit_into_afternoon_before_fixed_show() -> None:
     lake = _attraction(1, DAY_RULE, duration=150)
     light_show = _attraction(2, LATE_SHOW_RULE, duration=20)
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 6), (2, 1): _travel(2, 1, 6)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 6), (2, 1): _travel(2, 1, 6)})
 
     result = route_segmented_day(
         _day(lake, light_show),
@@ -163,17 +158,13 @@ def test_step3_spreads_single_daytime_visit_into_afternoon_before_fixed_show() -
     assert daytime.arrival_min == 13 * 60 + 30
     assert daytime.leave_min == 16 * 60
     assert daytime.planned_duration_min == 150
-    assert (
-        min(daytime.arrival_min, 14 * 60) - max(9 * 60, 11 * 60 + 30)
-        >= 60
-    )
+    assert min(daytime.arrival_min, 14 * 60) - max(9 * 60, 11 * 60 + 30) >= 60
     assert show.arrival_min == 19 * 60 + 30
     assert show.planned_duration_min == 20
     assert result.meal_plan.status is MealStatus.FULL
     assert result.meal_plan.placement is MealPlacement.BETWEEN_SEGMENTS
-    assert result.meal_plan.end_min <= (
-        show.arrival_min - show.buffered_travel_from_previous_min
-    )
+    assert result.meal_plan.end_min is not None
+    assert result.meal_plan.end_min <= (show.arrival_min - show.buffered_travel_from_previous_min)
     assert result.validation.valid
 
 
@@ -188,9 +179,7 @@ def test_step3_single_daytime_spread_respects_last_entry_fallback() -> None:
     )
     lake = _attraction(1, early_last_entry, duration=150)
     light_show = _attraction(2, LATE_SHOW_RULE, duration=20)
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 6), (2, 1): _travel(2, 1, 6)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 6), (2, 1): _travel(2, 1, 6)})
 
     result = route_segmented_day(
         _day(lake, light_show),
@@ -242,9 +231,7 @@ def test_step3_day_spread_falls_back_when_full_duration_would_break_window() -> 
         (TimeRule.from_strings(("01-01", "12-31"), "10:30", "12:30"),),
         duration=120,
     )
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)})
 
     result = route_segmented_day(
         _day(first, second, bounds=(9 * 60, 13 * 60)),
@@ -275,14 +262,10 @@ def test_step3_evening_only_1830_show_is_not_forced_to_start_at_1900() -> None:
 
 
 def test_step3_meal_reduces_to_60_minutes_without_dropping_attractions() -> None:
-    late_day_rule = (
-        TimeRule.from_strings(("01-01", "12-31"), "16:59", "17:36"),
-    )
+    late_day_rule = (TimeRule.from_strings(("01-01", "12-31"), "16:59", "17:36"),)
     daytime = _attraction(1, late_day_rule)
     evening = _attraction(2, EVENING_RULE, duration=30)
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)})
 
     result = route_segmented_day(
         _day(daytime, evening, bounds=(17 * 60, 20 * 60)),
@@ -297,14 +280,10 @@ def test_step3_meal_reduces_to_60_minutes_without_dropping_attractions() -> None
 
 
 def test_step3_no_meal_slot_keeps_hard_feasible_attractions_and_warns() -> None:
-    late_day_rule = (
-        TimeRule.from_strings(("01-01", "12-31"), "16:59", "17:36"),
-    )
+    late_day_rule = (TimeRule.from_strings(("01-01", "12-31"), "16:59", "17:36"),)
     daytime = _attraction(1, late_day_rule)
     light_show = _attraction(2, SHOW_RULE, duration=30)
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 10), (2, 1): _travel(2, 1, 10)})
 
     result = route_segmented_day(
         _day(daytime, light_show, bounds=(17 * 60, 19 * 60 + 30)),
@@ -358,9 +337,7 @@ def test_step3_only_genuine_c6_failure_rejects_evening_segment() -> None:
         (TimeRule.from_strings(("01-01", "12-31"), "09:00", "23:00"),),
     )
     light_show = _attraction(2, SHOW_RULE, duration=30)
-    provider = InMemoryTravelTimeProvider(
-        {(1, 2): _travel(1, 2, 30), (2, 1): _travel(2, 1, 30)}
-    )
+    provider = InMemoryTravelTimeProvider({(1, 2): _travel(1, 2, 30), (2, 1): _travel(2, 1, 30)})
 
     result = route_segmented_day(
         _day(all_day, light_show, bounds=(18 * 60, 21 * 60)),

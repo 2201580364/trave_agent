@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
+from typing import Any, TypedDict, cast
 
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ResourceNotFoundError
@@ -31,6 +32,12 @@ from .review_time import (
 )
 
 _OPEN_TASK_STATUSES = frozenset({"ready_for_review", "in_review", "changes_requested"})
+
+
+class BatchDecisionResult(TypedDict):
+    succeeded: tuple[PlaceReviewTask, ...]
+    failed: tuple[dict[str, object], ...]
+    total: int
 
 
 class ReviewTaskService(ReviewSupport):
@@ -420,7 +427,7 @@ class ReviewTaskService(ReviewSupport):
 
     def decide_batch(
         self, principal: AdminPrincipal, *, items: tuple[dict[str, object], ...], request_id: str
-    ) -> dict[str, object]:
+    ) -> BatchDecisionResult:
         self._require(principal, "place:review:decide")
         if not items or len(items) > 100:
             raise ValueError("batch must contain 1 to 100 decisions")
@@ -432,10 +439,10 @@ class ReviewTaskService(ReviewSupport):
                     principal,
                     task_id=str(item["task_id"]),
                     operation_intent_id=str(item["operation_intent_id"]),
-                    expected_version=int(item["expected_version"]),
+                    expected_version=int(cast(Any, item["expected_version"])),
                     decision_kind=str(item["decision_kind"]),
                     reason_code=str(item["reason_code"]),
-                    reason_text=item.get("reason_text")
+                    reason_text=str(item["reason_text"])
                     if isinstance(item.get("reason_text"), str)
                     else None,
                     request_id=request_id,

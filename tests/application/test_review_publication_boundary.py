@@ -13,6 +13,7 @@ from tests.application.test_admin_identity_http import (
     _seed_human_verified_revision_with_evidence,
 )
 from tests.application.test_admin_identity_http import admin_context as admin_context
+from travel_agent.domain.admin import AdminAuditEvent
 from travel_agent.infrastructure.database.admin_identity import (
     AdminAuditEventRow,
     SqlAlchemyAdminAuditRepository,
@@ -61,13 +62,13 @@ def test_publication_audit_failure_rolls_back_and_retries(
     payload = dict(prepare if operation == "prepare" else preview if operation == "preview" else {})
     payload.update(operation_intent_id="publication-retry", reason_code="PUBLICATION_TEST")
 
-    def state():
+    def state() -> list[list[dict[str, object]]]:
         with context.sessions() as session:
             return [
                 [
                     dict(row)
                     for row in session.execute(
-                        select(model.__table__).order_by(*model.__table__.primary_key.columns)
+                        select(model.__table__).order_by(*model.__table__.primary_key)
                     ).mappings()
                 ]
                 for model in (
@@ -83,7 +84,7 @@ def test_publication_audit_failure_rolls_back_and_retries(
     before = state()
     add = SqlAlchemyAdminAuditRepository.add
 
-    def fail(repository, event):
+    def fail(repository: SqlAlchemyAdminAuditRepository, event: AdminAuditEvent) -> None:
         add(repository, event)
         raise RuntimeError("simulated publication audit failure")
 

@@ -2,18 +2,42 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from travel_agent.domain.place_catalog import (
+    PlaceClosure,
+    PlaceDateException,
     PlaceReviewTask,
     PlaceRevisionEvidence,
+    PlaceTimeRule,
     has_source_content_conflict,
 )
 from travel_agent.domain.place_catalog.session_payload import valid_session_timing
 
 
+class ReadinessCheck(TypedDict):
+    key: str
+    collected: bool
+    verified: bool
+    total: int
+    verified_count: int
+
+
+class ReviewReadiness(TypedDict):
+    status: str
+    completed_checks: int
+    verified_checks: int
+    total_checks: int
+    missing_checks: tuple[str, ...]
+    pending_review_checks: tuple[str, ...]
+    task_status: str | None
+    checks: tuple[ReadinessCheck, ...]
+
+
 def evaluate_review_readiness(
     evidence: PlaceRevisionEvidence,
     task: PlaceReviewTask | None,
-) -> dict[str, object]:
+) -> ReviewReadiness:
     """Summarize the six editor/reviewer checks used by the OM1 workbench."""
 
     revision = evidence.revision
@@ -108,8 +132,10 @@ def evaluate_review_readiness(
     )
     access_verified = access_collected and verified_access_points == len(active_access_points)
 
-    active_time_rules = tuple(item for item in evidence.time_rules if item.active)
-    active_time_children = (
+    active_time_rules: tuple[PlaceTimeRule, ...] = tuple(
+        item for item in evidence.time_rules if item.active
+    )
+    active_time_children: tuple[PlaceTimeRule | PlaceClosure | PlaceDateException, ...] = (
         *active_time_rules,
         *(item for item in evidence.closures if item.active),
         *(item for item in evidence.date_exceptions if item.active),
@@ -128,13 +154,15 @@ def evaluate_review_readiness(
             and bool(fixed_sessions)
             and all(
                 valid_session_timing(item.start_minute, item.end_minute, item.last_entry_minute)
-                for item in (
-                    *fixed_sessions,
-                    *(
-                        e
-                        for e in evidence.date_exceptions
-                        if e.active and e.exception_kind == "session_override"
-                    ),
+                for item in tuple[PlaceTimeRule | PlaceDateException, ...](
+                    (
+                        *fixed_sessions,
+                        *(
+                            e
+                            for e in evidence.date_exceptions
+                            if e.active and e.exception_kind == "session_override"
+                        ),
+                    )
                 )
             )
         )
@@ -233,7 +261,7 @@ def _readiness_check(
     verified: bool,
     total: int,
     verified_count: int,
-) -> dict[str, object]:
+) -> ReadinessCheck:
     return {
         "key": key,
         "collected": collected,

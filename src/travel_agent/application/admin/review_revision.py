@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
+from typing import Any, cast
 
 from travel_agent.application.common.clock import Clock
 from travel_agent.application.common.errors import ResourceNotFoundError
@@ -195,11 +196,11 @@ class RevisionLifecycleService(ReviewSupport):
             # evidence set and force needless re-entry of unchanged facts.
             evidence = uow.catalog.load_revision_evidence(base_revision_id)
             if evidence is not None:
-                for item in evidence.geometries:
-                    if item.active:
+                for source_geometries in evidence.geometries:
+                    if source_geometries.active:
                         uow.catalog.add_geometry(
                             replace(
-                                item,
+                                source_geometries,
                                 geometry_id=self._ids.new_id("geometry"),
                                 place_revision_id=revision.place_revision_id,
                                 review_status="candidate",
@@ -207,11 +208,11 @@ class RevisionLifecycleService(ReviewSupport):
                                 created_at=now,
                             )
                         )
-                for item in evidence.access_points:
-                    if item.active:
+                for source_access_points in evidence.access_points:
+                    if source_access_points.active:
                         uow.catalog.add_access_point(
                             replace(
-                                item,
+                                source_access_points,
                                 access_point_id=self._ids.new_id("access_point"),
                                 place_revision_id=revision.place_revision_id,
                                 review_status="candidate",
@@ -219,11 +220,11 @@ class RevisionLifecycleService(ReviewSupport):
                                 created_at=now,
                             )
                         )
-                for item in evidence.time_rules:
-                    if item.active:
+                for source_time_rules in evidence.time_rules:
+                    if source_time_rules.active:
                         uow.catalog.add_time_rule(
                             replace(
-                                item,
+                                source_time_rules,
                                 time_rule_id=self._ids.new_id("time_rule"),
                                 place_revision_id=revision.place_revision_id,
                                 review_status="candidate",
@@ -231,11 +232,11 @@ class RevisionLifecycleService(ReviewSupport):
                                 created_at=now,
                             )
                         )
-                for item in evidence.closures:
-                    if item.active:
+                for source_closures in evidence.closures:
+                    if source_closures.active:
                         uow.catalog.add_closure(
                             replace(
-                                item,
+                                source_closures,
                                 closure_id=self._ids.new_id("closure"),
                                 place_revision_id=revision.place_revision_id,
                                 review_status="candidate",
@@ -243,11 +244,11 @@ class RevisionLifecycleService(ReviewSupport):
                                 created_at=now,
                             )
                         )
-                for item in evidence.date_exceptions:
-                    if item.active:
+                for source_date_exceptions in evidence.date_exceptions:
+                    if source_date_exceptions.active:
                         uow.catalog.add_date_exception(
                             replace(
-                                item,
+                                source_date_exceptions,
                                 date_exception_id=self._ids.new_id("date_exception"),
                                 place_revision_id=revision.place_revision_id,
                                 review_status="candidate",
@@ -404,7 +405,7 @@ class RevisionLifecycleService(ReviewSupport):
                 )
             updated = replace(
                 current,
-                **normalized,
+                **cast(dict[str, Any], normalized),
                 solver_eligible=False,
                 conflicts_resolved=False,
                 reviewed_at=None,

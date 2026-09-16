@@ -30,6 +30,7 @@ from travel_agent.solver import (
     Attraction,
     Coordinate,
     DailyWeather,
+    FixedSession,
     TimeRule,
     WeatherBasis,
     WeatherSeverity,
@@ -140,15 +141,21 @@ class DatabasePublishedSolverDataProvider:
                     if revision.place_kind == "show"
                     else _time_rules(session, revision.place_revision_id)
                 )
-                fixed_sessions = ()
-                if revision.place_kind == "show" or session.scalar(
-                    select(PlaceTimeRuleRow.time_rule_id).where(
-                        PlaceTimeRuleRow.place_revision_id == revision.place_revision_id,
-                        PlaceTimeRuleRow.rule_kind == "fixed_session",
-                        PlaceTimeRuleRow.active.is_(True),
-                        PlaceTimeRuleRow.review_status == "human_verified",
-                    ).limit(1)
-                ) is not None:
+                fixed_sessions: tuple[FixedSession, ...] = ()
+                if (
+                    revision.place_kind == "show"
+                    or session.scalar(
+                        select(PlaceTimeRuleRow.time_rule_id)
+                        .where(
+                            PlaceTimeRuleRow.place_revision_id == revision.place_revision_id,
+                            PlaceTimeRuleRow.rule_kind == "fixed_session",
+                            PlaceTimeRuleRow.active.is_(True),
+                            PlaceTimeRuleRow.review_status == "human_verified",
+                        )
+                        .limit(1)
+                    )
+                    is not None
+                ):
                     from travel_agent.domain.place_catalog.session_payload import (
                         build_fixed_session_payload,
                     )
@@ -217,9 +224,11 @@ class DatabasePublishedSolverDataProvider:
                 travel_time_provider=ApproximateTravelTimeProvider(
                     coordinates,
                     speed_kmh=18,
+                    walking_threshold_m=2000,
+                    walking_speed_kmh=4.5,
                     detour_ratio=1.6,
                     minimum_travel_min=5,
-                    data_version="database-published-approx-od-v1",
+                    data_version="database-published-approx-od-v2",
                     fetched_at=datetime.combine(today, datetime.min.time(), tzinfo=UTC),
                 ),
                 od_basis="database_published_approximate",
@@ -243,12 +252,21 @@ def _time_rules(session: Session, revision_id: str) -> tuple[TimeRule, ...]:
     # loaded as discrete sessions, never flattened into opening hours (H3/C2).
     return tuple(
         TimeRule(
-            1, 1, 12, 31, row.start_minute, row.end_minute,
-            row.last_entry_minute, frozenset(row.weekdays), row.valid_from, row.valid_to,
+            1,
+            1,
+            12,
+            31,
+            row.start_minute,
+            row.end_minute,
+            row.last_entry_minute,
+            frozenset(row.weekdays),
+            row.valid_from,
+            row.valid_to,
         )
         for row in rows
         if row.rule_kind == "opening_hours"
-        and row.start_minute is not None and row.end_minute is not None
+        and row.start_minute is not None
+        and row.end_minute is not None
     )
 
 

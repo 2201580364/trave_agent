@@ -17,13 +17,20 @@ from travel_agent.domain.sharing import PlanShareRepository
 
 
 class UnitOfWork(Protocol):
-    drafts: TripDraftRepository
-    generation_intents: GenerationIntentRepository
-    trips: TripRepository
-    trip_revisions: TripRevisionRepository
-    solver_runs: SolverRunRepository
-    plan_shares: PlanShareRepository
-    feedbacks: FeedbackRepository
+    @property
+    def drafts(self) -> TripDraftRepository: ...
+    @property
+    def generation_intents(self) -> GenerationIntentRepository: ...
+    @property
+    def trips(self) -> TripRepository: ...
+    @property
+    def trip_revisions(self) -> TripRevisionRepository: ...
+    @property
+    def solver_runs(self) -> SolverRunRepository: ...
+    @property
+    def plan_shares(self) -> PlanShareRepository: ...
+    @property
+    def feedbacks(self) -> FeedbackRepository: ...
 
     def __enter__(self) -> Self: ...
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
-from ortools.constraint_solver import routing_enums_pb2
+from ortools.constraint_solver import routing_enums_pb2  # type: ignore[import-untyped]
 
 from travel_agent.solver import (
     ApproximateTravelTimeProvider,
@@ -121,9 +121,7 @@ def _provider(attractions: tuple[Attraction, ...]) -> ApproximateTravelTimeProvi
 
 def excessive_selection_is_conserved_and_explained() -> DegradationCaseResult:
     attractions = tuple(_attraction(index, duration=300) for index in range(1, 31))
-    weather = _weather(
-        {MONDAY: WeatherSeverity.NORMAL, TUESDAY: WeatherSeverity.NORMAL}
-    )
+    weather = _weather({MONDAY: WeatherSeverity.NORMAL, TUESDAY: WeatherSeverity.NORMAL})
     step1 = assign_days(
         tuple(AttractionPreference(item, MONDAY) for item in attractions),
         trip_dates=(MONDAY, TUESDAY),
@@ -162,9 +160,7 @@ def excessive_selection_is_conserved_and_explained() -> DegradationCaseResult:
 
 def all_dates_closed_are_traceable() -> DegradationCaseResult:
     attraction = _attraction(31, close_days=frozenset({1, 2}))
-    weather = _weather(
-        {MONDAY: WeatherSeverity.NORMAL, TUESDAY: WeatherSeverity.NORMAL}
-    )
+    weather = _weather({MONDAY: WeatherSeverity.NORMAL, TUESDAY: WeatherSeverity.NORMAL})
     step1 = assign_days(
         (AttractionPreference(attraction, MONDAY),),
         trip_dates=(MONDAY, TUESDAY),
@@ -196,9 +192,7 @@ def all_dates_closed_are_traceable() -> DegradationCaseResult:
 
 def all_dates_extreme_weather_are_traceable() -> DegradationCaseResult:
     attraction = _attraction(32)
-    weather = _weather(
-        {MONDAY: WeatherSeverity.EXTREME, TUESDAY: WeatherSeverity.EXTREME}
-    )
+    weather = _weather({MONDAY: WeatherSeverity.EXTREME, TUESDAY: WeatherSeverity.EXTREME})
     step1 = assign_days(
         (AttractionPreference(attraction, MONDAY),),
         trip_dates=(MONDAY, TUESDAY),
@@ -251,8 +245,7 @@ def missing_od_never_becomes_zero_travel() -> DegradationCaseResult:
         and quality.accounting.unplaced_count == 2
         and itinerary.days[0].total_travel_min == 0
         and all(
-            item.rejection_code is RejectionCode.ROUTING_UNPLACED
-            for item in itinerary.unplaced
+            item.rejection_code is RejectionCode.ROUTING_UNPLACED for item in itinerary.unplaced
         )
     )
     return DegradationCaseResult(
@@ -291,8 +284,7 @@ def evening_show_cannot_break_departure_anchor() -> DegradationCaseResult:
         quality.gate_passed
         and not itinerary.days[0].visits
         and item.rejection_code is RejectionCode.NO_AVAILABLE_DATE
-        and RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL
-        in item.attempts[0].rejection_codes
+        and RejectionCode.ARRIVAL_AFTER_LATEST_ARRIVAL in item.attempts[0].rejection_codes
     )
     return DegradationCaseResult(
         "DEG-05",
@@ -358,10 +350,7 @@ def no_dinner_slot_keeps_hard_feasible_visits() -> DegradationCaseResult:
         and quality.accounting.scheduled_count == 2
         and meal.status is MealStatus.UNSCHEDULED
         and degradation.explainable
-        and any(
-            item.code is DegradationCode.DINNER_UNSCHEDULED
-            for item in degradation.notices
-        )
+        and any(item.code is DegradationCode.DINNER_UNSCHEDULED for item in degradation.notices)
     )
     return DegradationCaseResult(
         "DEG-06",
@@ -403,10 +392,7 @@ def timeout_with_solution_returns_validated_best_so_far() -> DegradationCaseResu
         and itinerary.days[0].solve_metadata.status is RouteSearchStatus.BEST_SO_FAR
         and itinerary.best_so_far_day_count == 1
         and degradation.explainable
-        and any(
-            item.code is DegradationCode.SEARCH_BEST_SO_FAR
-            for item in degradation.notices
-        )
+        and any(item.code is DegradationCode.SEARCH_BEST_SO_FAR for item in degradation.notices)
     )
     return DegradationCaseResult(
         "DEG-07",

@@ -6,13 +6,15 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from travel_agent.application.admin import AdminIdentityService, PlaceReviewWorkflowService
 from travel_agent.application.admin.holiday_calendar_sync import (
@@ -31,6 +33,7 @@ from travel_agent.application.feedback import (
     SubmitTripFeedback,
     SubmitTripFeedbackHandler,
 )
+from travel_agent.application.feedback.handlers import FeedbackResult
 from travel_agent.application.planning import (
     CreateDraft,
     CreateDraftHandler,
@@ -62,10 +65,14 @@ from travel_agent.domain.planning import (
     TransportType,
     TravelFacts,
     TravelMode,
+    Trip,
+    TripDraft,
+    TripRevision,
     VisitPeriodPreferenceInput,
 )
 from travel_agent.infrastructure.database.identity import AnonymousIdentityService
 from travel_agent.infrastructure.solver import PublishedSolverDataProvider
+from travel_agent.infrastructure.solver.gateway import PublishedAttraction, PublishedSolverData
 
 from .admin import build_admin_router
 
@@ -212,7 +219,9 @@ def create_app(container: HttpContainer) -> FastAPI:
         )
 
     @app.middleware("http")
-    async def request_id_middleware(request: Request, call_next):
+    async def request_id_middleware(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         supplied = request.headers.get("X-Request-ID", "")
         request_id = supplied if _valid_request_id(supplied) else f"req_{uuid4().hex}"
         request.state.request_id = request_id
@@ -221,7 +230,7 @@ def create_app(container: HttpContainer) -> FastAPI:
         return response
 
     @app.exception_handler(ApplicationError)
-    async def application_error_handler(request: Request, exc: ApplicationError):
+    async def application_error_handler(request: Request, exc: ApplicationError) -> JSONResponse:
         return JSONResponse(
             status_code=_status_for(exc),
             content={
@@ -237,7 +246,7 @@ def create_app(container: HttpContainer) -> FastAPI:
         )
 
     @app.exception_handler(HTTPException)
-    async def http_error_handler(request: Request, exc: HTTPException):
+    async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
         code = "authentication_required" if exc.status_code == 401 else "http_error"
         return _error_response(
             request,
@@ -248,7 +257,9 @@ def create_app(container: HttpContainer) -> FastAPI:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error_handler(request: Request, exc: RequestValidationError):
+    async def validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         fields = [
             {
                 "field": ".".join(str(item) for item in error["loc"] if item != "body"),
@@ -267,7 +278,7 @@ def create_app(container: HttpContainer) -> FastAPI:
         )
 
     @app.exception_handler(ValueError)
-    async def domain_validation_error_handler(request: Request, exc: ValueError):
+    async def domain_validation_error_handler(request: Request, exc: ValueError) -> JSONResponse:
         message = str(exc)
         # Contract §2.4: `message` is versioned user copy. Domain invariants
         # may raise English invariant text; only pass through copy that is
@@ -551,7 +562,7 @@ def create_app(container: HttpContainer) -> FastAPI:
                 or revision.trip_id != trip_id
             ):
                 raise ResourceNotFoundError
-            return _jsonable(revision)
+            return cast(dict[str, object], _jsonable(revision))
 
     @app.post(
         "/api/v1/trips/{trip_id}/revisions/{revision_id}/attraction-replacements",
@@ -723,15 +734,15 @@ def create_app(container: HttpContainer) -> FastAPI:
     return app
 
 
-def _owned_intent(container: HttpContainer, intent_id: str, principal: str):
+def _owned_intent(container: HttpContainer, intent_id: str, principal: str) -> dict[str, object]:
     with container.uow_factory() as uow:
         intent = uow.generation_intents.get(intent_id)
         if intent is None or intent.principal_id != principal:
             raise ResourceNotFoundError
-        return _jsonable(intent)
+        return cast(dict[str, object], _jsonable(intent))
 
 
-def _draft_response(draft) -> dict[str, object]:
+def _draft_response(draft: TripDraft) -> dict[str, object]:
     facts = draft.travel_facts
     travel_facts = None
     if facts is not None:
@@ -773,7 +784,7 @@ def _draft_response(draft) -> dict[str, object]:
     }
 
 
-def _feedback_response(result) -> dict[str, object]:
+def _feedback_response(result: FeedbackResult) -> dict[str, object]:
     feedback = result.feedback
     return {
         "feedback_id": feedback.feedback_id,
@@ -791,7 +802,9 @@ def _feedback_response(result) -> dict[str, object]:
     }
 
 
-def _trip_summary_response(trip, revision, revision_count: int) -> dict[str, object]:
+def _trip_summary_response(
+    trip: Trip, revision: TripRevision, revision_count: int
+) -> dict[str, object]:
     snapshot = _snapshot_overview(revision.result_snapshot)
     return {
         "trip_id": trip.trip_id,
@@ -811,7 +824,7 @@ def _trip_summary_response(trip, revision, revision_count: int) -> dict[str, obj
 
 
 def _revision_summary_response(
-    revision,
+    revision: TripRevision,
     *,
     current_revision_id: str,
 ) -> dict[str, object]:
@@ -854,7 +867,7 @@ def _snapshot_overview(snapshot: dict[str, object]) -> dict[str, object]:
     }
 
 
-def _readiness_issues(draft) -> list[str]:
+def _readiness_issues(draft: TripDraft) -> list[str]:
     issues = []
     if draft.travel_facts is None:
         issues.append("travel_facts_missing")
@@ -865,7 +878,7 @@ def _readiness_issues(draft) -> list[str]:
     return issues
 
 
-def _jsonable(value):
+def _jsonable(value: Any) -> Any:
     if hasattr(value, "__dataclass_fields__"):
         return _jsonable(asdict(value))
     if isinstance(value, Enum):
@@ -921,7 +934,7 @@ def _valid_request_id(value: str) -> bool:
     return bool(value) and len(value) <= 100 and value.isascii() and value.isprintable()
 
 
-def _published_snapshot(container: HttpContainer, city_id: str):
+def _published_snapshot(container: HttpContainer, city_id: str) -> PublishedSolverData:
     if container.catalog is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "catalog unavailable")
     version = container.snapshots.current_version(city_id)
@@ -933,7 +946,7 @@ def _published_snapshot(container: HttpContainer, city_id: str):
         ) from exc
 
 
-def _attraction_response(item) -> dict[str, object]:
+def _attraction_response(item: PublishedAttraction) -> dict[str, object]:
     attraction = item.attraction
     response = {
         "attraction_id": item.external_id,
@@ -954,7 +967,9 @@ def _attraction_response(item) -> dict[str, object]:
     return response
 
 
-def _ensure_selection_constraints(snapshot, selected_ids: tuple[str, ...]) -> None:
+def _ensure_selection_constraints(
+    snapshot: PublishedSolverData, selected_ids: tuple[str, ...]
+) -> None:
     by_id = {item.external_id: item for item in snapshot.attractions}
     groups: dict[str, int] = {}
     for attraction_id in selected_ids:

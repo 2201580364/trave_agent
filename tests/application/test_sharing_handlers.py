@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -141,8 +142,10 @@ def test_plan_share_is_redacted_immutable_and_idempotent() -> None:
     assert repeated.reused is True
     assert repeated.public_token == created.public_token
     assert published.share_snapshot == created.share.share_snapshot
-    assert published.share_snapshot["content_kind"] == "planned_itinerary"
-    assert published.share_snapshot["days"][0]["items"][1]["fixed_time"] == ("18:30")
+    assert cast(dict[str, Any], published.share_snapshot)["content_kind"] == "planned_itinerary"
+    assert cast(dict[str, Any], published.share_snapshot)["days"][0]["items"][1]["fixed_time"] == (
+        "18:30"
+    )
     serialized = json.dumps(published.share_snapshot, ensure_ascii=False)
     for forbidden in (
         "principal_id",
@@ -195,11 +198,11 @@ def test_reference_copy_keeps_attractions_but_drops_private_travel_facts() -> No
     assert copied.draft.visit_period_preferences == ()
 
 
-def test_share_shows_session_start_and_hides_internal_session_identity():
+def test_share_shows_session_start_and_hides_internal_session_identity() -> None:
     """H3: early entry is not mislabeled as the public show start."""
     store = _store()
     revision = store.trip_revisions["revision_1"]
-    node = revision.result_snapshot["days"][0]["nodes"][1]
+    node = cast(dict[str, Any], revision.result_snapshot)["days"][0]["nodes"][1]
     node["arrival_min"] = 1100
     node["selected_session"] = {
         "session_id": "internal-session",
@@ -210,6 +213,9 @@ def test_share_shows_session_start_and_hides_internal_session_identity():
     created = CreatePlanShareHandler(
         InMemoryUnitOfWork(store), FixedClock(), SequenceIdGenerator(), _tokens()
     ).handle(CreatePlanShare("principal_owner", "session-share", "trip_1", "revision_1"))
-    assert created.share.share_snapshot["days"][0]["items"][1]["fixed_time"] == "18:20 入场 · 18:30"
+    assert (
+        cast(dict[str, Any], created.share.share_snapshot)["days"][0]["items"][1]["fixed_time"]
+        == "18:20 入场 · 18:30"
+    )
     assert "internal-session" not in json.dumps(created.share.share_snapshot)
     assert "selected_session" not in json.dumps(created.share.share_snapshot)

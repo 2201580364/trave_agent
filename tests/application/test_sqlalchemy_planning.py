@@ -10,7 +10,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from travel_agent.application.common.errors import (
     DraftVersionConflictError,
@@ -55,7 +55,7 @@ class FakeGateway:
         )
 
 
-def _factory(path: Path):
+def _factory(path: Path) -> sessionmaker[Session]:
     engine = create_engine(f"sqlite:///{path}")
     create_schema(engine)
     return sessionmaker(engine, expire_on_commit=False)
@@ -69,9 +69,18 @@ def _draft() -> TripDraft:
 
 def _intent() -> GenerationIntent:
     return GenerationIntent(
-        "intent_1", "principal_1", "draft_1", 1, GenerationStatus.QUEUED,
-        "generation-input-v1", {"city_id": "hangzhou"}, "a" * 64,
-        "hangzhou-v1", 7, NOW, NOW,
+        "intent_1",
+        "principal_1",
+        "draft_1",
+        1,
+        GenerationStatus.QUEUED,
+        "generation-input-v1",
+        {"city_id": "hangzhou"},
+        "a" * 64,
+        "hangzhou-v1",
+        7,
+        NOW,
+        NOW,
     )
 
 
@@ -119,9 +128,7 @@ def test_intent_status_compare_and_swap_allows_only_one_claim(tmp_path: Path) ->
         uow.generation_intents.save(claimed, expected_status="queued")
         uow.commit()
 
-    with SqlAlchemyUnitOfWork(factory) as uow, pytest.raises(
-        ValueError, match="status conflict"
-    ):
+    with SqlAlchemyUnitOfWork(factory) as uow, pytest.raises(ValueError, match="status conflict"):
         uow.generation_intents.save(claimed, expected_status="queued")
 
 
@@ -129,9 +136,7 @@ def test_trip_revision_compare_and_swap_rejects_stale_publisher(
     tmp_path: Path,
 ) -> None:
     factory = _factory(tmp_path / "planning.db")
-    original = Trip(
-        "trip_1", "principal_1", "hangzhou", "draft_1", "revision_1", NOW, NOW
-    )
+    original = Trip("trip_1", "principal_1", "hangzhou", "draft_1", "revision_1", NOW, NOW)
     with SqlAlchemyUnitOfWork(factory) as uow:
         uow.trips.add(original)
         uow.commit()
@@ -176,14 +181,28 @@ def test_trip_and_revision_queries_are_owned_ordered_and_paginated(
     )
     revisions = (
         TripRevision(
-            "revision_b1", "trip_b", 1, "intent_b1",
-            CompletionKind.COMPLETE_SUCCESS, False, "trip-result-v1",
-            {"days": []}, "a" * 64, older,
+            "revision_b1",
+            "trip_b",
+            1,
+            "intent_b1",
+            CompletionKind.COMPLETE_SUCCESS,
+            False,
+            "trip-result-v1",
+            {"days": []},
+            "a" * 64,
+            older,
         ),
         TripRevision(
-            "revision_b2", "trip_b", 2, "intent_b2",
-            CompletionKind.COMPLETE_SUCCESS, False, "trip-result-v1",
-            {"days": []}, "b" * 64, NOW,
+            "revision_b2",
+            "trip_b",
+            2,
+            "intent_b2",
+            CompletionKind.COMPLETE_SUCCESS,
+            False,
+            "trip-result-v1",
+            {"days": []},
+            "b" * 64,
+            NOW,
         ),
     )
     with SqlAlchemyUnitOfWork(factory) as uow:
@@ -194,16 +213,10 @@ def test_trip_and_revision_queries_are_owned_ordered_and_paginated(
         uow.commit()
 
     with SqlAlchemyUnitOfWork(factory) as uow:
-        first_page = uow.trips.list_by_principal(
-            "principal_1", limit=2, offset=0
-        )
-        second_page = uow.trips.list_by_principal(
-            "principal_1", limit=2, offset=2
-        )
+        first_page = uow.trips.list_by_principal("principal_1", limit=2, offset=0)
+        second_page = uow.trips.list_by_principal("principal_1", limit=2, offset=2)
         trip_revisions = uow.trip_revisions.list_by_trip("trip_b")
-        revision_counts = uow.trip_revisions.count_by_trip_ids(
-            ("trip_a", "trip_b", "trip_missing")
-        )
+        revision_counts = uow.trip_revisions.count_by_trip_ids(("trip_a", "trip_b", "trip_missing"))
 
     assert [trip.trip_id for trip in first_page] == ["trip_a", "trip_b"]
     assert [trip.trip_id for trip in second_page] == ["trip_old"]
@@ -215,9 +228,10 @@ def test_uncommitted_completion_products_are_rolled_back(tmp_path: Path) -> None
     factory = _factory(tmp_path / "planning.db")
     trip = Trip("trip_1", "principal_1", "hangzhou", "draft_1", "revision_1", NOW, NOW)
 
-    with pytest.raises(RuntimeError, match="simulate failure"), SqlAlchemyUnitOfWork(
-        factory
-    ) as uow:
+    with (
+        pytest.raises(RuntimeError, match="simulate failure"),
+        SqlAlchemyUnitOfWork(factory) as uow,
+    ):
         uow.trips.add(trip)
         raise RuntimeError("simulate failure")
 
@@ -243,6 +257,9 @@ def test_execute_generation_persists_complete_graph_across_restart(tmp_path: Pat
     restarted_factory = _factory(database)
     with SqlAlchemyUnitOfWork(restarted_factory) as uow:
         intent = uow.generation_intents.get("intent_1")
+        assert result.trip_id is not None
+        assert result.trip_revision_id is not None
+        assert result.solver_run_id is not None
         trip = uow.trips.get(result.trip_id)
         revision = uow.trip_revisions.get(result.trip_revision_id)
         run = uow.solver_runs.get(result.solver_run_id)
@@ -261,9 +278,7 @@ def test_alembic_upgrade_builds_the_same_schema(tmp_path: Path) -> None:
 
     command.upgrade(config, "head")
 
-    factory = sessionmaker(
-        create_engine(f"sqlite:///{database}"), expire_on_commit=False
-    )
+    factory = sessionmaker(create_engine(f"sqlite:///{database}"), expire_on_commit=False)
     with SqlAlchemyUnitOfWork(factory) as uow:
         uow.drafts.save(_draft())
         uow.plan_shares.add(
@@ -301,9 +316,7 @@ def test_alembic_upgrade_builds_the_same_schema(tmp_path: Path) -> None:
         )
         uow.commit()
 
-    restarted_factory = sessionmaker(
-        create_engine(f"sqlite:///{database}"), expire_on_commit=False
-    )
+    restarted_factory = sessionmaker(create_engine(f"sqlite:///{database}"), expire_on_commit=False)
     with SqlAlchemyUnitOfWork(restarted_factory) as uow:
         restored = uow.plan_shares.get_by_public_token_hash("c" * 64)
         restored_feedback = uow.feedbacks.get_by_target(

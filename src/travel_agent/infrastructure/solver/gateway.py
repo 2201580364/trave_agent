@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
 from fractions import Fraction
@@ -43,6 +43,9 @@ from travel_agent.solver import (
     resolve_effective_window,
     route_itinerary,
 )
+from travel_agent.solver.degradation import DegradationReport
+from travel_agent.solver.models import ItineraryPlan, RoutedDay
+from travel_agent.solver.quality import SolverQualityReport
 from travel_agent.solver.time_windows import applicable_fixed_sessions
 
 from .schedule_quality import improve_default_days
@@ -130,7 +133,9 @@ class ProductionSolverGateway:
             improved = improve_default_days(step1, itinerary, subgraph.provider(), prepared.weather)
             if improved != step1:
                 itinerary = route_itinerary(
-                    improved, subgraph.provider(), weather_by_date=prepared.weather,
+                    improved,
+                    subgraph.provider(),
+                    weather_by_date=prepared.weather,
                 )
             quality = evaluate_solver_quality(itinerary, prepared.attractions)
             degradation = evaluate_itinerary_degradation(
@@ -214,10 +219,10 @@ def _prepare_input(
     departure = datetime.fromisoformat(_text(facts["departure_at"]))
     anchors = TripTimeAnchors(
         _minute_of_day(arrival),
-        int(facts["station_to_city_min"]),
+        int(str(facts["station_to_city_min"])),
         _minute_of_day(departure),
-        int(facts["station_early_min"]),
-        int(facts["last_visit_to_station_min"]),
+        int(str(facts["station_early_min"])),
+        int(str(facts["last_visit_to_station_min"])),
     )
     travel_mode = TravelMode(_text(facts["travel_mode"]))
     by_external_id = {item.external_id: item.attraction for item in published.attractions}
@@ -258,11 +263,7 @@ def _validate_selection_constraints(
         item = published[external_id]
         for group_id in item.selection_exclusion_group_ids:
             groups.setdefault(group_id, []).append(external_id)
-    conflicts = {
-        group_id: tuple(sorted(ids))
-        for group_id, ids in groups.items()
-        if len(ids) > 1
-    }
+    conflicts = {group_id: tuple(sorted(ids)) for group_id, ids in groups.items() if len(ids) > 1}
     if conflicts:
         raise ValueError("selected attractions violate reviewed exclusion groups")
 
@@ -425,10 +426,14 @@ def _rebalance_od_cluster_sizes(
                     gained_affinity = _average_attraction_cluster_cost(
                         attraction, recipient, provider
                     )
-                    protected_pair = bool(donor_others) and min(
-                        _symmetric_od_cost(attraction.id, other.id, provider)
-                        for other in donor_others
-                    ) <= 10
+                    protected_pair = (
+                        bool(donor_others)
+                        and min(
+                            _symmetric_od_cost(attraction.id, other.id, provider)
+                            for other in donor_others
+                        )
+                        <= 10
+                    )
                     candidates.append(
                         (
                             int(protected_pair),
@@ -499,10 +504,14 @@ def _rebalance_od_cluster_durations(
                     if improvement <= 0:
                         continue
                     donor_others = [item for item in donor if item.id != attraction.id]
-                    if donor_others and min(
-                        _symmetric_od_cost(attraction.id, other.id, provider)
-                        for other in donor_others
-                    ) <= 10:
+                    if (
+                        donor_others
+                        and min(
+                            _symmetric_od_cost(attraction.id, other.id, provider)
+                            for other in donor_others
+                        )
+                        <= 10
+                    ):
                         continue
                     od_penalty = _average_attraction_cluster_cost(
                         attraction,
@@ -583,7 +592,13 @@ def _visit_period(raw: dict[str, object] | None) -> VisitPeriodPreference | None
     )
 
 
-def _result_snapshot(request, published, itinerary, quality, degradation):
+def _result_snapshot(
+    request: SolverRequest,
+    published: PublishedSolverData,
+    itinerary: ItineraryPlan,
+    quality: SolverQualityReport,
+    degradation: DegradationReport,
+) -> dict[str, object]:
     external_by_solver_id = {item.attraction.id: item.external_id for item in published.attractions}
     days = []
     for day in itinerary.days:
@@ -744,14 +759,12 @@ def _result_snapshot(request, published, itinerary, quality, degradation):
 def _transport_mode(travel: TravelTimeResult) -> str:
     if travel.travel_mode is not None:
         return travel.travel_mode.value
-    if travel.travel_min <= 8:
-        return "walking_estimate"
     if travel.travel_min <= 20:
         return "taxi_estimate"
     return "transit_or_taxi_estimate"
 
 
-def _lunch_plan(day) -> dict[str, object] | None:
+def _lunch_plan(day: RoutedDay) -> dict[str, object] | None:
     visits = day.visits
     if not visits:
         return None
@@ -829,7 +842,7 @@ def _text(value: object) -> str:
 
 
 def _jsonable(value: object) -> object:
-    if hasattr(value, "__dataclass_fields__"):
+    if is_dataclass(value) and not isinstance(value, type):
         return _jsonable(asdict(value))
     if isinstance(value, Enum):
         return value.value

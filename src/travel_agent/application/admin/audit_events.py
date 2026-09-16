@@ -45,15 +45,13 @@ _IDENTITY_FLOW_ROLES = (
 
 def canonical_digest(value: object) -> str:
     """Canonical-JSON SHA-256: the single digest algorithm for audit fields."""
-    payload = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return hashlib.sha256(payload).hexdigest()
 
 
-def validate_audit_reason(
-    reason_code: str, reason_text: str | None
-) -> str | None:
+def validate_audit_reason(reason_code: str, reason_text: str | None) -> str | None:
     """Validate the audit reason pair; return the normalized reason_text."""
     if REASON_CODE_PATTERN.fullmatch(reason_code) is None:
         raise ValueError("reason_code must be a stable uppercase code")
@@ -114,6 +112,7 @@ def build_audit_event(
     if (actor is None) == (actor_id_override is None):
         raise ValueError("provide exactly one of actor / actor_id_override")
     actor_id = actor_id_override if actor is None else actor.admin_actor_id
+    assert actor_id is not None
     return AdminAuditEvent(
         event_id,
         actor_id,

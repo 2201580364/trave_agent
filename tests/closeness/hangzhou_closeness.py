@@ -35,11 +35,12 @@ from travel_agent.solver import (
     evaluate_solver_quality,
     route_itinerary,
 )
+from travel_agent.solver.closeness import ItineraryClosenessReport
 
 
 @dataclass(frozen=True, slots=True)
 class HangzhouClosenessResult:
-    report: object
+    report: ItineraryClosenessReport
     note: str
 
 

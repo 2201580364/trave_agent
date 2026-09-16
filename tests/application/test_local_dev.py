@@ -43,7 +43,9 @@ def test_local_catalog_is_explicit_and_covers_evening_attraction() -> None:
     assert all(item.attraction.data_verified for item in published.attractions)
 
 
-def test_local_app_uses_migrated_database_and_serves_catalog(tmp_path: Path, monkeypatch) -> None:
+def test_local_app_uses_migrated_database_and_serves_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     database_path = tmp_path / "local-dev.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     migration = Config("alembic.ini")
@@ -85,7 +87,7 @@ def test_local_app_uses_migrated_database_and_serves_catalog(tmp_path: Path, mon
 
 
 def test_local_app_exposes_holiday_sync_capability_from_environment(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     database_url = f"sqlite:///{(tmp_path / 'holiday-capability.db').as_posix()}"
     migration = Config("alembic.ini")
@@ -295,49 +297,109 @@ def test_database_published_provider_loads_reviewed_selection_constraints(tmp_pa
     engine = build_engine(DatabaseSettings(url=database_url))
     sessions = build_session_factory(engine)
     with sessions() as session:
-        session.add(PlaceRow(
-            place_id="group-place", city_id="hangzhou", status="active", merged_into_place_id=None,
-            created_at="2026-08-01T00:00:00+00:00", updated_at="2026-08-01T00:00:00+00:00",
-        ))
-        session.add(PlaceRevisionRow(
-            place_revision_id="group-revision", place_id="group-place", revision_number=1,
-            revision_version=1, lifecycle_status="published", canonical_name="互斥景点",
-            aliases=[], place_kind="attraction", category="景点", admin_area="杭州", address="杭州",
-            geometry_kind="point", duration_min=30, duration_recommended=60, duration_max=90,
-            internal_travel_min=5, energy_level=1, indoor_outdoor="outdoor", suitable_periods=[],
-            audience_tags=[], rain_suitability="conditional", is_always_open=True,
-            solver_eligible=True, conflicts_resolved=True, source_record_ids=[],
-            created_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
-            published_at="2026-08-30T00:00:00+00:00", review_flags=[],
-            relation_review_status="no_relations",
-        ))
-        session.add(PlaceAccessPointRow(
-            access_point_id="group-access", place_revision_id="group-revision",
-            access_point_kind="visitor_entrance", name="入口", lat=30.25, lng=120.16,
-            source_record_id="missing-source", review_status="human_verified", active=True,
-            fetched_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-01T00:00:00+00:00",
-            created_at="2026-08-01T00:00:00+00:00",
-        ))
-        session.add(SolverPlaceProjectionRow(
-            projection_id="group-projection", projection_version="projection-v1",
-            data_snapshot_version="db-group-v1", place_id="group-place",
-            place_revision_id="group-revision",
-            solver_node_id=201, place_kind="attraction", geometry_kind="point",
-            arrival_access_point_id="group-access", departure_access_point_id="group-access",
-            duration_min=30, duration_recommended=60, duration_max=90, internal_travel_min=5,
-            solver_payload={"name": "互斥景点", "suggested_duration": 60}, projection_hash="a" * 64,
-            status="published", gate_reason_codes=[], created_at="2026-08-30T00:00:00+00:00",
-            published_at="2026-08-30T00:00:00+00:00",
-        ))
-        session.add(SelectionExclusionGroupRow(
-            exclusion_group_id="group-1", city_id="hangzhou", name="同一体验",
-            status="active", review_status="human_verified", decision_note="已裁决",
-            created_at="2026-08-01T00:00:00+00:00", reviewed_at="2026-08-02T00:00:00+00:00",
-        ))
-        session.add(SelectionExclusionMemberRow(
-            exclusion_group_id="group-1", place_id="group-place",
-            created_at="2026-08-01T00:00:00+00:00",
-        ))
+        session.add(
+            PlaceRow(
+                place_id="group-place",
+                city_id="hangzhou",
+                status="active",
+                merged_into_place_id=None,
+                created_at="2026-08-01T00:00:00+00:00",
+                updated_at="2026-08-01T00:00:00+00:00",
+            )
+        )
+        session.add(
+            PlaceRevisionRow(
+                place_revision_id="group-revision",
+                place_id="group-place",
+                revision_number=1,
+                revision_version=1,
+                lifecycle_status="published",
+                canonical_name="互斥景点",
+                aliases=[],
+                place_kind="attraction",
+                category="景点",
+                admin_area="杭州",
+                address="杭州",
+                geometry_kind="point",
+                duration_min=30,
+                duration_recommended=60,
+                duration_max=90,
+                internal_travel_min=5,
+                energy_level=1,
+                indoor_outdoor="outdoor",
+                suitable_periods=[],
+                audience_tags=[],
+                rain_suitability="conditional",
+                is_always_open=True,
+                solver_eligible=True,
+                conflicts_resolved=True,
+                source_record_ids=[],
+                created_at="2026-08-01T00:00:00+00:00",
+                reviewed_at="2026-08-01T00:00:00+00:00",
+                published_at="2026-08-30T00:00:00+00:00",
+                review_flags=[],
+                relation_review_status="no_relations",
+            )
+        )
+        session.add(
+            PlaceAccessPointRow(
+                access_point_id="group-access",
+                place_revision_id="group-revision",
+                access_point_kind="visitor_entrance",
+                name="入口",
+                lat=30.25,
+                lng=120.16,
+                source_record_id="missing-source",
+                review_status="human_verified",
+                active=True,
+                fetched_at="2026-08-01T00:00:00+00:00",
+                reviewed_at="2026-08-01T00:00:00+00:00",
+                created_at="2026-08-01T00:00:00+00:00",
+            )
+        )
+        session.add(
+            SolverPlaceProjectionRow(
+                projection_id="group-projection",
+                projection_version="projection-v1",
+                data_snapshot_version="db-group-v1",
+                place_id="group-place",
+                place_revision_id="group-revision",
+                solver_node_id=201,
+                place_kind="attraction",
+                geometry_kind="point",
+                arrival_access_point_id="group-access",
+                departure_access_point_id="group-access",
+                duration_min=30,
+                duration_recommended=60,
+                duration_max=90,
+                internal_travel_min=5,
+                solver_payload={"name": "互斥景点", "suggested_duration": 60},
+                projection_hash="a" * 64,
+                status="published",
+                gate_reason_codes=[],
+                created_at="2026-08-30T00:00:00+00:00",
+                published_at="2026-08-30T00:00:00+00:00",
+            )
+        )
+        session.add(
+            SelectionExclusionGroupRow(
+                exclusion_group_id="group-1",
+                city_id="hangzhou",
+                name="同一体验",
+                status="active",
+                review_status="human_verified",
+                decision_note="已裁决",
+                created_at="2026-08-01T00:00:00+00:00",
+                reviewed_at="2026-08-02T00:00:00+00:00",
+            )
+        )
+        session.add(
+            SelectionExclusionMemberRow(
+                exclusion_group_id="group-1",
+                place_id="group-place",
+                created_at="2026-08-01T00:00:00+00:00",
+            )
+        )
         session.commit()
 
     from travel_agent.infrastructure.solver.database_published import (
@@ -368,13 +430,23 @@ def test_database_opening_rules_preserve_calendar_and_exclude_sessions() -> None
             ("winter", "opening_hours", [2, 4, 6], date(2026, 10, 1), date(2026, 12, 31)),
             ("departure", "fixed_session", [1, 3, 5], None, None),
         ):
-            session.add(PlaceTimeRuleRow(
-                time_rule_id=rule_id, place_revision_id="revision", rule_kind=kind,
-                weekdays=weekdays, valid_from=start, valid_to=end,
-                start_minute=540, end_minute=1080, last_entry_minute=1020,
-                source_record_id="source", review_status="human_verified", active=True,
-                created_at="2026-09-16T00:00:00+00:00",
-            ))
+            session.add(
+                PlaceTimeRuleRow(
+                    time_rule_id=rule_id,
+                    place_revision_id="revision",
+                    rule_kind=kind,
+                    weekdays=weekdays,
+                    valid_from=start,
+                    valid_to=end,
+                    start_minute=540,
+                    end_minute=1080,
+                    last_entry_minute=1020,
+                    source_record_id="source",
+                    review_status="human_verified",
+                    active=True,
+                    created_at="2026-09-16T00:00:00+00:00",
+                )
+            )
         session.flush()
         rules = _time_rules(session, "revision")
         assert len(rules) == 2

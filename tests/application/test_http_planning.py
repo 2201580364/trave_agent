@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from travel_agent.application.planning import ExecuteGenerationHandler
-from travel_agent.application.planning.ports import SolverOutcome
+from travel_agent.application.planning.ports import SolverOutcome, SolverRequest
 from travel_agent.domain.planning import CompletionKind
 from travel_agent.infrastructure.database import (
     AnonymousIdentityService,
@@ -57,7 +57,7 @@ class SequenceTokenGenerator:
 
 
 class FakeGateway:
-    def solve(self, request: object) -> SolverOutcome:
+    def solve(self, request: SolverRequest) -> SolverOutcome:
         return SolverOutcome(
             CompletionKind.COMPLETE_SUCCESS,
             False,
@@ -95,15 +95,12 @@ def _client(tmp_path: Path) -> TestClient:
     sessions = sessionmaker(engine, expire_on_commit=False)
     ids = SequenceIdGenerator()
     clock = FixedClock()
+
     def uow_factory() -> SqlAlchemyUnitOfWork:
         return SqlAlchemyUnitOfWork(sessions)
 
-    execute = ExecuteGenerationHandler(
-        uow_factory(), clock, ids, FakeGateway()
-    )
-    identity = AnonymousIdentityService(
-        sessions, clock, ids, SequenceTokenGenerator()
-    )
+    execute = ExecuteGenerationHandler(uow_factory(), clock, ids, FakeGateway())
+    identity = AnonymousIdentityService(sessions, clock, ids, SequenceTokenGenerator())
     published = PublishedSolverData(
         "hangzhou-v1",
         "hangzhou",
@@ -131,11 +128,7 @@ def _client(tmp_path: Path) -> TestClient:
                 ),
             ),
         ),
-        {
-            NOW.date(): DailyWeather(
-                NOW.date(), WeatherBasis.FORECAST, WeatherSeverity.NORMAL
-            )
-        },
+        {NOW.date(): DailyWeather(NOW.date(), WeatherBasis.FORECAST, WeatherSeverity.NORMAL)},
         InMemoryTravelTimeProvider({}),
         "approximate",
         "forecast",
@@ -150,9 +143,7 @@ def _client(tmp_path: Path) -> TestClient:
         identity,
         catalog,
         None,
-        HmacPlanShareTokenCodec(
-            "test-plan-share-secret-2026-08-28-at-least-32-bytes"
-        ),
+        HmacPlanShareTokenCodec("test-plan-share-secret-2026-08-28-at-least-32-bytes"),
     )
     return TestClient(create_app(container))
 
@@ -178,9 +169,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     principal_id, token = _session(client)
     headers = _auth(token)
 
-    created = client.post(
-        "/api/v1/trip-drafts", json={"city_id": "hangzhou"}, headers=headers
-    )
+    created = client.post("/api/v1/trip-drafts", json={"city_id": "hangzhou"}, headers=headers)
     assert created.status_code == 201
     draft_id = created.json()["draft_id"]
 
@@ -212,9 +201,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         },
     )
     assert facts.status_code == 200
-    assert facts.json()["travel_facts"]["arrival"]["transport_type"] == (
-        "already_in_destination"
-    )
+    assert facts.json()["travel_facts"]["arrival"]["transport_type"] == ("already_in_destination")
 
     selection = client.put(
         f"/api/v1/trip-drafts/{draft_id}/attraction-selection",
@@ -279,15 +266,17 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     )
     assert replacement_draft.json()["selected_attraction_ids"] == ["attr_museum"]
     latest_revision = client.get(
-        f"/api/v1/trips/{intent['trip_id']}/revisions/"
-        f"{replacement_intent['trip_revision_id']}",
+        f"/api/v1/trips/{intent['trip_id']}/revisions/{replacement_intent['trip_revision_id']}",
         headers=headers,
     )
     assert latest_revision.json()["revision_number"] == 2
-    assert client.get(
-        f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}",
-        headers=headers,
-    ).status_code == 200
+    assert (
+        client.get(
+            f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}",
+            headers=headers,
+        ).status_code
+        == 200
+    )
 
     repeated = client.post(
         f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}"
@@ -300,9 +289,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         },
     )
     assert repeated.status_code == 202
-    assert repeated.json()["trip_revision_id"] == replacement_intent[
-        "trip_revision_id"
-    ]
+    assert repeated.json()["trip_revision_id"] == replacement_intent["trip_revision_id"]
 
     stale = client.post(
         f"/api/v1/trips/{intent['trip_id']}/revisions/{intent['trip_revision_id']}"
@@ -343,9 +330,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         headers=headers,
     )
     assert revisions.status_code == 200
-    assert revisions.json()["current_revision_id"] == replacement_intent[
-        "trip_revision_id"
-    ]
+    assert revisions.json()["current_revision_id"] == replacement_intent["trip_revision_id"]
     assert [item["revision_number"] for item in revisions.json()["items"]] == [
         2,
         1,
@@ -423,9 +408,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         },
     )
     assert repeated_feedback.status_code == 201
-    assert repeated_feedback.json()["feedback_id"] == trip_feedback.json()[
-        "feedback_id"
-    ]
+    assert repeated_feedback.json()["feedback_id"] == trip_feedback.json()["feedback_id"]
     assert repeated_feedback.json()["reused"] is True
     assert repeated_feedback.json()["deduplicated"] is False
 
@@ -441,9 +424,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         },
     )
     assert deduplicated_feedback.status_code == 201
-    assert deduplicated_feedback.json()["feedback_id"] == trip_feedback.json()[
-        "feedback_id"
-    ]
+    assert deduplicated_feedback.json()["feedback_id"] == trip_feedback.json()["feedback_id"]
     assert deduplicated_feedback.json()["deduplicated"] is True
 
     node_feedback = client.post(
@@ -484,9 +465,7 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
         },
     )
     assert conflicting_feedback.status_code == 409
-    assert conflicting_feedback.json()["error"]["code"] == (
-        "feedback_intent_conflict"
-    )
+    assert conflicting_feedback.json()["error"]["code"] == ("feedback_intent_conflict")
 
     _, visitor_token = _session(client)
     visitor_headers = _auth(visitor_token)
@@ -497,20 +476,26 @@ def test_anonymous_user_completes_http_planning_and_recovers_revision(
     assert copied.status_code == 201
     assert copied.json()["selected_attraction_ids"] == ["attr_museum"]
     assert copied.json()["travel_facts"] is None
-    assert client.get(
-        f"/api/v1/trip-drafts/{copied.json()['draft_id']}",
-        headers=headers,
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/trips/{intent['trip_id']}/feedback",
-        headers=visitor_headers,
-        json={
-            "feedback_intent_id": "feedback_visitor_forbidden",
-            "revision_id": replacement_intent["trip_revision_id"],
-            "rating": "reasonable",
-            "problem_types": [],
-        },
-    ).status_code == 404
+    assert (
+        client.get(
+            f"/api/v1/trip-drafts/{copied.json()['draft_id']}",
+            headers=headers,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/trips/{intent['trip_id']}/feedback",
+            headers=visitor_headers,
+            json={
+                "feedback_intent_id": "feedback_visitor_forbidden",
+                "revision_id": replacement_intent["trip_revision_id"],
+                "rating": "reasonable",
+                "problem_types": [],
+            },
+        ).status_code
+        == 404
+    )
     assert client.get("/api/v1/plan-shares/not-a-valid-token").status_code == 404
 
 
@@ -531,18 +516,14 @@ def test_anonymous_ownership_is_hidden_as_not_found(tmp_path: Path) -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "resource_not_found"
-    assert client.get("/api/v1/trips", headers=_auth(second_token)).json()[
-        "items"
-    ] == []
+    assert client.get("/api/v1/trips", headers=_auth(second_token)).json()["items"] == []
 
 
 def test_draft_conflict_uses_stable_error_and_request_id(tmp_path: Path) -> None:
     client = _client(tmp_path)
     _, token = _session(client)
     headers = {**_auth(token), "X-Request-ID": "req_client_123"}
-    created = client.post(
-        "/api/v1/trip-drafts", json={"city_id": "hangzhou"}, headers=headers
-    )
+    created = client.post("/api/v1/trip-drafts", json={"city_id": "hangzhou"}, headers=headers)
     draft_id = created.json()["draft_id"]
 
     response = client.put(
@@ -573,18 +554,14 @@ def test_auth_validation_and_readiness_use_http_contract(tmp_path: Path) -> None
     assert unauthorized.json()["error"]["code"] == "authentication_required"
     assert invalid.status_code == 422
     assert invalid.json()["error"]["code"] == "request_validation_failed"
-    assert invalid.json()["error"]["field_errors"][0]["field"] == (
-        "device_installation_id"
-    )
+    assert invalid.json()["error"]["field_errors"][0]["field"] == ("device_installation_id")
 
 
 def test_domain_validation_failure_does_not_expose_stack_trace(tmp_path: Path) -> None:
     client = _client(tmp_path)
     _, token = _session(client)
     headers = _auth(token)
-    created = client.post(
-        "/api/v1/trip-drafts", json={"city_id": "hangzhou"}, headers=headers
-    )
+    created = client.post("/api/v1/trip-drafts", json={"city_id": "hangzhou"}, headers=headers)
 
     response = client.patch(
         f"/api/v1/trip-drafts/{created.json()['draft_id']}/travel-facts",
@@ -622,9 +599,7 @@ def test_catalog_uses_published_snapshot_and_external_ids(tmp_path: Path) -> Non
     _, token = _session(client)
 
     listing = client.get("/api/v1/attractions", headers=_auth(token))
-    detail = client.get(
-        "/api/v1/attractions/attr_west_lake", headers=_auth(token)
-    )
+    detail = client.get("/api/v1/attractions/attr_west_lake", headers=_auth(token))
 
     assert listing.status_code == 200
     assert listing.json()["data_snapshot_version"] == "hangzhou-v1"

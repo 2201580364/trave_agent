@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, date, datetime, timedelta
-from typing import cast
 
 from fastapi import FastAPI
 
@@ -64,19 +63,16 @@ def build_local_dev_app(
         city_id="hangzhou",
         fallback=fallback_catalog,
     )
-    return cast(
-        FastAPI,
-        build_http_app(
-            HttpSettings(
-                DatabaseSettings(url=resolved_url),
-                "local-only-plan-share-secret-2026-08-28-do-not-use-production",
-                os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN") or None,
-                os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD") or None,
-                HolidaySyncSettings.from_env(load_dotenv_file=False),
-            ),
-            snapshots,
-            catalog,
+    return build_http_app(
+        HttpSettings(
+            DatabaseSettings(url=resolved_url),
+            "local-only-plan-share-secret-2026-08-28-do-not-use-production",
+            os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN") or None,
+            os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD") or None,
+            HolidaySyncSettings.from_env(load_dotenv_file=False),
         ),
+        snapshots,
+        catalog,
     )
 
 
@@ -193,14 +189,8 @@ def build_local_hangzhou_catalog(
     )
 
 
-def _rule(
-    open_time: str, close_time: str, last_entry: str | None = None
-) -> tuple[TimeRule, ...]:
-    return (
-        TimeRule.from_strings(
-            ("01-01", "12-31"), open_time, close_time, last_entry
-        ),
-    )
+def _rule(open_time: str, close_time: str, last_entry: str | None = None) -> tuple[TimeRule, ...]:
+    return (TimeRule.from_strings(("01-01", "12-31"), open_time, close_time, last_entry),)
 
 
 def _published(

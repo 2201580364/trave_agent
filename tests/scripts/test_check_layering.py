@@ -24,7 +24,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-import check_layering  # noqa: E402
+from scripts import check_layering  # noqa: E402
 
 
 @pytest.fixture()

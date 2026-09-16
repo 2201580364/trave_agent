@@ -78,28 +78,28 @@ class InMemoryGenerationIntentRepository:
         self._records[intent.generation_intent_id] = intent
 
 
-class _InMemoryAddRepository:
-    def __init__(self, records: dict[str, object], id_field: str) -> None:
+class _InMemoryAddRepository[T]:
+    def __init__(self, records: dict[str, T], id_field: str) -> None:
         self._records = records
         self._id_field = id_field
 
-    def get(self, record_id: str) -> object | None:
+    def get(self, record_id: str) -> T | None:
         return self._records.get(record_id)
 
-    def add(self, record: object) -> None:
+    def add(self, record: T) -> None:
         record_id = str(getattr(record, self._id_field))
         if record_id in self._records:
             raise ValueError(f"{self._id_field} already exists")
         self._records[record_id] = record
 
-    def save(self, record: object) -> None:
+    def save(self, record: T) -> None:
         record_id = str(getattr(record, self._id_field))
         if record_id not in self._records:
             raise ValueError(f"{self._id_field} does not exist")
         self._records[record_id] = record
 
 
-class InMemoryTripRepository(_InMemoryAddRepository):
+class InMemoryTripRepository(_InMemoryAddRepository[Trip]):
     def __init__(self, records: dict[str, Trip]) -> None:
         super().__init__(records, "trip_id")
         self._trip_records = records
@@ -131,7 +131,7 @@ class InMemoryTripRepository(_InMemoryAddRepository):
         self._trip_records[record.trip_id] = record
 
 
-class InMemoryTripRevisionRepository(_InMemoryAddRepository):
+class InMemoryTripRevisionRepository(_InMemoryAddRepository[TripRevision]):
     def __init__(self, records: dict[str, TripRevision]) -> None:
         super().__init__(records, "trip_revision_id")
         self._revision_records = records
@@ -160,7 +160,7 @@ class InMemoryTripRevisionRepository(_InMemoryAddRepository):
         )
 
 
-class InMemoryPlanShareRepository(_InMemoryAddRepository):
+class InMemoryPlanShareRepository(_InMemoryAddRepository[PlanShare]):
     def __init__(self, records: dict[str, PlanShare]) -> None:
         super().__init__(records, "plan_share_id")
         self._share_records = records
@@ -246,7 +246,7 @@ class InMemoryUnitOfWork:
         self.generation_intents = InMemoryGenerationIntentRepository({})
         self.trips = InMemoryTripRepository({})
         self.trip_revisions = InMemoryTripRevisionRepository({})
-        self.solver_runs = _InMemoryAddRepository({}, "solver_run_id")
+        self.solver_runs = _InMemoryAddRepository[SolverRun]({}, "solver_run_id")
         self.plan_shares = InMemoryPlanShareRepository({})
         self.feedbacks = InMemoryFeedbackRepository({})
 
@@ -258,7 +258,9 @@ class InMemoryUnitOfWork:
         )
         self.trips = InMemoryTripRepository(self._working.trips)
         self.trip_revisions = InMemoryTripRevisionRepository(self._working.trip_revisions)
-        self.solver_runs = _InMemoryAddRepository(self._working.solver_runs, "solver_run_id")
+        self.solver_runs = _InMemoryAddRepository[SolverRun](
+            self._working.solver_runs, "solver_run_id"
+        )
         self.plan_shares = InMemoryPlanShareRepository(self._working.plan_shares)
         self.feedbacks = InMemoryFeedbackRepository(self._working.feedbacks)
         self._committed = False

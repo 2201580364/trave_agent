@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import cast
 
 from fastapi import FastAPI
 
@@ -90,9 +89,7 @@ class ProductionHttpSettings:
         loaded = load_runtime_environment(dotenv_path)
         secret = os.environ.get("TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET", "")
         if len(secret.encode("utf-8")) < 32:
-            raise ValueError(
-                "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET must contain at least 32 bytes"
-            )
+            raise ValueError("TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET must contain at least 32 bytes")
         admin_login = os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "").strip()
         admin_password = os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "")
         if bool(admin_login) != bool(admin_password):
@@ -138,21 +135,18 @@ def build_production_http_app(settings: ProductionHttpSettings) -> FastAPI:
         raise ValueError(f"no valid published solver snapshot is available: {'; '.join(failures)}")
     # JSON remains an empty-database fallback; published rows are resolved per request.
     fallback_version = selected.version
-    app = cast(
-        FastAPI,
-        build_http_app(
-            HttpSettings(
-                settings.database,
-                settings.plan_share_token_secret,
-                settings.admin_bootstrap_login,
-                settings.admin_bootstrap_password,
-                settings.holiday_sync,
-            ),
-            None,
-            published_fallback=published_data,
-            published_city_id=settings.published_snapshot.city_id,
-            published_fallback_version=fallback_version,
+    app = build_http_app(
+        HttpSettings(
+            settings.database,
+            settings.plan_share_token_secret,
+            settings.admin_bootstrap_login,
+            settings.admin_bootstrap_password,
+            settings.holiday_sync,
         ),
+        None,
+        published_fallback=published_data,
+        published_city_id=settings.published_snapshot.city_id,
+        published_fallback_version=fallback_version,
     )
     app.state.published_snapshot_requested_version = settings.published_snapshot.version
     app.state.published_snapshot_selected_version = selected.version

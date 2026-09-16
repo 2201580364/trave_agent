@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
+from fastapi import FastAPI
 
 from travel_agent.application.admin import (
     AdminIdentityService,
@@ -60,20 +61,14 @@ class HttpSettings:
     holiday_sync: HolidaySyncSettings = field(default_factory=HolidaySyncSettings)
 
     def __post_init__(self) -> None:
-        if (self.admin_bootstrap_login is None) != (
-            self.admin_bootstrap_password is None
-        ):
-            raise ValueError(
-                "admin bootstrap login and password must be configured together"
-            )
+        if (self.admin_bootstrap_login is None) != (self.admin_bootstrap_password is None):
+            raise ValueError("admin bootstrap login and password must be configured together")
 
     @classmethod
     def from_env(cls) -> HttpSettings:
         secret = os.environ.get("TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET", "")
         if len(secret.encode("utf-8")) < 32:
-            raise ValueError(
-                "TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET must contain at least 32 bytes"
-            )
+            raise ValueError("TRAVEL_AGENT_PLAN_SHARE_TOKEN_SECRET must contain at least 32 bytes")
         login = os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_LOGIN", "").strip()
         password = os.environ.get("TRAVEL_AGENT_ADMIN_BOOTSTRAP_PASSWORD", "")
         return cls(
@@ -93,7 +88,7 @@ def build_http_app(
     published_fallback: PublishedSolverDataProvider | None = None,
     published_city_id: str = "hangzhou",
     published_fallback_version: str = "hangzhou-local-v1",
-):
+) -> FastAPI:
     engine = build_engine(settings.database)
     sessions = build_session_factory(engine)
     if published_data is None:
@@ -121,9 +116,7 @@ def build_http_app(
     gateway = ProductionSolverGateway(published_data, clock)
     execute = ExecuteGenerationHandler(uow_factory(), clock, ids, gateway)
     identity = AnonymousIdentityService(sessions, clock, ids)
-    admin_identity = AdminIdentityService(
-        lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids
-    )
+    admin_identity = AdminIdentityService(lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids)
     review_workflow = PlaceReviewWorkflowService(
         lambda: SqlAlchemyAdminUnitOfWork(sessions),
         clock,
@@ -139,9 +132,7 @@ def build_http_app(
     holiday_settings = settings.holiday_sync
     discoverer = fetcher = extractor = None
     if holiday_settings.configured:
-        holiday_http = httpx.Client(
-            headers={"User-Agent": "travel-agent-holiday-sync/1.0"}
-        )
+        holiday_http = httpx.Client(headers={"User-Agent": "travel-agent-holiday-sync/1.0"})
         discoverer = GovCnAnnouncementDiscoverer(holiday_http)
         fetcher = GovCnAnnouncementFetcher(holiday_http)
         extractor = AiHolidayAnnouncementExtractor(
@@ -163,10 +154,7 @@ def build_http_app(
         worker_available=holiday_settings.configured,
         job_submission_available=holiday_settings.configured,
     )
-    if (
-        settings.admin_bootstrap_login is not None
-        and settings.admin_bootstrap_password is not None
-    ):
+    if settings.admin_bootstrap_login is not None and settings.admin_bootstrap_password is not None:
         admin_identity.bootstrap_initial_admin(
             settings.admin_bootstrap_login,
             settings.admin_bootstrap_password,

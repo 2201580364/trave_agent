@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import (
     JSON,
@@ -19,6 +19,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Mapped, Session, mapped_column, sessionmaker
 
@@ -188,11 +189,15 @@ class SqlAlchemyHolidayCalendarRepository:
             statement = statement.where(HolidayCalendarSyncJobRow.calendar_year == year)
         if status is not None:
             statement = statement.where(HolidayCalendarSyncJobRow.status == status)
-        rows = self._session.execute(
-            statement.order_by(HolidayCalendarSyncJobRow.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        ).scalars().all()
+        rows = (
+            self._session.execute(
+                statement.order_by(HolidayCalendarSyncJobRow.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+            .scalars()
+            .all()
+        )
         return tuple(_job_from_row(row) for row in rows)
 
     def claim_job(self, job_id: str, *, now: datetime) -> HolidayCalendarSyncJob | None:
@@ -222,13 +227,11 @@ class SqlAlchemyHolidayCalendarRepository:
         except IntegrityError:
             self._session.rollback()
             return None
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             return None
         return self.get_job(job_id)
 
-    def claim_next(
-        self, *, now: datetime, stale_before: datetime
-    ) -> HolidayCalendarSyncJob | None:
+    def claim_next(self, *, now: datetime, stale_before: datetime) -> HolidayCalendarSyncJob | None:
         self._session.execute(
             update(HolidayCalendarSyncJobRow)
             .where(
@@ -270,15 +273,19 @@ class SqlAlchemyHolidayCalendarRepository:
         return f"{row.region_code}:{row.calendar_year}"
 
     def get_published(self, region_code: str, year: int) -> HolidayCalendarVersion | None:
-        row = self._session.execute(
-            select(HolidayCalendarRow)
-            .where(
-                HolidayCalendarRow.region_code == region_code,
-                HolidayCalendarRow.calendar_year == year,
-                HolidayCalendarRow.status == "published",
+        row = (
+            self._session.execute(
+                select(HolidayCalendarRow)
+                .where(
+                    HolidayCalendarRow.region_code == region_code,
+                    HolidayCalendarRow.calendar_year == year,
+                    HolidayCalendarRow.status == "published",
+                )
+                .order_by(HolidayCalendarRow.version.desc())
             )
-            .order_by(HolidayCalendarRow.version.desc())
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         return None if row is None else self._calendar_from_row(row)
 
     def get_calendar(self, calendar_id: str) -> HolidayCalendarVersion | None:
@@ -286,14 +293,18 @@ class SqlAlchemyHolidayCalendarRepository:
         return None if row is None else self._calendar_from_row(row)
 
     def list_published(self, region_code: str = "CN") -> tuple[HolidayCalendarVersion, ...]:
-        rows = self._session.execute(
-            select(HolidayCalendarRow)
-            .where(
-                HolidayCalendarRow.region_code == region_code,
-                HolidayCalendarRow.status == "published",
+        rows = (
+            self._session.execute(
+                select(HolidayCalendarRow)
+                .where(
+                    HolidayCalendarRow.region_code == region_code,
+                    HolidayCalendarRow.status == "published",
+                )
+                .order_by(HolidayCalendarRow.calendar_year, HolidayCalendarRow.version)
             )
-            .order_by(HolidayCalendarRow.calendar_year, HolidayCalendarRow.version)
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return tuple(self._calendar_from_row(row) for row in rows)
 
     def get_by_digest(
@@ -309,14 +320,18 @@ class SqlAlchemyHolidayCalendarRepository:
         return None if row is None else self._calendar_from_row(row)
 
     def next_version(self, region_code: str, year: int) -> int:
-        row = self._session.execute(
-            select(HolidayCalendarRow.version)
-            .where(
-                HolidayCalendarRow.region_code == region_code,
-                HolidayCalendarRow.calendar_year == year,
+        row = (
+            self._session.execute(
+                select(HolidayCalendarRow.version)
+                .where(
+                    HolidayCalendarRow.region_code == region_code,
+                    HolidayCalendarRow.calendar_year == year,
+                )
+                .order_by(HolidayCalendarRow.version.desc())
             )
-            .order_by(HolidayCalendarRow.version.desc())
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         return 1 if row is None else row + 1
 
     def publish(self, calendar: HolidayCalendarVersion) -> None:
@@ -373,8 +388,7 @@ class SqlAlchemyHolidayCalendarRepository:
             )
             .join(
                 PlaceDateExceptionRow,
-                PlaceDateExceptionRow.place_revision_id
-                == PlaceRevisionRow.place_revision_id,
+                PlaceDateExceptionRow.place_revision_id == PlaceRevisionRow.place_revision_id,
             )
             .where(
                 PlaceDateExceptionRow.holiday_calendar_id.in_(calendar_ids),
@@ -390,16 +404,24 @@ class SqlAlchemyHolidayCalendarRepository:
         return tuple((row[0], row[1], row[2], int(row[3])) for row in rows)
 
     def _calendar_from_row(self, row: HolidayCalendarRow) -> HolidayCalendarVersion:
-        periods = self._session.execute(
-            select(HolidayPeriodRow)
-            .where(HolidayPeriodRow.holiday_calendar_id == row.holiday_calendar_id)
-            .order_by(HolidayPeriodRow.display_order)
-        ).scalars().all()
-        workdays = self._session.execute(
-            select(HolidayAdjustedWorkdayRow)
-            .where(HolidayAdjustedWorkdayRow.holiday_calendar_id == row.holiday_calendar_id)
-            .order_by(HolidayAdjustedWorkdayRow.service_date)
-        ).scalars().all()
+        periods = (
+            self._session.execute(
+                select(HolidayPeriodRow)
+                .where(HolidayPeriodRow.holiday_calendar_id == row.holiday_calendar_id)
+                .order_by(HolidayPeriodRow.display_order)
+            )
+            .scalars()
+            .all()
+        )
+        workdays = (
+            self._session.execute(
+                select(HolidayAdjustedWorkdayRow)
+                .where(HolidayAdjustedWorkdayRow.holiday_calendar_id == row.holiday_calendar_id)
+                .order_by(HolidayAdjustedWorkdayRow.service_date)
+            )
+            .scalars()
+            .all()
+        )
         return HolidayCalendarVersion(
             row.holiday_calendar_id,
             row.region_code,
@@ -576,9 +598,7 @@ def ensure_builtin_holiday_calendar_seeds(sessions: sessionmaker[Session]) -> No
                         "published",
                         builtin.display_name,
                         f"legacy_verified_cn_holiday_{year}",
-                        hashlib.sha256(
-                            builtin.source_note.encode("utf-8")
-                        ).hexdigest(),
+                        hashlib.sha256(builtin.source_note.encode("utf-8")).hexdigest(),
                         digest,
                         tuple(
                             HolidayCalendarPeriod(

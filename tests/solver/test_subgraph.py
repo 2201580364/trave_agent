@@ -30,7 +30,9 @@ def test_on_demand_subgraph_is_deterministic_and_keeps_missing_edges_missing() -
     assert first == second
     assert first.snapshot_hash
     assert first.provider().get_travel_time(1, 3) is None
-    assert first.provider().get_travel_time(1, 2).travel_min == 8
+    edge = first.provider().get_travel_time(1, 2)
+    assert edge is not None
+    assert edge.travel_min == 8
     assert ODSubgraphSnapshot.from_dict(first.to_dict()) == first
 
 

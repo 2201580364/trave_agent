@@ -1,6 +1,7 @@
 """Solver audit model tests. Traceability: H3, ADR-0005."""
 
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from travel_agent.observability import DecisionEvent, SolverRunAudit, SolverRunStatus
 
@@ -31,10 +32,9 @@ def test_solver_audit_serializes_reproducible_decision_context() -> None:
         created_at=datetime(2026, 8, 22, 8, 0, tzinfo=UTC),
     )
 
-    payload = audit.to_dict()
+    payload = cast(dict[str, Any], audit.to_dict())
 
     assert payload["solve_run_id"] == "solve-1"
     assert payload["status"] == "completed"
     assert payload["events"][0]["constraint"] == "C1"
     assert payload["created_at"] == "2026-08-22T08:00:00+00:00"
-

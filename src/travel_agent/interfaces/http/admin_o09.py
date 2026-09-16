@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Query, Request, status
 
+from travel_agent.application.admin import PlaceReviewWorkflowService
 from travel_agent.domain.admin import AdminPrincipal
 
 from .admin import (
@@ -15,7 +18,9 @@ from .admin import (
 )
 
 
-def register_o09_routes(router: APIRouter, review_workflow, principal_dependency) -> None:
+def register_o09_routes(
+    router: APIRouter, review_workflow: PlaceReviewWorkflowService, principal_dependency: Any
+) -> None:
     @router.post("/place-revisions/{revision_id}/publications")
     def publish_place_revision(
         revision_id: str,

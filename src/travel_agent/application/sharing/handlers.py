@@ -13,7 +13,7 @@ from travel_agent.application.common.errors import (
 )
 from travel_agent.application.common.unit_of_work import UnitOfWork
 from travel_agent.application.planning.ports import IdGenerator
-from travel_agent.domain.planning import TripDraft
+from travel_agent.domain.planning import TripDraft, TripRevision
 from travel_agent.domain.sharing import PlanShare, PublishedPlanShare
 
 from .commands import CopyPlanShareToDraft, CreatePlanShare
@@ -174,7 +174,7 @@ class CopyPlanShareToDraftHandler:
         return CopiedDraftResult(draft)
 
 
-def _public_share_snapshot(city_id: str, revision) -> dict[str, object]:
+def _public_share_snapshot(city_id: str, revision: TripRevision) -> dict[str, object]:
     result = revision.result_snapshot
     raw_days = result.get("days")
     days = raw_days if isinstance(raw_days, list) else []
@@ -223,7 +223,7 @@ def _public_share_snapshot(city_id: str, revision) -> dict[str, object]:
                 "items": items,
             }
         )
-    dates = [day["date"] for day in public_days if isinstance(day.get("date"), str)]
+    dates = [value for day in public_days if isinstance((value := day.get("date")), str)]
     raw_unplaced = result.get("unplaced")
     return {
         "schema_version": "plan-share-v1",
@@ -236,7 +236,9 @@ def _public_share_snapshot(city_id: str, revision) -> dict[str, object]:
         "revision_number": revision.revision_number,
         "completion_kind": revision.completion_kind.value,
         "has_soft_degradation": revision.has_soft_degradation,
-        "scheduled_count": sum(len(day["items"]) for day in public_days),
+        "scheduled_count": sum(
+            len(day_items) for day in public_days if isinstance((day_items := day["items"]), list)
+        ),
         "unplaced_count": len(raw_unplaced) if isinstance(raw_unplaced, list) else 0,
         "days": public_days,
         "data_notice": "这是出发前的计划摘要，开放、天气和交通请在出发前再次确认。",

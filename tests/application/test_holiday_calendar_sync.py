@@ -1,7 +1,9 @@
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from typing import Self
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from travel_agent.application.admin.holiday_calendar_sync import (
     ChinaHolidayCalendarSyncService,
@@ -10,6 +12,7 @@ from travel_agent.application.admin.holiday_calendar_sync import (
     OfficialSourceTemporarilyUnavailable,
 )
 from travel_agent.application.admin.holiday_worker import HolidayCalendarSyncWorker
+from travel_agent.domain.admin import AdminAuditEvent
 from travel_agent.domain.place_catalog.holiday_sync import (
     ExtractedHolidayCalendar,
     HolidayAdjustedWorkday,
@@ -22,6 +25,7 @@ from travel_agent.infrastructure.database import (
     SqlAlchemyPublishedHolidayCalendarCatalog,
     ensure_builtin_holiday_calendar_seeds,
 )
+from travel_agent.infrastructure.database.admin_identity import SqlAlchemyAdminAuditRepository
 
 NOW = datetime(2026, 9, 3, 10, 0, tzinfo=UTC)
 
@@ -59,7 +63,14 @@ class Extractor:
     def __init__(self) -> None:
         self.revision = 1
 
-    def extract(self, *, announcement, content, content_sha256, year):
+    def extract(
+        self,
+        *,
+        announcement: OfficialHolidayAnnouncement,
+        content: bytes,
+        content_sha256: str,
+        year: int,
+    ) -> ExtractedHolidayCalendar:
         names = ("元旦", "春节", "清明节", "劳动节", "端午节", "中秋节", "国庆节")
         return ExtractedHolidayCalendar(
             "CN",
@@ -83,7 +94,11 @@ class Extractor:
         )
 
 
-def _service(tmp_path, discovery, extractor=None):
+def _service(
+    tmp_path: Path,
+    discovery: OfficialHolidayAnnouncement | None | Exception,
+    extractor: Extractor | None = None,
+) -> tuple[ChinaHolidayCalendarSyncService, sessionmaker[Session], Extractor]:
     engine = create_engine(f"sqlite:///{tmp_path / 'holiday.db'}")
     Base.metadata.create_all(engine)
     sessions = sessionmaker(engine, expire_on_commit=False)
@@ -99,7 +114,7 @@ def _service(tmp_path, discovery, extractor=None):
     return service, sessions, extractor
 
 
-def test_sync_publishes_once_then_replays_same_content_as_up_to_date(tmp_path) -> None:
+def test_sync_publishes_once_then_replays_same_content_as_up_to_date(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/zhengce/content/2026/holiday.htm",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -136,14 +151,13 @@ def test_sync_publishes_once_then_replays_same_content_as_up_to_date(tmp_path) -
         assert len(calendar.periods) == 7
         audit_action = session.execute(
             text(
-                "SELECT action FROM admin_audit_events "
-                "WHERE action = 'HOLIDAY_CALENDAR_PUBLISHED'"
+                "SELECT action FROM admin_audit_events WHERE action = 'HOLIDAY_CALENDAR_PUBLISHED'"
             )
         ).scalar_one()
         assert audit_action == "HOLIDAY_CALENDAR_PUBLISHED"
 
 
-def test_successful_discovery_without_announcement_is_not_announced(tmp_path) -> None:
+def test_successful_discovery_without_announcement_is_not_announced(tmp_path: Path) -> None:
     service, _, _ = _service(tmp_path, None)
     job = service.create_job(
         year=2027, mode="sync", operation_intent_id="intent-1", created_by="admin"
@@ -154,7 +168,9 @@ def test_successful_discovery_without_announcement_is_not_announced(tmp_path) ->
     assert result.status == "not_announced"
 
 
-def test_historical_missing_announcement_requires_attention_not_not_announced(tmp_path) -> None:
+def test_historical_missing_announcement_requires_attention_not_not_announced(
+    tmp_path: Path,
+) -> None:
     service, _, _ = _service(tmp_path, None)
     job = service.create_job(
         year=2024, mode="preview", operation_intent_id="historical-missing", created_by="admin"
@@ -166,10 +182,8 @@ def test_historical_missing_announcement_requires_attention_not_not_announced(tm
     assert result.validation_result["reason"] == "historical_announcement_not_found"
 
 
-def test_network_failure_is_temporarily_unavailable_not_not_announced(tmp_path) -> None:
-    service, _, _ = _service(
-        tmp_path, OfficialSourceTemporarilyUnavailable("TLS timeout")
-    )
+def test_network_failure_is_temporarily_unavailable_not_not_announced(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path, OfficialSourceTemporarilyUnavailable("TLS timeout"))
     job = service.create_job(
         year=2027, mode="sync", operation_intent_id="intent-1", created_by="admin"
     )
@@ -183,11 +197,18 @@ def test_network_failure_is_temporarily_unavailable_not_not_announced(tmp_path) 
 
 
 class UnavailableExtractor(Extractor):
-    def extract(self, *, announcement, content, content_sha256, year):
+    def extract(
+        self,
+        *,
+        announcement: OfficialHolidayAnnouncement,
+        content: bytes,
+        content_sha256: str,
+        year: int,
+    ) -> ExtractedHolidayCalendar:
         raise HolidayExtractionTemporarilyUnavailable("provider timeout")
 
 
-def test_ai_provider_failure_is_retryable_and_never_not_announced(tmp_path) -> None:
+def test_ai_provider_failure_is_retryable_and_never_not_announced(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/holiday",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -210,7 +231,7 @@ def test_ai_provider_failure_is_retryable_and_never_not_announced(tmp_path) -> N
     ]
 
 
-def test_operation_intent_is_idempotent_and_rejects_changed_input(tmp_path) -> None:
+def test_operation_intent_is_idempotent_and_rejects_changed_input(tmp_path: Path) -> None:
     service, _, _ = _service(tmp_path, None)
     first = service.create_job(
         year=2027, mode="sync", operation_intent_id="same", created_by="admin"
@@ -222,7 +243,7 @@ def test_operation_intent_is_idempotent_and_rejects_changed_input(tmp_path) -> N
     assert replay.job_id == first.job_id
 
 
-def test_queued_job_can_be_cancelled_and_is_not_claimed(tmp_path) -> None:
+def test_queued_job_can_be_cancelled_and_is_not_claimed(tmp_path: Path) -> None:
     service, _, _ = _service(tmp_path, None)
     job = service.create_job(
         year=2027, mode="preview", operation_intent_id="cancel-1", created_by="admin"
@@ -234,7 +255,7 @@ def test_queued_job_can_be_cancelled_and_is_not_claimed(tmp_path) -> None:
     assert service.run_next() is None
 
 
-def test_changed_normalized_content_creates_v2_and_supersedes_v1(tmp_path) -> None:
+def test_changed_normalized_content_creates_v2_and_supersedes_v1(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/zhengce/content/2026/holiday.htm",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -247,9 +268,9 @@ def test_changed_normalized_content_creates_v2_and_supersedes_v1(tmp_path) -> No
     )
     first = service.run(first_job.job_id)
     with sessions() as session:
-        first_digest = SqlAlchemyHolidayCalendarRepository(session).get_published(
-            "CN", 2027
-        ).normalized_digest
+        calendar = SqlAlchemyHolidayCalendarRepository(session).get_published("CN", 2027)
+        assert calendar is not None
+        first_digest = calendar.normalized_digest
     extractor.revision = 2
     second_job = service.create_job(
         year=2027, mode="sync", operation_intent_id="v2", created_by="admin"
@@ -259,6 +280,7 @@ def test_changed_normalized_content_creates_v2_and_supersedes_v1(tmp_path) -> No
 
     assert second.status == "published"
     assert second.calendar_id != first.calendar_id
+    assert second.calendar_id is not None
     with sessions() as session:
         repository = SqlAlchemyHolidayCalendarRepository(session)
         current = repository.get_published("CN", 2027)
@@ -275,7 +297,14 @@ def test_changed_normalized_content_creates_v2_and_supersedes_v1(tmp_path) -> No
 
 
 class InvalidExtractor(Extractor):
-    def extract(self, *, announcement, content, content_sha256, year):
+    def extract(
+        self,
+        *,
+        announcement: OfficialHolidayAnnouncement,
+        content: bytes,
+        content_sha256: str,
+        year: int,
+    ) -> ExtractedHolidayCalendar:
         value = super().extract(
             announcement=announcement,
             content=content,
@@ -294,7 +323,7 @@ class InvalidExtractor(Extractor):
         )
 
 
-def test_invalid_extraction_never_publishes_calendar(tmp_path) -> None:
+def test_invalid_extraction_never_publishes_calendar(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/zhengce/content/2026/holiday.htm",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -314,7 +343,7 @@ def test_invalid_extraction_never_publishes_calendar(tmp_path) -> None:
         assert SqlAlchemyHolidayCalendarRepository(session).get_published("CN", 2027) is None
 
 
-def test_preview_reports_validated_without_publishing(tmp_path) -> None:
+def test_preview_reports_validated_without_publishing(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/zhengce/content/2026/holiday.htm",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -334,7 +363,7 @@ def test_preview_reports_validated_without_publishing(tmp_path) -> None:
         assert SqlAlchemyHolidayCalendarRepository(session).get_published("CN", 2027) is None
 
 
-def test_operator_can_edit_validated_preview_and_publish_idempotently(tmp_path) -> None:
+def test_operator_can_edit_validated_preview_and_publish_idempotently(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/zhengce/content/2026/holiday.htm",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -352,18 +381,14 @@ def test_operator_can_edit_validated_preview_and_publish_idempotently(tmp_path) 
     published = service.confirm_preview(
         job_id=preview.job_id,
         periods=periods,
-        adjusted_workdays=list(
-            preview.validation_result["preview_adjusted_workdays"]
-        ),
+        adjusted_workdays=list(preview.validation_result["preview_adjusted_workdays"]),
         operation_intent_id="confirm-preview-edit",
         confirmed_by="reviewer",
     )
     replay = service.confirm_preview(
         job_id=preview.job_id,
         periods=periods,
-        adjusted_workdays=list(
-            preview.validation_result["preview_adjusted_workdays"]
-        ),
+        adjusted_workdays=list(preview.validation_result["preview_adjusted_workdays"]),
         operation_intent_id="confirm-preview-edit",
         confirmed_by="reviewer",
     )
@@ -378,23 +403,20 @@ def test_operator_can_edit_validated_preview_and_publish_idempotently(tmp_path) 
 
 
 class FailingAuditUnitOfWork(SqlAlchemyHolidayCalendarUnitOfWork):
-    def __enter__(self):
-        result = super().__enter__()
-        self.audits = FailingAudits(self.audits)
-        return result
+    def __enter__(self) -> Self:
+        super().__enter__()
+        self.audits = FailingAudits(self._session)
+        return self
 
 
-class FailingAudits:
-    def __init__(self, inner) -> None:
-        self.inner = inner
-
-    def add(self, event) -> None:
+class FailingAudits(SqlAlchemyAdminAuditRepository):
+    def add(self, event: AdminAuditEvent) -> None:
         if event.action == "HOLIDAY_CALENDAR_PUBLISHED":
             raise RuntimeError("audit storage unavailable")
-        self.inner.add(event)
+        super().add(event)
 
 
-def test_audit_failure_rolls_back_calendar_publication(tmp_path) -> None:
+def test_audit_failure_rolls_back_calendar_publication(tmp_path: Path) -> None:
     announcement = OfficialHolidayAnnouncement(
         "https://www.gov.cn/zhengce/content/2026/holiday.htm",
         "国务院办公厅关于2027年部分节假日安排的通知",
@@ -428,7 +450,7 @@ def test_audit_failure_rolls_back_calendar_publication(tmp_path) -> None:
 
 
 def test_builtin_calendars_are_idempotently_seeded_and_read_from_published_rows(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'seeds.db'}")
     Base.metadata.create_all(engine)
@@ -446,7 +468,7 @@ def test_builtin_calendars_are_idempotently_seeded_and_read_from_published_rows(
     assert catalog.get_calendar("cn-mainland-2026").periods[0].start.year == 2026
 
 
-def test_repository_allows_only_one_running_job_per_region_and_year(tmp_path) -> None:
+def test_repository_allows_only_one_running_job_per_region_and_year(tmp_path: Path) -> None:
     service, sessions, _ = _service(tmp_path, None)
     first = service.create_job(
         year=2027, mode="sync", operation_intent_id="lock-1", created_by="admin"
@@ -466,7 +488,7 @@ def test_repository_allows_only_one_running_job_per_region_and_year(tmp_path) ->
         assert blocked is None
 
 
-def test_worker_recovers_expired_running_lease_and_increments_attempt(tmp_path) -> None:
+def test_worker_recovers_expired_running_lease_and_increments_attempt(tmp_path: Path) -> None:
     service, sessions, _ = _service(tmp_path, None)
     job = service.create_job(
         year=2027, mode="sync", operation_intent_id="stale", created_by="admin"
@@ -492,10 +514,8 @@ def test_worker_recovers_expired_running_lease_and_increments_attempt(tmp_path) 
     assert recovered.attempt_count == 2
 
 
-def test_temporary_failure_records_exponential_retry_time(tmp_path) -> None:
-    service, _, _ = _service(
-        tmp_path, OfficialSourceTemporarilyUnavailable("timeout")
-    )
+def test_temporary_failure_records_exponential_retry_time(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path, OfficialSourceTemporarilyUnavailable("timeout"))
     job = service.create_job(
         year=2027, mode="sync", operation_intent_id="retry", created_by="admin"
     )
@@ -506,7 +526,7 @@ def test_temporary_failure_records_exponential_retry_time(tmp_path) -> None:
     assert result.next_retry_at == NOW + timedelta(minutes=1)
 
 
-def test_worker_processes_queued_jobs_until_idle(tmp_path) -> None:
+def test_worker_processes_queued_jobs_until_idle(tmp_path: Path) -> None:
     service, _, _ = _service(tmp_path, None)
     job = service.create_job(
         year=2027, mode="sync", operation_intent_id="worker", created_by="admin"

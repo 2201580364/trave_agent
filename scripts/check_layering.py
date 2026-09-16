@@ -70,7 +70,7 @@ class Report:
     scanned_files: int = 0
     violations: list[Violation] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "passed": self.passed,
             "scanned_files": self.scanned_files,

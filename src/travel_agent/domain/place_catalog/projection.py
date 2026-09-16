@@ -152,7 +152,6 @@ def evaluate_projection_publication(
                 *(geometry.source_record_id for geometry in context.geometries if geometry.active),
                 *(point.source_record_id for point in context.access_points if point.active),
                 *(rule.source_record_id for rule in context.time_rules if rule.active),
-                *(relation.source_record_id for relation in context.relations if relation.active),
             )
         )
     )
@@ -162,6 +161,17 @@ def evaluate_projection_publication(
         for source_record_id in source_record_ids
     ):
         reasons.add("SOURCE_RECORD_PLACE_MISMATCH")
+
+    # Relations span two Places. Their provenance may belong to either endpoint,
+    # whereas geometry/access/time facts must belong to the current Place (H3).
+    for relation in context.relations:
+        if not relation.active:
+            continue
+        source = active_source_records.get(relation.source_record_id)
+        if source is None:
+            reasons.add("MISSING_SOURCE_RECORD")
+        elif source.place_id not in {relation.from_place_id, relation.to_place_id}:
+            reasons.add("SOURCE_RECORD_PLACE_MISMATCH")
 
     source_records = {
         source_record_id: record
@@ -240,16 +250,12 @@ def evaluate_projection_publication(
         for item in items
         if not item.active
     } - set(source_record_ids)
-    if (
-        has_source_content_conflict(
-            tuple(
-                item
-                for item in context.source_records
-                if item.source_record_id not in inactive_only_sources
-            )
-        )
-        and not revision.conflicts_resolved
-    ):
+    conflict_source_records = tuple(
+        item
+        for item in source_records.values()
+        if item.source_record_id not in inactive_only_sources
+    )
+    if has_source_content_conflict(conflict_source_records) and not revision.conflicts_resolved:
         reasons.add("SOURCE_CONFLICT_UNRESOLVED")
     if any(
         relation.active

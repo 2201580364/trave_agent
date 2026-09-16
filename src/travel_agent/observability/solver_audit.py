@@ -62,9 +62,7 @@ def build_solver_run_audit(
                         visit_date=day.visit_date.isoformat(),
                         preference_source=preference.source.value,
                         preference_source_ref=preference.source_ref,
-                        preferred_bucket=next(
-                            iter(preference.preferred_buckets)
-                        ).value,
+                        preferred_bucket=next(iter(preference.preferred_buckets)).value,
                         acceptable_buckets=tuple(
                             sorted(item.value for item in preference.acceptable_buckets)
                         ),
@@ -93,13 +91,13 @@ def build_solver_run_audit(
                 item.rejection_code.value,
             )
         )
-    for item in itinerary.data_rejected:
+    for rejected_item in itinerary.data_rejected:
         events.append(
             DecisionEvent(
-                item.attraction.id,
+                rejected_item.attraction.id,
                 "DATA_GATE",
                 "rejected",
-                item.code.value,
+                rejected_item.code.value,
             )
         )
     for day, validation in zip(itinerary.days, itinerary.validations, strict=True):
@@ -141,11 +139,7 @@ def build_solver_run_audit(
         weather_basis=weather_basis,
         random_seed=random_seed,
         duration_ratio=duration_ratio,
-        status=(
-            SolverRunStatus.COMPLETED
-            if quality.gate_passed
-            else SolverRunStatus.FAILED
-        ),
+        status=(SolverRunStatus.COMPLETED if quality.gate_passed else SolverRunStatus.FAILED),
         hard_constraint_violations=quality.hard_constraint_violations,
         elapsed_ms=elapsed_ms,
         events=tuple(events),

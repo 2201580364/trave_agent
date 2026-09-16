@@ -18,6 +18,7 @@ from travel_agent.solver import (
     Coordinate,
     DailyWeather,
     InMemoryTravelTimeProvider,
+    ItineraryPlan,
     MealStatus,
     ODBasis,
     ODTravelMode,
@@ -102,7 +103,7 @@ def _provider(coordinates: dict[int, Coordinate]) -> ApproximateTravelTimeProvid
     )
 
 
-def _scheduled_dates(itinerary: object) -> dict[int, str]:
+def _scheduled_dates(itinerary: ItineraryPlan) -> dict[int, str]:
     return {
         visit.attraction.id: day.visit_date.isoformat()
         for day in itinerary.days
@@ -219,9 +220,7 @@ def extreme_weather_moves_outdoor_but_keeps_indoor() -> GoldenCaseResult:
     quality = evaluate_solver_quality(itinerary, attractions)
     dates = _scheduled_dates(itinerary)
     passed = (
-        quality.gate_passed
-        and dates[5] == TUESDAY.isoformat()
-        and dates[6] == MONDAY.isoformat()
+        quality.gate_passed and dates[5] == TUESDAY.isoformat() and dates[6] == MONDAY.isoformat()
     )
     return GoldenCaseResult(
         "HZ-GC-03",
@@ -433,11 +432,7 @@ def daytime_visits_are_spread_before_fixed_evening_show() -> GoldenCaseResult:
     quality = evaluate_solver_quality(itinerary, attractions)
     visits = itinerary.days[0].visits
     first, second, fixed_show = visits
-    lunch_gap = (
-        second.arrival_min
-        - second.buffered_travel_from_previous_min
-        - first.leave_min
-    )
+    lunch_gap = second.arrival_min - second.buffered_travel_from_previous_min - first.leave_min
     meal = itinerary.segmented_days[0].meal_plan
     passed = (
         quality.gate_passed

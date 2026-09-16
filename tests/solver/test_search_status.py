@@ -3,7 +3,7 @@
 from datetime import UTC, date, datetime
 from typing import Any
 
-from ortools.constraint_solver import routing_enums_pb2
+from ortools.constraint_solver import routing_enums_pb2  # type: ignore[import-untyped]
 
 from travel_agent.observability import build_solver_run_audit
 from travel_agent.solver import (
@@ -76,9 +76,7 @@ def _day_plan(attraction: Attraction) -> DayPlan:
 
 
 def _weather() -> dict[date, DailyWeather]:
-    return {
-        DAY: DailyWeather(DAY, WeatherBasis.FORECAST, WeatherSeverity.NORMAL)
-    }
+    return {DAY: DailyWeather(DAY, WeatherBasis.FORECAST, WeatherSeverity.NORMAL)}
 
 
 def test_default_search_exposes_completed_metadata() -> None:
@@ -170,9 +168,6 @@ def test_itinerary_timeout_counts_flow_to_degradation_and_audit() -> None:
     assert itinerary.best_so_far_day_count == 1
     assert itinerary.no_solution_day_count == 0
     assert degradation.explainable
-    assert any(
-        item.code is DegradationCode.SEARCH_BEST_SO_FAR
-        for item in degradation.notices
-    )
+    assert any(item.code is DegradationCode.SEARCH_BEST_SO_FAR for item in degradation.notices)
     assert audit.timed_out_day_count == 1
     assert audit.best_so_far_day_count == 1

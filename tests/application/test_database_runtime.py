@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine
@@ -20,7 +21,9 @@ from travel_agent.infrastructure.database import (
 )
 
 
-def test_database_settings_load_pool_values_without_repr_secret(monkeypatch) -> None:
+def test_database_settings_load_pool_values_without_repr_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv(
         "TRAVEL_AGENT_DATABASE_URL",
         "mysql+pymysql://app_user:secret@example.invalid/travel_agent",
@@ -36,9 +39,7 @@ def test_database_settings_load_pool_values_without_repr_secret(monkeypatch) -> 
 
 
 def test_mysql_engine_and_metadata_use_pymysql_innodb_utf8mb4_and_json() -> None:
-    settings = DatabaseSettings(
-        "mysql+pymysql://app_user:secret@example.invalid/travel_agent"
-    )
+    settings = DatabaseSettings("mysql+pymysql://app_user:secret@example.invalid/travel_agent")
     engine = build_engine(settings)
 
     ddl = "\n".join(

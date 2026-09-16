@@ -62,7 +62,7 @@ def test_relation_audit_failure_rolls_back_then_same_intent_can_retry(
             )
             session.commit()
     root = f"/api/v1/admin/place-revisions/{revision_id}/relations"
-    payload = {
+    payload: dict[str, object] = {
         "expected_revision_version": 1,
         "operation_intent_id": "relation-boundary-retry",
         "reason_code": "RELATION_CONFIRMED",
@@ -80,7 +80,7 @@ def test_relation_audit_failure_rolls_back_then_same_intent_can_retry(
                 [
                     dict(row)
                     for row in session.execute(
-                        select(model.__table__).order_by(*model.__table__.primary_key.columns)
+                        select(model.__table__).order_by(*model.__table__.primary_key)
                     ).mappings()
                 ]
                 for model in (PlaceRevisionRow, PlaceRelationRow, AdminAuditEventRow)

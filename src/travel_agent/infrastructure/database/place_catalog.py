@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import (
     JSON,
@@ -20,8 +20,9 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Mapped, Session, mapped_column
+from sqlalchemy.orm import InstrumentedAttribute, Mapped, Session, mapped_column
 
 from travel_agent.domain.place_catalog import (
     Place,
@@ -558,7 +559,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(**_geometry_values(geometry))
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("geometry not found")
         revision = self.get_revision(geometry.place_revision_id)
         if revision is None:
@@ -580,7 +581,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(**_access_point_values(access_point))
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("access point not found")
         revision = self.get_revision(access_point.place_revision_id)
         if revision is None:
@@ -603,7 +604,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(active=False, review_status="rejected", reviewed_at=None)
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("geometry not found")
         revision = self.get_revision(place_revision_id)
         if revision is None:
@@ -626,7 +627,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(active=False, review_status="rejected", reviewed_at=None)
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("access point not found")
         revision = self.get_revision(place_revision_id)
         if revision is None:
@@ -658,7 +659,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(**_time_rule_values(rule))
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("time rule not found")
         return self._require_revision(rule.place_revision_id)
 
@@ -677,7 +678,7 @@ class SqlAlchemyPlaceCatalogRepository:
                 PlaceTimeRuleRow.place_revision_id == place_revision_id,
             )
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("time rule not found")
         return self._require_revision(place_revision_id)
 
@@ -722,7 +723,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(**_closure_values(closure))
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("closure not found")
         return self._require_revision(closure.place_revision_id)
 
@@ -767,7 +768,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(**_date_exception_values(exception))
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("date exception not found")
         return self._require_revision(exception.place_revision_id)
 
@@ -790,7 +791,7 @@ class SqlAlchemyPlaceCatalogRepository:
     def _retire_time_evidence(
         self,
         table: type[PlaceTimeRuleRow] | type[PlaceClosureRow] | type[PlaceDateExceptionRow],
-        key: object,
+        key: InstrumentedAttribute[str],
         evidence_id: str,
         *,
         place_revision_id: str,
@@ -806,7 +807,7 @@ class SqlAlchemyPlaceCatalogRepository:
             )
             .values(active=False, review_status="rejected", reviewed_at=None)
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError(not_found_message)
         return self._require_revision(place_revision_id)
 
@@ -826,7 +827,7 @@ class SqlAlchemyPlaceCatalogRepository:
         reviewed_at: datetime,
         place_id: str | None = None,
     ) -> PlaceRevision:
-        table_and_key = {
+        table_and_key: tuple[Any, InstrumentedAttribute[str]] | None = {
             "geometry": (PlaceGeometryRow, PlaceGeometryRow.geometry_id),
             "access_point": (PlaceAccessPointRow, PlaceAccessPointRow.access_point_id),
             "time_rule": (PlaceTimeRuleRow, PlaceTimeRuleRow.time_rule_id),
@@ -860,7 +861,7 @@ class SqlAlchemyPlaceCatalogRepository:
                 reviewed_at=reviewed_at if review_status == "human_verified" else None,
             )
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("evidence not found")
         revision = self.get_revision(revision_id)
         if revision is None:
@@ -882,7 +883,7 @@ class SqlAlchemyPlaceCatalogRepository:
                 reviewed_at=None,
             )
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("candidate revision version conflict")
 
     def add_time_rule(self, rule: PlaceTimeRule) -> None:
@@ -1003,7 +1004,7 @@ class SqlAlchemyPlaceCatalogRepository:
                 reviewed_at=None,
             )
         )
-        if result.rowcount != 1:
+        if cast(CursorResult[Any], result).rowcount != 1:
             raise ValueError("place relation not found")
         return self._require_revision(revision_id)
 
@@ -1118,6 +1119,7 @@ class SqlAlchemyPlaceCatalogRepository:
                     *(row.source_record_id for row in geometry_rows if row.active),
                     *(row.source_record_id for row in access_rows if row.active),
                     *(row.source_record_id for row in time_rule_rows if row.active),
+                    *(row.source_record_id for row in relation_rows if row.active),
                 )
             )
         )

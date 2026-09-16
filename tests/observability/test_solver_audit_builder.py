@@ -1,6 +1,7 @@
 """Solver audit builder tests. Traceability: H3, H7, ADR-0005 D4."""
 
 from datetime import UTC, date, datetime
+from typing import Any, cast
 
 from travel_agent.observability import SolverRunStatus, build_solver_run_audit
 from travel_agent.solver import (
@@ -56,7 +57,7 @@ def test_audit_builder_serializes_assignments_reassignments_and_counts() -> None
         elapsed_ms=25,
         created_at=datetime(2026, 8, 23, 8, 0, tzinfo=UTC),
     )
-    payload = audit.to_dict()
+    payload = cast(dict[str, Any], audit.to_dict())
 
     assert audit.status is SolverRunStatus.COMPLETED
     assert audit.hard_constraint_violations == 0
@@ -120,7 +121,11 @@ def test_audit_builder_records_explainable_visit_period_decision() -> None:
         elapsed_ms=25,
         created_at=datetime(2026, 8, 23, 8, 0, tzinfo=UTC),
     )
-    event = next(item for item in audit.to_dict()["events"] if item["constraint"] == "VISIT_PERIOD")
+    event = next(
+        item
+        for item in cast(list[dict[str, Any]], audit.to_dict()["events"])
+        if item["constraint"] == "VISIT_PERIOD"
+    )
 
     assert event["outcome"] == "fallback"
     assert event["preference_source"] == "curated"

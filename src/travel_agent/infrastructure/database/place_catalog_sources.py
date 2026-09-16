@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .place_catalog import SqlAlchemyPlaceCatalogRepository
+
 from travel_agent.domain.place_catalog import PlaceRevision, PlaceSourceRecord
 
 
 class SqlAlchemyPlaceCatalogSourceRepository:
-    def __init__(self, owner):
+    def __init__(self, owner: SqlAlchemyPlaceCatalogRepository) -> None:
         self._owner = owner
 
     def create_source_record(

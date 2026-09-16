@@ -4,6 +4,7 @@ Only used for the gateway's derived default dates, never user-locked dates.
 Moves and swaps are rerouted and independently validated before acceptance.
 """
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import date
 from itertools import combinations, permutations
@@ -15,12 +16,13 @@ from travel_agent.solver import (
 )
 from travel_agent.solver.day_assignment import rebuild_day_plan
 from travel_agent.solver.itinerary import _precheck_target
-from travel_agent.solver.models import DailyWeather, SegmentedDay
+from travel_agent.solver.models import DailyWeather, DayAllocation, SegmentedDay
 from travel_agent.solver.quality_policy import (
     QUALITY_BALANCE_TOLERANCE_PER_MILLE,
     QUALITY_DATE_PERMUTATION_LIMIT,
     QUALITY_EVENING_REST_MIN,
     QUALITY_MAX_PASSES,
+    QUALITY_NEIGHBOUR_DISTANCE_M,
     QUALITY_NEIGHBOUR_SYMMETRIC_MIN,
     QUALITY_ROUTE_BUDGET,
 )
@@ -43,19 +45,16 @@ def improve_default_days(
     ids = tuple(sorted(i for group in current for i in group))
     if not ids:
         return step1
-    # Protect local pairs as a soft priority; singletons and connected groups
-    # are both proposed so capacity/availability can still separate them.
-    close_pairs = []
+    # Phase 1 keeps ADR-0027's original broad balancing behaviour: protect
+    # neighbour pairs that the seed route already had together. Phase 2 below
+    # then performs a narrow local absorption for selected outdoor neighbours
+    # that were split before the broad search started.
     original_day = {i: k for k, group in enumerate(current) for i in group}
+    all_close_pairs = []
     for a, b in combinations(ids, 2):
-        ab, ba = provider.get_travel_time(a, b), provider.get_travel_time(b, a)
-        if (
-            original_day[a] == original_day[b]
-            and ab is not None
-            and ba is not None
-            and ab.travel_min + ba.travel_min <= QUALITY_NEIGHBOUR_SYMMETRIC_MIN
-        ):
-            close_pairs.append((a, b))
+        if _is_close_pair(a, b, allocations, provider):
+            all_close_pairs.append((a, b))
+    close_pairs = [(a, b) for a, b in all_close_pairs if original_day[a] == original_day[b]]
     cache: dict[tuple[int, tuple[int, ...]], SegmentedDay | None] = {}
 
     def routed(index: int, members: tuple[int, ...]) -> SegmentedDay | None:
@@ -86,7 +85,11 @@ def improve_default_days(
         if any(d is None for d in days):
             return None
         index_by_id = {i: k for k, group in enumerate(partition) for i in group}
+        singleton_days = sum(len(group) == 1 for group in partition)
         split = sum(index_by_id[a] != index_by_id[b] for a, b in close_pairs)
+        moved_from_initial = sum(
+            original_day[i] != index_by_id[i] for group in partition for i in group
+        )
         meals = shortfall = travel = tight_evening = 0
         loads = []
         for day in days:
@@ -129,21 +132,28 @@ def improve_default_days(
             travel += route.total_travel_min
         return (
             sum(not group for group in partition),
+            singleton_days,
             split,
             meals,
             shortfall,
             tight_evening,
             max(loads) - min(loads),
+            moved_from_initial,
             travel,
         )
 
     best_score = score(current)
     if best_score is None:
         return step1
+    index_by_id = {i: k for k, group in enumerate(current) for i in group}
+    all_neighbours_kept = all(index_by_id[a] == index_by_id[b] for a, b in all_close_pairs)
     if (
-        best_score[0] == 0
-        and best_score[2:5] == (0, 0, 0)
-        and best_score[5] <= QUALITY_BALANCE_TOLERANCE_PER_MILLE
+        all_neighbours_kept
+        and best_score[0] == 0
+        and best_score[1] == 0
+        and best_score[2] == 0
+        and best_score[3:6] == (0, 0, 0)
+        and best_score[6] <= QUALITY_BALANCE_TOLERANCE_PER_MILLE
     ):
         return step1
     # Strictly improving bounded descent; memoized date/subset routes cap work.
@@ -196,6 +206,13 @@ def improve_default_days(
         if winner == current:
             break
         current, best_score = winner, winner_score
+    current, best_score = _absorb_split_neighbours(
+        current,
+        best_score,
+        all_close_pairs,
+        score,
+    )
+
     # Retain rejected input accounting; routed drops remain available for the
     # existing recovery pass and are not silently forgotten.
     retained = set(ids)
@@ -217,3 +234,78 @@ def improve_default_days(
             for index, day in enumerate(dates)
         ),
     )
+
+
+def _is_close_pair(
+    left: int,
+    right: int,
+    allocations: dict[int, DayAllocation],
+    provider: TravelTimeProvider,
+) -> bool:
+    forward = provider.get_travel_time(left, right)
+    backward = provider.get_travel_time(right, left)
+    if forward is None or backward is None:
+        return False
+    if forward.travel_min + backward.travel_min <= QUALITY_NEIGHBOUR_SYMMETRIC_MIN:
+        return True
+    distances = [item.distance_m for item in (forward, backward) if item.distance_m is not None]
+    return (
+        bool(distances)
+        and min(distances) <= QUALITY_NEIGHBOUR_DISTANCE_M
+        and not allocations[left].attraction.is_indoor
+        and not allocations[right].attraction.is_indoor
+    )
+
+
+def _absorb_split_neighbours(
+    current: tuple[tuple[int, ...], ...],
+    best_score: tuple[int, ...],
+    close_pairs: list[tuple[int, int]],
+    score: Callable[[tuple[tuple[int, ...], ...]], tuple[int, ...] | None],
+) -> tuple[tuple[tuple[int, ...], ...], tuple[int, ...]]:
+    def local_key(
+        partition: tuple[tuple[int, ...], ...],
+        base_score: tuple[int, ...],
+    ) -> tuple[int, ...]:
+        index_by_id = {i: k for k, group in enumerate(partition) for i in group}
+        split = sum(index_by_id[a] != index_by_id[b] for a, b in close_pairs)
+        return (
+            base_score[0],
+            base_score[1],
+            split,
+            base_score[3],
+            base_score[4],
+            base_score[5],
+            base_score[6],
+            base_score[7],
+            base_score[8],
+        )
+
+    scorer = score
+    best_local_key = local_key(current, best_score)
+    for _ in range(QUALITY_MAX_PASSES):
+        index_by_id = {i: k for k, group in enumerate(current) for i in group}
+        candidates = set()
+        for left, right in close_pairs:
+            left_day = index_by_id[left]
+            right_day = index_by_id[right]
+            if left_day == right_day:
+                continue
+            moves = ((left, left_day, right_day), (right, right_day, left_day))
+            for moving, source, target in moves:
+                proposal = [set(group) for group in current]
+                proposal[source].remove(moving)
+                proposal[target].add(moving)
+                candidates.add(tuple(tuple(sorted(group)) for group in proposal))
+        winner, winner_score, winner_key = current, best_score, best_local_key
+        for candidate in sorted(candidates):
+            candidate_score = scorer(candidate)
+            if candidate_score is None:
+                continue
+            candidate_key = local_key(candidate, candidate_score)
+            if candidate_key < winner_key:
+                winner, winner_score, winner_key = candidate, candidate_score, candidate_key
+        if winner == current:
+            return current, best_score
+        current, best_score, best_local_key = winner, winner_score, winner_key
+    return current, best_score

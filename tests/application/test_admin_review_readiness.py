@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any
 
+from travel_agent.application.admin.review_readiness import ReadinessCheck, ReviewReadiness
 from travel_agent.application.admin.review_readiness import (
     evaluate_review_readiness as _review_readiness,
 )
@@ -44,7 +46,7 @@ def _source(*, status: str = "active") -> PlaceSourceRecord:
     )
 
 
-def _revision(**changes: object) -> PlaceRevision:
+def _revision(**changes: Any) -> PlaceRevision:
     base = PlaceRevision(
         "revision-1",
         "place-1",
@@ -160,8 +162,8 @@ def _task(status: str) -> PlaceReviewTask:
     return PlaceReviewTask("task-1", "revision-1", status, None, 1, "editor-1", NOW, NOW)
 
 
-def _check(result: dict[str, object], key: str) -> dict[str, object]:
-    return next(item for item in result["checks"] if item["key"] == key)  # type: ignore[index,union-attr]
+def _check(result: ReviewReadiness, key: str) -> ReadinessCheck:
+    return next(item for item in result["checks"] if item["key"] == key)
 
 
 def test_complete_evidence_without_task_is_ready_to_submit_not_ready_to_approve() -> None:
@@ -310,7 +312,7 @@ def test_active_relation_must_be_resolved_and_human_verified() -> None:
     assert _check(verified_result, "relation")["verified"] is True
 
 
-def test_inactive_bad_time_evidence_does_not_block_readiness():
+def test_inactive_bad_time_evidence_does_not_block_readiness() -> None:
     """H3: an inactive child with missing/conflicting source is informational only."""
     conflict = replace(_source(), source_record_id="old", content_sha256="d" * 64)
     inactive = replace(_time_rule(source_record_id="old"), active=False, time_rule_id="old-rule")
@@ -323,7 +325,7 @@ def test_inactive_bad_time_evidence_does_not_block_readiness():
     assert _check(result, "time")["verified"] is True
 
 
-def test_incomplete_or_entry_at_end_session_cannot_pass_readiness():
+def test_incomplete_or_entry_at_end_session_cannot_pass_readiness() -> None:
     """H3/C2: invalid candidate facts remain editable and cannot be approved."""
     for changes in ({"end_minute": None}, {"last_entry_minute": 2880}):
         rule = replace(_time_rule(rule_kind="fixed_session"), **changes)
@@ -333,7 +335,7 @@ def test_incomplete_or_entry_at_end_session_cannot_pass_readiness():
         assert _check(result, "time")["collected"] is False
 
 
-def test_published_session_payload_applies_override_and_excludes_inactive_rules():
+def test_published_session_payload_applies_override_and_excludes_inactive_rules() -> None:
     """H3/C2: reviewed date overrides replace regular sessions on that date only."""
     from travel_agent.domain.place_catalog.session_payload import build_fixed_session_payload
     from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
@@ -368,13 +370,17 @@ def test_published_session_payload_applies_override_and_excludes_inactive_rules(
     assert [s.session_id for s in sessions if s.matches(date(2026, 9, 11))] == ["time-rule-1"]
 
 
-def test_show_late_entry_passes_readiness_and_survives_projection_payload():
+def test_show_late_entry_passes_readiness_and_survives_projection_payload() -> None:
     """H3/C2 ADR-0026: retain the reviewed 18:40 deadline for an 18:30 show."""
     from travel_agent.domain.place_catalog.session_payload import build_fixed_session_payload
     from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
 
-    rule = replace(_time_rule(rule_kind="fixed_session"), start_minute=1110,
-                   end_minute=1170, last_entry_minute=1120)
+    rule = replace(
+        _time_rule(rule_kind="fixed_session"),
+        start_minute=1110,
+        end_minute=1170,
+        last_entry_minute=1120,
+    )
     evidence = _evidence(revision=_revision(place_kind="show"), time_rules=(rule,))
     assert _check(_review_readiness(evidence, None), "time")["verified"] is True
     assert parse_fixed_sessions(build_fixed_session_payload(evidence))[0].entry_min == 1120
@@ -383,7 +389,7 @@ def test_show_late_entry_passes_readiness_and_survives_projection_payload():
         assert _check(_review_readiness(invalid, None), "time")["collected"] is False
 
 
-def test_show_session_respects_separate_last_entry_rule():
+def test_show_session_respects_separate_last_entry_rule() -> None:
     """H3/C2: multi-session support must not bypass the venue entry cutoff."""
     from travel_agent.domain.place_catalog.session_payload import build_fixed_session_payload
     from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions

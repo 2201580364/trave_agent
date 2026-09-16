@@ -7,10 +7,11 @@ research catalog on Sep 16. No external API or mutable research DB dependency.
 import hashlib
 import json
 from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
 
 import pytest
 
-from travel_agent.application.planning.ports import SolverRequest
+from travel_agent.application.planning.ports import SolverOutcome, SolverRequest
 from travel_agent.infrastructure.solver import (
     InMemoryPublishedSolverDataProvider,
     ProductionSolverGateway,
@@ -30,11 +31,11 @@ from travel_agent.solver.models import FixedSession
 
 
 class Clock:
-    def now(self):
+    def now(self) -> datetime:
         return datetime(2026, 9, 16, tzinfo=UTC)
 
 
-def snapshot():
+def snapshot() -> PublishedSolverData:
     specs = (
         (1, "平湖秋月", 40, 2, 30.258255, 120.152633, ()),
         (
@@ -154,7 +155,7 @@ def snapshot():
         attractions,
         weather,
         ApproximateTravelTimeProvider(
-            {a.attraction.id: a.coordinate for a in attractions},
+            {a.attraction.id: a.coordinate for a in attractions if a.coordinate is not None},
             speed_kmh=18,
             detour_ratio=1.6,
             minimum_travel_min=5,
@@ -166,9 +167,9 @@ def snapshot():
     )
 
 
-def solve(catalog, start=date(2026, 9, 30)):
+def solve(catalog: PublishedSolverData, start: date = date(2026, 9, 30)) -> SolverOutcome:
     end = start + timedelta(days=2)
-    payload = {
+    payload: dict[str, object] = {
         "schema_version": "generation-input-v1",
         "city_id": "hangzhou",
         "data_snapshot_version": catalog.version,
@@ -193,11 +194,11 @@ def solve(catalog, start=date(2026, 9, 30)):
     )
 
 
-def test_ten_places_have_full_visits_meals_balanced_load_and_real_sessions():
+def test_ten_places_have_full_visits_meals_balanced_load_and_real_sessions() -> None:
     catalog = snapshot()
     first, second = solve(catalog), solve(catalog)
     assert first.result_snapshot_hash == second.result_snapshot_hash
-    result = first.result_snapshot
+    result = cast(dict[str, Any], first.result_snapshot)
     assert first.quality_gate_passed
     assert result["summary"]["scheduled_count"] == 10
     assert result["unplaced"] == []
@@ -241,9 +242,45 @@ def test_ten_places_have_full_visits_meals_balanced_load_and_real_sessions():
     assert next(n for n in lake_day["nodes"] if n["attraction_id"] == "1")["arrival_min"] >= 780
 
 
+def test_west_lake_outdoor_neighbours_stay_together_with_walking_od() -> None:
+    catalog = snapshot()
+    coordinates = {
+        item.attraction.id: item.coordinate
+        for item in catalog.attractions
+        if item.coordinate is not None
+    }
+    walking_catalog = PublishedSolverData(
+        catalog.version,
+        catalog.city_id,
+        catalog.attractions,
+        catalog.weather_by_date,
+        ApproximateTravelTimeProvider(
+            coordinates,
+            speed_kmh=18,
+            walking_threshold_m=2000,
+            walking_speed_kmh=4.5,
+            detour_ratio=1.6,
+            minimum_travel_min=5,
+            data_version="database-like-walking-od",
+            fetched_at=Clock().now(),
+        ),
+        catalog.od_basis,
+        catalog.weather_basis,
+    )
+
+    result = cast(dict[str, Any], solve(walking_catalog).result_snapshot)
+    days_by_id = {n["attraction_id"]: d["date"] for d in result["days"] for n in d["nodes"]}
+
+    assert result["quality_gate_passed"]
+    assert result["summary"]["scheduled_count"] == 10
+    assert result["unplaced"] == []
+    assert days_by_id["1"] == days_by_id["12"]
+    assert all(len(day["nodes"]) >= 2 for day in result["days"])
+
+
 @pytest.mark.parametrize("start", [date(2026, 9, 28), date(2026, 9, 29)])
-def test_quality_rebalance_still_checks_closed_days_and_return_time(start):
-    result = solve(snapshot(), start).result_snapshot
+def test_quality_rebalance_still_checks_closed_days_and_return_time(start: date) -> None:
+    result = cast(dict[str, Any], solve(snapshot(), start).result_snapshot)
     assert result["quality_gate_passed"]
     assert result["accounting"]["conserved"]
     for day in result["days"]:

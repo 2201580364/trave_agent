@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query, status
 
 from travel_agent.application.admin.errors import AdminPermissionDeniedError
 from travel_agent.application.admin.holiday_calendar_sync import ChinaHolidayCalendarSyncService
@@ -17,7 +19,7 @@ from .admin import (
 def register_o17_routes(
     router: APIRouter,
     holiday_calendar_sync: ChinaHolidayCalendarSyncService | None,
-    principal_dependency: Depends,
+    principal_dependency: Any,
 ) -> None:
     if holiday_calendar_sync is None:
         return
@@ -27,7 +29,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:read"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:read")
         return {
             "execution_available": holiday_calendar_sync.execution_available,
             "region_code": "CN",
@@ -39,7 +41,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:write"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:write")
         if not holiday_calendar_sync.job_submission_available:
             raise HTTPException(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -62,7 +64,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:read"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:read")
         jobs = holiday_calendar_sync.list_jobs(
             year=year, status=job_status, limit=limit, offset=offset
         )
@@ -78,7 +80,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:read"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:read")
         return _holiday_sync_job_response(holiday_calendar_sync.get_job(job_id))
 
     @router.post("/holiday-calendar-sync-jobs/{job_id}/cancel")
@@ -87,7 +89,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:write"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:write")
         return _holiday_sync_job_response(
             holiday_calendar_sync.cancel_job(job_id, cancelled_by=current.admin_actor_id)
         )
@@ -99,7 +101,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:write"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:write")
         return _holiday_sync_job_response(
             holiday_calendar_sync.confirm_preview(
                 job_id=job_id,
@@ -118,7 +120,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:read"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:read")
         return _holiday_calendar_version_response(holiday_calendar_sync.get_calendar(calendar_id))
 
     @router.get("/holiday-calendars/{calendar_id}/impact")
@@ -127,7 +129,7 @@ def register_o17_routes(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
         if not current.has_permission("holiday:calendar:read"):
-            raise AdminPermissionDeniedError
+            raise AdminPermissionDeniedError("holiday:calendar:read")
         impact = holiday_calendar_sync.get_calendar_impact(calendar_id)
         return {
             "calendar_id": impact.calendar_id,

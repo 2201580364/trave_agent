@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, cast
 
 from .models import ODBasis, ODTravelMode, TravelTimeResult
 from .transport import InMemoryTravelTimeProvider, TravelTimeProvider
@@ -70,18 +71,23 @@ class ODSubgraphSnapshot:
     def from_dict(cls, payload: dict[str, object]) -> ODSubgraphSnapshot:
         entries = tuple(
             TravelTimeResult(
-                int(row["origin_id"]), int(row["destination_id"]), int(row["travel_min"]),
-                ODBasis(str(row["basis"])), str(row["data_version"]),
+                int(row["origin_id"]),
+                int(row["destination_id"]),
+                int(row["travel_min"]),
+                ODBasis(str(row["basis"])),
+                str(row["data_version"]),
                 datetime.fromisoformat(str(row["fetched_at"])),
                 ODTravelMode(str(row["travel_mode"])) if row.get("travel_mode") else None,
                 int(row["distance_m"]) if row.get("distance_m") is not None else None,
                 str(row["fallback_reason"]) if row.get("fallback_reason") else None,
             )
-            for row in payload["entries"]
+            for row in cast(list[dict[str, Any]], payload["entries"])
         )
         snapshot = cls(
-            tuple(sorted(int(item) for item in payload["node_ids"])), entries,
-            str(payload["data_version"]), str(payload["snapshot_hash"]),
+            tuple(sorted(int(item) for item in cast(list[int], payload["node_ids"]))),
+            entries,
+            str(payload["data_version"]),
+            str(payload["snapshot_hash"]),
             datetime.fromisoformat(str(payload["created_at"])),
         )
         cls.replay(snapshot)

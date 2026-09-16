@@ -32,6 +32,7 @@ from travel_agent.domain.place_catalog import (
     PlaceReviewTask,
     PlaceRevision,
     PlaceRevisionEvidence,
+    ResearchSnapshot,
 )
 from travel_agent.domain.place_catalog.holiday_sync import (
     HolidayCalendarSyncJob,
@@ -877,8 +878,10 @@ def build_admin_router(
     return router
 
 
-def _snapshot_api_response(snapshot, *, include_payload: bool) -> dict[str, object]:
-    response = {
+def _snapshot_api_response(
+    snapshot: ResearchSnapshot, *, include_payload: bool
+) -> dict[str, object]:
+    response: dict[str, object] = {
         "snapshot_id": snapshot.snapshot_id,
         "data_snapshot_version": snapshot.data_snapshot_version,
         "city_id": snapshot.city_id,

@@ -52,13 +52,11 @@ def _emitted_actions() -> set[str]:
         # the reason_code. Capture tuple-head strings inside that function so
         # dynamically selected actions are covered too.
         if path.name == "holiday_calendar_sync.py":
-            match = re.search(r"def _terminal_audit_fields", text)
-            if match is not None:
-                tail = text[match.start():]
+            function_match = re.search(r"def _terminal_audit_fields", text)
+            if function_match is not None:
+                tail = text[function_match.start() :]
                 body = re.split(r"\n(?=def |class )", tail)[0]
-                actions.update(
-                    re.findall(r'\(\s*"([A-Z][A-Z0-9_]+)",\s*\n?\s*"[A-Z]', body)
-                )
+                actions.update(re.findall(r'\(\s*"([A-Z][A-Z0-9_]+)",\s*\n?\s*"[A-Z]', body))
     return actions
 
 
@@ -81,9 +79,7 @@ def test_registry_has_no_stale_entries() -> None:
     stale = sorted(_registered_actions() - _emitted_actions())
     # Allow codes that appear in the rule file prose but were renamed; the
     # current registry must match the code exactly.
-    assert not stale, (
-        f"registry entries no longer emitted in code (prune them): {stale}"
-    )
+    assert not stale, f"registry entries no longer emitted in code (prune them): {stale}"
 
 
 def test_target_types_are_registered() -> None:

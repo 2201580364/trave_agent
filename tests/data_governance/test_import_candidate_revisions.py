@@ -162,5 +162,6 @@ def test_candidate_import_repairs_only_pristine_legacy_metadata(tmp_path: Path) 
     with Session(engine) as session:
         revision = session.get(PlaceRevisionRow, "revision-hz-cand-008")
         assert revision is not None
+        assert revision.review_flags is not None
         assert "DURATION_NOT_COLLECTED" in revision.review_flags
         assert revision.relation_review_status == "pending"

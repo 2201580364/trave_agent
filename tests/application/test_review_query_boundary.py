@@ -29,7 +29,7 @@ def test_queries_preserve_state(admin_context: AdminTestContext, suffix: str) ->
     _seed_approvable_candidate(context, "revision-query")
     _, headers = _login(context.client, ROOT_LOGIN, ROOT_PASSWORD)
 
-    def state():
+    def state() -> list[list[dict[str, object]]]:
         with context.sessions() as session:
             return [
                 [dict(row) for row in session.execute(select(model.__table__)).mappings()]

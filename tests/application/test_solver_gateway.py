@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
 
 import pytest
 
@@ -96,7 +97,7 @@ def _request(
     attraction_ids: list[str] | None = None,
     end_date: date = TODAY,
 ) -> SolverRequest:
-    snapshot = {
+    snapshot: dict[str, object] = {
         "schema_version": "generation-input-v1",
         "city_id": "hangzhou",
         "travel_facts": {
@@ -317,18 +318,18 @@ def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     assert first.quality_gate_passed is True
     assert first.completion_kind is CompletionKind.COMPLETE_SUCCESS
     assert first.result_snapshot_hash == second.result_snapshot_hash
-    assert first.result_snapshot["accounting"]["conserved"] is True
-    nodes = first.result_snapshot["days"][0]["nodes"]
+    assert cast(dict[str, Any], first.result_snapshot)["accounting"]["conserved"] is True
+    nodes = cast(dict[str, Any], first.result_snapshot)["days"][0]["nodes"]
     assert {item["attraction_id"] for item in nodes} == {"attr_west_lake", "attr_fountain"}
     assert [item["node_id"] for item in nodes] == [
-        item["node_id"] for item in second.result_snapshot["days"][0]["nodes"]
+        item["node_id"] for item in cast(dict[str, Any], second.result_snapshot)["days"][0]["nodes"]
     ]
     connected_node = next(item for item in nodes if item["travel_from_previous_min"] > 0)
-    assert connected_node["transport_mode"] == "walking_estimate"
+    assert connected_node["transport_mode"] == "taxi_estimate"
     assert connected_node["travel_basis"] == "approximate"
     assert connected_node["travel_distance_m"] > 0
     assert connected_node["travel_fallback_reason"] is None
-    assert first.result_snapshot["days"][0]["lunch"]["status"] == "full"
+    assert cast(dict[str, Any], first.result_snapshot)["days"][0]["lunch"]["status"] == "full"
     assert first.audit_payload["solve_run_id"] == "solver_run_1"
     assert first.audit_payload["data_snapshot_version"] == VERSION
 
@@ -375,12 +376,12 @@ def test_gateway_maps_gaode_mode_and_road_distance_into_v2_result() -> None:
 
     connected_node = next(
         node
-        for node in outcome.result_snapshot["days"][0]["nodes"]
+        for node in cast(dict[str, Any], outcome.result_snapshot)["days"][0]["nodes"]
         if node["travel_from_previous_min"] > 0
     )
 
     assert outcome.result_schema_version == "trip-result-v2"
-    assert outcome.result_snapshot["schema_version"] == "trip-result-v2"
+    assert cast(dict[str, Any], outcome.result_snapshot)["schema_version"] == "trip-result-v2"
     assert connected_node["transport_mode"] == "transit"
     assert connected_node["travel_basis"] == "gaode"
     assert connected_node["travel_distance_m"] == 8_200
@@ -397,7 +398,7 @@ def test_gateway_exposes_approximate_fallback_reason_without_claiming_gaode() ->
 
     connected_node = next(
         node
-        for node in outcome.result_snapshot["days"][0]["nodes"]
+        for node in cast(dict[str, Any], outcome.result_snapshot)["days"][0]["nodes"]
         if node["travel_from_previous_min"] > 0
     )
 
@@ -416,17 +417,23 @@ def test_gateway_derives_stable_balanced_dates_when_user_has_no_date_preference(
     first = _balanced_gateway().solve(request)
     second = _balanced_gateway().solve(request)
 
-    first_counts = [len(day["nodes"]) for day in first.result_snapshot["days"]]
-    second_counts = [len(day["nodes"]) for day in second.result_snapshot["days"]]
+    first_counts = [
+        len(day["nodes"]) for day in cast(dict[str, Any], first.result_snapshot)["days"]
+    ]
+    second_counts = [
+        len(day["nodes"]) for day in cast(dict[str, Any], second.result_snapshot)["days"]
+    ]
     scheduled_ids = {
-        node["attraction_id"] for day in first.result_snapshot["days"] for node in day["nodes"]
+        node["attraction_id"]
+        for day in cast(dict[str, Any], first.result_snapshot)["days"]
+        for node in day["nodes"]
     }
 
     assert first_counts == second_counts
     assert all(count > 0 for count in first_counts)
     assert max(first_counts) - min(first_counts) <= 1
     assert scheduled_ids == set(attraction_ids)
-    assert first.result_snapshot["accounting"]["conserved"] is True
+    assert cast(dict[str, Any], first.result_snapshot)["accounting"]["conserved"] is True
     assert first.result_snapshot_hash == second.result_snapshot_hash
 
 
@@ -441,13 +448,13 @@ def test_gateway_keeps_nearby_attractions_together_with_published_od() -> None:
     second = _od_clustered_gateway().solve(request)
     dates_by_attraction = {
         node["attraction_id"]: day["date"]
-        for day in first.result_snapshot["days"]
+        for day in cast(dict[str, Any], first.result_snapshot)["days"]
         for node in day["nodes"]
     }
-    day_counts = [len(day["nodes"]) for day in first.result_snapshot["days"]]
+    day_counts = [len(day["nodes"]) for day in cast(dict[str, Any], first.result_snapshot)["days"]]
     west_lake_day = next(
         day
-        for day in first.result_snapshot["days"]
+        for day in cast(dict[str, Any], first.result_snapshot)["days"]
         if any(node["attraction_id"] == "attr_3" for node in day["nodes"])
     )
 
@@ -460,7 +467,7 @@ def test_gateway_keeps_nearby_attractions_together_with_published_od() -> None:
         "attr_7",
     ]
     assert sorted(day_counts) == [2, 2, 3]
-    assert first.result_snapshot["accounting"]["conserved"] is True
+    assert cast(dict[str, Any], first.result_snapshot)["accounting"]["conserved"] is True
     assert first.result_snapshot_hash == second.result_snapshot_hash
 
 
@@ -629,7 +636,7 @@ def test_mutated_input_snapshot_is_rejected_by_hash_integrity_check() -> None:
     assert raised.value.retryable is False
 
 
-def test_gateway_returns_selected_show_session_and_true_start_time():
+def test_gateway_returns_selected_show_session_and_true_start_time() -> None:
     """H3/C2: the persisted result identifies the actual session, including early entry."""
     from dataclasses import replace
 
@@ -653,7 +660,7 @@ def test_gateway_returns_selected_show_session_and_true_start_time():
     )
     result = gateway.solve(_request())
     assert result.quality_gate_passed
-    nodes = result.result_snapshot["days"][0]["nodes"]
+    nodes = cast(dict[str, Any], result.result_snapshot)["days"][0]["nodes"]
     show_nodes = [n for n in nodes if n["attraction_id"] == "attr_fountain"]
     assert len(show_nodes) == 1
     assert show_nodes[0]["selected_session"] == {

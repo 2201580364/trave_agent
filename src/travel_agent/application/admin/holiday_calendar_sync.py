@@ -43,9 +43,7 @@ class HolidayCalendarRepository(Protocol):
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[HolidayCalendarSyncJob, ...]: ...
-    def claim_job(
-        self, job_id: str, *, now: datetime
-    ) -> HolidayCalendarSyncJob | None: ...
+    def claim_job(self, job_id: str, *, now: datetime) -> HolidayCalendarSyncJob | None: ...
     def claim_next(
         self, *, now: datetime, stale_before: datetime
     ) -> HolidayCalendarSyncJob | None: ...
@@ -66,8 +64,10 @@ class HolidayCalendarAuditRepository(Protocol):
 
 
 class HolidayCalendarUnitOfWork(Protocol):
-    calendars: HolidayCalendarRepository
-    audits: HolidayCalendarAuditRepository
+    @property
+    def calendars(self) -> HolidayCalendarRepository: ...
+    @property
+    def audits(self) -> HolidayCalendarAuditRepository: ...
 
     def __enter__(self) -> Self: ...
     def __exit__(
@@ -208,9 +208,7 @@ class ChinaHolidayCalendarSyncService:
         offset: int = 0,
     ) -> tuple[HolidayCalendarSyncJob, ...]:
         with self._uow_factory() as uow:
-            return uow.calendars.list_jobs(
-                year=year, status=status, limit=limit, offset=offset
-            )
+            return uow.calendars.list_jobs(year=year, status=status, limit=limit, offset=offset)
 
     def get_job(self, job_id: str) -> HolidayCalendarSyncJob:
         with self._uow_factory() as uow:
@@ -227,31 +225,34 @@ class ChinaHolidayCalendarSyncService:
             if job.status not in {"queued", "temporarily_unavailable"}:
                 raise ValueError("当前状态的同步任务无法取消；正在执行的任务会自然完成")
             cancelled = job.transition(
-                "cancelled", at=self._clock.now(),
+                "cancelled",
+                at=self._clock.now(),
                 validation_result={"valid": False, "reason": "cancelled_by_operator"},
                 next_retry_at=None,
             )
             uow.calendars.update_job(cancelled)
-            uow.audits.add(build_audit_event(
-                event_id=self._ids.new_id("admin_audit"),
-                actor=None,
-                actor_id_override=cancelled_by,
-                actor_role="data_editor",
-                action="HOLIDAY_CALENDAR_SYNC_CANCELLED",
-                target_type="holiday_calendar_sync_job",
-                target_id=job_id,
-                target_revision=None,
-                before_digest=None,
-                after_digest=job.operation_digest,
-                reason_code="HOLIDAY_SYNC_CANCELLED",
-                reason_text=f"取消 {job.year} 年中国法定节假日历同步任务",
-                request_id=job_id,
-                operation_intent_id=job.operation_intent_id,
-                operation_digest=job.operation_digest,
-                result="succeeded",
-                error_code=None,
-                occurred_at=cancelled.finished_at or self._clock.now(),
-            ))
+            uow.audits.add(
+                build_audit_event(
+                    event_id=self._ids.new_id("admin_audit"),
+                    actor=None,
+                    actor_id_override=cancelled_by,
+                    actor_role="data_editor",
+                    action="HOLIDAY_CALENDAR_SYNC_CANCELLED",
+                    target_type="holiday_calendar_sync_job",
+                    target_id=job_id,
+                    target_revision=None,
+                    before_digest=None,
+                    after_digest=job.operation_digest,
+                    reason_code="HOLIDAY_SYNC_CANCELLED",
+                    reason_text=f"取消 {job.year} 年中国法定节假日历同步任务",
+                    request_id=job_id,
+                    operation_intent_id=job.operation_intent_id,
+                    operation_digest=job.operation_digest,
+                    result="succeeded",
+                    error_code=None,
+                    occurred_at=cancelled.finished_at or self._clock.now(),
+                )
+            )
             uow.commit()
             return cancelled
 
@@ -276,9 +277,7 @@ class ChinaHolidayCalendarSyncService:
             old_holidays = _period_dates(previous.periods) if previous else set()
             new_workdays = {item.service_date for item in calendar.adjusted_workdays}
             old_workdays = (
-                {item.service_date for item in previous.adjusted_workdays}
-                if previous
-                else set()
+                {item.service_date for item in previous.adjusted_workdays} if previous else set()
             )
             provenance_ids = tuple(
                 item
@@ -346,10 +345,7 @@ class ChinaHolidayCalendarSyncService:
                 job.source_title,
                 f"holiday_source_{job.source_content_sha256[:24]}",
                 job.source_content_sha256,
-                tuple(
-                    HolidayCalendarPeriodInput.to_domain(item)
-                    for item in parsed_periods
-                ),
+                tuple(HolidayCalendarPeriodInput.to_domain(item) for item in parsed_periods),
                 tuple(HolidayWorkdayInput.to_domain(item) for item in parsed_workdays),
             )
             validation = validate_extracted_calendar(extracted, requested_year=job.year)
@@ -358,9 +354,7 @@ class ChinaHolidayCalendarSyncService:
                     "调整后的预览数据未通过确定性校验："
                     + "；".join(_validation_error_text(item) for item in validation.errors)
                 )
-            existing = uow.calendars.get_by_digest(
-                "CN", job.year, validation.normalized_digest
-            )
+            existing = uow.calendars.get_by_digest("CN", job.year, validation.normalized_digest)
             if existing is not None:
                 raise ValueError("调整后的内容与已发布版本相同，无需重复发布")
             current = uow.calendars.get_published("CN", job.year)
@@ -640,9 +634,7 @@ class ChinaHolidayCalendarSyncService:
                     **source_changes,
                 )
             if job.mode == "preview":
-                job = self._update_progress(
-                    job, "preview_ready", "校验通过，正在生成预览结果"
-                )
+                job = self._update_progress(job, "preview_ready", "校验通过，正在生成预览结果")
                 return self._finish(
                     job,
                     "validated_preview",
@@ -673,9 +665,7 @@ class ChinaHolidayCalendarSyncService:
                     },
                     **source_changes,
                 )
-            job = self._update_progress(
-                job, "publishing", "校验通过，正在提交新的年度日历版本"
-            )
+            job = self._update_progress(job, "publishing", "校验通过，正在提交新的年度日历版本")
             current = uow.calendars.get_published(job.region_code, job.year)
             now = self._clock.now()
             calendar_id = self._ids.new_id("holiday_calendar")
@@ -724,9 +714,7 @@ class ChinaHolidayCalendarSyncService:
                     "stage_detail": job.validation_result.get(
                         "stage_detail", "校验通过，正在提交新的年度日历版本"
                     ),
-                    "execution_events": job.validation_result.get(
-                        "execution_events", []
-                    ),
+                    "execution_events": job.validation_result.get("execution_events", []),
                 },
                 calendar_id=calendar_id,
                 **source_changes,
@@ -810,9 +798,7 @@ class ChinaHolidayCalendarSyncService:
             validation_result=validation_result,
             next_retry_at=(
                 self._clock.now()
-                + timedelta(
-                    seconds=min(3600, 60 * (2 ** max(0, running_job.attempt_count - 1)))
-                )
+                + timedelta(seconds=min(3600, 60 * (2 ** max(0, running_job.attempt_count - 1))))
                 if status == "temporarily_unavailable"
                 else None
             ),
@@ -914,7 +900,8 @@ def _terminal_audit_fields(job: HolidayCalendarSyncJob) -> tuple[str, str, str]:
             f"{job.year} 年法定节假日历已是最新版本",
         ),
         "cancelled": (
-            "HOLIDAY_CALENDAR_SYNC_CANCELLED", "HOLIDAY_SYNC_CANCELLED",
+            "HOLIDAY_CALENDAR_SYNC_CANCELLED",
+            "HOLIDAY_SYNC_CANCELLED",
             f"已取消 {job.year} 年法定节假日历同步任务",
         ),
     }

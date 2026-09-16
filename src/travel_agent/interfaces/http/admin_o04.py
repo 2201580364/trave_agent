@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Request
 
+from travel_agent.application.admin import PlaceReviewWorkflowService
 from travel_agent.domain.admin import AdminPrincipal
 
 from . import admin_responses as responses
@@ -15,7 +18,9 @@ from .admin import (
 )
 
 
-def register_o04_routes(router: APIRouter, review_workflow, principal_dependency) -> None:
+def register_o04_routes(
+    router: APIRouter, review_workflow: PlaceReviewWorkflowService, principal_dependency: Any
+) -> None:
     @router.post(
         "/place-revisions/{revision_id}/geometries",
         response_model=responses.PlaceRevision,

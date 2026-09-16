@@ -89,9 +89,7 @@ class ItineraryBaseline:
         if not self.source_refs:
             raise ValueError("baseline must retain at least one source reference")
         if not (
-            self.visit_expectations
-            or self.same_day_expectations
-            or self.adjacency_expectations
+            self.visit_expectations or self.same_day_expectations or self.adjacency_expectations
         ):
             raise ValueError("baseline must contain at least one scored expectation")
         ids = [item.attraction_id for item in self.visit_expectations]
@@ -275,15 +273,11 @@ def _same_day_component(
 ) -> ClosenessComponent:
     matched = 0.0
     total = 0.0
-    for expectation in baseline.same_day_expectations:
-        total += expectation.weight
-        dates = {
-            visits[item][0]
-            for item in expectation.attraction_ids
-            if item in visits
-        }
-        if len(dates) == 1 and all(item in visits for item in expectation.attraction_ids):
-            matched += expectation.weight
+    for same_day_expectation in baseline.same_day_expectations:
+        total += same_day_expectation.weight
+        dates = {visits[item][0] for item in same_day_expectation.attraction_ids if item in visits}
+        if len(dates) == 1 and all(item in visits for item in same_day_expectation.attraction_ids):
+            matched += same_day_expectation.weight
     return _weighted_component("same_day", matched, total)
 
 
@@ -297,12 +291,12 @@ def _adjacency_component(
         directed.update(zip(ids, ids[1:], strict=False))
     matched = 0.0
     total = 0.0
-    for expectation in baseline.adjacency_expectations:
-        total += expectation.weight
-        forward = (expectation.first_id, expectation.second_id) in directed
-        reverse = (expectation.second_id, expectation.first_id) in directed
-        if forward or (reverse and not expectation.directional):
-            matched += expectation.weight
+    for adjacency_expectation in baseline.adjacency_expectations:
+        total += adjacency_expectation.weight
+        forward = (adjacency_expectation.first_id, adjacency_expectation.second_id) in directed
+        reverse = (adjacency_expectation.second_id, adjacency_expectation.first_id) in directed
+        if forward or (reverse and not adjacency_expectation.directional):
+            matched += adjacency_expectation.weight
     return _weighted_component("adjacency", matched, total)
 
 
@@ -317,26 +311,17 @@ def _fixed_matches(
         actual = visits.get(expectation.attraction_id)
         if expectation.fixed_day:
             total += 1
-            matched += int(
-                actual is not None and actual[0] == expectation.preferred_day
-            )
+            matched += int(actual is not None and actual[0] == expectation.preferred_day)
         if expectation.fixed_bucket:
             total += 1
-            matched += int(
-                actual is not None and actual[1] in expectation.preferred_buckets
-            )
-    for expectation in baseline.same_day_expectations:
-        if not expectation.fixed:
+            matched += int(actual is not None and actual[1] in expectation.preferred_buckets)
+    for same_day_expectation in baseline.same_day_expectations:
+        if not same_day_expectation.fixed:
             continue
         total += 1
-        dates = {
-            visits[item][0]
-            for item in expectation.attraction_ids
-            if item in visits
-        }
+        dates = {visits[item][0] for item in same_day_expectation.attraction_ids if item in visits}
         matched += int(
-            len(dates) == 1
-            and all(item in visits for item in expectation.attraction_ids)
+            len(dates) == 1 and all(item in visits for item in same_day_expectation.attraction_ids)
         )
     directed = {
         pair
@@ -347,13 +332,13 @@ def _fixed_matches(
             strict=False,
         )
     }
-    for expectation in baseline.adjacency_expectations:
-        if not expectation.fixed:
+    for adjacency_expectation in baseline.adjacency_expectations:
+        if not adjacency_expectation.fixed:
             continue
         total += 1
-        forward = (expectation.first_id, expectation.second_id) in directed
-        reverse = (expectation.second_id, expectation.first_id) in directed
-        matched += int(forward or (reverse and not expectation.directional))
+        forward = (adjacency_expectation.first_id, adjacency_expectation.second_id) in directed
+        reverse = (adjacency_expectation.second_id, adjacency_expectation.first_id) in directed
+        matched += int(forward or (reverse and not adjacency_expectation.directional))
     return matched, total
 
 
@@ -375,9 +360,7 @@ def _expectation_outcomes(
                 ClosenessExpectationOutcome(
                     "day_assignment",
                     (expectation.attraction_id,),
-                    _date_values(
-                        (expectation.preferred_day,) if expectation.preferred_day else ()
-                    ),
+                    _date_values((expectation.preferred_day,) if expectation.preferred_day else ()),
                     _date_values(tuple(sorted(expectation.acceptable_days))),
                     _date_values((actual[0],)) if actual else (),
                     score,
@@ -403,8 +386,8 @@ def _expectation_outcomes(
                     outcome,
                 )
             )
-    for expectation in baseline.same_day_expectations:
-        attraction_ids = tuple(sorted(expectation.attraction_ids))
+    for same_day_expectation in baseline.same_day_expectations:
+        attraction_ids = tuple(sorted(same_day_expectation.attraction_ids))
         actual_dates = tuple(
             visits[item][0].isoformat() for item in attraction_ids if item in visits
         )
@@ -418,27 +401,27 @@ def _expectation_outcomes(
                 (),
                 actual_dates,
                 float(matched),
-                expectation.fixed,
-                ExpectationOutcome.MATCHED if matched else (
-                    ExpectationOutcome.MISSED if all_present else ExpectationOutcome.MISSING
-                ),
+                same_day_expectation.fixed,
+                ExpectationOutcome.MATCHED
+                if matched
+                else (ExpectationOutcome.MISSED if all_present else ExpectationOutcome.MISSING),
             )
         )
     directed = _directed_adjacencies(itinerary)
-    for expectation in baseline.adjacency_expectations:
-        forward = (expectation.first_id, expectation.second_id) in directed
-        reverse = (expectation.second_id, expectation.first_id) in directed
-        matched = forward or (reverse and not expectation.directional)
-        actual = "forward" if forward else "reverse" if reverse else "not_adjacent"
+    for adjacency_expectation in baseline.adjacency_expectations:
+        forward = (adjacency_expectation.first_id, adjacency_expectation.second_id) in directed
+        reverse = (adjacency_expectation.second_id, adjacency_expectation.first_id) in directed
+        matched = forward or (reverse and not adjacency_expectation.directional)
+        actual_adjacency = "forward" if forward else "reverse" if reverse else "not_adjacent"
         outcomes.append(
             ClosenessExpectationOutcome(
                 "adjacency",
-                (expectation.first_id, expectation.second_id),
-                ("forward",) if expectation.directional else ("either_direction",),
+                (adjacency_expectation.first_id, adjacency_expectation.second_id),
+                ("forward",) if adjacency_expectation.directional else ("either_direction",),
                 (),
-                (actual,),
+                (actual_adjacency,),
                 float(matched),
-                expectation.fixed,
+                adjacency_expectation.fixed,
                 ExpectationOutcome.MATCHED if matched else ExpectationOutcome.MISSED,
             )
         )
@@ -488,8 +471,11 @@ def _overall(*components: ClosenessComponent) -> float:
     if not available:
         return 1.0
     total_weight = sum(COMPONENT_WEIGHTS[item.name] for item in available)
-    return sum(
-        COMPONENT_WEIGHTS[item.name] * item.score
-        for item in available
-        if item.score is not None
-    ) / total_weight
+    return (
+        sum(
+            COMPONENT_WEIGHTS[item.name] * item.score
+            for item in available
+            if item.score is not None
+        )
+        / total_weight
+    )

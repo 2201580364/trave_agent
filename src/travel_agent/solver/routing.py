@@ -11,7 +11,7 @@ from datetime import date
 from time import perf_counter
 from typing import Any, Protocol
 
-from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+from ortools.constraint_solver import pywrapcp, routing_enums_pb2  # type: ignore[import-untyped]
 
 from .availability import is_open_on
 from .models import (
@@ -59,7 +59,7 @@ class DefaultRoutingSearchExecutor:
         return routing.SolveWithParameters(parameters)
 
     def status(self, routing: pywrapcp.RoutingModel) -> int:
-        return routing.status()
+        return int(routing.status())
 
 
 def route_day(
@@ -190,9 +190,7 @@ def route_day(
                     for entry, length in sorted(duration_by_entry.items())
                 ]
             )
-            routing.solver().Add(
-                time_dimension.SlackVar(index) >= duration - 1
-            )
+            routing.solver().Add(time_dimension.SlackVar(index) >= duration - 1)
             routing.AddVariableMinimizedByFinalizer(cumul)
             continue
         resolution = resolve_effective_window(allocation.attraction, day_plan.visit_date)
@@ -439,7 +437,8 @@ def validate_routed_day(
                     )
                 )
         minimum_duration = (
-            1 if attraction.fixed_sessions
+            1
+            if attraction.fixed_sessions
             else math.ceil(attraction.suggested_duration * DEFAULT_DURATION_RATIO)
         )
         if (

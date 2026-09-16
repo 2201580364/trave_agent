@@ -10,6 +10,7 @@ from travel_agent.application.admin.holiday_calendar_sync import (
     HolidayExtractionError,
     OfficialHolidayAnnouncement,
 )
+from travel_agent.domain.place_catalog.holiday_sync import ExtractedHolidayCalendar
 from travel_agent.infrastructure.holiday_sync import (
     AiHolidayAnnouncementExtractor,
     HolidaySyncSettings,
@@ -28,7 +29,9 @@ class Model:
     def __init__(self, quote: str = "春节：2月1日至2月7日放假调休。") -> None:
         self.quote = quote
 
-    def extract_holiday_calendar(self, *, year, source_title, source_text):
+    def extract_holiday_calendar(
+        self, *, year: int, source_title: str, source_text: str
+    ) -> dict[str, object]:
         assert "春节" in source_text
         return {
             "region": "CN",
@@ -51,7 +54,7 @@ class Model:
         }
 
 
-def _extract(model: Model):
+def _extract(model: Model) -> ExtractedHolidayCalendar:
     return AiHolidayAnnouncementExtractor(model).extract(
         announcement=OfficialHolidayAnnouncement(
             "https://www.gov.cn/holiday",
@@ -97,9 +100,12 @@ def test_openai_compatible_model_requests_json_and_parses_candidate() -> None:
         model="structured-test",
     )
 
-    assert model.extract_holiday_calendar(
-        year=2027, source_title="notice", source_text="official text"
-    ) == expected
+    assert (
+        model.extract_holiday_calendar(
+            year=2027, source_title="notice", source_text="official text"
+        )
+        == expected
+    )
 
 
 def test_holiday_sync_settings_require_complete_provider_when_worker_enabled(

@@ -26,7 +26,7 @@ NOW = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
 
 
 def test_snapshot_command_requires_explicit_live_acknowledgement(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         sys,
@@ -49,16 +49,14 @@ def test_snapshot_command_requires_explicit_live_acknowledgement(
 
 
 def test_load_coordinates_accepts_published_gate6_fixture() -> None:
-    coordinates = _load_coordinates(
-        Path("tests/data/hangzhou_attractions_snapshot.json")
-    )
+    coordinates = _load_coordinates(Path("tests/data/hangzhou_attractions_snapshot.json"))
 
     assert len(coordinates) == 7
     assert coordinates[14] == Coordinate(30.2525, 120.1495)
 
 
 def test_load_coordinates_rejects_records_outside_publication_gate(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "invalid.json"
     source.write_text(
@@ -83,7 +81,7 @@ def test_load_coordinates_rejects_records_outside_publication_gate(
 
 
 def test_load_coordinates_requires_explicit_candidate_acknowledgement(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "candidate.json"
     source.write_text(

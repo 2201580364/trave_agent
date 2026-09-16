@@ -1,6 +1,7 @@
 """Reviewed itinerary closeness tests. Traceability: H3, Gate 6, ADR-0007."""
 
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -21,6 +22,7 @@ from travel_agent.solver import (
     evaluate_itinerary_closeness,
     evaluate_solver_quality,
 )
+from travel_agent.solver.closeness import ItineraryClosenessReport
 
 MONDAY = date(2026, 8, 24)
 TUESDAY = date(2026, 8, 25)
@@ -36,8 +38,7 @@ def _itinerary(*days: tuple[date, tuple[tuple[Attraction, int], ...]]) -> Itiner
             visit_date,
             DayTimeBounds(8 * 60, 22 * 60),
             tuple(
-                RouteVisit(attraction, arrival, arrival + 60, 60)
-                for attraction, arrival in visits
+                RouteVisit(attraction, arrival, arrival + 60, 60) for attraction, arrival in visits
             ),
             (),
             0,
@@ -56,7 +57,7 @@ def _itinerary(*days: tuple[date, tuple[tuple[Attraction, int], ...]]) -> Itiner
 
 
 def _baseline(**changes: object) -> ItineraryBaseline:
-    values = {
+    values: dict[str, Any] = {
         "baseline_id": "reviewed-1",
         "version": "1.0.0",
         "provenance": BaselineProvenance.HUMAN_REVIEWED,
@@ -69,7 +70,7 @@ def _baseline(**changes: object) -> ItineraryBaseline:
     return ItineraryBaseline(**values)
 
 
-def _evaluate(itinerary: ItineraryPlan, baseline: ItineraryBaseline):
+def _evaluate(itinerary: ItineraryPlan, baseline: ItineraryBaseline) -> ItineraryClosenessReport:
     attractions = [visit.attraction for day in itinerary.days for visit in day.visits]
     quality = evaluate_solver_quality(itinerary, attractions)
     return evaluate_itinerary_closeness(itinerary, quality, baseline)

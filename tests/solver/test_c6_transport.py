@@ -207,3 +207,49 @@ def test_c6_rejects_buffer_ratio_below_one() -> None:
             next_arrival_min=11 * 60,
             buffer_ratio=0.9,
         )
+
+
+def test_c6_local_walking_uses_pedestrian_speed_and_same_buffered_edge() -> None:
+    """OD-QUALITY-001: don't display a motor-speed short hop as walking."""
+    import math
+
+    from travel_agent.solver import ODTravelMode
+
+    provider = ApproximateTravelTimeProvider(
+        {1: Coordinate(30.25, 120.15), 2: Coordinate(30.258, 120.15)},
+        speed_kmh=18,
+        walking_threshold_m=2000,
+        walking_speed_kmh=4.5,
+        detour_ratio=1.6,
+        minimum_travel_min=5,
+        data_version="local-walk-v2",
+        fetched_at=NOW,
+    )
+    edge = provider.get_travel_time(1, 2)
+    assert edge is not None and edge.distance_m is not None
+    assert 1400 <= edge.distance_m <= 1500
+    assert edge.travel_mode is ODTravelMode.WALKING
+    assert edge.travel_min == math.ceil(edge.distance_m / 75)
+    assert edge.travel_min >= 19
+    assert edge.basis is ODBasis.APPROXIMATE
+    assert not evaluate_connection(
+        provider, origin_id=1, destination_id=2, previous_leave_min=600, next_arrival_min=610
+    ).feasible
+    assert evaluate_connection(
+        provider,
+        origin_id=1,
+        destination_id=2,
+        previous_leave_min=600,
+        next_arrival_min=600 + math.ceil(edge.travel_min * 1.2),
+    ).feasible
+
+
+def test_unknown_estimate_mode_is_never_inferred_as_walking_from_duration() -> None:
+    from travel_agent.infrastructure.solver.gateway import _transport_mode
+
+    assert (
+        _transport_mode(
+            TravelTimeResult(1, 2, 5, ODBasis.APPROXIMATE, "unknown-mode", NOW, distance_m=1500)
+        )
+        != "walking_estimate"
+    )

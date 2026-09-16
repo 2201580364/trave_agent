@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import fakeredis
 import pytest
@@ -82,7 +83,7 @@ def _payload(
     }
 
 
-def test_gaode_settings_load_env_without_exposing_key(monkeypatch) -> None:
+def test_gaode_settings_load_env_without_exposing_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TRAVEL_AGENT_GAODE_API_KEY", "gaode-secret")
     monkeypatch.setenv("TRAVEL_AGENT_GAODE_CITY_CODE", "330100")
     monkeypatch.setenv("TRAVEL_AGENT_GAODE_TIMEOUT_SECONDS", "3.5")
@@ -100,7 +101,7 @@ def test_gaode_settings_load_env_without_exposing_key(monkeypatch) -> None:
     assert "gaode-secret" not in repr(settings)
 
 
-def test_gaode_settings_require_key(monkeypatch) -> None:
+def test_gaode_settings_require_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TRAVEL_AGENT_GAODE_API_KEY", raising=False)
 
     with pytest.raises(ValueError, match="GAODE_API_KEY"):
@@ -224,7 +225,7 @@ def test_gaode_client_classifies_api_rate_limit() -> None:
     assert failures == ["rate_limited"]
 
 
-def test_gaode_file_cache_reuses_routes_without_storing_key(tmp_path) -> None:
+def test_gaode_file_cache_reuses_routes_without_storing_key(tmp_path: Path) -> None:
     cache_path = tmp_path / "gaode-routes.json"
     settings = GaodeSettings(
         "secret-not-for-cache",
@@ -287,7 +288,7 @@ def test_gaode_redis_cache_reuses_routes_across_clients_without_credentials() ->
         FixedClock(),
         transport=first_transport,
         cache=RedisGaodeRouteCache(
-            first_redis,  # type: ignore[arg-type]
+            first_redis,
             key_prefix="test-travel-agent",
         ),
     )
@@ -300,7 +301,7 @@ def test_gaode_redis_cache_reuses_routes_across_clients_without_credentials() ->
         FixedClock(),
         transport=second_transport,
         cache=RedisGaodeRouteCache(
-            second_redis,  # type: ignore[arg-type]
+            second_redis,
             key_prefix="test-travel-agent",
         ),
     )
@@ -336,9 +337,7 @@ def test_gaode_builder_materializes_both_directions_and_selects_walking() -> Non
     )
     client = GaodeRouteClient(settings, FixedClock(), transport=transport)
 
-    built = GaodeODSnapshotBuilder(settings, client).build(
-        {1: ORIGIN, 2: DESTINATION}
-    )
+    built = GaodeODSnapshotBuilder(settings, client).build({1: ORIGIN, 2: DESTINATION})
 
     forward = built.provider.get_travel_time(1, 2)
     backward = built.provider.get_travel_time(2, 1)
@@ -374,9 +373,7 @@ def test_gaode_builder_prefers_transit_when_close_to_driving_time() -> None:
     )
     client = GaodeRouteClient(settings, FixedClock(), transport=transport)
 
-    built = GaodeODSnapshotBuilder(settings, client).build(
-        {1: ORIGIN, 2: DESTINATION}
-    )
+    built = GaodeODSnapshotBuilder(settings, client).build({1: ORIGIN, 2: DESTINATION})
 
     result = built.provider.get_travel_time(1, 2)
     assert result is not None
@@ -389,9 +386,7 @@ def test_gaode_builder_transparently_falls_back_after_timeout() -> None:
         "secret",
         enabled_modes=(ODTravelMode.DRIVING,),
     )
-    transport = FakeTransport(
-        error=GaodeRouteError(GaodeFailureCode.TIMEOUT, "timeout")
-    )
+    transport = FakeTransport(error=GaodeRouteError(GaodeFailureCode.TIMEOUT, "timeout"))
     client = GaodeRouteClient(settings, FixedClock(), transport=transport)
     fallback = ApproximateTravelTimeProvider(
         {1: ORIGIN, 2: DESTINATION},
@@ -435,20 +430,13 @@ def test_gaode_builder_reports_missing_pairs_without_fallback() -> None:
     client = GaodeRouteClient(
         settings,
         FixedClock(),
-        transport=FakeTransport(
-            error=GaodeRouteError(GaodeFailureCode.NO_ROUTE, "no route")
-        ),
+        transport=FakeTransport(error=GaodeRouteError(GaodeFailureCode.NO_ROUTE, "no route")),
     )
 
-    built = GaodeODSnapshotBuilder(settings, client).build(
-        {1: ORIGIN, 2: DESTINATION}
-    )
+    built = GaodeODSnapshotBuilder(settings, client).build({1: ORIGIN, 2: DESTINATION})
 
     assert built.provider.get_travel_time(1, 2) is None
     assert built.report.missing_pair_count == 2
     assert not built.report.complete
     assert len(built.report.failure_details) == 2
-    assert all(
-        item.code is GaodeFailureCode.NO_ROUTE
-        for item in built.report.failure_details
-    )
+    assert all(item.code is GaodeFailureCode.NO_ROUTE for item in built.report.failure_details)

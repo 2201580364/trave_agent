@@ -10,6 +10,7 @@ from travel_agent.solver import (
     AttractionPreference,
     DailyWeather,
     InMemoryTravelTimeProvider,
+    ItineraryPlan,
     ODBasis,
     TimeRule,
     TravelTimeResult,
@@ -28,10 +29,15 @@ WEATHER = {DAY: DailyWeather(DAY, WeatherBasis.FORECAST, WeatherSeverity.NORMAL)
 
 
 @pytest.mark.parametrize("entry", [1110, 1120, 1169])
-def test_entry_after_show_start_is_allowed_until_before_end(entry):
+def test_entry_after_show_start_is_allowed_until_before_end(entry: int) -> None:
     """H3/C2: even a short remaining visit is valid under ADR-0026."""
-    show = Attraction(1, "Show", suggested_duration=60, data_verified=True,
-                      fixed_sessions=(FixedSession("late-entry", 1110, 1170, entry),))
+    show = Attraction(
+        1,
+        "Show",
+        suggested_duration=60,
+        data_verified=True,
+        fixed_sessions=(FixedSession("late-entry", 1110, 1170, entry),),
+    )
     result, provider = solve((show,), start=entry, end=1200)
     visit = result.days[0].visits[0]
     assert (visit.arrival_min, visit.leave_min) == (entry, 1170)
@@ -41,23 +47,35 @@ def test_entry_after_show_start_is_allowed_until_before_end(entry):
 
 
 @pytest.mark.parametrize("entry", [1170, 1171])
-def test_entry_at_or_after_show_end_is_rejected(entry):
+def test_entry_at_or_after_show_end_is_rejected(entry: int) -> None:
     with pytest.raises(ValueError, match="before its end"):
         FixedSession("invalid", 1110, 1170, entry)
 
 
-def test_late_entry_still_reserves_transport_and_return_boundary():
-    show = Attraction(1, "Show", suggested_duration=60, data_verified=True,
-                      fixed_sessions=(FixedSession("late-entry", 1110, 1170, 1160),))
-    next_show = Attraction(2, "Next", suggested_duration=60, data_verified=True,
-                           fixed_sessions=(FixedSession("next", 1180, 1240),))
+def test_late_entry_still_reserves_transport_and_return_boundary() -> None:
+    show = Attraction(
+        1,
+        "Show",
+        suggested_duration=60,
+        data_verified=True,
+        fixed_sessions=(FixedSession("late-entry", 1110, 1170, 1160),),
+    )
+    next_show = Attraction(
+        2,
+        "Next",
+        suggested_duration=60,
+        data_verified=True,
+        fixed_sessions=(FixedSession("next", 1180, 1240),),
+    )
     result, _ = solve((show, next_show), start=1150, end=1250, travel=30)
     assert sum(len(day.visits) for day in result.days) == 1
     result, _ = solve((show,), start=1150, end=1169)
     assert result.unplaced
 
 
-def solve(attractions, start=720, end=1200, travel=30):
+def solve(
+    attractions: tuple[Attraction, ...], start: int = 720, end: int = 1200, travel: int = 30
+) -> tuple[ItineraryPlan, InMemoryTravelTimeProvider]:
     provider = InMemoryTravelTimeProvider(
         {
             (a.id, b.id): TravelTimeResult(
@@ -79,7 +97,7 @@ def solve(attractions, start=720, end=1200, travel=30):
     return result, provider
 
 
-def test_later_session_selected_after_real_transport_and_full_show_reserved():
+def test_later_session_selected_after_real_transport_and_full_show_reserved() -> None:
     museum = Attraction(
         1,
         "Museum",
@@ -107,7 +125,7 @@ def test_later_session_selected_after_real_transport_and_full_show_reserved():
     assert not validate_routed_day(invalid, provider, weather_by_date=WEATHER).valid
 
 
-def test_gap_between_sessions_is_not_a_feasible_day_window():
+def test_gap_between_sessions_is_not_a_feasible_day_window() -> None:
     show = Attraction(
         1,
         "Show",
@@ -123,7 +141,7 @@ def test_gap_between_sessions_is_not_a_feasible_day_window():
     assert len(result.unplaced) == 1
 
 
-def test_weekday_date_range_and_opening_hours_filter_sessions():
+def test_weekday_date_range_and_opening_hours_filter_sessions() -> None:
     opening = TimeRule(1, 1, 12, 31, 900, 1100)
     show = Attraction(
         1,
@@ -143,7 +161,7 @@ def test_weekday_date_range_and_opening_hours_filter_sessions():
     assert result == solve((show,))[0]
 
 
-def test_two_shows_choose_one_session_each_without_losing_transport_time():
+def test_two_shows_choose_one_session_each_without_losing_transport_time() -> None:
     first = Attraction(
         1,
         "First",
@@ -172,7 +190,7 @@ def test_two_shows_choose_one_session_each_without_losing_transport_time():
     ]
 
 
-def test_overnight_show_respects_next_day_minutes_and_return_bound():
+def test_overnight_show_respects_next_day_minutes_and_return_bound() -> None:
     show = Attraction(
         1,
         "Night",
@@ -186,7 +204,7 @@ def test_overnight_show_respects_next_day_minutes_and_return_bound():
     assert len(result.unplaced) == 1
 
 
-def test_sessions_do_not_allow_missing_od_connections():
+def test_sessions_do_not_allow_missing_od_connections() -> None:
     first = Attraction(
         1,
         "First",

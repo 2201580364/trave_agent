@@ -167,7 +167,7 @@ def test_build_published_snapshot_rejects_incomplete_od() -> None:
         )
 
 
-def test_snapshot_preserves_discrete_session_payload():
+def test_snapshot_preserves_discrete_session_payload() -> None:
     """H3/C2: the production builder cannot drop new multi-session facts."""
     from travel_agent.infrastructure.solver.published_json import _parse_attraction
 
@@ -208,7 +208,7 @@ def test_snapshot_preserves_discrete_session_payload():
         ],
     ],
 )
-def test_malformed_session_payload_fails_closed(payload):
+def test_malformed_session_payload_fails_closed(payload: dict[str, object]) -> None:
     """H3/C2: malformed published facts produce validation errors."""
     from travel_agent.infrastructure.solver.fixed_sessions import parse_fixed_sessions
 

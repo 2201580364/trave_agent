@@ -1,4 +1,4 @@
-﻿"""Documentation governance gate for the trave_agent knowledge base.
+"""Documentation governance gate for the trave_agent knowledge base.
 
 Detects documentation drift mechanically instead of relying on discipline.
 Style contract aligned with audit_catalog_boundaries.py:
@@ -62,7 +62,7 @@ class Report:
         if check.violations:
             self.passed = False
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "passed": self.passed,
             "checks": [
