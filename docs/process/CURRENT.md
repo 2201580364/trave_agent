@@ -2,9 +2,9 @@
 
 > 唯一的「现在」入口。每轮任务结束时更新本文件；历史细节看 [status-archive/](status-archive/)，跨里程碑稳定路线看 [project-roadmap.md](project-roadmap.md)。
 
-- 更新时间：2026-09-17（管理端裸 HTTP 修复、镜像发布与浏览器验收）
+- 更新时间：2026-09-17（管理端证据审核时间序列化修复、API 镜像发布与浏览器验收）
 - 当前节点：`M1 后段 / Gate 7 / OM1；发布目录动态数据库接入已部署；用户端按请求读取最新 published Projection；关系裁决形成的互斥组进入选点与求解约束；OD近邻分天保护与十景点整段质量修复已提交；12 条代表性候选已完成审核、批次发布与用户可见性回归；历史问题清单已收口，真实OD部署体验待验收`
-- 线上验收：API/用户端/管理端已更新为 `ccr` 仓库的固定 digest；管理端为 `admin-20260917-httpuuid1`（`5d05...236d6`），API 为 `api-20260917-mounted-env1`（`294619...7df6`）。配置改为精确只读挂载 `/etc/travel-agent/api/.env`，日志、MySQL/Redis 数据与 published 数据均为宿主机挂载。数据库 migration `0016_expand_alembic_version`、readiness、备份校验、用户端行程恢复，以及服务器裸 HTTP 管理端真实“新建修订”均通过；真实 OD 仍保持 approximate，待单独验收。
+- 线上验收：API/用户端/管理端已更新为 `ccr` 仓库的固定 digest；管理端为 `admin-20260917-httpuuid1`（`5d05...236d6`），API 为 `api-20260917-reviewedat1`（`98e490...aa574`）。配置改为精确只读挂载 `/etc/travel-agent/api/.env`，日志、MySQL/Redis 数据与 published 数据均为宿主机挂载。数据库 migration `0016_expand_alembic_version`、readiness、备份校验、用户端行程恢复、服务器裸 HTTP 管理端真实“新建修订”，以及候选列表 422 修复后的浏览器加载均通过；真实 OD 仍保持 approximate，待单独验收。
 - 本轮自动验证基线（Python3.12锁定环境、PYTHONUTF8=1）：后端全量606项通过；Golden8/8；ruff（src/tests/scripts）、全仓mypy242文件、153文件分层通过。无新增迁移。
 - 本轮浏览器验证：内置Chrome完成平湖秋月单景点选择→确认→生成→刷新，显示1已安排/0未排入、无景点间接驳；原13景点历史行程也能刷新恢复。此轮不冒充真实OD端到端验收。
 - 已有关系约束基线：已发布且 `human_verified` 的 `selection_exclusion_groups` 随数据库目录加载到 `PublishedAttraction`；选点接口与 `ProductionSolverGateway` 双层拒绝同组重复选择，已有数据库/求解器回归随本轮全量通过。
@@ -62,6 +62,7 @@
 | 真实 OD 接线（H3/C6） | dev | infrastructure/solver/{gateway,database_published}、http/composition、gateway测试、.env.example | 离线接线通过；服务器步行鉴权1次通过；冷缓存生成/共享缓存/部署验收未完成 |
 | 本地共享服务器数据源与旧部署目录清理 | dev | `.env`（gitignored）、deploy/production、CURRENT、本月归档、问题清单 | 已完成：旧源码目录已按用户确认删除；MySQL/Redis 已改为 `0.0.0.0:23306/26379`，本地 `.env` 已直连服务器 IP 并实测读取线上记录、Redis PING 成功；容器健康与 API readiness 通过 |
 | 管理端裸 HTTP 操作 ID 兼容修复 | dev | admin-web API/错误管线/各写入页面及测试、deploy/production、CURRENT、本月归档、问题清单 | 已完成；`crypto.randomUUID` 回退覆盖全部管理端写入入口，镜像已按 `5d05...236d6` 部署，Chrome 点击新建修订创建第4版 candidate，edge记录POST 201 |
+| 管理端证据审核时间序列化修复 | dev | place_catalog仓储与审核HTTP测试、API镜像、CURRENT、本月归档、问题清单 | 已完成待用户提交；仓储统一 ISO 8601 序列化，线上唯一无时区几何审核时间已定点归一化，API `98e490...aa574` 已部署；Chrome 候选列表60条和异常修订均恢复加载 |
 
 ## 关键事实速查
 

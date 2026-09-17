@@ -6,7 +6,7 @@ x-logging: &logging
 
 services:
   api:
-    image: &api-image ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:294619467641fc5b1493bb890bf86a0de43d3a8ba8adbae6ef5abe7c39be7df6
+    image: &api-image ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:98e490a500daa9b9be3f0ef2c1b029c523ddc0ba61d3f749be9611e4834aa574
     restart: unless-stopped
     expose: ["8000"]
     environment:

@@ -858,7 +858,9 @@ class SqlAlchemyPlaceCatalogRepository:
             .where(*predicates)
             .values(
                 review_status=review_status,
-                reviewed_at=reviewed_at if review_status == "human_verified" else None,
+                reviewed_at=reviewed_at.isoformat()
+                if review_status == "human_verified"
+                else None,
             )
         )
         if cast(CursorResult[Any], result).rowcount != 1:
