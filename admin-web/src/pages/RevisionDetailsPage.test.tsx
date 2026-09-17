@@ -226,7 +226,7 @@ describe('RevisionDetailsPage', () => {
     expect(screen.getByText('地点资料')).toBeTruthy()
     expect(screen.getByText('O04 证据暂不可用')).toBeTruthy()
     expect(screen.getByText('O05 时间证据暂不可用')).toBeTruthy()
-    expect(screen.getAllByText('管理服务暂时不可用，请稍后重试。')).toHaveLength(2)
+    expect(screen.getAllByText('本次操作在浏览器中未能完成，请刷新页面后重试。')).toHaveLength(2)
   })
 
   it('renders revision-scoped O05 time evidence and keeps cross-midnight offsets visible', async () => {

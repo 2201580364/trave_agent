@@ -200,7 +200,14 @@ class DatabasePublishedSolverDataProvider:
                     data_verified=True,
                     fixed_sessions=fixed_sessions,
                 )
-                attractions.append(PublishedAttraction(revision.place_id, attraction, coordinate))
+                attractions.append(
+                    PublishedAttraction(
+                        revision.place_id,
+                        attraction,
+                        coordinate,
+                        departure_coordinate=departure_coordinates[solver_node_id],
+                    )
+                )
             if not attractions:
                 raise LookupError("published projections have no usable access points")
             exclusion_groups = _selection_exclusion_groups(
@@ -215,6 +222,7 @@ class DatabasePublishedSolverDataProvider:
                         item.attraction,
                         item.coordinate,
                         tuple(sorted(exclusion_groups.get(item.external_id, ()))),
+                        item.departure_coordinate,
                     )
                     for item in attractions
                 ]

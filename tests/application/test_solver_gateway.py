@@ -617,6 +617,47 @@ def test_missing_published_snapshot_is_retryable() -> None:
     assert raised.value.retryable is True
 
 
+def test_missing_weather_date_is_retryable_data_failure_not_invalid_input() -> None:
+    """H3/C5: no fabricated weather and no blame on a valid travel date."""
+    from dataclasses import replace
+
+    published = replace(_published(), weather_by_date={})
+    gateway = ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((published,)), FixedClock()
+    )
+    with pytest.raises(SolverExecutionError) as raised:
+        gateway.solve(_request())
+    assert raised.value.code == "data_snapshot_unavailable"
+    assert raised.value.retryable is True
+
+
+@pytest.mark.parametrize("real_od", [False, True])
+def test_single_selected_place_generates_without_external_route_requests(real_od: bool) -> None:
+    """H3/C6: single-place trips do not need a fabricated self-route."""
+    from tests.application.test_gaode_provider import FakeTransport
+    from travel_agent.infrastructure.solver.gaode import (
+        GaodeODSnapshotBuilder,
+        GaodeRouteClient,
+        GaodeSettings,
+    )
+
+    transport = FakeTransport({})
+    settings = GaodeSettings("test-only", enabled_modes=(ODTravelMode.WALKING,))
+    builder = GaodeODSnapshotBuilder(
+        settings, GaodeRouteClient(settings, FixedClock().now, transport=transport)
+    )
+    gateway = ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((_published(),)),
+        FixedClock(),
+        od_builder=builder if real_od else None,
+    )
+    result = gateway.solve(_request(attraction_ids=["attr_west_lake"]))
+    assert result.quality_gate_passed
+    assert result.completion_kind == CompletionKind.COMPLETE_SUCCESS
+    assert result.audit_payload["od_subgraph_edge_count"] == 0
+    assert transport.calls == []
+
+
 def test_unknown_selected_attraction_is_terminal_invalid_input() -> None:
     with pytest.raises(SolverExecutionError) as raised:
         _gateway().solve(_request(attraction_ids=["attr_missing"]))
@@ -673,3 +714,77 @@ def test_gateway_returns_selected_show_session_and_true_start_time() -> None:
     assert show_nodes[0]["arrival_min"] == 1100
     assert show_nodes[0]["leave_min"] == 1170
     assert result.result_snapshot_hash == gateway.solve(_request()).result_snapshot_hash
+
+
+def test_gateway_materializes_real_od_before_solving_and_audits_frozen_edges() -> None:
+    from dataclasses import replace
+
+    from tests.application.test_gaode_provider import FakeTransport, _payload
+    from travel_agent.infrastructure.solver.gaode import (
+        GaodeODSnapshotBuilder,
+        GaodeRouteClient,
+        GaodeSettings,
+    )
+
+    transport = FakeTransport(
+        {
+            "/v3/direction/walking": _payload(duration_seconds=600, distance_m=750),
+        }
+    )
+    settings = GaodeSettings("test-only", enabled_modes=(ODTravelMode.WALKING,))
+    builder = GaodeODSnapshotBuilder(
+        settings, GaodeRouteClient(settings, FixedClock().now, transport=transport)
+    )
+    published = _published()
+    published = replace(
+        published,
+        attractions=(
+            replace(published.attractions[0], departure_coordinate=Coordinate(30.2600, 120.1640)),
+            published.attractions[1],
+            PublishedAttraction("not-selected", Attraction(3, "unused"), Coordinate(30.27, 120.18)),
+        ),
+    )
+    gateway = ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((published,)),
+        FixedClock(),
+        od_builder=builder,
+    )
+    outcome = gateway.solve(_request())
+    assert outcome.quality_gate_passed
+    assert len(transport.calls) == 2
+    assert transport.calls[0][1]["origin"] == "120.164000,30.260000"
+    assert outcome.audit_payload["od_basis"] == "gaode"
+    snapshot = cast(dict[str, Any], outcome.audit_payload["od_subgraph_snapshot"])
+    assert snapshot["node_ids"] == [1, 2]
+    assert all(edge["basis"] == "gaode" for edge in snapshot["entries"])
+
+
+def test_gateway_real_od_outage_is_retryable_and_never_uses_fixture_edges() -> None:
+    from tests.application.test_gaode_provider import FakeTransport
+    from travel_agent.infrastructure.solver.gaode import (
+        GaodeFailureCode,
+        GaodeODSnapshotBuilder,
+        GaodeRouteClient,
+        GaodeRouteError,
+        GaodeSettings,
+    )
+
+    settings = GaodeSettings("test-only", enabled_modes=(ODTravelMode.WALKING,))
+    transport = FakeTransport(error=GaodeRouteError(GaodeFailureCode.TIMEOUT, "timeout"))
+    builder = GaodeODSnapshotBuilder(
+        settings,
+        GaodeRouteClient(
+            settings,
+            FixedClock().now,
+            transport=transport,
+        ),
+    )
+    gateway = ProductionSolverGateway(
+        InMemoryPublishedSolverDataProvider((_published(),)),
+        FixedClock(),
+        od_builder=builder,
+    )
+    with pytest.raises(SolverExecutionError) as raised:
+        gateway.solve(_request())
+    assert raised.value.code == "data_snapshot_unavailable"
+    assert raised.value.retryable

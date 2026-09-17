@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Descriptions, Form, Input, InputNumber, List,
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { adminErrorMessage } from '../api/errorMessages'
+import { createClientId, createOperationIntent } from '../api/adminApi'
 import type { HolidayCalendar, HolidayCalendarImpact, HolidayCalendarSyncJob, HolidayCalendarVersion } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
@@ -81,7 +82,7 @@ export function HolidayCalendarsPage() {
       setSubmitting(true)
       const job = await api.createHolidayCalendarSyncJob({
         ...values,
-        operation_intent_id: `holiday-sync-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('holiday-sync'),
       })
       message.success(values.mode === 'preview' ? '预览任务已创建' : '同步发布任务已创建')
       setSyncOpen(false)
@@ -148,7 +149,7 @@ export function HolidayCalendarsPage() {
       <Modal title="同步任务详情" open={selectedJob !== null} footer={null} onCancel={() => { setSelectedJob(null); setSelectedJobId(null) }} width={720}>
         {selectedJob && <Space orientation="vertical" size="middle" style={{ width: '100%' }}><Alert type={selectedJob.status === 'running' ? 'info' : selectedJob.status === 'queued' ? 'warning' : selectedJob.status === 'needs_attention' ? 'error' : 'success'} showIcon title={jobProgressText(selectedJob)} description="任务会自动刷新；下方记录展示 AI 和系统按时间发生的实际执行过程。" />{selectedJob.status === 'running' && <ExecutionProgress job={selectedJob} />}<ExecutionTimeline job={selectedJob} />{selectedJob.status === 'validated_preview' && <Button type="primary" onClick={() => setPreviewJob(selectedJob)}>查看并确认本轮预览数据</Button>}<Descriptions bordered column={1} size="small" items={jobDetailItems(selectedJob)} />{(selectedJob.status === 'queued' || selectedJob.status === 'temporarily_unavailable') && <Button danger onClick={async () => { try { const cancelled = await api.cancelHolidayCalendarSyncJob(selectedJob.sync_job_id); setSelectedJob(cancelled); message.success('同步任务已取消'); await load() } catch (reason) { setError(adminErrorMessage(reason)) } }}>取消此任务</Button>}</Space>}
       </Modal>
-      <Modal title="本轮预览数据确认" open={previewJob !== null} onCancel={() => setPreviewJob(null)} footer={null} width={1100}>{previewJob && <PreviewResult key={previewJob.sync_job_id} job={previewJob} onPublish={async (periods, workdays) => { try { const job = await api.confirmHolidayCalendarPreview(previewJob.sync_job_id, { periods, adjusted_workdays: workdays, operation_intent_id: `holiday-confirm-${crypto.randomUUID()}` }); setPreviewJob(null); setSelectedJob(job); setSelectedJobId(job.sync_job_id); message.success('预览内容已确认并完成入库发布'); await load() } catch (reason) { setError(adminErrorMessage(reason)) } }} />}</Modal>
+      <Modal title="本轮预览数据确认" open={previewJob !== null} onCancel={() => setPreviewJob(null)} footer={null} width={1100}>{previewJob && <PreviewResult key={previewJob.sync_job_id} job={previewJob} onPublish={async (periods, workdays) => { try { const job = await api.confirmHolidayCalendarPreview(previewJob.sync_job_id, { periods, adjusted_workdays: workdays, operation_intent_id: createOperationIntent('holiday-confirm') }); setPreviewJob(null); setSelectedJob(job); setSelectedJobId(job.sync_job_id); message.success('预览内容已确认并完成入库发布'); await load() } catch (reason) { setError(adminErrorMessage(reason)) } }} />}</Modal>
       <Modal title="年度日历版本详情" open={selectedCalendar !== null} footer={null} onCancel={() => { setSelectedCalendar(null); setSelectedImpact(null) }} width={860}>
         {selectedCalendar && <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Descriptions bordered column={2} size="small" items={[
@@ -216,8 +217,8 @@ function ExecutionTimeline({ job }: { job: HolidayCalendarSyncJob }) {
 }
 
 function PreviewResult({ job, onPublish }: { job: HolidayCalendarSyncJob; onPublish: (periods: Array<Record<string, unknown>>, workdays: Array<Record<string, unknown>>) => Promise<void> }) {
-  const [periods, setPeriods] = useState<Array<Record<string, unknown>>>(() => Array.isArray(job.validation_result.preview_periods) ? job.validation_result.preview_periods.map((item) => ({ ...(item as Record<string, unknown>), _row_key: crypto.randomUUID() })) : [])
-  const [workdays, setWorkdays] = useState<Array<Record<string, unknown>>>(() => Array.isArray(job.validation_result.preview_adjusted_workdays) ? job.validation_result.preview_adjusted_workdays.map((item) => ({ ...(item as Record<string, unknown>), _row_key: crypto.randomUUID() })) : [])
+  const [periods, setPeriods] = useState<Array<Record<string, unknown>>>(() => Array.isArray(job.validation_result.preview_periods) ? job.validation_result.preview_periods.map((item) => ({ ...(item as Record<string, unknown>), _row_key: createClientId() })) : [])
+  const [workdays, setWorkdays] = useState<Array<Record<string, unknown>>>(() => Array.isArray(job.validation_result.preview_adjusted_workdays) ? job.validation_result.preview_adjusted_workdays.map((item) => ({ ...(item as Record<string, unknown>), _row_key: createClientId() })) : [])
   const [publishing, setPublishing] = useState(false)
   const hasData = periods.length > 0
   const update = (setter: typeof setPeriods, rows: Array<Record<string, unknown>>, index: number, field: string, value: string) => setter(rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item))
@@ -241,8 +242,8 @@ function PreviewResult({ job, onPublish }: { job: HolidayCalendarSyncJob; onPubl
   }
   return <Space orientation="vertical" size="large" style={{ width: '100%' }}>
     <Alert showIcon type={hasData ? 'info' : 'warning'} title={hasData ? '请核对 AI 提取结果，必要时可直接调整' : '该任务没有保存预览明细'} description={hasData ? '确认后，系统会重新校验年份、日期范围、重复冲突、七类法定节日和官方依据；全部通过才会直接生成新的已发布版本。' : '这条任务可能由旧版本 Worker 执行，无法回放本轮数据。请重新创建预览任务。'} />
-    <div><Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}><Typography.Title level={5} style={{ margin: 0 }}>法定节假日</Typography.Title><Button icon={<PlusOutlined />} onClick={() => setPeriods([...periods, { _row_key: crypto.randomUUID(), name: '', start: `${job.year}-01-01`, end: `${job.year}-01-01`, evidence_quote: '' }])}>新增节假日</Button></Space><Table size="small" pagination={false} rowKey={(item) => String(item._row_key)} dataSource={periods} columns={periodColumns} locale={{ emptyText: '暂无节假日段' }} scroll={{ x: 900 }} /></div>
-    <div><Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}><Typography.Title level={5} style={{ margin: 0 }}>调休上班日期</Typography.Title><Button icon={<PlusOutlined />} onClick={() => setWorkdays([...workdays, { _row_key: crypto.randomUUID(), date: `${job.year}-01-01`, holiday_name: '', evidence_quote: '' }])}>新增调休日期</Button></Space><Table size="small" pagination={false} rowKey={(item) => String(item._row_key)} dataSource={workdays} columns={workdayColumns} locale={{ emptyText: '无调休上班日' }} scroll={{ x: 760 }} /></div>
+    <div><Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}><Typography.Title level={5} style={{ margin: 0 }}>法定节假日</Typography.Title><Button icon={<PlusOutlined />} onClick={() => setPeriods([...periods, { _row_key: createClientId(), name: '', start: `${job.year}-01-01`, end: `${job.year}-01-01`, evidence_quote: '' }])}>新增节假日</Button></Space><Table size="small" pagination={false} rowKey={(item) => String(item._row_key)} dataSource={periods} columns={periodColumns} locale={{ emptyText: '暂无节假日段' }} scroll={{ x: 900 }} /></div>
+    <div><Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}><Typography.Title level={5} style={{ margin: 0 }}>调休上班日期</Typography.Title><Button icon={<PlusOutlined />} onClick={() => setWorkdays([...workdays, { _row_key: createClientId(), date: `${job.year}-01-01`, holiday_name: '', evidence_quote: '' }])}>新增调休日期</Button></Space><Table size="small" pagination={false} rowKey={(item) => String(item._row_key)} dataSource={workdays} columns={workdayColumns} locale={{ emptyText: '无调休上班日' }} scroll={{ x: 760 }} /></div>
     <Space style={{ width: '100%', justifyContent: 'flex-end' }}><Button type="primary" icon={<SyncOutlined />} loading={publishing} disabled={!hasData} onClick={() => void publish()}>确认内容并入库发布</Button></Space>
   </Space>
 }

@@ -23,8 +23,20 @@ class ODSubgraphSnapshot:
     def __post_init__(self) -> None:
         if tuple(sorted(set(self.node_ids))) != self.node_ids:
             raise ValueError("OD subgraph node_ids must be sorted and unique")
-        if not self.entries:
+        if not self.node_ids:
+            raise ValueError("OD subgraph requires at least one node")
+        if not self.entries and len(self.node_ids) != 1:
             raise ValueError("OD subgraph must contain at least one directed edge")
+        pairs = [(item.origin_id, item.destination_id) for item in self.entries]
+        if len(set(pairs)) != len(pairs):
+            raise ValueError("OD subgraph cannot contain duplicate directed edges")
+        if any(
+            origin == destination or origin not in self.node_ids or destination not in self.node_ids
+            for origin, destination in pairs
+        ):
+            raise ValueError("OD subgraph edge endpoints must belong to distinct selected nodes")
+        if any(item.data_version != self.data_version for item in self.entries):
+            raise ValueError("OD subgraph cannot mix data versions")
         if len(self.snapshot_hash) != 64:
             raise ValueError("OD subgraph snapshot_hash must be SHA-256")
 
@@ -32,7 +44,7 @@ class ODSubgraphSnapshot:
         return InMemoryTravelTimeProvider(
             {(item.origin_id, item.destination_id): item for item in self.entries},
             data_version=self.data_version,
-            fetched_at=max(item.fetched_at for item in self.entries),
+            fetched_at=max((item.fetched_at for item in self.entries), default=self.created_at),
         )
 
     @classmethod
@@ -43,6 +55,8 @@ class ODSubgraphSnapshot:
         )
         if rebuilt.snapshot_hash != snapshot.snapshot_hash:
             raise ValueError("OD subgraph snapshot hash mismatch")
+        if rebuilt.data_version != snapshot.data_version:
+            raise ValueError("OD subgraph data version mismatch")
         return rebuilt.provider()
 
     def to_dict(self) -> dict[str, object]:
@@ -84,7 +98,7 @@ class ODSubgraphSnapshot:
             for row in cast(list[dict[str, Any]], payload["entries"])
         )
         snapshot = cls(
-            tuple(sorted(int(item) for item in cast(list[int], payload["node_ids"]))),
+            tuple(int(item) for item in cast(list[int], payload["node_ids"])),
             entries,
             str(payload["data_version"]),
             str(payload["snapshot_hash"]),
@@ -103,8 +117,10 @@ class OnDemandODSubgraphBuilder:
         created_at: datetime,
     ) -> ODSubgraphSnapshot:
         ordered = tuple(sorted(set(node_ids)))
-        if len(ordered) < 2:
-            raise ValueError("OD subgraph requires at least two nodes")
+        if not ordered:
+            raise ValueError("OD subgraph requires at least one node")
+        if len(ordered) == 1:
+            return self._snapshot(ordered, (), created_at)
         entries = [
             travel
             for origin_id in ordered
@@ -126,7 +142,7 @@ class OnDemandODSubgraphBuilder:
         ordered: tuple[int, ...], entries: tuple[TravelTimeResult, ...], created_at: datetime
     ) -> ODSubgraphSnapshot:
         versions = {item.data_version for item in entries}
-        if len(versions) != 1:
+        if len(versions) != 1 and not (len(ordered) == 1 and not entries):
             raise ValueError("OD subgraph cannot mix data versions")
         payload = [
             {
@@ -150,7 +166,7 @@ class OnDemandODSubgraphBuilder:
         return ODSubgraphSnapshot(
             ordered,
             entries,
-            versions.pop(),
+            versions.pop() if versions else "no-inter-node-travel-v1",
             hashlib.sha256(serialized).hexdigest(),
             created_at,
         )

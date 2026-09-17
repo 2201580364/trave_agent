@@ -5,6 +5,7 @@ import { Form, Modal, Input, Select, Space, Table, Tag, Typography } from 'antd'
 import type { PlaceRelationEvidence, PlaceRevision, PlaceRevisionEvidence, SourceChannel } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { adminErrorMessage } from '../api/errorMessages'
+import { createOperationIntent } from '../api/adminApi'
 import { relationExplanation, relationMeaning, sourceLabelById, isFormValidationError, reviewStatusColor } from './revisionDetailDisplay'
 import { InstructionHint } from './revisionDetailFields'
 import { relationReviewStatusLabel, relationTypeLabel, relationResolutionLabel, reviewStatusLabel } from '../ui/displayLabels'
@@ -30,7 +31,7 @@ export function RelationEvidenceCard({ api, evidence, revision, sourceChannels, 
     try {
       await api.reviewEvidence(revision.place_revision_id, 'relation', item.relation_id, {
         review_status: reviewStatus,
-        operation_intent_id: `relation-evidence-review-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('relation-evidence-review'),
         reason_code: reviewStatus === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED',
       })
       await onChanged()
@@ -49,7 +50,7 @@ export function RelationEvidenceCard({ api, evidence, revision, sourceChannels, 
         expected_revision_version: revision.revision_version,
         resolution_status: status,
         decision_note: note || null,
-        operation_intent_id: `relation-resolution-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('relation-resolution'),
         reason_code: 'RELATION_RESOLUTION_UPDATED',
       })
       setEditing(null)
@@ -63,7 +64,7 @@ export function RelationEvidenceCard({ api, evidence, revision, sourceChannels, 
       await api.confirmNoPlaceRelations(revision.place_revision_id, {
         expected_revision_number: revision.revision_number,
         expected_revision_version: revision.revision_version,
-        operation_intent_id: `relation-review-none-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('relation-review-none'),
         reason_code: 'RELATION_REVIEW_CONFIRMED_NONE',
       })
       await onChanged()

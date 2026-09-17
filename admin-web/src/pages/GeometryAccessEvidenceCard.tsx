@@ -4,6 +4,7 @@ import { Alert, Button, Card, Collapse, Descriptions, Form, Input, InputNumber, 
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { adminErrorMessage } from '../api/errorMessages'
+import { createOperationIntent } from '../api/adminApi'
 import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, SourceChannel } from '../api/types'
 import type { useAdminSession } from '../auth/AdminSessionProvider'
 import { accessPointKindLabel, geometryKindLabel, projectionStatusLabel, reviewStatusLabel, sourceDecisionLabel } from '../ui/displayLabels'
@@ -64,7 +65,7 @@ export function GeometryAccessEvidenceCard({
     setSaveError(null)
     try {
       const values = await form.validateFields()
-      const base = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-${crypto.randomUUID()}`, reason_code: editing ? 'EVIDENCE_UPDATED' : 'EVIDENCE_CREATED' }
+      const base = { expected_revision_version: revision.revision_version, operation_intent_id: createOperationIntent('evidence'), reason_code: editing ? 'EVIDENCE_UPDATED' : 'EVIDENCE_CREATED' }
       if (modal === 'geometry') {
         const geometryValues = values as GeometryFormValues
         const input: PlaceGeometryInput = { ...base, geometry_kind: geometryValues.geometry_kind, geometry: geometryPayload(geometryValues), source_record_id: geometryValues.source_record_id }
@@ -84,11 +85,11 @@ export function GeometryAccessEvidenceCard({
   }
   const review = async (kind: 'geometry' | 'access_point', id: string, status: 'human_verified' | 'rejected') => {
     setSaving(true)
-    try { await api.reviewEvidence(revision.place_revision_id, kind, id, { review_status: status, operation_intent_id: `evidence-review-${crypto.randomUUID()}`, reason_code: status === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED' }); await onChanged(); onSuccess(status === 'human_verified' ? '证据已通过核验' : '证据已驳回') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+    try { await api.reviewEvidence(revision.place_revision_id, kind, id, { review_status: status, operation_intent_id: createOperationIntent('evidence-review'), reason_code: status === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED' }); await onChanged(); onSuccess(status === 'human_verified' ? '证据已通过核验' : '证据已驳回') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
   }
   const retire = async (kind: 'geometry' | 'access', id: string) => {
     setSaving(true)
-    try { const input = { expected_revision_version: revision.revision_version, operation_intent_id: `evidence-retire-${crypto.randomUUID()}`, reason_code: 'EVIDENCE_RETIRED' }; if (kind === 'geometry') await api.retireGeometry(revision.place_revision_id, id, input); else await api.retireAccessPoint(revision.place_revision_id, id, input); await onChanged(); onSuccess('证据已停用，修订版本需重新送审') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
+    try { const input = { expected_revision_version: revision.revision_version, operation_intent_id: createOperationIntent('evidence-retire'), reason_code: 'EVIDENCE_RETIRED' }; if (kind === 'geometry') await api.retireGeometry(revision.place_revision_id, id, input); else await api.retireAccessPoint(revision.place_revision_id, id, input); await onChanged(); onSuccess('证据已停用，修订版本需重新送审') } catch (reason) { onError(adminErrorMessage(reason)) } finally { setSaving(false) }
   }
   if (loading) return <Card title="地图、几何与访问点（O04）" loading />
   if (error !== null) {

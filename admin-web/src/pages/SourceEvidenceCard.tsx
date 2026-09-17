@@ -4,6 +4,7 @@ import { Alert, Button, Card, Collapse, Form, Input, Modal, Select, Space, Table
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { adminErrorMessage } from '../api/errorMessages'
+import { createOperationIntent } from '../api/adminApi'
 import type { CreatePlaceSourceRecordInput, PlaceEvidenceSource, PlaceRevision, PlaceRevisionEvidence, SourceChannel } from '../api/types'
 import type { useAdminSession } from '../auth/AdminSessionProvider'
 import { collectionModeLabel, sourceDecisionLabel, sourceKindLabel } from '../ui/displayLabels'
@@ -61,7 +62,7 @@ export function SourceEvidenceCard({ api, evidence, revision, sourceChannels, ca
         collection_mode: values.collection_mode,
         observed_at: new Date(values.observed_at).toISOString(),
         content_sha256: values.content_sha256?.trim() || undefined,
-        operation_intent_id: `source-record-create-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('source-record-create'),
         reason_code: 'PLACE_SOURCE_RECORD_ADDED',
         reason_text: values.reason_text?.trim() || undefined,
       }
@@ -90,7 +91,7 @@ export function SourceEvidenceCard({ api, evidence, revision, sourceChannels, ca
         try {
           await api.detachSourceRecord(revision.place_revision_id, source.source_record_id, {
             expected_revision_version: revision.revision_version,
-            operation_intent_id: `source-record-detach-${crypto.randomUUID()}`,
+            operation_intent_id: createOperationIntent('source-record-detach'),
             reason_code: 'PLACE_SOURCE_RECORD_REMOVED',
           })
           await onChanged()

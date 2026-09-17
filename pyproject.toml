@@ -36,11 +36,13 @@ dev = [
 where = ["src"]
 
 [tool.pytest.ini_options]
+cache_dir = "var/cache/pytest"
 addopts = "-q"
 pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
+cache-dir = "var/cache/ruff"
 target-version = "py312"
 line-length = 100
 
@@ -50,6 +52,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 extend-ignore = ["B008"]
 
 [tool.mypy]
+cache_dir = "var/cache/mypy"
 python_version = "3.12"
 strict = true
 files = ["src", "tests"]

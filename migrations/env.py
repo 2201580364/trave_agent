@@ -13,6 +13,8 @@ config = context.config
 if not config.attributes.get("skip_dotenv", False):
     load_runtime_environment()
 database_url = os.environ.get("TRAVEL_AGENT_DATABASE_URL")
+if os.environ.get("TRAVEL_AGENT_CONFIG_FILE") and not database_url:
+    raise ValueError("Mounted migration configuration requires a database URL")
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 if config.config_file_name is not None:

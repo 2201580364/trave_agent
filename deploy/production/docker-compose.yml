@@ -1,39 +1,66 @@
 name: travel-agent
 
+x-logging: &logging
+  driver: json-file
+  options: {max-size: 20m, max-file: "10"}
+
 services:
   api:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260915-ui11
+    image: &api-image ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:294619467641fc5b1493bb890bf86a0de43d3a8ba8adbae6ef5abe7c39be7df6
     restart: unless-stopped
     expose: ["8000"]
-    env_file: [/etc/travel-agent/app.env]
+    environment:
+      TRAVEL_AGENT_CONFIG_FILE: /etc/travel-agent/api/.env
     volumes:
+      - /etc/travel-agent/api/.env:/etc/travel-agent/api/.env:ro
+      - /srv/travel-agent/logs/api:/app/logs
+      - /srv/travel-agent/data/api:/app/var
       - /srv/travel-agent/data/published:/srv/travel-agent/data/published:ro
+    logging: *logging
     networks: [backend, frontend]
     depends_on:
-      mysql: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
   migrate:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:api-20260915-ui11
-    command: ["python", "-m", "alembic", "upgrade", "head"]
-    profiles: ["tools"]
-    env_file: [/etc/travel-agent/migrate.env]
+    image: *api-image
+    command: ["sh", "-c", "exec python -m alembic upgrade head >> /app/logs/migrate.log 2>&1"]
+    profiles: [tools]
+    environment:
+      TRAVEL_AGENT_CONFIG_FILE: /etc/travel-agent/migrate/.env
+    volumes:
+      - /etc/travel-agent/migrate/.env:/etc/travel-agent/migrate/.env:ro
+      - /srv/travel-agent/logs/migrate:/app/logs
+    logging: *logging
     networks: [backend]
     depends_on:
-      mysql: { condition: service_healthy }
+      mysql: {condition: service_healthy}
   user-h5:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:user-h5-20260915-ui11
+    image: ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:64c592de8e5f6fd931d15cc11abd18d78cdaaabf125ffa9d2f80e719844bbc5a
     restart: unless-stopped
+    volumes:
+      - /etc/travel-agent/user-h5:/etc/caddy:ro
+      - /srv/travel-agent/logs/user-h5:/var/log/caddy
+      - /srv/travel-agent/data/user-h5:/data
+    logging: *logging
     networks: [frontend]
   admin-web:
-    image: uswccr.ccs.tencentyun.com/travel_agent/travel_agent:admin-web-20260914
+    image: ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:5d05bf10cd318f049ac759d976336d552de30b9e36424bef121b35bdd2c236d6
     restart: unless-stopped
+    volumes:
+      - /etc/travel-agent/admin-web:/etc/caddy:ro
+      - /srv/travel-agent/logs/admin-web:/var/log/caddy
+      - /srv/travel-agent/data/admin-web:/data
+    logging: *logging
     networks: [frontend]
   edge:
     image: caddy:2.9.1-alpine
     restart: unless-stopped
-    ports: ["${TRAVEL_AGENT_EDGE_BIND:-0.0.0.0}:${TRAVEL_AGENT_EDGE_PORT:-18080}:80"]
+    ports: ["0.0.0.0:18080:80"]
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /etc/travel-agent/edge:/etc/caddy:ro
+      - /srv/travel-agent/logs/edge:/var/log/caddy
+      - /srv/travel-agent/data/edge:/data
+    logging: *logging
     networks: [frontend]
     depends_on: [api, user-h5, admin-web]
   mysql:
@@ -46,36 +73,25 @@ services:
     pids_limit: 256
     stop_grace_period: 60s
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
-      MYSQL_DATABASE: "${MYSQL_DATABASE:-travel_agent}"
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_0900_ai_ci
-      - --default-time-zone=+00:00
-      - --skip-name-resolve=ON
-    ports:
-      - "127.0.0.1:${MYSQL_BIND_PORT:-3306}:3306"
+      MYSQL_ROOT_PASSWORD_FILE: /etc/travel-agent/mysql/root-password
+      MYSQL_DATABASE: travel_agent
+    ports: ["0.0.0.0:23306:3306"]
     volumes:
       - /srv/travel-agent/data/mysql:/var/lib/mysql
-      - /opt/travel-agent/infra/mysql/travel-agent.cnf:/etc/mysql/conf.d/travel-agent.cnf:ro
+      - /etc/travel-agent/mysql/conf.d:/etc/mysql/conf.d:ro
+      - /etc/travel-agent/mysql/clients:/etc/travel-agent/mysql/clients:ro
+      - /etc/travel-agent/mysql/root-password:/etc/travel-agent/mysql/root-password:ro
+      - /etc/travel-agent/mysql/health.cnf:/etc/travel-agent/mysql/health.cnf:ro
+      - /srv/travel-agent/logs/mysql:/var/log/mysql
     healthcheck:
-      test:
-        - CMD-SHELL
-        - MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysql --protocol=socket -uroot --batch --skip-column-names -e "SELECT 1" >/dev/null
+      test: [CMD-SHELL, 'mysql --defaults-extra-file=/etc/travel-agent/mysql/health.cnf --protocol=socket --batch --skip-column-names -e "SELECT 1" >/dev/null']
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 40s
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: 20m
-        max-file: "10"
-    networks:
-      - backend
-
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [backend]
   redis:
     image: redis:7.4-alpine
     container_name: travel-agent-redis
@@ -86,35 +102,21 @@ services:
     pids_limit: 128
     stop_grace_period: 30s
     user: "999:999"
-    environment:
-      REDIS_APP_USER: "${REDIS_APP_USER:-travel_agent}"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
-    command:
-      - redis-server
-      - /usr/local/etc/redis/redis.conf
-    ports:
-      - "127.0.0.1:${REDIS_BIND_PORT:-6379}:6379"
+    command: [redis-server, /etc/redis/redis.conf]
+    ports: ["0.0.0.0:26379:6379"]
     volumes:
       - /srv/travel-agent/data/redis:/data
-      - /opt/travel-agent/infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-      - /etc/travel-agent/redis/users.acl:/usr/local/etc/redis/users.acl:ro
+      - /etc/travel-agent/redis:/etc/redis:ro
+      - /srv/travel-agent/logs/redis:/var/log/redis
     healthcheck:
-      test:
-        - CMD-SHELL
-        - redis-cli --user "$${REDIS_APP_USER}" --pass "$${REDIS_PASSWORD}" --no-auth-warning ping | grep -q PONG
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$(cat /etc/redis/health-password)" redis-cli --user "$$(cat /etc/redis/health-user)" ping | grep -q PONG']
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 10s
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: 20m
-        max-file: "10"
-    networks:
-      - backend
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [backend]
 
 networks:
   frontend:
@@ -122,4 +124,4 @@ networks:
     driver: bridge
   backend:
     name: travel-agent-backend
-    driver: bridge
+    external: true

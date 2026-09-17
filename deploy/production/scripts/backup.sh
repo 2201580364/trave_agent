@@ -6,9 +6,14 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-set -a
-source /etc/travel-agent/infra.env
-set +a
+# G7-R0.3: credentials are read inside containers from read-only mounts.
+if [[ "${1:-}" != "--apply" ]]; then
+  echo '{"status":"ok","dry_run":true,"actions":["MySQL logical backup","Redis BGSAVE","SHA-256 manifest"],"deletes":false}'
+  exit 0
+fi
+redis_admin() {
+  docker exec travel-agent-redis sh -c 'export REDISCLI_AUTH="$(cat /etc/redis/admin-password)"; exec redis-cli --user "$(cat /etc/redis/admin-user)" "$@"' sh "$@"
+}
 
 BACKUP_ROOT=/srv/travel-agent/backups
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -17,47 +22,25 @@ REDIS_OUTPUT=${BACKUP_ROOT}/redis/travel-agent-${STAMP}.rdb
 MYSQL_PARTIAL=${MYSQL_OUTPUT}.partial
 REDIS_PARTIAL=${REDIS_OUTPUT}.partial
 CHECKSUM_OUTPUT=${BACKUP_ROOT}/checksums-${STAMP}.sha256
-RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
-
-cleanup_partial_files() {
-  rm -f -- "${MYSQL_PARTIAL}" "${REDIS_PARTIAL}"
-}
-
-trap cleanup_partial_files EXIT
+# Retention cleanup is manual; this command never deletes backup files.
 
 umask 077
 install -d -m 0750 "${BACKUP_ROOT}/mysql" "${BACKUP_ROOT}/redis"
 
-docker exec \
-  -e MYSQL_PWD="${MYSQL_BACKUP_PASSWORD}" \
-  travel-agent-mysql \
-  mysqldump --protocol=socket -u"${MYSQL_BACKUP_USER}" \
-    --single-transaction --events --triggers --hex-blob --no-tablespaces \
-    "${MYSQL_DATABASE}" \
+docker exec travel-agent-mysql \
+  mysqldump --defaults-extra-file=/etc/travel-agent/mysql/clients/backup.cnf \
+    --protocol=socket --single-transaction --events --triggers --hex-blob --no-tablespaces \
+    "$(cat /etc/travel-agent/mysql/clients/database)" \
   | gzip -9 >"${MYSQL_PARTIAL}"
 mv -- "${MYSQL_PARTIAL}" "${MYSQL_OUTPUT}"
 
-REDIS_LASTSAVE_BEFORE=$(docker exec travel-agent-redis \
-  redis-cli --user "${REDIS_ADMIN_USER}" \
-    --pass "${REDIS_ADMIN_PASSWORD}" --no-auth-warning LASTSAVE)
-
-docker exec travel-agent-redis \
-  redis-cli --user "${REDIS_ADMIN_USER}" \
-    --pass "${REDIS_ADMIN_PASSWORD}" --no-auth-warning BGSAVE >/dev/null
+redis_admin BGSAVE >/dev/null
 
 REDIS_SAVE_COMPLETED=false
 for _attempt in $(seq 1 60); do
-  REDIS_PERSISTENCE=$(docker exec travel-agent-redis \
-    redis-cli --user "${REDIS_ADMIN_USER}" \
-      --pass "${REDIS_ADMIN_PASSWORD}" --no-auth-warning \
-      INFO persistence | tr -d '\r')
-  REDIS_LASTSAVE_AFTER=$(docker exec travel-agent-redis \
-    redis-cli --user "${REDIS_ADMIN_USER}" \
-      --pass "${REDIS_ADMIN_PASSWORD}" --no-auth-warning LASTSAVE)
-
+  REDIS_PERSISTENCE=$(redis_admin INFO persistence | tr -d '\r')
   if grep -q '^rdb_bgsave_in_progress:0$' <<<"${REDIS_PERSISTENCE}" \
-    && grep -q '^rdb_last_bgsave_status:ok$' <<<"${REDIS_PERSISTENCE}" \
-    && (( REDIS_LASTSAVE_AFTER > REDIS_LASTSAVE_BEFORE )); then
+    && grep -q '^rdb_last_bgsave_status:ok$' <<<"${REDIS_PERSISTENCE}"; then
     REDIS_SAVE_COMPLETED=true
     break
   fi
@@ -76,9 +59,4 @@ sha256sum "${MYSQL_OUTPUT}" "${REDIS_OUTPUT}" \
   >"${CHECKSUM_OUTPUT}"
 chmod 0600 "${CHECKSUM_OUTPUT}"
 
-find "${BACKUP_ROOT}/mysql" -type f -name 'travel-agent-*.sql.gz' -mtime +"${RETENTION_DAYS}" -delete
-find "${BACKUP_ROOT}/redis" -type f -name 'travel-agent-*.rdb' -mtime +"${RETENTION_DAYS}" -delete
-find "${BACKUP_ROOT}" -maxdepth 1 -type f -name 'checksums-*.sha256' -mtime +"${RETENTION_DAYS}" -delete
-
-trap - EXIT
-echo "Backup completed at ${STAMP}."
+echo "{\"status\":\"ok\",\"timestamp\":\"${STAMP}\",\"checksum_manifest\":\"${CHECKSUM_OUTPUT}\"}"

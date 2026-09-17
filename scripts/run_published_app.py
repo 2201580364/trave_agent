@@ -27,11 +27,15 @@ def main() -> None:
 
     settings = ProductionHttpSettings.from_env(dotenv_path=args.dotenv)
     app = build_production_http_app(settings)
-    configure_file_logging(ROOT / "logs", component="api", enable_console=False)
+    logger = configure_file_logging(ROOT / "logs", component="api", enable_console=False)
+    configure_file_logging(
+        ROOT / "logs", component="server", logger_name="uvicorn", enable_console=True
+    )
+    logger.info("Published application initialized", extra={"event": "app_startup"})
 
     import uvicorn
 
-    uvicorn.run(app, host=args.host, port=args.port, access_log=False)
+    uvicorn.run(app, host=args.host, port=args.port, access_log=False, log_config=None)
 
 
 if __name__ == "__main__":

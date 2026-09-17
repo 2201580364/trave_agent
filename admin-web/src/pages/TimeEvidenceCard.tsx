@@ -3,6 +3,7 @@ import { Alert, Button, Card, Checkbox, Collapse, Form, Input, InputNumber, Moda
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { adminErrorMessage } from '../api/errorMessages'
+import { createOperationIntent } from '../api/adminApi'
 import type { HolidayCalendar, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimePreview, PlaceTimeRuleEvidence, PlaceTimeRuleInput, SourceChannel } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { dateExceptionKindLabel, reasonCodeLabel, reviewStatusLabel, sourceDecisionLabel, timeRuleKindLabel } from '../ui/displayLabels'
@@ -70,7 +71,7 @@ export function TimeEvidenceCard({
         open_end_minute: minutes.end_minute,
         open_last_entry_minute: minutes.last_entry_minute,
         shift_closure: values.shift_closure !== false,
-        operation_intent_id: `holiday-exceptions-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('holiday-exceptions'),
         reason_code: 'HOLIDAY_POLICY_MATERIALIZED',
       })
       setModal(null); await onChanged(); onSuccess('已按节假日历生成日期例外，请逐项核验后再送审')
@@ -105,7 +106,7 @@ export function TimeEvidenceCard({
       const values = await form.validateFields()
       const base = {
         expected_revision_version: revision.revision_version,
-        operation_intent_id: `time-evidence-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('time-evidence'),
         reason_code: editing ? 'TIME_EVIDENCE_UPDATED' : 'TIME_EVIDENCE_CREATED',
       }
       if (modal === 'time_rule') {
@@ -170,7 +171,7 @@ export function TimeEvidenceCard({
     try {
       await api.reviewEvidence(revision.place_revision_id, kind, id, {
         review_status: status,
-        operation_intent_id: `time-evidence-review-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('time-evidence-review'),
         reason_code: status === 'human_verified' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED',
       })
       await onChanged()
@@ -190,7 +191,7 @@ export function TimeEvidenceCard({
     try {
       const input = {
         expected_revision_version: revision.revision_version,
-        operation_intent_id: `time-evidence-retire-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('time-evidence-retire'),
         reason_code: 'TIME_EVIDENCE_RETIRED',
       }
       if (kind === 'time_rule') await api.retireTimeRule(revision.place_revision_id, id, input)
@@ -209,7 +210,7 @@ export function TimeEvidenceCard({
     try {
       await api.deleteTimeRule(revision.place_revision_id, id, {
         expected_revision_version: revision.revision_version,
-        operation_intent_id: `time-rule-delete-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('time-rule-delete'),
         reason_code: 'TIME_RULE_DELETED',
       })
       await onChanged()

@@ -90,6 +90,7 @@ def test_approximate_provider_uses_departure_endpoint_for_origin() -> None:
     result = provider.get_travel_time(1, 2)
 
     assert result is not None
+    assert result.distance_m is not None
     assert result.distance_m > 1000
     assert provider.get_travel_time(2, 1) is None
 

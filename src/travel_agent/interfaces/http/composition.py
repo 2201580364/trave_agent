@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -41,12 +42,24 @@ from travel_agent.infrastructure.holiday_sync import (
 )
 from travel_agent.infrastructure.ids import UuidIdGenerator
 from travel_agent.infrastructure.memory import SystemClock
+from travel_agent.infrastructure.provider_governance import (
+    ProviderBlockCode,
+    ProviderGovernancePolicy,
+    ProviderRequestBlocked,
+    build_provider_request_governor,
+)
 from travel_agent.infrastructure.sharing import HmacPlanShareTokenCodec
 from travel_agent.infrastructure.solver import (
     DatabasePublishedSnapshotVersionProvider,
     DatabasePublishedSolverDataProvider,
     ProductionSolverGateway,
     PublishedSolverDataProvider,
+)
+from travel_agent.infrastructure.solver.gaode import (
+    GaodeODSnapshotBuilder,
+    GaodeRouteClient,
+    GaodeSettings,
+    RedisGaodeRouteCache,
 )
 
 from .app import HttpContainer, create_app
@@ -113,7 +126,52 @@ def build_http_app(
     def uow_factory() -> SqlAlchemyUnitOfWork:
         return SqlAlchemyUnitOfWork(sessions)
 
-    gateway = ProductionSolverGateway(published_data, clock)
+    od_builder = None
+    od_source = os.environ.get("TRAVEL_AGENT_OD_SOURCE", "approximate")
+    if od_source not in {"approximate", "gaode"}:
+        raise ValueError("TRAVEL_AGENT_OD_SOURCE must be approximate or gaode")
+    if od_source == "gaode":
+        gaode_settings = GaodeSettings.from_env(load_dotenv_file=False)
+        redis_url = os.environ.get("TRAVEL_AGENT_PROVIDER_REDIS_URL", "").strip()
+        cache = RedisGaodeRouteCache.from_url(redis_url) if redis_url else None
+        governor = build_provider_request_governor(
+            ProviderGovernancePolicy(
+                provider="gaode",
+                daily_request_budget=int(
+                    os.environ.get("TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET", "1000")
+                ),
+                minimum_interval_seconds=1.05,
+                circuit_failure_codes=frozenset(
+                    {"timeout", "http_error", "api_error", "invalid_response"}
+                ),
+            ),
+            clock.now,
+            json_path=Path("var/ops/provider-governance.json"),
+            redis_url=redis_url,
+        )
+
+        def before_request() -> None:
+            while True:
+                try:
+                    governor.before_request()
+                    return
+                except ProviderRequestBlocked as exc:
+                    if exc.code is not ProviderBlockCode.RATE_WINDOW or exc.retry_at is None:
+                        raise
+                    time.sleep(max(0, (exc.retry_at - clock.now()).total_seconds()))
+
+        od_builder = GaodeODSnapshotBuilder(
+            gaode_settings,
+            GaodeRouteClient(
+                gaode_settings,
+                clock.now,
+                cache=cache,
+                before_request=before_request,
+                on_success=governor.record_success,
+                on_failure=governor.record_failure,
+            ),
+        )
+    gateway = ProductionSolverGateway(published_data, clock, od_builder=od_builder)
     execute = ExecuteGenerationHandler(uow_factory(), clock, ids, gateway)
     identity = AnonymousIdentityService(sessions, clock, ids)
     admin_identity = AdminIdentityService(lambda: SqlAlchemyAdminUnitOfWork(sessions), clock, ids)

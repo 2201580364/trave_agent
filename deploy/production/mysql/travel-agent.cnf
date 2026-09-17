@@ -1,4 +1,5 @@
 [mysqld]
+log_error=/var/log/mysql/error.log
 default_storage_engine=InnoDB
 character_set_server=utf8mb4
 collation_server=utf8mb4_0900_ai_ci
@@ -7,7 +8,7 @@ default_time_zone=+00:00
 
 slow_query_log=ON
 long_query_time=1
-slow_query_log_file=/var/lib/mysql/slow-query.log
+slow_query_log_file=/var/log/mysql/slow-query.log
 
 max_connections=20
 innodb_buffer_pool_size=128M

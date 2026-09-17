@@ -1,6 +1,35 @@
-import { AdminApi } from './adminApi'
+import { AdminApi, createClientId, createOperationIntent } from './adminApi'
 
 describe('AdminApi', () => {
+  it('creates operation intent IDs when randomUUID is unavailable in an HTTP browser context', () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => {
+        for (let index = 0; index < bytes.length; index += 1) bytes[index] = index
+        return bytes
+      },
+    })
+
+    try {
+      const clientId = createClientId()
+      const intent = createOperationIntent('revision-create')
+      expect(clientId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+      expect(intent).toMatch(/^revision-create-[0-9a-f-]{36}$/)
+      expect(intent.length).toBeLessThanOrEqual(64)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('creates distinct IDs without browser crypto support', () => {
+    vi.stubGlobal('crypto', undefined)
+    try {
+      expect(createClientId()).toMatch(/^[0-9a-f-]{36}$/)
+      expect(createClientId()).not.toBe(createClientId())
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('only adds the in-memory bearer token to authenticated requests', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ items: [], limit: 100, offset: 0 }), {

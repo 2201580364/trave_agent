@@ -11,6 +11,7 @@ COPY scripts ./scripts
 COPY data/governance ./data/governance
 COPY --from=uv-bin /uv /uvx /bin/
 RUN uv sync --frozen --no-dev
+RUN mkdir -p /app/var/ops /app/logs && chown -R appuser:appuser /app/var /app/logs
 USER appuser
 EXPOSE 8000
-CMD ["python", "scripts/run_published_app.py", "--host", "0.0.0", "--port", "8000", "--dotenv", "/etc/travel-agent/app.env"]
+CMD ["python", "scripts/run_published_app.py", "--host", "0.0.0.0", "--port", "8000"]

@@ -93,5 +93,5 @@ export function adminErrorMessage(error: unknown): string {
     const message = baseMessage + summary + fieldErrors
     return error.requestId ? `${message}（请求 ${error.requestId}）` : message
   }
-  return '管理服务暂时不可用，请稍后重试。'
+  return '本次操作在浏览器中未能完成，请刷新页面后重试。'
 }

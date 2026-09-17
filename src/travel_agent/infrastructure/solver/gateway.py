@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass, replace
 from datetime import date, datetime, timedelta
 from enum import Enum
 from fractions import Fraction
@@ -48,6 +48,7 @@ from travel_agent.solver.models import ItineraryPlan, RoutedDay
 from travel_agent.solver.quality import SolverQualityReport
 from travel_agent.solver.time_windows import applicable_fixed_sessions
 
+from .gaode import GaodeODSnapshotBuilder
 from .schedule_quality import improve_default_days
 
 LUNCH_EARLIEST_MIN = 11 * 60 + 30
@@ -62,6 +63,7 @@ class PublishedAttraction:
     attraction: Attraction
     coordinate: Coordinate | None = None
     selection_exclusion_group_ids: tuple[str, ...] = ()
+    departure_coordinate: Coordinate | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,9 +101,15 @@ class InMemoryPublishedSolverDataProvider:
 
 
 class ProductionSolverGateway:
-    def __init__(self, data: PublishedSolverDataProvider, clock: Clock) -> None:
+    def __init__(
+        self,
+        data: PublishedSolverDataProvider,
+        clock: Clock,
+        od_builder: GaodeODSnapshotBuilder | None = None,
+    ) -> None:
         self._data = data
         self._clock = clock
+        self._od_builder = od_builder
 
     def solve(self, request: SolverRequest) -> SolverOutcome:
         started = perf_counter()
@@ -113,6 +121,26 @@ class ProductionSolverGateway:
             if _stable_hash(request.input_snapshot) != request.input_snapshot_hash:
                 raise ValueError("generation input snapshot hash does not match")
             prepared = _prepare_input(request.input_snapshot, snapshot)
+            if self._od_builder is not None:
+                selected = {item.id for item in prepared.attractions}
+                places = [item for item in snapshot.attractions if item.attraction.id in selected]
+                if any(item.coordinate is None for item in places):
+                    raise ValueError("selected OD nodes require reviewed coordinates")
+                arrivals = {
+                    item.attraction.id: item.coordinate
+                    for item in places
+                    if item.coordinate is not None
+                }
+                departures = {
+                    item.attraction.id: item.departure_coordinate or item.coordinate
+                    for item in places
+                    if item.coordinate is not None
+                }
+                built = self._od_builder.build(arrivals, departure_coordinates=departures)
+                if not built.report.complete:
+                    raise SolverExecutionError("data_snapshot_unavailable", retryable=True)
+                snapshot = replace(snapshot, travel_time_provider=built.provider, od_basis="gaode")
+                prepared = _prepare_input(request.input_snapshot, snapshot)
             subgraph = OnDemandODSubgraphBuilder().build(
                 tuple(item.id for item in prepared.attractions),
                 snapshot.travel_time_provider,
@@ -249,6 +277,8 @@ def _prepare_input(
         )
         for external_id, attraction in zip(selected_ids, attractions, strict=True)
     )
+    if any(day not in published.weather_by_date for day in trip_dates):
+        raise SolverExecutionError("data_snapshot_unavailable", retryable=True)
     weather = {day: published.weather_by_date[day] for day in trip_dates}
     return _PreparedInput(attractions, preferences, trip_dates, weather, anchors, travel_mode)
 

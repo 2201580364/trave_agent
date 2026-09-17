@@ -29,6 +29,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
+import { createOperationIntent } from '../api/adminApi'
 import type { PlaceAccessPointEvidence, PlaceAccessPointInput, PlaceClosureEvidence, PlaceClosureInput, PlaceDateExceptionEvidence, PlaceDateExceptionInput, PlaceEvidenceSource, PlaceGeometryEvidence, PlaceGeometryInput, PlaceRevision, PlaceRevisionEvidence, PlaceTimeRuleEvidence, PlaceTimeRuleInput, PlaceTimePreview, PlaceRelationEvidence, ReviewTask, PublicationCheck, SourceChannel, SourceConflict, HolidayCalendar } from '../api/types'
 import { useAdminSession } from '../auth/AdminSessionProvider'
 import { ErrorNotice } from '../components/ErrorNotice'
@@ -218,7 +219,7 @@ export function RevisionDetailsPage() {
     try {
       const created = await api.createPlaceRevision(revision.place_id, {
         base_revision_id: revision.place_revision_id,
-        operation_intent_id: `revision-create-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('revision-create'),
         reason_code: 'PLACE_FACTS_REFRESH',
       })
       messageApi.success(`已创建修订版本 ${created.revision_number}`)
@@ -237,7 +238,7 @@ export function RevisionDetailsPage() {
       const values = await form.validateFields()
       const updated = await api.updatePlaceRevision(revision.place_revision_id, {
         expected_revision_number: revision.revision_number,
-        operation_intent_id: `revision-update-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('revision-update'),
         reason_code: 'PLACE_FACTS_EDITED',
         ...values,
       })
@@ -256,7 +257,7 @@ export function RevisionDetailsPage() {
     setWorking(true)
     try {
       await api.submitPlaceReview(revision.place_revision_id, {
-        operation_intent_id: `review-submit-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('review-submit'),
         reason_code: 'READY_FOR_REVIEW',
       })
       await load()
@@ -278,7 +279,7 @@ export function RevisionDetailsPage() {
         return
       }
       await api.publishPlaceRevision(revision.place_revision_id, {
-        operation_intent_id: `revision-publish-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('revision-publish'),
         reason_code: 'PUBLISH_GATE_PASSED',
       })
       messageApi.success('新快照已发布')
@@ -296,7 +297,7 @@ export function RevisionDetailsPage() {
     try {
       const result = await api.preparePlaceRevisionProjection(revision.place_revision_id, {
         data_snapshot_version: 'hangzhou-research-candidate-v1',
-        operation_intent_id: `projection-prepare-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('projection-prepare'),
         reason_code: 'PROJECTION_PREPARED',
       })
       await load()
@@ -316,7 +317,7 @@ export function RevisionDetailsPage() {
         expected_revision_number: revision.revision_number,
         expected_revision_version: revision.revision_version,
         resolved: true,
-        operation_intent_id: `source-conflicts-resolve-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('source-conflicts-resolve'),
         reason_code: 'SOURCE_CONFLICTS_REVIEWED',
         reason_text: resolveConflictNote.trim(),
       })

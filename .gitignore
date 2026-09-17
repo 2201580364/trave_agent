@@ -70,3 +70,10 @@ var/
 /admin-web/node_modules/*
 /admin-web/dist/
 /admin-web/*.tsbuildinfo
+
+# Mounted production secrets (only *.example templates are versioned).
+**/root-password
+**/health-password
+**/admin-password
+**/clients/
+**/users.acl

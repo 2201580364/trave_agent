@@ -3,7 +3,7 @@ Description=Travel Agent MySQL and Redis backup
 Requires=docker.service
 After=docker.service
 ConditionPathExists=/opt/travel-agent/infra/scripts/backup.sh
-ConditionPathExists=/etc/travel-agent/infra.env
+ConditionPathExists=/etc/travel-agent/mysql/clients/backup.cnf
 
 [Service]
 Type=oneshot
@@ -13,4 +13,4 @@ UMask=0077
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=6
-ExecStart=/usr/bin/bash /opt/travel-agent/infra/scripts/backup.sh
+ExecStart=/usr/bin/bash /opt/travel-agent/infra/scripts/backup.sh --apply

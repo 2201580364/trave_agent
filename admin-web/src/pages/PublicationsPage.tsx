@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { adminErrorMessage } from '../api/errorMessages'
+import { createOperationIntent } from '../api/adminApi'
 import type {
   PlaceListFilters as PlaceListFilterValues,
   PlaceRevision,
@@ -125,7 +126,7 @@ export function PublicationsPage() {
       const result = await api.previewPublicationBatch({
         city_id: 'hangzhou',
         place_revision_ids: revisionIds,
-        operation_intent_id: `publication-batch-preview-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('publication-batch-preview'),
         reason_code: 'PUBLICATION_BATCH_PREVIEW',
       })
       setBatch(result)
@@ -143,7 +144,7 @@ export function PublicationsPage() {
     setError(null)
     try {
       const result = await api.executePublicationBatch(batch.batch_id, {
-        operation_intent_id: `publication-batch-execute-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('publication-batch-execute'),
         reason_code: 'PUBLICATION_BATCH_EXECUTE',
       })
       setBatch(result.batch)
@@ -169,7 +170,7 @@ export function PublicationsPage() {
     setError(null)
     try {
       await api.publishPlaceRevision(revision.place_revision_id, {
-        operation_intent_id: `publication-${crypto.randomUUID()}`,
+        operation_intent_id: createOperationIntent('publication'),
         reason_code: 'PUBLICATION_APPROVED',
       })
       message.success('地点已发布；正在打开已发布地点目录')

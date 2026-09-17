@@ -288,6 +288,16 @@ mysql/redis healthy
 - 镜像 digest、artifact hash 和 Compose 版本进入 locked manifest；
 - R0.4 开始后环境不再临时修改。
 
-## 12. 当前实施边界
+## 12. 实施与验收边界
 
-本文件只确定部署方式。当前尚未新增 API/user-h5/admin-web Dockerfile，也未扩展现有 Compose；服务器上的 MySQL/Redis 继续按已验收的 `travel-agent-infra` 项目运行。OM1 管理端、后续迁移和 R0.2 published research snapshot 未完成前，不提前重建服务器应用栈，避免短期内连续迁移和重复发布。
+构建配置位于 `deploy/production/`，可复用操作流程位于 `.claude/skills/docker-image-deploy/SKILL.md`。应用镜像必须在本地构建并推送仓库，服务器只拉取固定版本镜像，以 Compose 更新；不得上传源码或在服务器构建应用镜像。以服务器实际挂载、环境文件和数据目录为准合并配置，不能直接覆盖既有部署清单。实现、部署与验收的当前状态统一见 `docs/process/CURRENT.md`。
+
+缺少域名时可按用户授权保留 18080 进行内部复测；此例外不代表 HTTPS 或外部研究环境锁定已通过。API 镜像以非 root 用户运行，构建时为该用户准备 `logs/` 与 `var/ops/` 的写入权限；配置额外挂载时还须核对挂载目录权限。
+
+### 按选点构建真实 OD（R0.2-06 / H3 / C6）
+
+API 环境设置 `TRAVEL_AGENT_OD_SOURCE=gaode` 后，生成流程先校验选点，再调用高德构建本次选点的出园→入园有向 OD；分天与 OR-Tools 排序只读取已构建的内存快照。目录浏览不调用高德。默认 `approximate` 仅保留开发/测试兼容，不代表真实路网验收通过。
+
+凭证使用已有 `TRAVEL_AGENT_GAODE_API_KEY`；共享缓存和配额状态复用 `TRAVEL_AGENT_PROVIDER_REDIS_URL`，日预算使用 `TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET`。无 Redis 时路由缓存仅在进程内，配额状态保存到 `var/ops/provider-governance.json`，容器部署应配置共享 Redis。缓存未命中按 1.05 秒间隔请求，配额耗尽或熔断不会绕过治理继续调用。N 个节点最多产生 N×(N−1)×模式数的缓存未命中请求，应在真实体验前实测冷缓存耗时；当前执行器仍为同步生成，不宣称冷缓存延迟验收通过。
+
+任何有向边无法获得时，生成返回可重试的数据不可用错误，不用本地近似边冒充真实交通。审计保存实际使用的 OD 子图与 hash。回归应核对 Redis 命中、配额、故障恢复、历史 Revision 保留和页面交通来源。切换模式不会重写历史 Revision；部署前必须完成真实凭证和受控环境验收。
