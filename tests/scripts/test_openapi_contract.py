@@ -57,6 +57,7 @@ class TestExportOpenApiSchema:
         schema = json.loads(output.read_text(encoding="utf-8"))
         assert schema["openapi"].startswith("3.")
         assert "/api/v1/anonymous-sessions" in schema["paths"]
+        assert "/api/v1/me" in schema["paths"]
 
     def test_export_snapshot_contains_admin_surface(self, tmp_path: Path) -> None:
         # The snapshot must include the admin router blocks, which only mount

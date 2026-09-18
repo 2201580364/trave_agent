@@ -160,6 +160,7 @@ od_basis: gaode | approximate
 | 方法 | 路径 | 用例 | 首切片 |
 |---|---|---|---:|
 | POST | `/anonymous-sessions` | 创建匿名主体 | 是 |
+| GET | `/me` | 校验当前匿名会话并返回主体标识 | 是 |
 | POST | `/trip-drafts` | 创建草稿 | 是 |
 | GET | `/trip-drafts/{draft_id}` | 恢复草稿 | 是 |
 | PATCH | `/trip-drafts/{draft_id}/travel-facts` | 更新日期、锚点、交通和节奏 | 是 |
@@ -207,6 +208,18 @@ M1 不提供 `/regenerate`。用户修改条件时更新或创建草稿，再提
 ```
 
 重复调用默认创建新会话；客户端已有有效 token 时不应重复创建。
+
+### 5.2 GET `/me`
+
+请求必须携带当前匿名会话的 `Authorization: Bearer <access_token>`。该端点只校验持久化会话是否仍然有效，用于页面刷新后恢复本地主体状态，不创建新身份，也不返回 access token。
+
+响应 `200`：
+
+```json
+{"principal_id": "principal_01K..."}
+```
+
+token 缺失、无效或过期时返回统一的 `401 authentication_required`。
 
 ## 6. 草稿资源
 

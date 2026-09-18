@@ -330,6 +330,10 @@ def create_app(container: HttpContainer) -> FastAPI:
             "expires_at": session.expires_at.isoformat(),
         }
 
+    @app.get("/api/v1/me")
+    def get_current_principal(principal: str = Depends(principal_id)) -> dict[str, str]:
+        return {"principal_id": principal}
+
     @app.post("/api/v1/trip-drafts", status_code=status.HTTP_201_CREATED)
     def create_draft(
         payload: CreateDraftInput,

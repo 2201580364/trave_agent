@@ -162,6 +162,23 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_current_principal_validates_persisted_anonymous_session(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    principal_id, token = _session(client)
+
+    response = client.get("/api/v1/me", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.json() == {"principal_id": principal_id}
+
+
+def test_current_principal_rejects_missing_session(tmp_path: Path) -> None:
+    response = _client(tmp_path).get("/api/v1/me")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "authentication_required"
+
+
 def test_anonymous_user_completes_http_planning_and_recovers_revision(
     tmp_path: Path,
 ) -> None:
