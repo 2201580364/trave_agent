@@ -9,6 +9,7 @@ from travel_agent.solver import (
     DayAllocation,
     DayPlan,
     DayTimeBounds,
+    FixedSession,
     InMemoryTravelTimeProvider,
     MealPlacement,
     MealStatus,
@@ -165,6 +166,44 @@ def test_step3_spreads_single_daytime_visit_into_afternoon_before_fixed_show() -
     assert result.meal_plan.placement is MealPlacement.BETWEEN_SEGMENTS
     assert result.meal_plan.end_min is not None
     assert result.meal_plan.end_min <= (show.arrival_min - show.buffered_travel_from_previous_min)
+    assert result.validation.valid
+
+
+def test_step3_moves_flexible_evening_visit_after_tight_fixed_event() -> None:
+    daytime = _attraction(1, DAY_RULE, duration=120)
+    night_market = _attraction(
+        2,
+        (TimeRule.from_strings(("01-01", "12-31"), "17:00", "23:00"),),
+        duration=80,
+    )
+    light_show = Attraction(
+        3,
+        "灯光秀",
+        suggested_duration=30,
+        is_always_open=False,
+        data_verified=True,
+        fixed_sessions=(FixedSession("show", 18 * 60 + 30, 19 * 60, 18 * 60 + 40),),
+    )
+    provider = InMemoryTravelTimeProvider(
+        {
+            (1, 2): _travel(1, 2, 5),
+            (2, 1): _travel(2, 1, 5),
+            (1, 3): _travel(1, 3, 20),
+            (3, 1): _travel(3, 1, 20),
+            (2, 3): _travel(2, 3, 5),
+            (3, 2): _travel(3, 2, 5),
+        }
+    )
+
+    result = route_segmented_day(
+        _day(daytime, night_market, light_show),
+        provider,
+        weather_by_date=_weather(),
+    )
+
+    assert [visit.attraction.id for visit in result.routed_day.visits] == [1, 3, 2]
+    assert result.routed_day.visits[1].arrival_min == 18 * 60 + 40
+    assert result.routed_day.visits[2].planned_duration_min == 80
     assert result.validation.valid
 
 

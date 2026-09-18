@@ -20,7 +20,7 @@
 | S5 | 脚本契约标准化 + 工具分级 | **已完成（2026-09-07）** | S2 | 1 天 |
 | S6 | 并行开发试点 | **已完成（2026-09-07，S6-4 合并由用户完成：941578e / fae014e）** | S3 | 1–2 天 |
 | S7 | 上帝类拆分（代码健康切片） | **已完成（2026-09-13，S7-1~S7-5）** | S3、R0.2-07 数据批次完成 | 1–2 周 |
-| S8 | 用户端补测 + 契约对照 | **本地工程收口（2026-09-18）**：管理响应迁移与生成类型、持久化任务恢复、内置浏览器E2E已实现并本地验证；部署/远端验收后置 | S3 | 3–5 天 |
+| S8 | 用户端补测 + 契约对照 | **本地已完成（2026-09-18）**：管理响应迁移与生成类型、持久化任务恢复、内置浏览器E2E及真实多景点OD页面回归通过；整批部署/远端复验属于M1发布收尾 | S3 | 3–5 天 |
 
 > 状态取值：`未开始` → `进行中` → `已完成` / `阻塞`（附原因）。每完成一项，更新本表并在 CURRENT.md 登记一行。
 
@@ -174,7 +174,7 @@
 | S8-1 | frontend 引入 Vitest，覆盖 `entities/planning`、`features/trip-draft` 的 store 与纯函数（核心路径优先） | 测试集 | **已进入 dev（a657504）**：vitest@1.6.0（`--legacy-peer-deps`，Taro 的 `peerOptional vite@^4` 与 vitest 携带的 vite@5 冲突，构建实际走 webpack5 故 vite 版本仅影响 vitest 自身）+ vitest.config.ts（`@` 别名、node 环境）；19 项测试（store 13 + api client 6）全过，`npm run test` script 已加，tsc --noEmit 过；frontend Vitest CI 配置已实现待提交（2026-09-11：npm ci --legacy-peer-deps → typecheck → npm test，本地 19/19；远端运行待验证） |
 | S8-2 | CI 导出 FastAPI OpenAPI schema 快照，与 `docs/specs/api-contract.md` 关键字段做 diff 校验 | 契约对照 | **已进入 dev（dc5d1ea）**：`scripts/export_openapi_schema.py`（离线内存 SQLite 组合根完整装配含 admin/O17/O18 路由块，73 路径快照写 `var/reports/openapi-schema.json`，--json 退出 0/1）+ `scripts/check_api_contract.py`（解析契约 4 种登记风格：§4 用户端表、§15.2.x admin 表、行内用户端路径、§15.2.1 O05 聚合句「POST/PATCH/DELETE 分别作用于…」按 REST 语义展开 POST→集合根/PATCH·DELETE→成员路径；code-only=退出 2 门禁、contract-only=信息性含计划端点；契约 §2.1.1 探针 `/api/v1/health/*` 与实际服务 `/health/*` 的前缀差异按文档化别名处理待契约修订）；当前 85 契约/82 实现/code_only=0 PASS；7 项契约测试 `tests/scripts/test_openapi_contract.py`；**ci.yml 已集成（2026-09-07）：backend job 在 layering 之后、docs gate 之前插入 "OpenAPI contract diff (S8-2)" 步骤（export --output var/ci/ → check --schema，本地命令链预演 PASS）** |
 | S8-3 | 管理API类型由OpenAPI生成，消除响应手工同步 | 生成式类型 | **已实现、本地验证**：管理JSON成功响应全部结构化，生成类型已同步，schema门禁覆盖61个管理操作；页面筛选/表单适配类型保留。通用用户端响应全量模型化属于独立范围。 |
-| S8-4 | Playwright E2E覆盖H5创建草稿→选点→生成→查看→分享 | E2E套件 | **已实现、本地页面验证**：frontend/e2e/m1-core-flow.mjs注入内置浏览器Playwright locator，十景点三日、逐日/刷新、历史/分享；另实测首次及替换生成中刷新。使用同一服务器MySQL/Redis及真实Gaode。无头CI/服务器复验未执行，后置部署不作通过声明。 |
+| S8-4 | Playwright E2E覆盖H5创建草稿→选点→生成→查看→分享 | E2E套件 | **本地已完成**：frontend/e2e/m1-core-flow.mjs覆盖主流程；内置Chrome实测十景点三日、逐日/刷新、历史/分享、首次及替换生成中刷新。使用同一服务器MySQL/Redis及真实Gaode；服务器整批复验按发布流程单列。 |
 
 **退出准则**：frontend 核心纯函数有测试；OpenAPI diff 纳入 CI；types.ts 由生成产出。
 
@@ -195,7 +195,7 @@
 - **M-a（S1+S1.5+S2+S4 完成）**：✅ 已达成（2026-09-05）——知识库自维护基线——冷启动 ~3k token，文档漂移有脚本拦截，文档与实现无现存矛盾
 - **M-b（S3+S5 完成）**：✅ 已达成（2026-09-07）——工程基础设施完备——CI 全绿门槛 + 工具面契约化，**具备并行开发与安全重构前提**
 - **M-c（S6 完成）**：✅ 已达成（2026-09-07）——并行开发跑通，协作规范 v2 沉淀
-- **M-d（S7+S8 完成）**：本地工程收口（2026-09-18）；S7已完成，S8管理响应迁移、生成类型与内置浏览器回归已本地验证。部署及远端验收后置；M1行程质量/冷OD性能与真实用户研究不因工程门禁通过而自动关闭。
+- **M-d（S7+S8 完成）**：✅ 本地已达成（2026-09-18）；S7已完成，S8管理响应迁移、生成类型、任务恢复与内置浏览器真实多景点OD回归通过。M1整批部署、远端复验及真实用户研究单列，不因工程门禁通过而自动关闭。
 
 ---
 

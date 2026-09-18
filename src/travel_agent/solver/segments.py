@@ -29,6 +29,10 @@ from .models import (
     TravelMode,
     TravelTimeResult,
 )
+from .quality_policy import (
+    QUALITY_EVENING_REST_MIN,
+    QUALITY_VISIT_SEVERE_RATIO_PER_MILLE,
+)
 from .quality_refinement import refine_ordered_schedule
 from .routing import RoutingSearchExecutor, route_day, validate_routed_day
 from .schedule_refinement import refine_daytime_schedule
@@ -73,6 +77,13 @@ def route_segmented_day(
             day_plan, provider, buffer_ratio=buffer_ratio, search_executor=search_executor
         )
         routed = refine_ordered_schedule(routed)
+        routed = _improve_fixed_event_order(
+            routed,
+            provider,
+            weather_by_date,
+            buffer_ratio,
+            evening_open_min,
+        )
         meal = _schedule_meal(
             routed,
             daytime_visit_count=len(routed.visits),
@@ -156,6 +167,128 @@ def route_segmented_day(
         meal_plan,
         cross_rejection,
         validation,
+    )
+
+
+def _improve_fixed_event_order(
+    route: RoutedDay,
+    provider: TravelTimeProvider,
+    weather_by_date: Mapping[date, DailyWeather],
+    buffer_ratio: float,
+    evening_open_min: int,
+) -> RoutedDay:
+    """Try bounded adjacent moves around fixed events, then revalidate C1/C2/C5/C6."""
+
+    best = route
+    seen = {tuple(visit.attraction.id for visit in route.visits)}
+    for _ in range(2):
+        proposals = []
+        visits = list(best.visits)
+        for index, visit in enumerate(visits):
+            if not visit.attraction.fixed_sessions:
+                continue
+            for neighbour in (index - 1, index + 1):
+                if not 0 <= neighbour < len(visits):
+                    continue
+                if visits[neighbour].attraction.fixed_sessions:
+                    continue
+                order = list(visits)
+                order[index], order[neighbour] = order[neighbour], order[index]
+                fingerprint = tuple(item.attraction.id for item in order)
+                if fingerprint in seen:
+                    continue
+                seen.add(fingerprint)
+                candidate = _rebuild_ordered_route(best, tuple(order), provider, buffer_ratio)
+                candidate = refine_ordered_schedule(candidate)
+                if validate_routed_day(
+                    candidate,
+                    provider,
+                    weather_by_date=weather_by_date,
+                    buffer_ratio=buffer_ratio,
+                ).valid:
+                    proposals.append(candidate)
+        if not proposals:
+            break
+        winner = min(
+            (best, *proposals),
+            key=lambda item: _fixed_order_key(item, evening_open_min),
+        )
+        if winner is best:
+            break
+        best = winner
+    return best
+
+
+def _rebuild_ordered_route(
+    seed: RoutedDay,
+    visits: tuple[RouteVisit, ...],
+    provider: TravelTimeProvider,
+    buffer_ratio: float,
+) -> RoutedDay:
+    rebuilt = []
+    total_travel = 0
+    total_buffered = 0
+    previous_id = None
+    for visit in visits:
+        travel = None
+        buffered = 0
+        if previous_id is not None:
+            travel = provider.get_travel_time(previous_id, visit.attraction.id)
+            if travel is None:
+                return seed
+            total_travel += travel.travel_min
+            buffered = math.ceil(travel.travel_min * buffer_ratio)
+            total_buffered += buffered
+        rebuilt.append(
+            replace(
+                visit,
+                travel_from_previous=travel,
+                buffered_travel_from_previous_min=buffered,
+            )
+        )
+        previous_id = visit.attraction.id
+    return replace(
+        seed,
+        visits=tuple(rebuilt),
+        total_travel_min=total_travel,
+        total_buffered_travel_min=total_buffered,
+    )
+
+
+def _fixed_order_key(route: RoutedDay, evening_open_min: int) -> tuple[object, ...]:
+    severe_connections = 0
+    daytime_after_fixed = 0
+    fixed_seen = False
+    for previous, current in zip(route.visits, route.visits[1:], strict=False):
+        if current.attraction.fixed_sessions:
+            slack = (
+                current.arrival_min
+                - previous.leave_min
+                - current.buffered_travel_from_previous_min
+            )
+            severe_connections += slack < QUALITY_EVENING_REST_MIN
+        fixed_seen = fixed_seen or bool(previous.attraction.fixed_sessions)
+        if fixed_seen and not current.attraction.fixed_sessions:
+            window = resolve_effective_window(current.attraction, route.visit_date).window
+            daytime_after_fixed += window is not None and window.open_min < evening_open_min
+    severe_shortfalls = sum(
+        not visit.attraction.fixed_sessions
+        and visit.planned_duration_min * 1000
+        < visit.attraction.suggested_duration * QUALITY_VISIT_SEVERE_RATIO_PER_MILLE
+        for visit in route.visits
+    )
+    shortfall = sum(
+        max(0, visit.attraction.suggested_duration - visit.planned_duration_min)
+        for visit in route.visits
+        if not visit.attraction.fixed_sessions
+    )
+    return (
+        severe_connections + severe_shortfalls,
+        severe_connections,
+        daytime_after_fixed,
+        shortfall,
+        route.total_travel_min,
+        tuple(visit.attraction.id for visit in route.visits),
     )
 
 

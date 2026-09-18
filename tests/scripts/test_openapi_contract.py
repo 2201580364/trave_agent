@@ -12,6 +12,7 @@ Contract under test (``.claude/rules/script-contract.md``):
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +31,7 @@ def _run(script: str, *argv: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         check=False,
         cwd=PROJECT_ROOT,
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
     )
 
 

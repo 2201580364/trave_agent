@@ -40,7 +40,7 @@ python -m pytest tests/solver/test_solver_contract.py -q
 python scripts/run_solver_contract.py
 ```
 
-机器可读快照：`var/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v5 / parameters-p1-2026-08-26`，历史 `solver-p1-v1 / trip-result-v1` 继续用于不可变 Revision 回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013/ADR-0015 升级版本。
+机器可读快照：`var/reports/solver-p1-contract.json`。当前公开版本为 `solver-p1-v2 / trip-result-v2 / constraints-p1-v9 / parameters-p1-2026-09-18a`，评分策略为 `expert-itinerary-review-v1 / expert-default-2026-09-18`；历史 `solver-p1-v1 / trip-result-v1` 及旧 Revision 继续按原版本回放。参数、状态、拒绝码或硬/软约束词汇发生变化时，契约漂移测试必须失败，并要求按 ADR-0009/ADR-0011/ADR-0012/ADR-0013/ADR-0015/ADR-0028 升级版本。
 
 ### 高德 OD Provider 与 V2 结果映射
 

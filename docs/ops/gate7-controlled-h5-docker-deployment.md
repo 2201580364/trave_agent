@@ -298,6 +298,6 @@ mysql/redis healthy
 
 API 环境设置 `TRAVEL_AGENT_OD_SOURCE=gaode` 后，生成流程先校验选点，再调用高德构建本次选点的出园→入园有向 OD；分天与 OR-Tools 排序只读取已构建的内存快照。目录浏览不调用高德。默认 `approximate` 仅保留开发/测试兼容，不代表真实路网验收通过。
 
-凭证使用已有 `TRAVEL_AGENT_GAODE_API_KEY`；共享缓存和配额状态复用 `TRAVEL_AGENT_PROVIDER_REDIS_URL`，日预算使用 `TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET`。无 Redis 时路由缓存仅在进程内，配额状态保存到 `var/ops/provider-governance.json`，容器部署应配置共享 Redis。缓存未命中按 1.05 秒间隔请求，配额耗尽或熔断不会绕过治理继续调用。N 个节点最多产生 N×(N−1)×模式数的缓存未命中请求，应在真实体验前实测冷缓存耗时；当前执行器仍为同步生成，不宣称冷缓存延迟验收通过。
+凭证使用已有 `TRAVEL_AGENT_GAODE_API_KEY`；共享缓存和配额状态复用 `TRAVEL_AGENT_PROVIDER_REDIS_URL`，日预算使用 `TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET`，跨进程请求间隔使用 `TRAVEL_AGENT_GAODE_MINIMUM_INTERVAL_SECONDS`（默认 0.3 秒），不同有向 OD 对的并发上限使用 `TRAVEL_AGENT_GAODE_MAXIMUM_WORKERS`（默认 8）。无 Redis 时路由缓存仅在进程内，配额状态保存到 `var/ops/provider-governance.json`，容器部署应配置共享 Redis。配额耗尽或熔断不会绕过治理继续调用。按需构图会安全裁剪不可能胜出的步行请求和已确定胜出的步行后续模式；仍应在真实体验前实测冷缓存耗时，不以理论请求量宣称验收通过。
 
 任何有向边无法获得时，生成返回可重试的数据不可用错误，不用本地近似边冒充真实交通。审计保存实际使用的 OD 子图与 hash。回归应核对 Redis 命中、配额、故障恢复、历史 Revision 保留和页面交通来源。切换模式不会重写历史 Revision；部署前必须完成真实凭证和受控环境验收。

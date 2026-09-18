@@ -336,6 +336,22 @@ def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     assert "initial_routing" in stages
     assert all(value >= 0 for value in stages.values())
     assert first.audit_payload["data_snapshot_version"] == VERSION
+    review = cast(dict[str, Any], cast(dict[str, Any], first.result_snapshot)["itinerary_review"])
+    optimization = cast(
+        dict[str, Any], cast(dict[str, Any], first.result_snapshot)["quality_optimization"]
+    )
+    assert review["scoring_policy_version"] == "expert-itinerary-review-v1"
+    assert review["weight_profile_version"] == "expert-default-2026-09-18"
+    assert 0 <= review["score_basis_points"] <= 10_000
+    assert optimization["stop_reason"] in {
+        "quality_target_met",
+        "no_new_candidate",
+        "no_improvement",
+        "route_budget",
+        "round_budget",
+        "wall_time_limit",
+    }
+    assert optimization["route_evaluation_count"] <= 256
 
 
 def test_gateway_rejects_selection_from_same_reviewed_exclusion_group() -> None:

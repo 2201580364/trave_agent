@@ -140,7 +140,12 @@ def build_http_app(
                 daily_request_budget=int(
                     os.environ.get("TRAVEL_AGENT_GAODE_DAILY_REQUEST_BUDGET", "1000")
                 ),
-                minimum_interval_seconds=1.05,
+                minimum_interval_seconds=float(
+                    os.environ.get(
+                        "TRAVEL_AGENT_GAODE_MINIMUM_INTERVAL_SECONDS",
+                        "0.3",
+                    )
+                ),
                 circuit_failure_codes=frozenset(
                     {"timeout", "http_error", "api_error", "invalid_response"}
                 ),

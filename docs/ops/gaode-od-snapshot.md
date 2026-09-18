@@ -33,7 +33,15 @@ TRAVEL_AGENT_GAODE_TIMEOUT_SECONDS=5
 TRAVEL_AGENT_GAODE_CACHE_TTL_SECONDS=86400
 TRAVEL_AGENT_GAODE_DATA_VERSION=gaode-hangzhou-local-v1
 TRAVEL_AGENT_GAODE_MODES=walking,transit,driving
+TRAVEL_AGENT_GAODE_MINIMUM_INTERVAL_SECONDS=0.3
+TRAVEL_AGENT_GAODE_MAXIMUM_WORKERS=8
 ```
+
+在线按需子图与本文件的离线发布脚本使用不同节流入口。在线组合根读取 `TRAVEL_AGENT_GAODE_MINIMUM_INTERVAL_SECONDS` 和 `TRAVEL_AGENT_GAODE_MAXIMUM_WORKERS`，默认分别为 0.3 秒和 8，并继续受共享 Redis 日预算、跨进程间隔和熔断保护；离线脚本的 `--request-interval-seconds` 默认仍为经历史构建验证的 1.05 秒。有限线程只并发不同有向 OD 对；同一 OD 对的模式仍按策略串行裁剪，共享节流器决定实际全局请求速率。
+
+在线构图会做不改变选路结论的请求裁剪：直线距离已大于 2 公里时，步行道路距离不可能回到 2 公里阈值内，因此跳过步行请求；步行实测已经满足道路距离不超过 2 公里且耗时不超过 35 分钟时，按既定选路策略它必然胜出，因此不再请求公交和驾车。其余情况仍请求并比较启用模式，不能把直线距离作为最终 OD。
+
+2026-09-18 十景点真实冷缓存验证使用全新数据版本，0 命中、174 个远程请求、0 失败，OD 阶段 54.612 秒、端到端 58.169 秒；原基线为 270 请求、361.064 秒。0.2 秒共享间隔在第一次并发实测中触发 3 次限流并安全失败，因此生产默认改为 0.3 秒。该单次结果证明代表性回归改善，不代替至少 30 次的 P95 或不同套餐/网络条件压测。证据见 [验证报告](../test/reports/m1-expert-itinerary-review-20260918.md)。
 
 不要在对话、命令历史、代码、`.env.example` 或 Git 中保存真实 Key。应用通过 `python-dotenv` 显式加载仓库根目录 `.env`，且 `override=false`：Docker、CI/CD、服务管理器等已注入的环境变量优先于 `.env`，因此生产部署仍可以使用 Secret 管理而不依赖文件。
 

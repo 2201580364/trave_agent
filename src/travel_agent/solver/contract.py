@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from . import quality_policy
 from .anchors import DEFAULT_DAY_END_MIN, DEFAULT_DAY_START_MIN
 from .day_assignment import DEFAULT_DURATION_RATIO_BY_MODE
+from .itinerary_review import SCORING_POLICY_VERSION, WEIGHT_PROFILE_VERSION
 from .models import RejectionCode, RouteSearchStatus, TravelMode
 from .routing import (
     DEFAULT_DROP_PENALTY,
@@ -35,8 +36,8 @@ from .transport import DEFAULT_TRANSIT_BUFFER_RATIO
 
 LEGACY_SOLVER_CONTRACT_VERSION = "solver-p1-v1"
 SOLVER_CONTRACT_VERSION = "solver-p1-v2"
-CONSTRAINT_VERSION = "constraints-p1-v8"
-PARAMETER_VERSION = "parameters-p1-2026-09-16b"
+CONSTRAINT_VERSION = "constraints-p1-v9"
+PARAMETER_VERSION = "parameters-p1-2026-09-18a"
 DEFAULT_OD_DURATION_REBALANCE_MAX_SYMMETRIC_PENALTY_MIN = 10
 
 
@@ -45,6 +46,8 @@ class SolverP1Contract:
     contract_version: str
     constraint_version: str
     parameter_version: str
+    scoring_policy_version: str
+    weight_profile_version: str
     duration_ratios: tuple[tuple[str, float], ...]
     transit_buffer_ratio: float
     route_time_limit_seconds: int
@@ -89,12 +92,15 @@ class SolverP1Contract:
 
 DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
     schedule_quality_parameters=tuple(
-        (name, getattr(quality_policy, name)) for name in sorted(vars(quality_policy))
+        (name, getattr(quality_policy, name))
+        for name in sorted(vars(quality_policy))
         if name.startswith("QUALITY_")
     ),
     contract_version=SOLVER_CONTRACT_VERSION,
     constraint_version=CONSTRAINT_VERSION,
     parameter_version=PARAMETER_VERSION,
+    scoring_policy_version=SCORING_POLICY_VERSION,
+    weight_profile_version=WEIGHT_PROFILE_VERSION,
     duration_ratios=tuple(
         (mode.value, DEFAULT_DURATION_RATIO_BY_MODE[mode])
         for mode in (TravelMode.SPEED, TravelMode.NORMAL, TravelMode.LEISURE)
@@ -133,6 +139,8 @@ DEFAULT_SOLVER_P1_CONTRACT = SolverP1Contract(
         "DINNER_BLOCK",
         "LUNCH_BLOCK",
         "DAY_SPREAD",
+        "EXPERT_ITINERARY_REVIEW",
+        "BOUNDED_QUALITY_OPTIMIZATION",
     ),
     search_statuses=tuple(item.value for item in RouteSearchStatus),
     rejection_codes=tuple(item.value for item in RejectionCode),

@@ -14,11 +14,13 @@ import json
 import math
 import os
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
 from os import PathLike
 from pathlib import Path
+from threading import Lock
 from time import perf_counter
 from typing import Protocol
 
@@ -86,6 +88,7 @@ class GaodeSettings:
         ODTravelMode.TRANSIT,
         ODTravelMode.DRIVING,
     )
+    maximum_workers: int = 8
 
     def __post_init__(self) -> None:
         if not self.api_key.strip():
@@ -100,6 +103,8 @@ class GaodeSettings:
             raise ValueError("Gaode data_version is required")
         if not self.enabled_modes or len(set(self.enabled_modes)) != len(self.enabled_modes):
             raise ValueError("Gaode enabled_modes must be non-empty and unique")
+        if not 1 <= self.maximum_workers <= 32:
+            raise ValueError("Gaode maximum_workers must be between 1 and 32")
 
     @classmethod
     def from_env(
@@ -127,6 +132,9 @@ class GaodeSettings:
                 "TRAVEL_AGENT_GAODE_DATA_VERSION", "gaode-route-v1"
             ).strip(),
             enabled_modes=modes,
+            maximum_workers=int(
+                os.environ.get("TRAVEL_AGENT_GAODE_MAXIMUM_WORKERS", "8")
+            ),
         )
 
 
@@ -156,7 +164,10 @@ class GaodeHttpTransport(Protocol):
 
 class HttpxGaodeTransport:
     def __init__(self, base_url: str) -> None:
-        self._base_url = base_url.rstrip("/")
+        self._client = httpx.Client(
+            base_url=base_url.rstrip("/"),
+            headers={"Accept": "application/json"},
+        )
 
     def get_json(
         self,
@@ -166,11 +177,10 @@ class HttpxGaodeTransport:
         timeout_seconds: float,
     ) -> Mapping[str, object]:
         try:
-            response = httpx.get(
-                self._base_url + path,
+            response = self._client.get(
+                path,
                 params=params,
                 timeout=timeout_seconds,
-                headers={"Accept": "application/json"},
             )
         except httpx.TimeoutException as exc:
             raise GaodeRouteError(GaodeFailureCode.TIMEOUT, "Gaode request timed out") from exc
@@ -421,6 +431,15 @@ class GaodeRouteClient:
             "remote_elapsed_ms": 0,
             "failures": 0,
         }
+        self._metrics_lock = Lock()
+
+    def metrics_snapshot(self) -> dict[str, int]:
+        with self._metrics_lock:
+            return self.metrics.copy()
+
+    def _increment_metric(self, key: str, value: int = 1) -> None:
+        with self._metrics_lock:
+            self.metrics[key] += value
 
     def fetch(
         self,
@@ -442,15 +461,18 @@ class GaodeRouteClient:
         )
         cached = self._cache.get(key, now)
         if cached is not None:
-            self.metrics["cache_hits"] += 1
+            self._increment_metric("cache_hits")
             return cached
         wait_started = perf_counter()
         try:
             self._before_request()
         finally:
-            self.metrics["provider_wait_ms"] += int((perf_counter() - wait_started) * 1000)
+            self._increment_metric(
+                "provider_wait_ms",
+                int((perf_counter() - wait_started) * 1000),
+            )
         remote_started = perf_counter()
-        self.metrics["remote_requests"] += 1
+        self._increment_metric("remote_requests")
         try:
             payload = self._transport.get_json(
                 _path_for(mode),
@@ -459,7 +481,7 @@ class GaodeRouteClient:
             )
             route = _parse_route(payload, mode, now)
         except GaodeRouteError as exc:
-            self.metrics["failures"] += 1
+            self._increment_metric("failures")
             self._on_failure(exc.code.value)
             if exc.occurred_at is not None:
                 raise
@@ -470,7 +492,10 @@ class GaodeRouteClient:
                 occurred_at=now,
             ) from exc
         finally:
-            self.metrics["remote_elapsed_ms"] += int((perf_counter() - remote_started) * 1000)
+            self._increment_metric(
+                "remote_elapsed_ms",
+                int((perf_counter() - remote_started) * 1000),
+            )
         self._on_success()
         self._cache.put(
             key,
@@ -526,7 +551,7 @@ class GaodeODSnapshotBuilder:
         departure_coordinates: Mapping[int, Coordinate] | None = None,
         selected_node_ids: tuple[int, ...] | None = None,
     ) -> GaodeSnapshotBuild:
-        initial_metrics = self._client.metrics.copy()
+        initial_metrics = self._client.metrics_snapshot()
         # ADR-0018 / R0.2-06: an area's exit need not be its entrance.
         # Legacy point snapshots explicitly keep one coordinate for both roles.
         node_ids = set(coordinates) if selected_node_ids is None else set(selected_node_ids)
@@ -541,33 +566,27 @@ class GaodeODSnapshotBuilder:
         fallback_count = 0
         missing_count = 0
         fetched_times: list[datetime] = []
-        for origin_id, _arrival in ordered:
-            origin = departures[origin_id]
-            for destination_id, destination in ordered:
-                if origin_id == destination_id:
-                    continue
-                routes: list[GaodeRoute] = []
-                pair_failures: list[GaodeFailureCode] = []
-                for mode in self._settings.enabled_modes:
-                    try:
-                        routes.append(self._client.fetch(origin, destination, mode))
-                    except GaodeRouteError as exc:
-                        pair_failures.append(exc.code)
-                        failures[exc.code.value] = failures.get(exc.code.value, 0) + 1
-                        failure_details.append(
-                            GaodeFailureDetail(
-                                origin_id,
-                                destination_id,
-                                mode,
-                                exc.code,
-                                exc.infocode,
-                                (
-                                    exc.occurred_at.isoformat()
-                                    if exc.occurred_at is not None
-                                    else None
-                                ),
-                            )
-                        )
+        pairs = tuple(
+            (origin_id, departures[origin_id], destination_id, destination)
+            for origin_id, _arrival in ordered
+            for destination_id, destination in ordered
+            if origin_id != destination_id
+        )
+        with ThreadPoolExecutor(
+            max_workers=min(self._settings.maximum_workers, max(1, len(pairs))),
+            thread_name_prefix="gaode-od",
+        ) as executor:
+            futures = tuple(
+                executor.submit(self._fetch_pair, origin_id, origin, destination_id, destination)
+                for origin_id, origin, destination_id, destination in pairs
+            )
+            for (origin_id, _origin, destination_id, _destination), future in zip(
+                pairs, futures, strict=True
+            ):
+                routes, pair_failures, pair_details = future.result()
+                for failure in pair_failures:
+                    failures[failure.value] = failures.get(failure.value, 0) + 1
+                failure_details.extend(pair_details)
                 selected = _select_route(routes)
                 if selected is not None:
                     results[(origin_id, destination_id)] = TravelTimeResult(
@@ -606,6 +625,7 @@ class GaodeODSnapshotBuilder:
             fetched_at=fetched_at,
         )
         pair_count = len(ordered) * max(0, len(ordered) - 1)
+        final_metrics = self._client.metrics_snapshot()
         return GaodeSnapshotBuild(
             provider,
             GaodeSnapshotBuildReport(
@@ -617,10 +637,40 @@ class GaodeODSnapshotBuilder:
                 tuple(failure_details),
                 tuple(
                     (key, value - initial_metrics[key])
-                    for key, value in self._client.metrics.items()
+                    for key, value in final_metrics.items()
                 ),
             ),
         )
+
+    def _fetch_pair(
+        self,
+        origin_id: int,
+        origin: Coordinate,
+        destination_id: int,
+        destination: Coordinate,
+    ) -> tuple[list[GaodeRoute], list[GaodeFailureCode], list[GaodeFailureDetail]]:
+        routes: list[GaodeRoute] = []
+        failures: list[GaodeFailureCode] = []
+        details: list[GaodeFailureDetail] = []
+        for mode in _modes_for_pair(origin, destination, self._settings.enabled_modes):
+            try:
+                route = self._client.fetch(origin, destination, mode)
+                routes.append(route)
+                if mode is ODTravelMode.WALKING and _walking_route_wins(route):
+                    break
+            except GaodeRouteError as exc:
+                failures.append(exc.code)
+                details.append(
+                    GaodeFailureDetail(
+                        origin_id,
+                        destination_id,
+                        mode,
+                        exc.code,
+                        exc.infocode,
+                        exc.occurred_at.isoformat() if exc.occurred_at is not None else None,
+                    )
+                )
+        return routes, failures, details
 
 
 def _cache_key(
@@ -746,7 +796,7 @@ def _select_route(routes: list[GaodeRoute]) -> GaodeRoute | None:
         return None
     by_mode = {route.mode: route for route in routes}
     walking = by_mode.get(ODTravelMode.WALKING)
-    if walking is not None and walking.distance_m <= 2_000 and walking.duration_min <= 35:
+    if walking is not None and _walking_route_wins(walking):
         return walking
     transit = by_mode.get(ODTravelMode.TRANSIT)
     driving = by_mode.get(ODTravelMode.DRIVING)
@@ -757,6 +807,39 @@ def _select_route(routes: list[GaodeRoute]) -> GaodeRoute | None:
     if driving is not None:
         return driving
     return min(routes, key=lambda item: (item.duration_min, item.mode.value))
+
+
+def _modes_for_pair(
+    origin: Coordinate,
+    destination: Coordinate,
+    enabled_modes: tuple[ODTravelMode, ...],
+) -> tuple[ODTravelMode, ...]:
+    """Skip walking only when geometry proves it cannot win the policy."""
+
+    if (
+        ODTravelMode.WALKING in enabled_modes
+        and len(enabled_modes) > 1
+        and _straight_line_distance_m(origin, destination) > 2_000
+    ):
+        return tuple(mode for mode in enabled_modes if mode is not ODTravelMode.WALKING)
+    return enabled_modes
+
+
+def _walking_route_wins(route: GaodeRoute) -> bool:
+    return route.distance_m <= 2_000 and route.duration_min <= 35
+
+
+def _straight_line_distance_m(origin: Coordinate, destination: Coordinate) -> float:
+    earth_radius_m = 6_371_000
+    origin_lat = math.radians(origin.lat)
+    destination_lat = math.radians(destination.lat)
+    latitude_delta = destination_lat - origin_lat
+    longitude_delta = math.radians(destination.lng - origin.lng)
+    haversine = (
+        math.sin(latitude_delta / 2) ** 2
+        + math.cos(origin_lat) * math.cos(destination_lat) * math.sin(longitude_delta / 2) ** 2
+    )
+    return earth_radius_m * 2 * math.asin(min(1.0, math.sqrt(haversine)))
 
 
 def _fallback_reason(failures: list[GaodeFailureCode]) -> str:

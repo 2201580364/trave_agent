@@ -16,12 +16,14 @@
 → 构造 AttractionPreference + TripTimeAnchors
 → assign_days()
 → route_itinerary()
-→ improve_default_days()（仅自动分天；ADR-0027）
+→ improve_default_days()（自动分天的专家评分与有界优化；ADR-0028）
 → route_itinerary()（分配变化时重新校验）
 → evaluate_solver_quality()
 → evaluate_itinerary_degradation()
 → presentation mapper / persistence / audit
 ```
+
+ADR-0028 启用后，`improve_default_days()` 使用固定版本七维专家评分与有界候选优化，并在最终硬门禁之外输出 `itinerary_review` 和 `quality_optimization`。评分不能补偿 C1/C2/C4/C5/C6，不允许删点或缩时刷分。
 
 ## 2. 必需输入
 
@@ -267,7 +269,7 @@ M1 契约不承诺：
 - 受控多样性候选；
 - 客户端自定义 seed；
 - 多峰优选时段；
-- 自动专家评分；
+- 用户反馈在线自动调整评分权重；
 - 酒店和餐厅联合优化（M2 先实现餐厅真实节点和重排）；
 - 实时行中动态重排。
 
@@ -292,3 +294,13 @@ M1 契约不承诺：
 `schedule_quality_parameters` 纳入契约快照：路由缓存预算1024、最多6轮、最多4日日期排列、平衡容差200‰、近邻双向OD合计10分钟、室外近邻距离1600米、晚间额外15分钟、CP-SAT每级确定性时间0.1。详见 [ADR-0027](../decisions/ADR-0027-whole-trip-schedule-quality.md)。全局搜索只作用于默认派生日期；直接求解器调用的显式日期分配不被重写。预算耗尽保留已验证最佳候选，不保证全局最优。
 
 数据库投影适配普通开放时间必须保留星期、有效日期和最晚入场；固定场次不限 show 类别。多条实际匹配的普通规则仍报冲突，不合并连续窗口绕过证据问题。
+
+## 专家评分与有界优化增量契约（ADR-0028，H2/H3/H7）
+
+版本升级为 `constraints-p1-v9 / parameters-p1-2026-09-18a`，结构契约和结果 schema 保持 `solver-p1-v2 / trip-result-v2`。评分策略为 `expert-itinerary-review-v1`，生产权重为 `expert-default-2026-09-18`；历史 Revision 不覆盖、不原地评分。
+
+整段比较顺序固定为安排覆盖、严重体验缺口、七维加权体验损失、总交通、用户编辑稳定性、稳定指纹。七维权重为 G地理20、V游览价值20、P节奏15、R衔接15、M餐休12、F体力8、U明确偏好10；不适用维度在一次运行开始时重归一化。显示分数不参与排序，硬约束和证据覆盖不混入百分制。
+
+有界优化最多6轮、256次未缓存日期路由，并设置不含首次外部 OD 采集的15秒墙钟看门狗；候选结构指纹去重，只有比较键严格改善才替换 best。停止原因包括 `quality_target_met / no_new_candidate / no_improvement / route_budget / round_budget / wall_time_limit / data_unavailable / no_feasible_seed`。结果新增向后兼容的 `itinerary_review` 与 `quality_optimization`，审计保留评分/权重版本、分项、诊断、候选数、路由数、动作和停止原因。
+
+反馈校准仅提供离线候选资格检查，默认门槛为200条反馈、80名独立用户、单维一次最多变化3个百分点，并要求 Golden、恶意样例、专家回放和人工批准。求解请求不能提交、加载或激活候选权重。

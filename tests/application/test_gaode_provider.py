@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Barrier, Lock
 
 import fakeredis
 import pytest
@@ -60,6 +61,30 @@ class FakeTransport:
         if self.error is not None:
             raise self.error
         return self.responses[path]
+
+
+class ConcurrentTransport:
+    def __init__(self) -> None:
+        self._barrier = Barrier(2, timeout=2)
+        self._lock = Lock()
+        self.active = 0
+        self.maximum_active = 0
+
+    def get_json(
+        self,
+        path: str,
+        *,
+        params: Mapping[str, str],
+        timeout_seconds: float,
+    ) -> Mapping[str, object]:
+        del path, params, timeout_seconds
+        with self._lock:
+            self.active += 1
+            self.maximum_active = max(self.maximum_active, self.active)
+        self._barrier.wait()
+        with self._lock:
+            self.active -= 1
+        return _payload(duration_seconds=600, distance_m=900)
 
 
 def _payload(
@@ -320,7 +345,7 @@ def test_gaode_redis_cache_reuses_routes_across_clients_without_credentials() ->
     assert "120.165" not in str(keys)
 
 
-def test_gaode_builder_materializes_both_directions_and_selects_walking() -> None:
+def test_gaode_builder_short_circuits_other_modes_when_walking_already_wins() -> None:
     transport = FakeTransport(
         {
             "/v3/direction/walking": _payload(
@@ -352,8 +377,46 @@ def test_gaode_builder_materializes_both_directions_and_selects_walking() -> Non
     assert built.report.requested_pair_count == 2
     assert built.report.gaode_pair_count == 2
     assert built.report.complete
-    assert len(transport.calls) == 4
-    assert transport.calls[0][1]["origin"] != transport.calls[2][1]["origin"]
+    assert len(transport.calls) == 2
+    assert all(call[0] == "/v3/direction/walking" for call in transport.calls)
+    assert transport.calls[0][1]["origin"] != transport.calls[1][1]["origin"]
+
+
+def test_gaode_builder_fetches_independent_pairs_with_bounded_concurrency() -> None:
+    transport = ConcurrentTransport()
+    settings = GaodeSettings(
+        "secret",
+        enabled_modes=(ODTravelMode.WALKING,),
+        maximum_workers=2,
+    )
+    client = GaodeRouteClient(settings, FixedClock(), transport=transport)
+
+    built = GaodeODSnapshotBuilder(settings, client).build({1: ORIGIN, 2: DESTINATION})
+
+    assert built.report.complete
+    assert transport.maximum_active == 2
+    assert dict(built.report.acquisition_metrics)["remote_requests"] == 2
+
+
+def test_gaode_builder_skips_walking_when_straight_line_already_exceeds_limit() -> None:
+    far_destination = Coordinate(30.3000, 120.2200)
+    transport = FakeTransport(
+        {
+            "/v3/direction/walking": _payload(duration_seconds=3_600, distance_m=8_000),
+            "/v3/direction/driving": _payload(duration_seconds=1_200, distance_m=9_000),
+        }
+    )
+    settings = GaodeSettings(
+        "secret",
+        enabled_modes=(ODTravelMode.WALKING, ODTravelMode.DRIVING),
+    )
+    client = GaodeRouteClient(settings, FixedClock(), transport=transport)
+
+    built = GaodeODSnapshotBuilder(settings, client).build({1: ORIGIN, 2: far_destination})
+
+    assert built.report.complete
+    assert len(transport.calls) == 2
+    assert all(call[0] == "/v3/direction/driving" for call in transport.calls)
 
 
 def test_gaode_builder_uses_explicit_departure_coordinates_for_directed_edges() -> None:

@@ -44,12 +44,21 @@ from travel_agent.solver import (
     route_itinerary,
 )
 from travel_agent.solver.degradation import DegradationReport
+from travel_agent.solver.itinerary_review import (
+    ItineraryExperienceReview,
+    build_review_context,
+    evaluate_itinerary_experience,
+)
 from travel_agent.solver.models import ItineraryPlan, RoutedDay
 from travel_agent.solver.quality import SolverQualityReport
 from travel_agent.solver.time_windows import applicable_fixed_sessions
 
 from .gaode import GaodeODSnapshotBuilder
-from .schedule_quality import improve_default_days
+from .schedule_quality import (
+    OptimizationStopReason,
+    ScheduleOptimizationResult,
+    improve_default_days,
+)
 
 LUNCH_EARLIEST_MIN = 11 * 60 + 30
 LUNCH_LATEST_END_MIN = 14 * 60
@@ -175,15 +184,46 @@ class ProductionSolverGateway:
                 weather_by_date=prepared.weather,
             )
             mark_stage("initial_routing")
-            improved = improve_default_days(step1, itinerary, subgraph.provider(), prepared.weather)
+            seed_itinerary = itinerary
+            review_context = build_review_context(
+                prepared.attractions,
+                itinerary,
+                travel_mode=prepared.travel_mode,
+            )
+            optimization = improve_default_days(
+                step1,
+                itinerary,
+                subgraph.provider(),
+                prepared.weather,
+            )
             mark_stage("quality_search")
-            if improved != step1:
+            if optimization.plan != step1:
                 itinerary = route_itinerary(
-                    improved,
+                    optimization.plan,
                     subgraph.provider(),
                     weather_by_date=prepared.weather,
                 )
             mark_stage("final_routing")
+            experience_review = evaluate_itinerary_experience(
+                itinerary,
+                review_context,
+                subgraph.provider(),
+            )
+            seed_review = optimization.initial_review
+            if (
+                optimization.plan != step1
+                and seed_review is not None
+                and experience_review.rank_key >= seed_review.rank_key
+            ):
+                itinerary = seed_itinerary
+                experience_review = seed_review
+                optimization = replace(
+                    optimization,
+                    plan=step1,
+                    searched_review=seed_review,
+                    stop_reason=OptimizationStopReason.NO_IMPROVEMENT,
+                    accepted_actions=(),
+                )
             quality = evaluate_solver_quality(itinerary, prepared.attractions)
             degradation = evaluate_itinerary_degradation(
                 itinerary,
@@ -192,7 +232,15 @@ class ProductionSolverGateway:
                 day_count=len(prepared.trip_dates),
             )
             elapsed_ms = max(0, int((perf_counter() - started) * 1000))
-            result = _result_snapshot(request, snapshot, itinerary, quality, degradation)
+            result = _result_snapshot(
+                request,
+                snapshot,
+                itinerary,
+                quality,
+                degradation,
+                experience_review,
+                optimization,
+            )
             audit = build_solver_run_audit(
                 itinerary,
                 quality,
@@ -216,6 +264,25 @@ class ProductionSolverGateway:
             audit_payload["od_subgraph_hash"] = subgraph.snapshot_hash
             audit_payload["od_subgraph_edge_count"] = len(subgraph.entries)
             audit_payload["od_subgraph_snapshot"] = subgraph.to_dict()
+            audit_payload["itinerary_review"] = experience_review.to_dict()
+            audit_payload["quality_optimization"] = {
+                "stop_reason": optimization.stop_reason.value,
+                "rounds": optimization.rounds,
+                "candidate_count": optimization.candidate_count,
+                "route_evaluation_count": optimization.route_evaluation_count,
+                "accepted_actions": list(optimization.accepted_actions),
+                "initial_score_basis_points": (
+                    optimization.initial_review.score_basis_points
+                    if optimization.initial_review is not None
+                    else None
+                ),
+                "searched_score_basis_points": (
+                    optimization.searched_review.score_basis_points
+                    if optimization.searched_review is not None
+                    else None
+                ),
+                "final_score_basis_points": experience_review.score_basis_points,
+            }
             partial = bool(itinerary.unplaced or itinerary.data_rejected)
             completion = (
                 CompletionKind.PARTIAL_SUCCESS if partial else CompletionKind.COMPLETE_SUCCESS
@@ -650,6 +717,8 @@ def _result_snapshot(
     itinerary: ItineraryPlan,
     quality: SolverQualityReport,
     degradation: DegradationReport,
+    experience_review: ItineraryExperienceReview,
+    optimization: ScheduleOptimizationResult,
 ) -> dict[str, object]:
     external_by_solver_id = {item.attraction.id: item.external_id for item in published.attractions}
     days = []
@@ -805,6 +874,28 @@ def _result_snapshot(
         ],
         "degradations": [_jsonable(item) for item in degradation.notices],
         "quality_gate_passed": quality.gate_passed,
+        "itinerary_review": experience_review.to_dict(),
+        "quality_optimization": _optimization_snapshot(optimization),
+    }
+
+
+def _optimization_snapshot(optimization: ScheduleOptimizationResult) -> dict[str, object]:
+    return {
+        "stop_reason": optimization.stop_reason.value,
+        "rounds": optimization.rounds,
+        "candidate_count": optimization.candidate_count,
+        "route_evaluation_count": optimization.route_evaluation_count,
+        "accepted_actions": list(optimization.accepted_actions),
+        "initial_score_basis_points": (
+            optimization.initial_review.score_basis_points
+            if optimization.initial_review is not None
+            else None
+        ),
+        "final_score_basis_points": (
+            optimization.searched_review.score_basis_points
+            if optimization.searched_review is not None
+            else None
+        ),
     }
 
 
