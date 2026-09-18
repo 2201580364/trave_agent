@@ -1,8 +1,22 @@
 import react from '@vitejs/plugin-react'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { defineConfig } from 'vitest/config'
 
+// Match the production edge redirect so refreshing the router's /admin home
+// preserves the application and lets ADR-0029 restore the server session.
+function redirectAdminBase(req: IncomingMessage, res: ServerResponse, next: () => void) {
+  const [pathname, query] = (req.url ?? '').split('?', 2)
+  if (pathname !== '/admin') return next()
+  res.writeHead(308, { Location: `/admin/${query ? `?${query}` : ''}` })
+  res.end()
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'admin-base-redirect',
+    configureServer(server) { server.middlewares.use(redirectAdminBase) },
+    configurePreviewServer(server) { server.middlewares.use(redirectAdminBase) },
+  }],
   base: '/admin/',
   server: {
     port: 5173,

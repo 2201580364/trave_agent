@@ -55,8 +55,10 @@ _ADMIN_OR_INLINE = re.compile(
 _USER_INLINE = re.compile(
     r"`(GET|POST|PUT|PATCH|DELETE)\s+"
     r"/((?:trips|trip-drafts|plan-shares|attractions|generation-intents|"
-    r"anonymous-sessions|health)/[A-Za-z0-9_/.{}-]+)`"
+    r"anonymous-sessions)/[A-Za-z0-9_/.{}-]+)`"
 )
+# Infrastructure probes are deliberately outside the /api/v1 business prefix.
+_HEALTH_PROBE = re.compile(r"`?(GET)\s+(/health/(?:live|ready))`")
 # Aggregated sub-resource sentence (§15.2.1 O05): "`POST/PATCH/DELETE` 分别作用于
 # `/time-rules/{time_rule_id}`、`/closures/{closure_id}` 和
 # `/date-exceptions/{date_exception_id}`" — each method combines with each
@@ -66,15 +68,6 @@ _AGG_SENTENCE = re.compile(
     r"((?:`/[^`\s]+`[、和\s]*)+)"
 )
 _REVISION_PREFIX = "/api/v1/admin/place-revisions/{revision_id}"
-# Contract §2.1.1 registers the probes under /api/v1/health/*, but the app and
-# ops docs (deploy/production, docs/ops) consistently serve /health/* without
-# the prefix. Treated as a documented alias until the contract is revised.
-_PROBE_ALIASES = {
-    "/api/v1/health/live": "/health/live",
-    "/api/v1/health/ready": "/health/ready",
-}
-
-
 def _normalize_query(path: str) -> str:
     """Drop the query string: ?param registrations describe usage, not routing."""
     return path.split("?", 1)[0]
@@ -88,6 +81,8 @@ def _extract_contract_endpoints(text: str) -> set[tuple[str, str]]:
         endpoints.add((method.lower(), _normalize_query(path)))
     for method, path in _USER_INLINE.findall(text):
         endpoints.add((method.lower(), _normalize_query(f"/api/v1/{path}")))
+    for method, path in _HEALTH_PROBE.findall(text):
+        endpoints.add((method.lower(), _normalize_query(path)))
     for match in _AGG_SENTENCE.finditer(text):
         methods = {m.lower() for m in match.group(1).split("/")}
         for token in re.findall(r"`(/[^`\s]+)`", match.group(2)):
@@ -99,12 +94,6 @@ def _extract_contract_endpoints(text: str) -> set[tuple[str, str]]:
             endpoints.add(("post", collection))
             for method in methods - {"post"}:
                 endpoints.add((method, member))
-    # Documented probe alias: contract path -> served path.
-    for contract_path, served_path in _PROBE_ALIASES.items():
-        for method in ("get",):
-            if (method, contract_path) in endpoints:
-                endpoints.discard((method, contract_path))
-                endpoints.add((method, served_path))
     return endpoints
 
 

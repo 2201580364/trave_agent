@@ -1,5 +1,5 @@
 """Generation execution adapters."""
 
-from .inline import InlineGenerationExecutor
+from .inline import InlineGenerationExecutor, QueuedGenerationExecutor
 
-__all__ = ["InlineGenerationExecutor"]
+__all__ = ["InlineGenerationExecutor", "QueuedGenerationExecutor"]

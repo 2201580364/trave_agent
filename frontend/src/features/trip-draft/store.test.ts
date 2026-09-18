@@ -62,6 +62,25 @@ describe('planning store draft lifecycle', () => {
     usePlanningStore.getState().reset()
   })
 
+  it('persists a pending generation across rehydration and clears it only on completion or draft edits (H3/S8)', async () => {
+    const pending = {
+      kind: 'initial' as const, intentId: 'durable-1', path: '/api/v1/generation-intents',
+      data: { generation_intent_id: 'durable-1', draft_id: 'draft-1', draft_version: 1 },
+      selectedAttractionIds: ['a', 'b']
+    }
+    snapshot().setPendingGeneration(pending)
+    const serialized = taroStorage.get('travel-agent-planning-v1')!
+    snapshot().setPendingGeneration(null)
+    taroStorage.set('travel-agent-planning-v1', serialized)
+    await usePlanningStore.persist.rehydrate()
+    expect(snapshot().pendingGeneration).toEqual(pending)
+    snapshot().setTrip('trip-1', 'revision-1')
+    expect(snapshot().pendingGeneration).toBeNull()
+    snapshot().setPendingGeneration(pending)
+    snapshot().setDraftVersion(2)
+    expect(snapshot().pendingGeneration).toBeNull()
+  })
+
   it('setDraft stores id and version', () => {
     usePlanningStore.getState().setDraft('draft-1', 3)
     const state = snapshot()

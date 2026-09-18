@@ -6,7 +6,7 @@ x-logging: &logging
 
 services:
   api:
-    image: &api-image ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:98e490a500daa9b9be3f0ef2c1b029c523ddc0ba61d3f749be9611e4834aa574
+    image: &api-image ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:ffc72164d06621a9cbad60a39361fa81621dfd7bf843a38632df8e703cdc56da
     restart: unless-stopped
     expose: ["8000"]
     environment:
@@ -18,6 +18,22 @@ services:
       - /srv/travel-agent/data/published:/srv/travel-agent/data/published:ro
     logging: *logging
     networks: [backend, frontend]
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  generation-worker:
+    image: *api-image
+    restart: unless-stopped
+    command: ["python", "-m", "travel_agent.interfaces.generation_worker", "--log-root", "/app/logs"]
+    environment:
+      TRAVEL_AGENT_CONFIG_FILE: /etc/travel-agent/generation-worker/.env
+    volumes:
+      - /etc/travel-agent/api/.env:/etc/travel-agent/generation-worker/.env:ro
+      - /srv/travel-agent/logs/generation-worker:/app/logs
+      - /srv/travel-agent/data/generation-worker:/app/var
+      - /srv/travel-agent/data/published:/srv/travel-agent/data/published:ro
+    logging: *logging
+    networks: [backend]
     depends_on:
       mysql: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -35,7 +51,7 @@ services:
     depends_on:
       mysql: {condition: service_healthy}
   user-h5:
-    image: ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:64c592de8e5f6fd931d15cc11abd18d78cdaaabf125ffa9d2f80e719844bbc5a
+    image: ccr.ccs.tencentyun.com/travel_agent/travel_agent@sha256:1b84d1d327ea1850882e1d2903c8e893dc8f6345f30eccf40baa8d8c978c4766
     restart: unless-stopped
     volumes:
       - /etc/travel-agent/user-h5:/etc/caddy:ro

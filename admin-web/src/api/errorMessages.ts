@@ -14,6 +14,8 @@ import { reasonCodeLabel } from '../ui/displayLabels'
 // Fallback copy for codes that may still surface with English messages from
 // older deployments; server copy wins whenever it already carries Chinese.
 const CODE_FALLBACKS: Record<string, string> = {
+  generation_wait_timeout: '当前等待已超时，后台任务仍会继续。请继续等待或稍后刷新查看，无需重复创建行程。',
+  authentication_required: '游客会话已失效，请重新登录后继续。旧行程不会自动转入新游客身份。',
   admin_authentication_required: '管理员会话无效或已过期，请重新登录。',
   admin_permission_denied: '当前管理员没有执行此操作的权限。',
   admin_operation_intent_conflict: '该操作标识已被用于不同内容，请关闭窗口后重新操作。',

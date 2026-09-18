@@ -321,7 +321,12 @@ def build_admin_router(
 
     principal_dependency = Depends(principal)
 
-    @router.post("/sessions", status_code=status.HTTP_201_CREATED)
+    @router.post(
+        "/sessions",
+        status_code=status.HTTP_201_CREATED,
+        response_model=responses.AdminLoginResponse,
+        response_model_exclude_unset=True,
+    )
     def create_session(
         payload: CreateAdminSessionInput,
         request: Request,
@@ -349,7 +354,7 @@ def build_admin_router(
         service.revoke_current(current, request_id=request.state.request_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    @router.get("/me")
+    @router.get("/me", response_model=responses.AdminMe, response_model_exclude_unset=True)
     def get_me(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
@@ -365,7 +370,9 @@ def build_admin_router(
 
     register_o17_routes(router, holiday_calendar_sync, principal_dependency)
 
-    @router.get("/admin-actors")
+    @router.get(
+        "/admin-actors", response_model=responses.AdminActorPage, response_model_exclude_unset=True
+    )
     def list_admin_actors(
         current: AdminPrincipal = principal_dependency,
         keyword: str | None = Query(default=None, max_length=100),
@@ -391,7 +398,12 @@ def build_admin_router(
             ),
         }
 
-    @router.post("/admin-actors", status_code=status.HTTP_201_CREATED)
+    @router.post(
+        "/admin-actors",
+        status_code=status.HTTP_201_CREATED,
+        response_model=responses.AdminActor,
+        response_model_exclude_unset=True,
+    )
     def create_admin_actor(
         payload: CreateAdminActorInput,
         request: Request,
@@ -409,7 +421,11 @@ def build_admin_router(
         )
         return {**_actor_response(actor), "reused": reused}
 
-    @router.put("/admin-actors/{actor_id}/roles")
+    @router.put(
+        "/admin-actors/{actor_id}/roles",
+        response_model=responses.AdminActor,
+        response_model_exclude_unset=True,
+    )
     def replace_admin_roles(
         actor_id: str,
         payload: ReplaceAdminRolesInput,
@@ -428,7 +444,9 @@ def build_admin_router(
         )
         return {**_actor_response(actor), "reused": reused}
 
-    @router.get("/audit-events")
+    @router.get(
+        "/audit-events", response_model=responses.AdminAuditPage, response_model_exclude_unset=True
+    )
     def list_audit_events(
         current: AdminPrincipal = principal_dependency,
         actor_id: str | None = Query(default=None, max_length=64),
@@ -481,7 +499,11 @@ def build_admin_router(
 
     if review_workflow is not None:
 
-        @router.get("/source-channels")
+        @router.get(
+            "/source-channels",
+            response_model=responses.SourceChannelList,
+            response_model_exclude_unset=True,
+        )
         def list_place_source_channels(
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
@@ -500,7 +522,11 @@ def build_admin_router(
                 ]
             }
 
-        @router.get("/holiday-calendars")
+        @router.get(
+            "/holiday-calendars",
+            response_model=responses.HolidayCalendarList,
+            response_model_exclude_unset=True,
+        )
         def list_holiday_calendars_endpoint(
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
@@ -724,7 +750,11 @@ def build_admin_router(
                 "total": total,
             }
 
-        @router.get("/dashboard-summary")
+        @router.get(
+            "/dashboard-summary",
+            response_model=responses.DashboardSummary,
+            response_model_exclude_unset=True,
+        )
         def get_dashboard_summary(
             current: AdminPrincipal = principal_dependency,
         ) -> dict[str, object]:
@@ -848,7 +878,11 @@ def build_admin_router(
         ) -> dict[str, object]:
             return _review_task_response(review_workflow.get_task(current, task_id=task_id))
 
-        @router.post("/review-tasks/batch-decisions")
+        @router.post(
+            "/review-tasks/batch-decisions",
+            response_model=responses.BatchReviewResult,
+            response_model_exclude_unset=True,
+        )
         def decide_place_review_batch(
             payload: BatchDecidePlaceReviewInput,
             request: Request,
@@ -865,7 +899,11 @@ def build_admin_router(
                 "failed": list(result["failed"]),
             }
 
-        @router.get("/review-tasks/{task_id}/decisions")
+        @router.get(
+            "/review-tasks/{task_id}/decisions",
+            response_model=responses.ReviewDecisionList,
+            response_model_exclude_unset=True,
+        )
         def list_review_decisions(
             task_id: str,
             current: AdminPrincipal = principal_dependency,

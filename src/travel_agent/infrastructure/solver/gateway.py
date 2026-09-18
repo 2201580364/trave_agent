@@ -113,14 +113,26 @@ class ProductionSolverGateway:
 
     def solve(self, request: SolverRequest) -> SolverOutcome:
         started = perf_counter()
+        stage_started = started
+        stage_ms: dict[str, int] = {}
+        acquisition_metrics: dict[str, int] = {}
+
+        def mark_stage(name: str) -> None:
+            nonlocal stage_started
+            now = perf_counter()
+            stage_ms[name] = max(0, int((now - stage_started) * 1000))
+            stage_started = now
+
         try:
             snapshot = self._data.load(request.data_snapshot_version)
+            mark_stage("snapshot_load")
         except LookupError as exc:
             raise SolverExecutionError("data_snapshot_unavailable", retryable=True) from exc
         try:
             if _stable_hash(request.input_snapshot) != request.input_snapshot_hash:
                 raise ValueError("generation input snapshot hash does not match")
             prepared = _prepare_input(request.input_snapshot, snapshot)
+            mark_stage("input_prepare")
             if self._od_builder is not None:
                 selected = {item.id for item in prepared.attractions}
                 places = [item for item in snapshot.attractions if item.attraction.id in selected]
@@ -137,6 +149,8 @@ class ProductionSolverGateway:
                     if item.coordinate is not None
                 }
                 built = self._od_builder.build(arrivals, departure_coordinates=departures)
+                acquisition_metrics = dict(built.report.acquisition_metrics)
+                mark_stage("od_acquisition")
                 if not built.report.complete:
                     raise SolverExecutionError("data_snapshot_unavailable", retryable=True)
                 snapshot = replace(snapshot, travel_time_provider=built.provider, od_basis="gaode")
@@ -146,6 +160,7 @@ class ProductionSolverGateway:
                 snapshot.travel_time_provider,
                 created_at=self._clock.now(),
             )
+            mark_stage("subgraph_prepare")
             step1 = assign_days(
                 prepared.preferences,
                 trip_dates=prepared.trip_dates,
@@ -153,18 +168,22 @@ class ProductionSolverGateway:
                 anchors=prepared.anchors,
                 travel_mode=prepared.travel_mode,
             )
+            mark_stage("day_assignment")
             itinerary = route_itinerary(
                 step1,
                 subgraph.provider(),
                 weather_by_date=prepared.weather,
             )
+            mark_stage("initial_routing")
             improved = improve_default_days(step1, itinerary, subgraph.provider(), prepared.weather)
+            mark_stage("quality_search")
             if improved != step1:
                 itinerary = route_itinerary(
                     improved,
                     subgraph.provider(),
                     weather_by_date=prepared.weather,
                 )
+            mark_stage("final_routing")
             quality = evaluate_solver_quality(itinerary, prepared.attractions)
             degradation = evaluate_itinerary_degradation(
                 itinerary,
@@ -190,7 +209,10 @@ class ProductionSolverGateway:
                 elapsed_ms=elapsed_ms,
                 created_at=self._clock.now(),
             )
+            mark_stage("validation_and_result")
             audit_payload = audit.to_dict()
+            audit_payload["stage_elapsed_ms"] = stage_ms
+            audit_payload["od_acquisition_metrics"] = acquisition_metrics
             audit_payload["od_subgraph_hash"] = subgraph.snapshot_hash
             audit_payload["od_subgraph_edge_count"] = len(subgraph.entries)
             audit_payload["od_subgraph_snapshot"] = subgraph.to_dict()

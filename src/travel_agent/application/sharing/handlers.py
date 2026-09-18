@@ -176,6 +176,11 @@ class CopyPlanShareToDraftHandler:
 
 def _public_share_snapshot(city_id: str, revision: TripRevision) -> dict[str, object]:
     result = revision.result_snapshot
+    provenance = result.get("provenance")
+    fixture_weather = (
+        isinstance(provenance, dict)
+        and provenance.get("weather_basis") == "deterministic_local_fixture"
+    )
     raw_days = result.get("days")
     days = raw_days if isinstance(raw_days, list) else []
     public_days: list[dict[str, object]] = []
@@ -217,8 +222,10 @@ def _public_share_snapshot(city_id: str, revision: TripRevision) -> dict[str, ob
             {
                 "date": raw_day.get("date"),
                 "weather": {
-                    "condition": weather.get("condition"),
-                    "basis": weather.get("basis"),
+                    "condition": None if fixture_weather else weather.get("condition"),
+                    "basis": (
+                        "deterministic_local_fixture" if fixture_weather else weather.get("basis")
+                    ),
                 },
                 "items": items,
             }

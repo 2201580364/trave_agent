@@ -13,6 +13,8 @@ from travel_agent.domain.place_catalog.session_payload import valid_session_timi
 from .entities import (
     Place,
     PlaceAccessPoint,
+    PlaceClosure,
+    PlaceDateException,
     PlaceGeometry,
     PlaceRelation,
     PlaceRevision,
@@ -48,6 +50,8 @@ class ProjectionPublicationContext:
     geometries: tuple[PlaceGeometry, ...]
     access_points: tuple[PlaceAccessPoint, ...]
     time_rules: tuple[PlaceTimeRule, ...]
+    closures: tuple[PlaceClosure, ...]
+    date_exceptions: tuple[PlaceDateException, ...]
     relations: tuple[PlaceRelation, ...]
     projection: SolverPlaceProjection
 
@@ -152,8 +156,22 @@ def evaluate_projection_publication(
                 *(geometry.source_record_id for geometry in context.geometries if geometry.active),
                 *(point.source_record_id for point in context.access_points if point.active),
                 *(rule.source_record_id for rule in context.time_rules if rule.active),
+                *(closure.source_record_id for closure in context.closures if closure.active),
+                *(
+                    exception.source_record_id
+                    for exception in context.date_exceptions
+                    if exception.active
+                ),
             )
         )
+    )
+    relation_source_record_ids = tuple(
+        dict.fromkeys(
+            relation.source_record_id for relation in context.relations if relation.active
+        )
+    )
+    referenced_source_record_ids = tuple(
+        dict.fromkeys((*source_record_ids, *relation_source_record_ids))
     )
     if any(
         source_record_id in source_records_by_id
@@ -180,9 +198,15 @@ def evaluate_projection_publication(
     }
     if not revision.source_record_ids or any(
         source_record_id not in active_source_records
-        for source_record_id in revision.source_record_ids
+        for source_record_id in referenced_source_record_ids
     ):
         reasons.add("MISSING_SOURCE_RECORD")
+    if any(
+        active_source_records[source_record_id].source_decision != "approved"
+        for source_record_id in referenced_source_record_ids
+        if source_record_id in active_source_records
+    ):
+        reasons.add("CONDITIONAL_SOURCE_STAGING_ONLY")
 
     verified_geometries = [
         geometry
@@ -225,6 +249,16 @@ def evaluate_projection_publication(
     ]
     if not revision.is_always_open and not verified_rules:
         reasons.add("TIME_RULE_UNRESOLVED")
+    closures_unverified = any(
+        item.active and (item.review_status != "human_verified" or item.reviewed_at is None)
+        for item in context.closures
+    )
+    exceptions_unverified = any(
+        item.active and (item.review_status != "human_verified" or item.reviewed_at is None)
+        for item in context.date_exceptions
+    )
+    if closures_unverified or exceptions_unverified:
+        reasons.add("TIME_RULE_UNRESOLVED")
     fixed_sessions = [rule for rule in verified_rules if rule.rule_kind == "fixed_session"]
     if revision.place_kind == "show":
         if any(
@@ -245,6 +279,8 @@ def evaluate_projection_publication(
             context.geometries,
             context.access_points,
             context.time_rules,
+            context.closures,
+            context.date_exceptions,
             context.relations,
         )
         for item in items

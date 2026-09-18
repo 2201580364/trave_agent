@@ -1,6 +1,21 @@
 import { AdminApi, createClientId, createOperationIntent } from './adminApi'
 
 describe('AdminApi', () => {
+  it('ignores stale request authorization and notifications after logout or a new login (ADR-0029)', async () => {
+    let token: string | null = 'old-token'
+    let finish!: (response: Response) => void
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise<Response>((resolve) => { finish = resolve }))
+    const unauthorized = vi.fn()
+    const notify = vi.fn()
+    const api = new AdminApi(() => token, unauthorized, notify)
+    const pending = api.getMe()
+    token = 'new-token'
+    finish(new Response(JSON.stringify({ error: { code: 'admin_authentication_required' } }), { status: 401 }))
+    await expect(pending).rejects.toMatchObject({ status: 401 })
+    expect(unauthorized).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+  })
+
   it('creates operation intent IDs when randomUUID is unavailable in an HTTP browser context', () => {
     vi.stubGlobal('crypto', {
       getRandomValues: (bytes: Uint8Array) => {

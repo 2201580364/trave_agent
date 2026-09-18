@@ -69,7 +69,7 @@ export function buildPublicationBlockers(
       description: '当前仍是候选修订版本。数据编辑员先补齐证据并送审，审核员逐项核验后点击“审核通过”。',
       actionLabel: '查看审核操作', target: 'review-actions',
     }
-    if (code === 'MISSING_SOURCE_RECORD' || code === 'SOURCE_RECORD_INVALID' || code === 'SOURCE_RECORD_PLACE_MISMATCH') return {
+    if (code === 'MISSING_SOURCE_RECORD' || code === 'SOURCE_RECORD_INVALID' || code === 'SOURCE_RECORD_PLACE_MISMATCH' || code === 'CONDITIONAL_SOURCE_STAGING_ONLY') return {
       code, title: reasonCodeLabel(code),
       description: '求解器只接受当前地点仍生效的来源记录。请在 O04/O05 证据中选择有效来源，并核对来源地址、观察时间和状态。',
       actionLabel: '查看证据与来源', target: 'o04-evidence',

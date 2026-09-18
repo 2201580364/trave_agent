@@ -8,6 +8,7 @@ from travel_agent.application.admin.errors import AdminPermissionDeniedError
 from travel_agent.application.admin.holiday_calendar_sync import ChinaHolidayCalendarSyncService
 from travel_agent.domain.admin import AdminPrincipal
 
+from . import admin_responses as responses
 from .admin import (
     ConfirmHolidayCalendarPreviewInput,
     CreateHolidayCalendarSyncJobInput,
@@ -24,7 +25,11 @@ def register_o17_routes(
     if holiday_calendar_sync is None:
         return
 
-    @router.get("/holiday-calendar-sync-capability")
+    @router.get(
+        "/holiday-calendar-sync-capability",
+        response_model=responses.HolidaySyncCapability,
+        response_model_exclude_unset=True,
+    )
     def get_holiday_calendar_sync_capability(
         current: AdminPrincipal = principal_dependency,
     ) -> dict[str, object]:
@@ -35,7 +40,12 @@ def register_o17_routes(
             "region_code": "CN",
         }
 
-    @router.post("/holiday-calendar-sync-jobs", status_code=status.HTTP_202_ACCEPTED)
+    @router.post(
+        "/holiday-calendar-sync-jobs",
+        status_code=status.HTTP_202_ACCEPTED,
+        response_model=responses.HolidayCalendarSyncJob,
+        response_model_exclude_unset=True,
+    )
     def create_holiday_calendar_sync_job(
         payload: CreateHolidayCalendarSyncJobInput,
         current: AdminPrincipal = principal_dependency,
@@ -55,7 +65,11 @@ def register_o17_routes(
         )
         return _holiday_sync_job_response(job)
 
-    @router.get("/holiday-calendar-sync-jobs")
+    @router.get(
+        "/holiday-calendar-sync-jobs",
+        response_model=responses.HolidaySyncJobPage,
+        response_model_exclude_unset=True,
+    )
     def list_holiday_calendar_sync_jobs(
         year: int | None = Query(default=None, ge=2000, le=2200),
         job_status: str | None = Query(default=None, alias="status", max_length=32),
@@ -74,7 +88,11 @@ def register_o17_routes(
             "offset": offset,
         }
 
-    @router.get("/holiday-calendar-sync-jobs/{job_id}")
+    @router.get(
+        "/holiday-calendar-sync-jobs/{job_id}",
+        response_model=responses.HolidayCalendarSyncJob,
+        response_model_exclude_unset=True,
+    )
     def get_holiday_calendar_sync_job(
         job_id: str,
         current: AdminPrincipal = principal_dependency,
@@ -83,7 +101,11 @@ def register_o17_routes(
             raise AdminPermissionDeniedError("holiday:calendar:read")
         return _holiday_sync_job_response(holiday_calendar_sync.get_job(job_id))
 
-    @router.post("/holiday-calendar-sync-jobs/{job_id}/cancel")
+    @router.post(
+        "/holiday-calendar-sync-jobs/{job_id}/cancel",
+        response_model=responses.HolidayCalendarSyncJob,
+        response_model_exclude_unset=True,
+    )
     def cancel_holiday_calendar_sync_job(
         job_id: str,
         current: AdminPrincipal = principal_dependency,
@@ -94,7 +116,11 @@ def register_o17_routes(
             holiday_calendar_sync.cancel_job(job_id, cancelled_by=current.admin_actor_id)
         )
 
-    @router.post("/holiday-calendar-sync-jobs/{job_id}/confirm")
+    @router.post(
+        "/holiday-calendar-sync-jobs/{job_id}/confirm",
+        response_model=responses.HolidayCalendarSyncJob,
+        response_model_exclude_unset=True,
+    )
     def confirm_holiday_calendar_preview(
         job_id: str,
         payload: ConfirmHolidayCalendarPreviewInput,
@@ -114,7 +140,11 @@ def register_o17_routes(
             )
         )
 
-    @router.get("/holiday-calendars/{calendar_id}")
+    @router.get(
+        "/holiday-calendars/{calendar_id}",
+        response_model=responses.HolidayCalendarVersion,
+        response_model_exclude_unset=True,
+    )
     def get_holiday_calendar_detail(
         calendar_id: str,
         current: AdminPrincipal = principal_dependency,
@@ -123,7 +153,11 @@ def register_o17_routes(
             raise AdminPermissionDeniedError("holiday:calendar:read")
         return _holiday_calendar_version_response(holiday_calendar_sync.get_calendar(calendar_id))
 
-    @router.get("/holiday-calendars/{calendar_id}/impact")
+    @router.get(
+        "/holiday-calendars/{calendar_id}/impact",
+        response_model=responses.HolidayCalendarImpact,
+        response_model_exclude_unset=True,
+    )
     def get_holiday_calendar_impact(
         calendar_id: str,
         current: AdminPrincipal = principal_dependency,

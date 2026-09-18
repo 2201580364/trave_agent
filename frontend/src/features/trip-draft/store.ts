@@ -2,6 +2,14 @@ import Taro from '@tarojs/taro'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+export interface PendingGeneration {
+  kind: 'initial' | 'replacement'
+  intentId: string
+  path: string
+  data: Record<string, string | number>
+  selectedAttractionIds: string[]
+}
+
 interface PlanningState {
   token: string
   principalId: string
@@ -12,6 +20,8 @@ interface PlanningState {
   revisionId: string
   currentRevisionId: string
   currentRevisionNumber: number
+  pendingGeneration: PendingGeneration | null
+  setPendingGeneration: (pending: PendingGeneration | null) => void
   setSession: (token: string, principalId: string) => void
   setDraft: (draftId: string, draftVersion: number) => void
   setDraftVersion: (version: number) => void
@@ -38,22 +48,25 @@ const empty = {
   tripId: '',
   revisionId: '',
   currentRevisionId: '',
-  currentRevisionNumber: 0
+  currentRevisionNumber: 0,
+  pendingGeneration: null as PendingGeneration | null
 }
 
 export const usePlanningStore = create<PlanningState>()(
   persist(
     (set) => ({
       ...empty,
+      setPendingGeneration: (pendingGeneration) => set({ pendingGeneration }),
       setSession: (token, principalId) => set({ token, principalId }),
       setDraft: (draftId, draftVersion) => set({ draftId, draftVersion }),
-      setDraftVersion: (draftVersion) => set({ draftVersion }),
+      setDraftVersion: (draftVersion) => set({ draftVersion, pendingGeneration: null }),
       setSelectedAttractions: (selectedAttractionIds) => set({ selectedAttractionIds }),
       setTrip: (tripId, revisionId, currentRevisionNumber = 0) => set({
         tripId,
         revisionId,
         currentRevisionId: revisionId,
-        currentRevisionNumber
+        currentRevisionNumber,
+        pendingGeneration: null
       }),
       setCurrentRevision: (currentRevisionId, currentRevisionNumber) => set({
         currentRevisionId,
@@ -67,7 +80,8 @@ export const usePlanningStore = create<PlanningState>()(
         tripId: '',
         revisionId: '',
         currentRevisionId: '',
-        currentRevisionNumber: 0
+        currentRevisionNumber: 0,
+        pendingGeneration: null
       }),
       reset: () => set(empty)
     }),

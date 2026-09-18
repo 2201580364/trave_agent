@@ -55,7 +55,7 @@ def _source(place_id: str = "place_westlake") -> PlaceSourceRecord:
         "https://westlake.hangzhou.gov.cn/example",
         "manual_reference",
         "staging",
-        "conditional",
+        "approved",
         NOW,
         "c" * 64,
         "active",
@@ -199,20 +199,84 @@ def _context(
     projection: SolverPlaceProjection | None = None,
 ) -> ProjectionPublicationContext:
     return ProjectionPublicationContext(
-        _place(),
-        _revision(),
-        source_records if source_records is not None else (_source(),),
-        (_geometry(),),
-        access_points if access_points is not None else _access_points(),
-        (_time_rule(),),
-        relations,
-        projection or _projection(),
+        place=_place(),
+        revision=_revision(),
+        source_records=source_records if source_records is not None else (_source(),),
+        geometries=(_geometry(),),
+        access_points=access_points if access_points is not None else _access_points(),
+        time_rules=(_time_rule(),),
+        closures=(),
+        date_exceptions=(),
+        relations=relations,
+        projection=projection or _projection(),
     )
 
 
 def test_conditional_source_record_is_staging_only() -> None:
     with pytest.raises(ValueError, match="staging only"):
-        replace(_source(), target_stage="published")
+        replace(_source(), source_decision="conditional", target_stage="published")
+
+
+def test_publication_gate_rejects_conditional_source_dependencies() -> None:
+    conditional = replace(
+        _source(),
+        source_record_id="source_westlake_conditional",
+        source_decision="conditional",
+    )
+    exception = PlaceDateException(
+        "exception_westlake_2026_10_01",
+        "place_revision_westlake_1",
+        date(2026, 10, 1),
+        "open_override",
+        8 * 60,
+        18 * 60,
+        17 * 60 + 30,
+        conditional.source_record_id,
+        "human_verified",
+        True,
+        NOW,
+        NOW,
+    )
+
+    reasons = evaluate_projection_publication(
+        replace(
+            _context(source_records=(_source(), conditional)),
+            date_exceptions=(exception,),
+        )
+    )
+
+    assert "CONDITIONAL_SOURCE_STAGING_ONLY" in reasons
+
+
+def test_publication_gate_rejects_unverified_closure_or_date_exception() -> None:
+    closure = PlaceClosure(
+        "closure_westlake_monday",
+        "place_revision_westlake_1",
+        1,
+        "source_westlake_1",
+        "candidate",
+        True,
+        NOW,
+    )
+    exception = PlaceDateException(
+        "exception_westlake_2026_10_01",
+        "place_revision_westlake_1",
+        date(2026, 10, 1),
+        "open_override",
+        8 * 60,
+        18 * 60,
+        17 * 60 + 30,
+        "source_westlake_1",
+        "candidate",
+        True,
+        NOW,
+    )
+
+    reasons = evaluate_projection_publication(
+        replace(_context(), closures=(closure,), date_exceptions=(exception,))
+    )
+
+    assert "TIME_RULE_UNRESOLVED" in reasons
 
 
 def test_projection_hash_is_stable_and_ignores_workflow_status() -> None:
@@ -525,6 +589,14 @@ def test_sqlalchemy_catalog_persists_and_only_gate_can_publish(tmp_path: Path) -
             SelectionExclusionMember("group_westlake_overlap", "place_westlake", NOW)
         )
         uow.place_catalog.add_projection(_projection())
+        context = uow.place_catalog.load_publication_context("projection_westlake_1")
+        assert context is not None
+        assert tuple(item.closure_id for item in context.closures) == (
+            "closure_westlake_monday",
+        )
+        assert tuple(item.date_exception_id for item in context.date_exceptions) == (
+            "exception_westlake_2026_10_01",
+        )
         published = uow.place_catalog.publish_projection("projection_westlake_1", published_at=NOW)
         uow.commit()
 

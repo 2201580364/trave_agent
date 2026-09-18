@@ -41,3 +41,6 @@ logs
 **/admin-password
 **/clients
 **/users.acl
+# The offline H5 overlay release copies a locally verified static build.
+!frontend/dist
+!frontend/dist/**

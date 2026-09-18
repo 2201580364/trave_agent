@@ -1104,6 +1104,20 @@ class SqlAlchemyPlaceCatalogRepository:
                 )
             )
         )
+        closure_rows = tuple(
+            self._session.scalars(
+                select(PlaceClosureRow).where(
+                    PlaceClosureRow.place_revision_id == revision_row.place_revision_id
+                )
+            )
+        )
+        date_exception_rows = tuple(
+            self._session.scalars(
+                select(PlaceDateExceptionRow).where(
+                    PlaceDateExceptionRow.place_revision_id == revision_row.place_revision_id
+                )
+            )
+        )
         relation_rows = tuple(
             self._session.scalars(
                 select(PlaceRelationRow).where(
@@ -1121,6 +1135,8 @@ class SqlAlchemyPlaceCatalogRepository:
                     *(row.source_record_id for row in geometry_rows if row.active),
                     *(row.source_record_id for row in access_rows if row.active),
                     *(row.source_record_id for row in time_rule_rows if row.active),
+                    *(row.source_record_id for row in closure_rows if row.active),
+                    *(row.source_record_id for row in date_exception_rows if row.active),
                     *(row.source_record_id for row in relation_rows if row.active),
                 )
             )
@@ -1146,6 +1162,10 @@ class SqlAlchemyPlaceCatalogRepository:
             geometries=tuple(_geometry_from_row(row) for row in geometry_rows),
             access_points=tuple(_access_point_from_row(row) for row in access_rows),
             time_rules=tuple(_time_rule_from_row(row) for row in time_rule_rows),
+            closures=tuple(_closure_from_row(row) for row in closure_rows),
+            date_exceptions=tuple(
+                _date_exception_from_row(row) for row in date_exception_rows
+            ),
             relations=tuple(_relation_from_row(row) for row in relation_rows),
             projection=_projection_from_row(projection_row),
         )

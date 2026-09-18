@@ -14,7 +14,10 @@ export default function HomePage() {
   const [error, setError] = useState('')
 
   const ensureSession = async () => {
-    if (store.token) return { token: store.token, principalId: store.principalId }
+    if (store.token) {
+      await apiRequest('/api/v1/me', { token: store.token })
+      return { token: store.token, principalId: store.principalId }
+    }
     const session = await apiRequest<AnonymousSession>('/api/v1/anonymous-sessions', {
       method: 'POST',
       data: { device_installation_id: `h5_${Date.now()}` }

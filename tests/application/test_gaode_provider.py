@@ -140,6 +140,9 @@ def test_gaode_client_parses_walking_route_and_uses_ttl_cache() -> None:
     second = client.fetch(ORIGIN, DESTINATION, ODTravelMode.WALKING)
 
     assert first == second
+    assert client.metrics["cache_hits"] == 1
+    assert client.metrics["remote_requests"] == 1
+    assert client.metrics["failures"] == 0
     assert first.duration_min == 11
     assert first.distance_m == 1350
     assert first.mode is ODTravelMode.WALKING

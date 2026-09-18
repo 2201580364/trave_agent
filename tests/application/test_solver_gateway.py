@@ -331,6 +331,10 @@ def test_gateway_runs_versioned_solver_and_maps_stable_result() -> None:
     assert connected_node["travel_fallback_reason"] is None
     assert cast(dict[str, Any], first.result_snapshot)["days"][0]["lunch"]["status"] == "full"
     assert first.audit_payload["solve_run_id"] == "solver_run_1"
+    stages = cast(dict[str, int], first.audit_payload["stage_elapsed_ms"])
+    assert "quality_search" in stages
+    assert "initial_routing" in stages
+    assert all(value >= 0 for value in stages.values())
     assert first.audit_payload["data_snapshot_version"] == VERSION
 
 

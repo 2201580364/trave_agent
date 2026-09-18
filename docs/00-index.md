@@ -63,6 +63,11 @@ data/
 
 ## 维护约定
 
+- [ADR-0029：管理端标签页会话恢复](decisions/ADR-0029-admin-tab-session-recovery.md)：按用户裁决保留 sessionStorage，刷新经服务端验证，防止退出后旧响应恢复主体。
+- [M1 现有工程收尾验证](test/reports/m1-engineering-close-20260918.md)：共享数据库/Redis、十景点真实 OD 冷暖回归、内置浏览器 E2E、事实修订及验收边界。
+
+- [行程评审评分与有界优化方案](product/行程评审评分与有界优化方案.md)：H2/H3/H7，专业导向评审规则、七维评分、结构化修复建议、终止机制与专家验证设计；配套 [ADR-0028 提案](decisions/ADR-0028-explainable-itinerary-review.md)，不替代已接受的运行契约。
+
 - 当前节点/测试基线/下一步变更 → 更新 [process/CURRENT.md](process/CURRENT.md)（唯一状态入口，不在其他文件复述节点）
 - 假设状态变更 → 更新 [assumptions.md](assumptions.md)
 - 技术决策 → 新增 [decisions/](decisions/) 下的 ADR

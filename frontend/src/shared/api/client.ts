@@ -18,6 +18,8 @@ export class ApiError extends Error {
 // Per-code fallback copy; used when the server message does not carry
 // user-facing Chinese text (contract: clients branch on `code`, §2.4).
 const CODE_FALLBACKS: Record<string, string> = {
+  generation_wait_timeout: '当前等待已超时，后台任务仍会继续。请继续等待或稍后刷新查看，无需重复创建行程。',
+  authentication_required: '游客会话已失效，请重新登录后继续。旧行程不会自动转入新游客身份。',
   draft_version_conflict: '草稿已在其他页面更新，请恢复最新版本后继续。',
   generation_intent_conflict: '该生成请求已被用于其他内容，请刷新页面后重试。',
   invalid_state_transition: '当前状态不允许执行该操作，请刷新页面后重试。',
@@ -35,9 +37,15 @@ const CODE_FALLBACKS: Record<string, string> = {
   rate_limited: '请求过于频繁，请稍后再试。',
 }
 
+export function errorMessageForCode(code: string, fallback = '请求失败，请稍后重试。'): string {
+  return CODE_FALLBACKS[code] ?? fallback
+}
+
 function hasChinese(text: string): boolean {
   return /[\u3400-\u9fff]/.test(text)
 }
+
+let openingLogin = false
 
 export async function apiRequest<T>(
   path: string,
@@ -71,7 +79,13 @@ export async function apiRequest<T>(
     const serverMessage = body?.error?.message ?? ''
     const message = serverMessage && hasChinese(serverMessage)
       ? serverMessage
-      : CODE_FALLBACKS[code] ?? '请求失败，请稍后重试。'
+      : errorMessageForCode(code)
+    if (response.statusCode === 401 && options.token && !openingLogin) {
+      openingLogin = true
+      void Taro.redirectTo({ url: '/pages/auth/index?expired=1' })
+        .catch(() => undefined)
+        .finally(() => { openingLogin = false })
+    }
     throw new ApiError(
       response.statusCode,
       code,

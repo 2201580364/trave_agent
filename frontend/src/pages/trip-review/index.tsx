@@ -4,7 +4,8 @@ import { useState } from 'react'
 
 import './index.css'
 
-import type { Draft, GenerationIntent } from '@/entities/planning/types'
+import type { Draft } from '@/entities/planning/types'
+import { useDurableGeneration } from '@/features/trip-draft/use-durable-generation'
 import { usePlanningStore } from '@/features/trip-draft/store'
 import { apiRequest } from '@/shared/api/client'
 import { PageAction } from '@/shared/ui/PageAction'
@@ -19,7 +20,8 @@ interface ReviewResponse {
 export default function TripReviewPage() {
   const store = usePlanningStore()
   const [review, setReview] = useState<ReviewResponse | null>(null)
-  const [loading, setLoading] = useState(false)
+  const generation = useDurableGeneration('initial')
+  const loading = generation.loading
   const [error, setError] = useState('')
 
   useDidShow(() => {
@@ -33,28 +35,12 @@ export default function TripReviewPage() {
 
   const generate = async () => {
     if (!store.token || !store.draftId || !review?.ready_for_generation) return
-    setLoading(true)
-    setError('')
-    try {
-      const intent = await apiRequest<GenerationIntent>('/api/v1/generation-intents', {
-        method: 'POST',
-        token: store.token,
-        data: {
-          generation_intent_id: `intent_${Date.now()}`,
-          draft_id: store.draftId,
-          draft_version: store.draftVersion
-        }
-      })
-      if (intent.status !== 'completed' || !intent.trip_id || !intent.trip_revision_id) {
-        throw new Error(intent.failure_code ? `生成失败：${intent.failure_code}` : '行程仍在生成，请稍后重试。')
-      }
-      store.setTrip(intent.trip_id, intent.trip_revision_id)
-      Taro.redirectTo({ url: '/pages/trip-detail/index' })
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '生成行程失败。')
-    } finally {
-      setLoading(false)
-    }
+    const intentId = `intent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    await generation.run({
+      kind: 'initial', intentId, path: '/api/v1/generation-intents',
+      data: { generation_intent_id: intentId, draft_id: store.draftId, draft_version: store.draftVersion },
+      selectedAttractionIds: store.selectedAttractionIds
+    })
   }
 
   const facts = review?.summary.travel_facts
@@ -91,10 +77,11 @@ export default function TripReviewPage() {
           </>
         )}
         {!review && !error && <View className='notice'>正在恢复生成前摘要…</View>}
-        {error && <View className='error'>{error}</View>}
+        {(error || generation.error) && <View className='error'>{error || generation.error}</View>}
+        {loading && <View className='notice'>正在获取交通并规划行程，刷新后会继续恢复同一任务。</View>}
       </View>
       <PageAction loading={loading} disabled={!review?.ready_for_generation} onClick={generate}>
-        生成我的行程
+        {store.pendingGeneration ? '继续等待当前任务' : '生成我的行程'}
       </PageAction>
     </View>
   )

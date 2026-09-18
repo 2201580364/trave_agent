@@ -51,6 +51,7 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
   const [principal, setPrincipal] = useState<AdminMe | null>(null)
   const [sessionReason, setSessionReason] = useState<SessionReason>(null)
   const tokenRef = useRef<string | null>(readStoredToken())
+  const sessionEpoch = useRef(0)
   const clearSessionRef = useRef<(reason: SessionReason) => void>(() => undefined)
   const requestErrorRef = useRef<(error: unknown) => void>(() => undefined)
   const apiRef = useRef<AdminApi | null>(null)
@@ -64,6 +65,7 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
   const api = apiRef.current
 
   const clearSession = useCallback((reason: SessionReason) => {
+    sessionEpoch.current += 1
     tokenRef.current = null
     persistToken(null)
     setPrincipal(null)
@@ -87,15 +89,18 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
 
   const login = useCallback(
     async (loginName: string, password: string) => {
+      const epoch = ++sessionEpoch.current
       const created = await api.createSession(loginName, password)
+      if (epoch !== sessionEpoch.current) return
       tokenRef.current = created.access_token
       persistToken(created.access_token)
       try {
         const me = await api.getMe()
+        if (epoch !== sessionEpoch.current) return
         setPrincipal(me)
         setSessionReason(null)
       } catch (error) {
-        clearSession(null)
+        if (epoch === sessionEpoch.current) clearSession(null)
         throw error
       }
     },
@@ -103,26 +108,27 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
   )
 
   const logout = useCallback(async () => {
-    try {
-      if (tokenRef.current !== null) await api.revokeCurrentSession()
-    } finally {
-      clearSession('signed-out')
-    }
+    // Capture the authenticated request before clearing locally; a slow response
+    // must never restore the principal or clear a later login (ADR-0029).
+    const revocation = tokenRef.current !== null ? api.revokeCurrentSession() : Promise.resolve()
+    clearSession('signed-out')
+    await revocation
   }, [api, clearSession])
 
   // 挂载恢复：token 存活于 sessionStorage 时经 /me 验证恢复会话，fail-closed。
   useEffect(() => {
     if (tokenRef.current === null) return
+    const epoch = sessionEpoch.current
     let cancelled = false
     void api
       .getMe()
       .then((me) => {
-        if (cancelled) return
+        if (cancelled || epoch !== sessionEpoch.current) return
         setPrincipal(me)
         setSessionReason(null)
       })
       .catch(() => {
-        if (cancelled) return
+        if (cancelled || epoch !== sessionEpoch.current) return
         clearSession('expired')
       })
     return () => {

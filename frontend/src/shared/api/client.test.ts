@@ -8,10 +8,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const taroRequest = vi.fn()
+const redirectTo = vi.fn().mockResolvedValue({})
 
 vi.mock('@tarojs/taro', () => ({
   default: {
-    request: (...args: unknown[]) => taroRequest(...args)
+    request: (...args: unknown[]) => taroRequest(...args),
+    redirectTo: (...args: unknown[]) => redirectTo(...args)
   }
 }))
 
@@ -57,6 +59,13 @@ describe('apiRequest success path', () => {
 })
 
 describe('apiRequest error mapping', () => {
+  it('routes an expired session to explicit login without creating a new identity', async () => {
+    taroRequest.mockResolvedValue({ statusCode: 401, data: { error: { code: 'authentication_required' } } })
+    const error = await apiRequest('/api/v1/me', { token: 'expired' }).catch((e: unknown) => e)
+    expect((error as ApiError).message).toContain('游客会话已失效')
+    expect(redirectTo).toHaveBeenCalledWith({ url: '/pages/auth/index?expired=1' })
+    expect(taroRequest).toHaveBeenCalledTimes(1)
+  })
   it('maps a transport failure to network_unavailable with status 0', async () => {
     taroRequest.mockRejectedValue(new Error('socket hang up'))
 

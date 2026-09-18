@@ -1,14 +1,15 @@
 import { Text, View } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useRouter } from '@tarojs/taro'
 import { useState } from 'react'
 
 import './index.css'
 
 import type { AnonymousSession, Draft } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
-import { apiRequest } from '@/shared/api/client'
+import { apiRequest, errorMessageForCode } from '@/shared/api/client'
 
 export default function AuthPage() {
+  const expired = useRouter().params.expired === '1'
   const store = usePlanningStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -44,6 +45,7 @@ export default function AuthPage() {
         <View className='title'>登录旅行助手</View>
         <View className='subtitle'>保存你的行程，从上次规划的位置继续。</View>
         <View className='card auth-card'>
+          {expired && <View className='notice'>{errorMessageForCode('authentication_required')}</View>}
           <View className='section-title'>轻松开始，不必先填表</View>
           <View className='field-help'>当前版本使用游客身份登录，设备会保存你的规划进度；账号注册功能将在正式账号体系接入后开放。</View>
           <View className={`primary auth-primary ${loading ? 'primary--disabled' : ''}`} onClick={() => !loading && enter()}>

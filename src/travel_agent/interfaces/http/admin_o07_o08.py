@@ -24,7 +24,11 @@ from .admin import (
 def register_o07_o08_routes(
     router: APIRouter, review_workflow: PlaceReviewWorkflowService, principal_dependency: Any
 ) -> None:
-    @router.get("/place-revisions/{revision_id}/source-conflicts")
+    @router.get(
+        "/place-revisions/{revision_id}/source-conflicts",
+        response_model=responses.SourceConflictResponse,
+        response_model_exclude_unset=True,
+    )
     def list_place_source_conflicts(
         revision_id: str,
         current: AdminPrincipal = principal_dependency,

@@ -3,20 +3,12 @@ import { Text, View } from '@tarojs/components'
 import './PlanShareCard.css'
 
 import type { PlanShareContent } from '@/entities/planning/types'
+import { durationLabel, shareWeatherLabel } from '@/entities/planning/display'
 
 function periodLabel(period: string) {
   if (period === 'morning') return '上午'
   if (period === 'afternoon') return '下午'
   return '晚上'
-}
-
-function durationLabel(value: number | null) {
-  if (!value) return ''
-  if (value <= 30) return '约半小时'
-  if (value <= 60) return '约 1 小时'
-  if (value <= 90) return '约 1–1.5 小时'
-  if (value <= 120) return '约 2 小时'
-  return `约 ${Math.round(value / 30) / 2} 小时`
 }
 
 function dateRange(content: PlanShareContent) {
@@ -47,9 +39,7 @@ export function PlanShareCard({ content }: { content: PlanShareContent }) {
               <View className='plan-share-day__index'>DAY {index + 1}</View>
               <View className='plan-share-day__date'>{day.date}</View>
             </View>
-            {day.weather.condition && (
-              <View className='plan-share-day__weather'>天气参考：{day.weather.condition}</View>
-            )}
+            <View className='plan-share-day__weather'>{shareWeatherLabel(day.weather.condition, day.weather.basis)}</View>
             <View className='plan-share-day__items'>
               {day.items.map((item, itemIndex) => (
                 <View key={`${item.name}-${itemIndex}`} className='plan-share-item'>
@@ -60,7 +50,7 @@ export function PlanShareCard({ content }: { content: PlanShareContent }) {
                     <View className='plan-share-item__name'>{item.name}</View>
                     <View className='plan-share-item__meta'>
                       {item.timing_kind === 'fixed_event' ? '固定场次' : periodLabel(item.period)}
-                      {durationLabel(item.duration_min) ? ` · ${durationLabel(item.duration_min)}` : ''}
+                      {item.duration_min != null ? ` · ${durationLabel(item.duration_min)}` : ''}
                     </View>
                   </View>
                 </View>

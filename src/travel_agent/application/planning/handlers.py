@@ -318,7 +318,9 @@ class ExecuteGenerationHandler:
                 running = intent.claim_running(now=self._clock.now())
             except ValueError as exc:
                 raise InvalidStateTransitionError(str(exc)) from exc
-            self._uow.generation_intents.save(running, expected_status=intent.status.value)
+            self._uow.generation_intents.save(
+                running, expected_status=intent.status.value, expected_updated_at=intent.updated_at
+            )
             self._uow.commit()
 
         solver_run_id = self._ids.new_id("solver_run")
@@ -345,12 +347,17 @@ class ExecuteGenerationHandler:
         )
         with self._uow:
             current = self._uow.generation_intents.get(generation_intent_id)
-            if current is None or current.status is not GenerationStatus.RUNNING:
+            if (
+                current is None or current.status is not GenerationStatus.RUNNING
+                or current.updated_at != running.updated_at
+            ):
                 raise InvalidStateTransitionError("generation intent is no longer running")
             self._uow.solver_runs.add(run)
             if not outcome.quality_gate_passed:
                 failed = current.fail(code="quality_gate_failed", retryable=False, now=now)
-                self._uow.generation_intents.save(failed, expected_status="running")
+                self._uow.generation_intents.save(
+                    failed, expected_status="running", expected_updated_at=running.updated_at
+                )
                 self._uow.commit()
                 return GenerationExecutionResult(
                     generation_intent_id, failed.status, solver_run_id, None, None, False
@@ -377,7 +384,7 @@ class ExecuteGenerationHandler:
                         code="trip_revision_conflict", retryable=False, now=now
                     )
                     self._uow.generation_intents.save(
-                        failed, expected_status="running"
+                        failed, expected_status="running", expected_updated_at=running.updated_at
                     )
                     self._uow.commit()
                     return GenerationExecutionResult(
@@ -422,7 +429,7 @@ class ExecuteGenerationHandler:
                         code="trip_revision_conflict", retryable=False, now=now
                     )
                     self._uow.generation_intents.save(
-                        failed, expected_status="running"
+                        failed, expected_status="running", expected_updated_at=running.updated_at
                     )
                     self._uow.commit()
                     return GenerationExecutionResult(
@@ -437,7 +444,9 @@ class ExecuteGenerationHandler:
             completed = current.complete(
                 trip_id=trip_id, trip_revision_id=revision_id, now=now
             )
-            self._uow.generation_intents.save(completed, expected_status="running")
+            self._uow.generation_intents.save(
+                completed, expected_status="running", expected_updated_at=running.updated_at
+            )
             self._uow.commit()
         return GenerationExecutionResult(
             generation_intent_id, completed.status, solver_run_id,
@@ -449,10 +458,15 @@ class ExecuteGenerationHandler:
     ) -> GenerationExecutionResult:
         with self._uow:
             current = self._uow.generation_intents.get(intent.generation_intent_id)
-            if current is None or current.status is not GenerationStatus.RUNNING:
+            if (
+                current is None or current.status is not GenerationStatus.RUNNING
+                or current.updated_at != intent.updated_at
+            ):
                 raise InvalidStateTransitionError("generation intent is no longer running")
             failed = current.fail(code=code, retryable=retryable, now=self._clock.now())
-            self._uow.generation_intents.save(failed, expected_status="running")
+            self._uow.generation_intents.save(
+                failed, expected_status="running", expected_updated_at=intent.updated_at
+            )
             self._uow.commit()
         return GenerationExecutionResult(
             intent.generation_intent_id, failed.status, None, None, None, False

@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from os import PathLike
 from pathlib import Path
+from time import perf_counter
 from typing import Protocol
 
 import httpx
@@ -97,9 +98,7 @@ class GaodeSettings:
             raise ValueError("Gaode cache_ttl_seconds must be positive")
         if not self.data_version.strip():
             raise ValueError("Gaode data_version is required")
-        if not self.enabled_modes or len(set(self.enabled_modes)) != len(
-            self.enabled_modes
-        ):
+        if not self.enabled_modes or len(set(self.enabled_modes)) != len(self.enabled_modes):
             raise ValueError("Gaode enabled_modes must be non-empty and unique")
 
     @classmethod
@@ -118,22 +117,12 @@ class GaodeSettings:
             "TRAVEL_AGENT_GAODE_MODES",
             "walking,transit,driving",
         )
-        modes = tuple(
-            ODTravelMode(item.strip())
-            for item in raw_modes.split(",")
-            if item.strip()
-        )
+        modes = tuple(ODTravelMode(item.strip()) for item in raw_modes.split(",") if item.strip())
         return cls(
             api_key=key,
-            city_code=os.environ.get(
-                "TRAVEL_AGENT_GAODE_CITY_CODE", "330100"
-            ).strip(),
-            timeout_seconds=float(
-                os.environ.get("TRAVEL_AGENT_GAODE_TIMEOUT_SECONDS", "5")
-            ),
-            cache_ttl_seconds=int(
-                os.environ.get("TRAVEL_AGENT_GAODE_CACHE_TTL_SECONDS", "86400")
-            ),
+            city_code=os.environ.get("TRAVEL_AGENT_GAODE_CITY_CODE", "330100").strip(),
+            timeout_seconds=float(os.environ.get("TRAVEL_AGENT_GAODE_TIMEOUT_SECONDS", "5")),
+            cache_ttl_seconds=int(os.environ.get("TRAVEL_AGENT_GAODE_CACHE_TTL_SECONDS", "86400")),
             data_version=os.environ.get(
                 "TRAVEL_AGENT_GAODE_DATA_VERSION", "gaode-route-v1"
             ).strip(),
@@ -425,6 +414,13 @@ class GaodeRouteClient:
         self._before_request = before_request or (lambda: None)
         self._on_success = on_success or (lambda: None)
         self._on_failure = on_failure or (lambda _failure_code: None)
+        self.metrics: dict[str, int] = {
+            "cache_hits": 0,
+            "remote_requests": 0,
+            "provider_wait_ms": 0,
+            "remote_elapsed_ms": 0,
+            "failures": 0,
+        }
 
     def fetch(
         self,
@@ -446,8 +442,15 @@ class GaodeRouteClient:
         )
         cached = self._cache.get(key, now)
         if cached is not None:
+            self.metrics["cache_hits"] += 1
             return cached
-        self._before_request()
+        wait_started = perf_counter()
+        try:
+            self._before_request()
+        finally:
+            self.metrics["provider_wait_ms"] += int((perf_counter() - wait_started) * 1000)
+        remote_started = perf_counter()
+        self.metrics["remote_requests"] += 1
         try:
             payload = self._transport.get_json(
                 _path_for(mode),
@@ -456,6 +459,7 @@ class GaodeRouteClient:
             )
             route = _parse_route(payload, mode, now)
         except GaodeRouteError as exc:
+            self.metrics["failures"] += 1
             self._on_failure(exc.code.value)
             if exc.occurred_at is not None:
                 raise
@@ -465,6 +469,8 @@ class GaodeRouteClient:
                 infocode=exc.infocode,
                 occurred_at=now,
             ) from exc
+        finally:
+            self.metrics["remote_elapsed_ms"] += int((perf_counter() - remote_started) * 1000)
         self._on_success()
         self._cache.put(
             key,
@@ -482,6 +488,7 @@ class GaodeSnapshotBuildReport:
     missing_pair_count: int
     failure_counts: tuple[tuple[str, int], ...]
     failure_details: tuple[GaodeFailureDetail, ...] = ()
+    acquisition_metrics: tuple[tuple[str, int], ...] = ()
 
     @property
     def complete(self) -> bool:
@@ -519,6 +526,7 @@ class GaodeODSnapshotBuilder:
         departure_coordinates: Mapping[int, Coordinate] | None = None,
         selected_node_ids: tuple[int, ...] | None = None,
     ) -> GaodeSnapshotBuild:
+        initial_metrics = self._client.metrics.copy()
         # ADR-0018 / R0.2-06: an area's exit need not be its entrance.
         # Legacy point snapshots explicitly keep one coordinate for both roles.
         node_ids = set(coordinates) if selected_node_ids is None else set(selected_node_ids)
@@ -607,6 +615,10 @@ class GaodeODSnapshotBuilder:
                 missing_count,
                 tuple(sorted(failures.items())),
                 tuple(failure_details),
+                tuple(
+                    (key, value - initial_metrics[key])
+                    for key, value in self._client.metrics.items()
+                ),
             ),
         )
 

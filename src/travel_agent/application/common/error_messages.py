@@ -12,6 +12,11 @@ from collections.abc import Mapping
 
 # Stable admin error code -> versioned user copy (Simplified Chinese).
 ADMIN_ERROR_MESSAGES: Mapping[str, str] = {
+    "generation_wait_timeout": (
+        "当前等待已超时，后台任务仍会继续。"
+        "请继续等待或稍后刷新查看，无需重复创建行程。"
+    ),
+    "authentication_required": "游客会话已失效，请重新登录后继续。旧行程不会自动转入新游客身份。",
     "admin_authentication_required": "管理员会话缺失、已失效或已撤销，请重新登录。",
     "admin_permission_denied": "当前管理员角色无权执行该操作，请联系安全管理员开通权限。",
     "admin_actor_version_conflict": "管理员资料已被其他操作更新，请刷新页面后重试。",

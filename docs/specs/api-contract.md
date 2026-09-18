@@ -39,7 +39,7 @@
 
 ### 2.1.1 运维探针
 
-`GET /api/v1/health/live`（存活）与 `GET /api/v1/health/ready`（就绪，含数据库 readiness 版本校验）为基础设施探针，不属于业务 API 面；无认证，仅暴露健康状态与就绪校验所需的最小信息。负载均衡、部署脚本和监控以此二端点为准，不得用业务端点充当探针。
+`GET /health/live`（存活）与 `GET /health/ready`（就绪，含数据库 readiness 版本校验）为基础设施探针，不属于业务 API 面；无认证，仅暴露健康状态与就绪校验所需的最小信息。它们位于业务 API 前缀之外，以便负载均衡、部署脚本和监控在认证或 API 路由异常时仍可探测服务状态；不得用业务端点充当探针。
 
 ### 2.2 身份
 
@@ -942,7 +942,7 @@ Authorization: Bearer <recipient_anonymous_access_token>
 | HTTP | 机器码 | 语义 | 可原输入重试 |
 |---:|---|---|---:|
 | 400 | `invalid_request` | JSON/请求语义无效 | 否 |
-| 401 | `authentication_required` | token 缺失/失效 | 否 |
+| 401 | `authentication_required` | token 缺失/失效；统一中文提示重新登录，客户端进入登录页由用户明确重建游客身份，不自动转移旧行程 | 否 |
 | 404 | `resource_not_found` | 不存在或无权访问 | 否 |
 | 409 | `draft_version_conflict` | 草稿版本过期 | 否 |
 | 409 | `generation_intent_conflict` | 同 intent 对应不同输入 | 否 |
@@ -961,6 +961,7 @@ Authorization: Bearer <recipient_anonymous_access_token>
 | 500 | `internal_error` | 未预期错误 | 否；用户可稍后发起新请求 |
 | 503 | `provider_unavailable` | 外部服务暂时失败 | 是 |
 | 503 | `generation_temporarily_failed` | 执行器暂时失败 | 是，沿用 intent |
+| 客户端 | `generation_wait_timeout` | 前端等待超时，不代表后台任务失败；保留持久化请求和 intent，刷新或继续等待时重放同一请求 | 是，沿用 intent |
 
 求解器拒绝码保持大写冻结词汇，例如 `CLOSED_ON_DATE`；应用错误码使用小写 snake_case，两者层级不同。
 

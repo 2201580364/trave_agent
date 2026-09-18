@@ -36,6 +36,14 @@ def test_every_registered_code_has_complete_chinese_copy() -> None:
         assert str(message).endswith("。"), code
 
 
+def test_user_session_expiry_copy_does_not_leak_unknown_details() -> None:
+    message = admin_error_message("authentication_required") + summarize_error_details(
+        "authentication_required", {"token": "private-secret"}
+    )
+    assert "游客会话已失效" in message
+    assert "private-secret" not in message
+
+
 def test_planning_issue_messages_are_chinese() -> None:
     for code, message in PLANNING_ISSUE_MESSAGES.items():
         _assert_chinese(message)

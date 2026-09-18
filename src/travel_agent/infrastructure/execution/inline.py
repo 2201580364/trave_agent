@@ -15,3 +15,10 @@ class InlineGenerationExecutor:
 
     def submit(self, generation_intent_id: str) -> None:
         self._handler.handle(generation_intent_id)
+
+
+class QueuedGenerationExecutor:
+    """Persisted workers discover queued intents; HTTP submission must return promptly."""
+
+    def submit(self, generation_intent_id: str) -> None:
+        del generation_intent_id

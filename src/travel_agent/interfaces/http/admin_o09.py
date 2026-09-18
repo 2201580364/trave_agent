@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, Request, status
 from travel_agent.application.admin import PlaceReviewWorkflowService
 from travel_agent.domain.admin import AdminPrincipal
 
+from . import admin_responses as responses
 from .admin import (
     ExecutePublicationBatchInput,
     PrepareProjectionInput,
@@ -21,7 +22,11 @@ from .admin import (
 def register_o09_routes(
     router: APIRouter, review_workflow: PlaceReviewWorkflowService, principal_dependency: Any
 ) -> None:
-    @router.post("/place-revisions/{revision_id}/publications")
+    @router.post(
+        "/place-revisions/{revision_id}/publications",
+        response_model=responses.PublishedProjection,
+        response_model_exclude_unset=True,
+    )
     def publish_place_revision(
         revision_id: str,
         payload: PublishPlaceRevisionInput,
@@ -46,7 +51,11 @@ def register_o09_routes(
             ),
         }
 
-    @router.post("/place-revisions/{revision_id}/projection-preparations")
+    @router.post(
+        "/place-revisions/{revision_id}/projection-preparations",
+        response_model=responses.PreparedProjection,
+        response_model_exclude_unset=True,
+    )
     def prepare_place_revision_projection(
         revision_id: str,
         payload: PrepareProjectionInput,
@@ -71,7 +80,12 @@ def register_o09_routes(
             "gate_reason_codes": list(projection.gate_reason_codes),
         }
 
-    @router.post("/publication-batches/previews", status_code=status.HTTP_201_CREATED)
+    @router.post(
+        "/publication-batches/previews",
+        status_code=status.HTTP_201_CREATED,
+        response_model=responses.PublicationBatch,
+        response_model_exclude_unset=True,
+    )
     def preview_publication_batch(
         payload: PreviewPublicationBatchInput,
         request: Request,
@@ -87,7 +101,11 @@ def register_o09_routes(
             request_id=request.state.request_id,
         )
 
-    @router.post("/publication-batches/{batch_id}/execute")
+    @router.post(
+        "/publication-batches/{batch_id}/execute",
+        response_model=responses.PublicationBatchExecution,
+        response_model_exclude_unset=True,
+    )
     def execute_publication_batch(
         batch_id: str,
         payload: ExecutePublicationBatchInput,
@@ -103,7 +121,11 @@ def register_o09_routes(
             request_id=request.state.request_id,
         )
 
-    @router.get("/research-snapshots")
+    @router.get(
+        "/research-snapshots",
+        response_model=responses.ResearchSnapshotPage,
+        response_model_exclude_unset=True,
+    )
     def list_research_snapshots(
         current: AdminPrincipal = principal_dependency,
         city_id: str | None = Query(default=None, max_length=64),
@@ -119,7 +141,11 @@ def register_o09_routes(
             "offset": offset,
         }
 
-    @router.get("/research-snapshots/{snapshot_id}")
+    @router.get(
+        "/research-snapshots/{snapshot_id}",
+        response_model=responses.ResearchSnapshot,
+        response_model_exclude_unset=True,
+    )
     def get_research_snapshot(
         snapshot_id: str,
         current: AdminPrincipal = principal_dependency,

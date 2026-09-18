@@ -10,6 +10,7 @@
   "scripts": {
     "dev:h5": "taro build --type h5 --watch",
     "build:h5": "taro build --type h5",
+    "build:h5:release": "npm run build:h5 && node ./scripts/version-h5-assets.mjs",
     "build:weapp": "taro build --type weapp",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import './index.css'
 
+import { distanceLabel, durationLabel, weatherSourceLabel } from '@/entities/planning/display'
 import type { Draft, MealBreak, TripRevision } from '@/entities/planning/types'
 import { NodeFeedbackControl } from '@/features/feedback/NodeFeedbackControl'
 import { TripFeedbackPanel } from '@/features/feedback/TripFeedbackPanel'
@@ -20,26 +21,11 @@ function minuteLabel(value: number) {
 
 function arrivalLabel(value: number, fixedEvent = false) {
   if (fixedEvent) return `${minuteLabel(value)} 场次`
-  const rounded = Math.round(value / 10) * 10
-  return `约 ${minuteLabel(rounded)} 到达`
-}
-
-function durationLabel(value: number) {
-  if (value <= 30) return '20–30 分钟'
-  if (value <= 60) return '半小时至 1 小时'
-  if (value <= 90) return '1–1.5 小时'
-  if (value <= 120) return '1.5–2 小时'
-  const hours = Math.round(value / 30) / 2
-  return `${hours} 小时`
+  return `${minuteLabel(value)} 到达`
 }
 
 function transitDurationLabel(value: number) {
-  if (value <= 6) return '5–10 分钟'
-  if (value <= 12) return '10–15 分钟'
-  if (value <= 20) return '15–25 分钟'
-  if (value <= 30) return '25–40 分钟'
-  const start = Math.floor(value / 10) * 10
-  return `${start}–${start + 15} 分钟`
+  return durationLabel(value)
 }
 
 function dayTransitLabel(value: number) {
@@ -56,16 +42,10 @@ function transportModeLabel(mode?: string | null) {
   return '驾车/打车'
 }
 
-function distanceLabel(value?: number | null) {
-  if (!value || value <= 0) return ''
-  if (value < 1000) return ` · ${Math.round(value / 50) * 50} 米`
-  return ` · 约 ${(value / 1000).toFixed(value < 10000 ? 1 : 0)} 公里`
-}
-
 function mealLabel(name: string, meal?: MealBreak | null) {
   if (!meal || meal.status === 'unscheduled') return `${name}留白 · 未能安排`
   const time = meal.start_min != null && meal.end_min != null
-    ? ` · 建议 ${minuteLabel(Math.floor(meal.start_min / 10) * 10)}–${minuteLabel(Math.floor(meal.end_min / 10) * 10)} 前后`
+    ? ` · 建议 ${minuteLabel(meal.start_min)}–${minuteLabel(meal.end_min)} 前后`
     : ''
   return `${name}留白${meal.status === 'reduced' ? ' · 已缩短' : ' · 已安排'}${time}`
 }
@@ -206,7 +186,7 @@ export default function TripDetailPage() {
                 <View className='day-heading'>
                   <View>
                     <View className='section-title'>{day.date}</View>
-                    <View className='field-help'>{dayTransitLabel(dayTransitMin)} · {day.weather?.basis === 'forecast' ? '天气预报' : '气候参考'}</View>
+                    <View className='field-help'>{dayTransitLabel(dayTransitMin)} · {weatherSourceLabel(result.provenance?.weather_basis, day.weather?.basis)}</View>
                   </View>
                   <View className='status-badge'>{day.search_status === 'best_so_far' ? '当前最优可行方案' : '已完成安排'}</View>
                 </View>
@@ -284,7 +264,7 @@ export default function TripDetailPage() {
 
             <View className='card provenance-card'>
               <View className='section-title'>这份行程依据什么生成</View>
-              <View className='field-help'>使用已发布的景点、天气和交通数据快照；刷新页面不会重新随机排列节点。</View>
+              <View className='field-help'>景点来自已发布目录，天气和交通来源见每日说明；刷新页面恢复原行程，不会重新排列节点。</View>
             </View>
 
             {!isHistorical && (

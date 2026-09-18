@@ -98,6 +98,7 @@ const reasonLabels: Record<string, string> = {
   FIXED_SESSION_REQUIRED: '演出地点需要固定场次规则',
   SOURCE_CONFLICT_UNRESOLVED: '来源冲突尚未裁决',
   SOURCE_RECORD_PLACE_MISMATCH: '来源记录不属于当前地点',
+  CONDITIONAL_SOURCE_STAGING_ONLY: '条件来源只能用于待审核数据',
   PLACE_NOT_SOLVER_ELIGIBLE: '修订版本尚未获得求解资格',
   OVERLAPPING_SELECTION_UNRESOLVED: '重叠地点关系尚未裁决',
   RELATION_REVIEW_REQUIRED: '地点关系尚未完成检查',

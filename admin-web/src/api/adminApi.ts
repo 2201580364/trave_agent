@@ -451,10 +451,11 @@ export class AdminApi {
     init: RequestInit & { authenticated?: boolean } = {},
   ): Promise<T> {
     const { authenticated = true, ...requestInit } = init
+    const requestToken = authenticated ? this.getAccessToken() : null
     const headers = new Headers(requestInit.headers)
     if (requestInit.body !== undefined) headers.set('Content-Type', 'application/json')
     if (authenticated) {
-      const token = this.getAccessToken()
+      const token = requestToken
       if (!token) {
         this.onUnauthorized()
         throw new AdminApiError(401, 'admin_authentication_required', '管理员会话不存在')
@@ -471,7 +472,7 @@ export class AdminApi {
         'admin_network_error',
         '无法连接管理服务，请检查网络或服务状态。',
       )
-      this.onRequestError?.(error)
+      if (!authenticated || requestToken === this.getAccessToken()) this.onRequestError?.(error)
       throw error
     }
     if (response.ok) {
@@ -485,7 +486,10 @@ export class AdminApi {
     } catch {
       // Keep the stable fallback below; never include an untrusted response body.
     }
-    if (response.status === 401 && authenticated) this.onUnauthorized()
+    const currentSessionRequest = !authenticated || requestToken === this.getAccessToken()
+    if (response.status === 401 && authenticated && currentSessionRequest) {
+      this.onUnauthorized()
+    }
     const code = body.error?.code ?? 'admin_request_failed'
     const error = new AdminApiError(
       response.status,
@@ -495,7 +499,7 @@ export class AdminApi {
       body.error?.details,
       body.error?.field_errors,
     )
-    this.onRequestError?.(error)
+    if (currentSessionRequest) this.onRequestError?.(error)
     throw error
   }
 }

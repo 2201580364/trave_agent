@@ -22,6 +22,7 @@ dependencies = [
 [project.scripts]
 travel-agent-archive-logs = "travel_agent.observability.archive:main"
 travel-agent-holiday-worker = "travel_agent.infrastructure.holiday_sync.worker_runtime:main"
+travel-agent-generation-worker = "travel_agent.interfaces.generation_worker:main"
 
 [project.optional-dependencies]
 dev = [

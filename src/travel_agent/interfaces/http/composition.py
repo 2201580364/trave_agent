@@ -32,7 +32,7 @@ from travel_agent.infrastructure.database import (
     build_session_factory,
     ensure_builtin_holiday_calendar_seeds,
 )
-from travel_agent.infrastructure.execution import InlineGenerationExecutor
+from travel_agent.infrastructure.execution import QueuedGenerationExecutor
 from travel_agent.infrastructure.holiday_sync import (
     AiHolidayAnnouncementExtractor,
     GovCnAnnouncementDiscoverer,
@@ -218,13 +218,13 @@ def build_http_app(
             settings.admin_bootstrap_password,
         )
     share_tokens = HmacPlanShareTokenCodec(settings.plan_share_token_secret)
-    return create_app(
+    app = create_app(
         HttpContainer(
             uow_factory,
             clock,
             ids,
             snapshots,
-            InlineGenerationExecutor(execute),
+            QueuedGenerationExecutor(),
             identity,
             published_data,
             DatabaseReadiness(sessions).check,
@@ -234,3 +234,9 @@ def build_http_app(
             holiday_calendar_sync,
         )
     )
+    # The worker process builds this composition without serving HTTP and uses
+    # the same immutable published-data and provider-governance wiring.
+    app.state.generation_handler = execute
+    app.state.generation_uow_factory = uow_factory
+    app.state.generation_clock = clock
+    return app

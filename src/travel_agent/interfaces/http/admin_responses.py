@@ -6,7 +6,7 @@ context fields are omitted with response_model_exclude_unset; explicit nulls sta
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 ReviewCheckKey = Literal["basic", "source", "geometry", "access_point", "time", "relation"]
 ReviewTaskStatus = Literal[
@@ -271,3 +271,330 @@ class PlaceTimePreview(AdminResponse):
     reason_codes: list[str]
     applied_exception_ids: list[str]
     rule_ids: list[str]
+
+
+# H3 / S8: remaining management response contracts.
+
+
+class AdminLoginResponse(AdminResponse):
+    admin_actor_id: str
+    access_token: str
+    expires_at: str
+    role_keys: list[str]
+    permissions: list[str]
+
+
+class AdminMe(AdminResponse):
+    admin_actor_id: str
+    login_name: str
+    role_keys: list[str]
+    permissions: list[str]
+    expires_at: str
+
+
+AdminActorStatus = Literal["active"] | Literal["disabled"] | Literal["locked"]
+
+
+class AdminActor(AdminResponse):
+    admin_actor_id: str
+    login_name: str
+    status: AdminActorStatus
+    version: int
+    session_version: int
+    role_keys: list[str]
+    created_at: str
+    updated_at: str
+    reused: bool = False
+
+
+AdminAuditResult = Literal["succeeded"] | Literal["rejected"] | Literal["failed"]
+
+
+class AdminAuditEvent(AdminResponse):
+    audit_event_id: str
+    actor_id: str
+    actor_login_name: str | None
+    actor_role: str
+    action: str
+    target_type: str
+    target_id: str
+    target_revision: str | None
+    before_digest: str | None
+    after_digest: str | None
+    reason_code: str
+    reason_text: str | None
+    request_id: str
+    operation_intent_id: str | None
+    result: AdminAuditResult
+    error_code: str | None
+    occurred_at: str
+
+
+class ReviewDecision(AdminResponse):
+    review_decision_id: str
+    review_task_id: str
+    place_revision_id: str
+    actor_id: str
+    actor_role: str
+    decision_kind: Literal["approve"] | Literal["request_changes"] | Literal["cancel"]
+    reason_code: str
+    reason_text: str | None
+    created_at: str
+
+
+class SourceConflictRecord(AdminResponse):
+    source_record_id: str
+    source_url: str
+    source_decision: str
+    status: str
+    observed_at: str
+
+
+class SourceConflict(AdminResponse):
+    source_id: str
+    resolved: bool
+    records: list[SourceConflictRecord]
+
+
+class SourceConflictResponse(AdminResponse):
+    revision_id: str
+    items: list[SourceConflict]
+
+
+class PublicationBatchItem(AdminResponse):
+    batch_item_id: str
+    place_revision_id: str
+    status: (
+        Literal["pending"]
+        | Literal["publishable"]
+        | Literal["blocked"]
+        | Literal["published"]
+        | Literal["failed"]
+    )
+    reason_codes: list[str]
+    projection_id: str | None
+    published_at: str | None
+    canonical_name: str = ""
+    admin_area: str = ""
+    place_kind: str = ""
+    category: str = ""
+    revision_number: int = 0
+
+
+class PublicationBatch(AdminResponse):
+    batch_id: str
+    city_id: str
+    operation_intent_id: str
+    status: (
+        Literal["preview"]
+        | Literal["executing"]
+        | Literal["published"]
+        | Literal["partial_failed"]
+        | Literal["failed"]
+    )
+    snapshot_id: str | None
+    created_at: str
+    items: list[PublicationBatchItem]
+
+
+class ResearchSnapshot(AdminResponse):
+    snapshot_id: str
+    data_snapshot_version: str
+    city_id: str
+    content_sha256: str
+    source_batch_id: str
+    created_at: str
+    status: Literal["published"]
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class DashboardSummaryRevisions(AdminResponse):
+    candidate: int
+    human_verified: int
+    published: int
+
+
+class DashboardSummary(AdminResponse):
+    revisions: DashboardSummaryRevisions
+    review_tasks: dict[str, int]
+    recent_ready_tasks: list[ReviewTask]
+
+
+class HolidayCalendarPeriodsItem(AdminResponse):
+    name: str
+    start: str
+    end: str
+
+
+class HolidayCalendar(AdminResponse):
+    calendar_id: str
+    display_name: str
+    source_note: str
+    source_record_id: str | None = Field(default=None)
+    periods: list[HolidayCalendarPeriodsItem]
+
+
+class HolidayCalendarSyncJob(AdminResponse):
+    source_published_at: str | None
+    source_content_sha256: str | None
+    sync_job_id: str
+    region_code: str
+    year: int
+    mode: Literal["preview"] | Literal["sync"]
+    status: (
+        Literal["queued"]
+        | Literal["running"]
+        | Literal["not_announced"]
+        | Literal["temporarily_unavailable"]
+        | Literal["needs_attention"]
+        | Literal["validated_preview"]
+        | Literal["published"]
+        | Literal["up_to_date"]
+        | Literal["cancelled"]
+    )
+    source_url: str | None = Field(default=None)
+    source_title: str | None = Field(default=None)
+    validation_result: dict[str, Any]
+    calendar_id: str | None = Field(default=None)
+    attempt_count: int
+    next_retry_at: str | None = Field(default=None)
+    created_by: str
+    created_at: str
+    started_at: str | None = Field(default=None)
+    finished_at: str | None = Field(default=None)
+
+
+class HolidayCalendarVersionPeriodsItem(AdminResponse):
+    holiday_name: str
+    start_date: str
+    end_date: str
+    evidence_quote: str
+    display_order: int
+
+
+class HolidayCalendarVersionAdjustedWorkdaysItem(AdminResponse):
+    service_date: str
+    holiday_name: str
+    evidence_quote: str
+
+
+class HolidayCalendarVersion(AdminResponse):
+    calendar_id: str
+    region_code: str
+    year: int
+    version: int
+    status: Literal["published"] | Literal["superseded"]
+    display_name: str
+    source_record_id: str
+    source_content_sha256: str
+    normalized_digest: str
+    supersedes_calendar_id: str | None = Field(default=None)
+    published_at: str
+    periods: list[HolidayCalendarVersionPeriodsItem]
+    adjusted_workdays: list[HolidayCalendarVersionAdjustedWorkdaysItem]
+
+
+class HolidayCalendarImpactAffectedPlacesItem(AdminResponse):
+    place_revision_id: str
+    place_name: str
+    admin_area: str
+    materialized_exception_count: int
+
+
+class HolidayCalendarImpact(AdminResponse):
+    calendar_id: str
+    compared_calendar_id: str | None = Field(default=None)
+    changed_date_count: int
+    added_holiday_dates: list[str]
+    removed_holiday_dates: list[str]
+    added_adjusted_workdays: list[str]
+    removed_adjusted_workdays: list[str]
+    affected_places: list[HolidayCalendarImpactAffectedPlacesItem]
+    historical_rows_without_provenance_excluded: bool
+
+
+class SourceChannel(AdminResponse):
+    source_id: str
+    display_name: str
+    source_kind: str
+    decision: Literal["approved"] | Literal["conditional"]
+    collection_modes: list[str]
+    base_urls: list[str]
+    conditions: list[str]
+
+
+class AdminActorPage(AdminResponse):
+    items: list[AdminActor]
+    limit: int
+    offset: int
+    total: int
+
+
+class AdminAuditPage(AdminResponse):
+    items: list[AdminAuditEvent]
+    limit: int
+    offset: int
+    total: int
+
+
+class SourceChannelList(AdminResponse):
+    items: list[SourceChannel]
+
+
+class HolidayCalendarList(AdminResponse):
+    items: list[HolidayCalendar]
+
+
+class HolidaySyncCapability(AdminResponse):
+    execution_available: bool
+    region_code: str
+
+
+class HolidaySyncJobPage(AdminResponse):
+    items: list[HolidayCalendarSyncJob]
+    limit: int
+    offset: int
+
+
+class ReviewDecisionList(AdminResponse):
+    items: list[ReviewDecision]
+
+
+class BatchReviewFailure(AdminResponse):
+    task_id: str | None
+    error_code: str
+    message: str
+
+
+class BatchReviewResult(AdminResponse):
+    total: int
+    succeeded: list[ReviewTask]
+    failed: list[BatchReviewFailure]
+
+
+class PreparedProjection(AdminResponse):
+    projection_id: str
+    place_revision_id: str
+    status: str
+    projection_hash: str
+    gate_reason_codes: list[str]
+
+
+class PublishedProjection(AdminResponse):
+    projection_id: str
+    place_revision_id: str
+    data_snapshot_version: str
+    status: str
+    published_at: str | None
+
+
+class ResearchSnapshotPage(AdminResponse):
+    items: list[ResearchSnapshot]
+    limit: int
+    offset: int
+
+
+class PublicationBatchExecution(AdminResponse):
+    batch: PublicationBatch
+    snapshot: ResearchSnapshot | None
+    reused: bool

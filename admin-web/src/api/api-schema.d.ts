@@ -1275,6 +1275,115 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdminActor */
+        AdminActor: {
+            /** Admin Actor Id */
+            admin_actor_id: string;
+            /** Created At */
+            created_at: string;
+            /** Login Name */
+            login_name: string;
+            /**
+             * Reused
+             * @default false
+             */
+            reused: boolean;
+            /** Role Keys */
+            role_keys: string[];
+            /** Session Version */
+            session_version: number;
+            /** Status */
+            status: "active" | "disabled" | "locked";
+            /** Updated At */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** AdminActorPage */
+        AdminActorPage: {
+            /** Items */
+            items: components["schemas"]["AdminActor"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminAuditEvent */
+        AdminAuditEvent: {
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id: string;
+            /** Actor Login Name */
+            actor_login_name: string | null;
+            /** Actor Role */
+            actor_role: string;
+            /** After Digest */
+            after_digest: string | null;
+            /** Audit Event Id */
+            audit_event_id: string;
+            /** Before Digest */
+            before_digest: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Occurred At */
+            occurred_at: string;
+            /** Operation Intent Id */
+            operation_intent_id: string | null;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Text */
+            reason_text: string | null;
+            /** Request Id */
+            request_id: string;
+            /** Result */
+            result: "succeeded" | "rejected" | "failed";
+            /** Target Id */
+            target_id: string;
+            /** Target Revision */
+            target_revision: string | null;
+            /** Target Type */
+            target_type: string;
+        };
+        /** AdminAuditPage */
+        AdminAuditPage: {
+            /** Items */
+            items: components["schemas"]["AdminAuditEvent"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminLoginResponse */
+        AdminLoginResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Admin Actor Id */
+            admin_actor_id: string;
+            /** Expires At */
+            expires_at: string;
+            /** Permissions */
+            permissions: string[];
+            /** Role Keys */
+            role_keys: string[];
+        };
+        /** AdminMe */
+        AdminMe: {
+            /** Admin Actor Id */
+            admin_actor_id: string;
+            /** Expires At */
+            expires_at: string;
+            /** Login Name */
+            login_name: string;
+            /** Permissions */
+            permissions: string[];
+            /** Role Keys */
+            role_keys: string[];
+        };
         /** AnonymousSessionInput */
         AnonymousSessionInput: {
             /** Device Installation Id */
@@ -1325,6 +1434,24 @@ export interface components {
             reason_text?: string | null;
             /** Task Id */
             task_id: string;
+        };
+        /** BatchReviewFailure */
+        BatchReviewFailure: {
+            /** Error Code */
+            error_code: string;
+            /** Message */
+            message: string;
+            /** Task Id */
+            task_id: string | null;
+        };
+        /** BatchReviewResult */
+        BatchReviewResult: {
+            /** Failed */
+            failed: components["schemas"]["BatchReviewFailure"][];
+            /** Succeeded */
+            succeeded: components["schemas"]["ReviewTask"][];
+            /** Total */
+            total: number;
         };
         /** ConfirmHolidayCalendarPreviewInput */
         ConfirmHolidayCalendarPreviewInput: {
@@ -1442,6 +1569,25 @@ export interface components {
          * @enum {string}
          */
         CrowdType: "unspecified" | "solo" | "couple" | "friends" | "family_with_children" | "with_elderly";
+        /** DashboardSummary */
+        DashboardSummary: {
+            /** Recent Ready Tasks */
+            recent_ready_tasks: components["schemas"]["ReviewTask"][];
+            /** Review Tasks */
+            review_tasks: {
+                [key: string]: number;
+            };
+            revisions: components["schemas"]["DashboardSummaryRevisions"];
+        };
+        /** DashboardSummaryRevisions */
+        DashboardSummaryRevisions: {
+            /** Candidate */
+            candidate: number;
+            /** Human Verified */
+            human_verified: number;
+            /** Published */
+            published: number;
+        };
         /** DecidePlaceReviewInput */
         DecidePlaceReviewInput: {
             /** Decision Kind */
@@ -1527,6 +1673,65 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HolidayCalendar */
+        HolidayCalendar: {
+            /** Calendar Id */
+            calendar_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Periods */
+            periods: components["schemas"]["HolidayCalendarPeriodsItem"][];
+            /** Source Note */
+            source_note: string;
+            /** Source Record Id */
+            source_record_id?: string | null;
+        };
+        /** HolidayCalendarImpact */
+        HolidayCalendarImpact: {
+            /** Added Adjusted Workdays */
+            added_adjusted_workdays: string[];
+            /** Added Holiday Dates */
+            added_holiday_dates: string[];
+            /** Affected Places */
+            affected_places: components["schemas"]["HolidayCalendarImpactAffectedPlacesItem"][];
+            /** Calendar Id */
+            calendar_id: string;
+            /** Changed Date Count */
+            changed_date_count: number;
+            /** Compared Calendar Id */
+            compared_calendar_id?: string | null;
+            /** Historical Rows Without Provenance Excluded */
+            historical_rows_without_provenance_excluded: boolean;
+            /** Removed Adjusted Workdays */
+            removed_adjusted_workdays: string[];
+            /** Removed Holiday Dates */
+            removed_holiday_dates: string[];
+        };
+        /** HolidayCalendarImpactAffectedPlacesItem */
+        HolidayCalendarImpactAffectedPlacesItem: {
+            /** Admin Area */
+            admin_area: string;
+            /** Materialized Exception Count */
+            materialized_exception_count: number;
+            /** Place Name */
+            place_name: string;
+            /** Place Revision Id */
+            place_revision_id: string;
+        };
+        /** HolidayCalendarList */
+        HolidayCalendarList: {
+            /** Items */
+            items: components["schemas"]["HolidayCalendar"][];
+        };
+        /** HolidayCalendarPeriodsItem */
+        HolidayCalendarPeriodsItem: {
+            /** End */
+            end: string;
+            /** Name */
+            name: string;
+            /** Start */
+            start: string;
+        };
         /** HolidayCalendarPreviewPeriodInput */
         HolidayCalendarPreviewPeriodInput: {
             /**
@@ -1555,6 +1760,112 @@ export interface components {
             evidence_quote: string;
             /** Holiday Name */
             holiday_name: string;
+        };
+        /** HolidayCalendarSyncJob */
+        HolidayCalendarSyncJob: {
+            /** Attempt Count */
+            attempt_count: number;
+            /** Calendar Id */
+            calendar_id?: string | null;
+            /** Created At */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Mode */
+            mode: "preview" | "sync";
+            /** Next Retry At */
+            next_retry_at?: string | null;
+            /** Region Code */
+            region_code: string;
+            /** Source Content Sha256 */
+            source_content_sha256: string | null;
+            /** Source Published At */
+            source_published_at: string | null;
+            /** Source Title */
+            source_title?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Status */
+            status: "queued" | "running" | "not_announced" | "temporarily_unavailable" | "needs_attention" | "validated_preview" | "published" | "up_to_date" | "cancelled";
+            /** Sync Job Id */
+            sync_job_id: string;
+            /** Validation Result */
+            validation_result: {
+                [key: string]: unknown;
+            };
+            /** Year */
+            year: number;
+        };
+        /** HolidayCalendarVersion */
+        HolidayCalendarVersion: {
+            /** Adjusted Workdays */
+            adjusted_workdays: components["schemas"]["HolidayCalendarVersionAdjustedWorkdaysItem"][];
+            /** Calendar Id */
+            calendar_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Normalized Digest */
+            normalized_digest: string;
+            /** Periods */
+            periods: components["schemas"]["HolidayCalendarVersionPeriodsItem"][];
+            /** Published At */
+            published_at: string;
+            /** Region Code */
+            region_code: string;
+            /** Source Content Sha256 */
+            source_content_sha256: string;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Status */
+            status: "published" | "superseded";
+            /** Supersedes Calendar Id */
+            supersedes_calendar_id?: string | null;
+            /** Version */
+            version: number;
+            /** Year */
+            year: number;
+        };
+        /** HolidayCalendarVersionAdjustedWorkdaysItem */
+        HolidayCalendarVersionAdjustedWorkdaysItem: {
+            /** Evidence Quote */
+            evidence_quote: string;
+            /** Holiday Name */
+            holiday_name: string;
+            /** Service Date */
+            service_date: string;
+        };
+        /** HolidayCalendarVersionPeriodsItem */
+        HolidayCalendarVersionPeriodsItem: {
+            /** Display Order */
+            display_order: number;
+            /** End Date */
+            end_date: string;
+            /** Evidence Quote */
+            evidence_quote: string;
+            /** Holiday Name */
+            holiday_name: string;
+            /** Start Date */
+            start_date: string;
+        };
+        /** HolidaySyncCapability */
+        HolidaySyncCapability: {
+            /** Execution Available */
+            execution_available: boolean;
+            /** Region Code */
+            region_code: string;
+        };
+        /** HolidaySyncJobPage */
+        HolidaySyncJobPage: {
+            /** Items */
+            items: components["schemas"]["HolidayCalendarSyncJob"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** OverrideSessionPreview */
         OverrideSessionPreview: {
@@ -2025,6 +2336,19 @@ export interface components {
             /** Solver Node Id */
             solver_node_id?: number | null;
         };
+        /** PreparedProjection */
+        PreparedProjection: {
+            /** Gate Reason Codes */
+            gate_reason_codes: string[];
+            /** Place Revision Id */
+            place_revision_id: string;
+            /** Projection Hash */
+            projection_hash: string;
+            /** Projection Id */
+            projection_id: string;
+            /** Status */
+            status: string;
+        };
         /** PreviewPublicationBatchInput */
         PreviewPublicationBatchInput: {
             /** City Id */
@@ -2037,6 +2361,70 @@ export interface components {
             reason_code: string;
             /** Reason Text */
             reason_text?: string | null;
+        };
+        /** PublicationBatch */
+        PublicationBatch: {
+            /** Batch Id */
+            batch_id: string;
+            /** City Id */
+            city_id: string;
+            /** Created At */
+            created_at: string;
+            /** Items */
+            items: components["schemas"]["PublicationBatchItem"][];
+            /** Operation Intent Id */
+            operation_intent_id: string;
+            /** Snapshot Id */
+            snapshot_id: string | null;
+            /** Status */
+            status: "preview" | "executing" | "published" | "partial_failed" | "failed";
+        };
+        /** PublicationBatchExecution */
+        PublicationBatchExecution: {
+            batch: components["schemas"]["PublicationBatch"];
+            /** Reused */
+            reused: boolean;
+            snapshot: components["schemas"]["ResearchSnapshot"] | null;
+        };
+        /** PublicationBatchItem */
+        PublicationBatchItem: {
+            /**
+             * Admin Area
+             * @default
+             */
+            admin_area: string;
+            /** Batch Item Id */
+            batch_item_id: string;
+            /**
+             * Canonical Name
+             * @default
+             */
+            canonical_name: string;
+            /**
+             * Category
+             * @default
+             */
+            category: string;
+            /**
+             * Place Kind
+             * @default
+             */
+            place_kind: string;
+            /** Place Revision Id */
+            place_revision_id: string;
+            /** Projection Id */
+            projection_id: string | null;
+            /** Published At */
+            published_at: string | null;
+            /** Reason Codes */
+            reason_codes: string[];
+            /**
+             * Revision Number
+             * @default 0
+             */
+            revision_number: number;
+            /** Status */
+            status: "pending" | "publishable" | "blocked" | "published" | "failed";
         };
         /** PublicationCheck */
         PublicationCheck: {
@@ -2055,6 +2443,19 @@ export interface components {
             reason_code: string;
             /** Reason Text */
             reason_text?: string | null;
+        };
+        /** PublishedProjection */
+        PublishedProjection: {
+            /** Data Snapshot Version */
+            data_snapshot_version: string;
+            /** Place Revision Id */
+            place_revision_id: string;
+            /** Projection Id */
+            projection_id: string;
+            /** Published At */
+            published_at: string | null;
+            /** Status */
+            status: string;
         };
         /** RegularSessionPreview */
         RegularSessionPreview: {
@@ -2088,6 +2489,39 @@ export interface components {
             new_attraction_id: string;
             /** Old Attraction Id */
             old_attraction_id: string;
+        };
+        /** ResearchSnapshot */
+        ResearchSnapshot: {
+            /** City Id */
+            city_id: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /** Created At */
+            created_at: string;
+            /** Data Snapshot Version */
+            data_snapshot_version: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Source Batch Id */
+            source_batch_id: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "published";
+        };
+        /** ResearchSnapshotPage */
+        ResearchSnapshotPage: {
+            /** Items */
+            items: components["schemas"]["ResearchSnapshot"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** ResolveRelationInput */
         ResolveRelationInput: {
@@ -2129,6 +2563,32 @@ export interface components {
             reason_code: string;
             /** Reason Text */
             reason_text?: string | null;
+        };
+        /** ReviewDecision */
+        ReviewDecision: {
+            /** Actor Id */
+            actor_id: string;
+            /** Actor Role */
+            actor_role: string;
+            /** Created At */
+            created_at: string;
+            /** Decision Kind */
+            decision_kind: "approve" | "request_changes" | "cancel";
+            /** Place Revision Id */
+            place_revision_id: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Text */
+            reason_text: string | null;
+            /** Review Decision Id */
+            review_decision_id: string;
+            /** Review Task Id */
+            review_task_id: string;
+        };
+        /** ReviewDecisionList */
+        ReviewDecisionList: {
+            /** Items */
+            items: components["schemas"]["ReviewDecision"][];
         };
         /** ReviewPlaceEvidenceInput */
         ReviewPlaceEvidenceInput: {
@@ -2223,6 +2683,57 @@ export interface components {
             offset: number;
             /** Total */
             total: number;
+        };
+        /** SourceChannel */
+        SourceChannel: {
+            /** Base Urls */
+            base_urls: string[];
+            /** Collection Modes */
+            collection_modes: string[];
+            /** Conditions */
+            conditions: string[];
+            /** Decision */
+            decision: "approved" | "conditional";
+            /** Display Name */
+            display_name: string;
+            /** Source Id */
+            source_id: string;
+            /** Source Kind */
+            source_kind: string;
+        };
+        /** SourceChannelList */
+        SourceChannelList: {
+            /** Items */
+            items: components["schemas"]["SourceChannel"][];
+        };
+        /** SourceConflict */
+        SourceConflict: {
+            /** Records */
+            records: components["schemas"]["SourceConflictRecord"][];
+            /** Resolved */
+            resolved: boolean;
+            /** Source Id */
+            source_id: string;
+        };
+        /** SourceConflictRecord */
+        SourceConflictRecord: {
+            /** Observed At */
+            observed_at: string;
+            /** Source Decision */
+            source_decision: string;
+            /** Source Record Id */
+            source_record_id: string;
+            /** Source Url */
+            source_url: string;
+            /** Status */
+            status: string;
+        };
+        /** SourceConflictResponse */
+        SourceConflictResponse: {
+            /** Items */
+            items: components["schemas"]["SourceConflict"][];
+            /** Revision Id */
+            revision_id: string;
         };
         /** SubmitGenerationInput */
         SubmitGenerationInput: {
@@ -2419,9 +2930,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminActorPage"];
                 };
             };
             /** @description Validation Error */
@@ -2456,9 +2965,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminActor"];
                 };
             };
             /** @description Validation Error */
@@ -2495,9 +3002,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminActor"];
                 };
             };
             /** @description Validation Error */
@@ -2538,9 +3043,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminAuditPage"];
                 };
             };
             /** @description Validation Error */
@@ -2609,9 +3112,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DashboardSummary"];
                 };
             };
             /** @description Validation Error */
@@ -2642,9 +3143,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidaySyncCapability"];
                 };
             };
             /** @description Validation Error */
@@ -2680,9 +3179,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidaySyncJobPage"];
                 };
             };
             /** @description Validation Error */
@@ -2717,9 +3214,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarSyncJob"];
                 };
             };
             /** @description Validation Error */
@@ -2752,9 +3247,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarSyncJob"];
                 };
             };
             /** @description Validation Error */
@@ -2787,9 +3280,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarSyncJob"];
                 };
             };
             /** @description Validation Error */
@@ -2826,9 +3317,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarSyncJob"];
                 };
             };
             /** @description Validation Error */
@@ -2859,9 +3348,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarList"];
                 };
             };
             /** @description Validation Error */
@@ -2894,9 +3381,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarVersion"];
                 };
             };
             /** @description Validation Error */
@@ -2929,9 +3414,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HolidayCalendarImpact"];
                 };
             };
             /** @description Validation Error */
@@ -2962,9 +3445,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminMe"];
                 };
             };
             /** @description Validation Error */
@@ -3632,9 +4113,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PreparedProjection"];
                 };
             };
             /** @description Validation Error */
@@ -3704,9 +4183,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PublishedProjection"];
                 };
             };
             /** @description Validation Error */
@@ -3851,9 +4328,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SourceConflictResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4223,9 +4698,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PublicationBatch"];
                 };
             };
             /** @description Validation Error */
@@ -4262,9 +4735,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PublicationBatchExecution"];
                 };
             };
             /** @description Validation Error */
@@ -4299,9 +4770,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ResearchSnapshotPage"];
                 };
             };
             /** @description Validation Error */
@@ -4334,9 +4803,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ResearchSnapshot"];
                 };
             };
             /** @description Validation Error */
@@ -4409,9 +4876,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["BatchReviewResult"];
                 };
             };
             /** @description Validation Error */
@@ -4477,9 +4942,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReviewDecisionList"];
                 };
             };
             /** @description Validation Error */
@@ -4549,9 +5012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AdminLoginResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4611,9 +5072,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SourceChannelList"];
                 };
             };
             /** @description Validation Error */

@@ -191,7 +191,10 @@ class SqlAlchemyGenerationIntentRepository:
         except IntegrityError as exc:
             raise GenerationIntentConflictError from exc
 
-    def save(self, intent: GenerationIntent, *, expected_status: str) -> None:
+    def save(
+        self, intent: GenerationIntent, *, expected_status: str,
+        expected_updated_at: datetime | None = None,
+    ) -> None:
         statement = (
             update(GenerationIntentRow)
             .where(
@@ -200,8 +203,39 @@ class SqlAlchemyGenerationIntentRepository:
             )
             .values(**_intent_values(intent))
         )
+        if expected_updated_at is not None:
+            statement = statement.where(
+                GenerationIntentRow.updated_at == expected_updated_at.isoformat()
+            )
         if cast(CursorResult[Any], self._session.execute(statement)).rowcount != 1:
             raise ValueError("generation intent status conflict")
+
+    def list_queued(self, *, limit: int) -> tuple[GenerationIntent, ...]:
+        rows = self._session.scalars(
+            select(GenerationIntentRow)
+            .where(GenerationIntentRow.status == GenerationStatus.QUEUED.value)
+            .order_by(
+                GenerationIntentRow.submitted_at.asc(),
+                GenerationIntentRow.generation_intent_id.asc(),
+            )
+            .limit(limit)
+        )
+        return tuple(_intent_from_row(row) for row in rows)
+
+    def recover_stale_running(self, *, before: datetime) -> int:
+        statement = (
+            update(GenerationIntentRow)
+            .where(
+                GenerationIntentRow.status == GenerationStatus.RUNNING.value,
+                GenerationIntentRow.updated_at < before.isoformat(),
+            )
+            .values(
+                status=GenerationStatus.QUEUED.value,
+                failure_code=None,
+                updated_at=before.isoformat(),
+            )
+        )
+        return cast(CursorResult[Any], self._session.execute(statement)).rowcount or 0
 
 
 class SqlAlchemyTripRepository:

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from dataclasses import replace
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -104,6 +105,27 @@ def test_success_atomically_creates_run_trip_and_immutable_revision() -> None:
     assert revision.completion_kind is CompletionKind.PARTIAL_SUCCESS
     assert revision.has_soft_degradation is True
     assert revision.result_snapshot["node_ids"] == ["node_1"]
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_late_worker_cannot_publish_or_fail_a_reclaimed_intent(fails: bool) -> None:
+    """H3/S8: stale recovery must fence the previous execution, not just its status."""
+    store = _store()
+
+    class ReclaimedGateway(FakeGateway):
+        def solve(self, request: object) -> SolverOutcome:
+            store.generation_intents["intent_1"] = replace(
+                store.generation_intents["intent_1"], updated_at=NOW + timedelta(minutes=16)
+            )
+            if fails:
+                raise SolverExecutionError("provider_unavailable", retryable=True)
+            return _outcome()
+
+    with pytest.raises(InvalidStateTransitionError):
+        _handler(store, ReclaimedGateway(_outcome())).handle("intent_1")
+    assert store.generation_intents["intent_1"].status is GenerationStatus.RUNNING
+    assert store.generation_intents["intent_1"].updated_at == NOW + timedelta(minutes=16)
+    assert not store.solver_runs and not store.trips and not store.trip_revisions
 
 
 def test_completed_intent_is_idempotent_and_does_not_call_gateway_again() -> None:

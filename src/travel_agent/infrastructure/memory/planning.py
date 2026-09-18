@@ -6,7 +6,7 @@ These adapters are application-test tools, not production persistence.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
@@ -20,6 +20,7 @@ from travel_agent.application.common.errors import (
 from travel_agent.domain.feedback import Feedback
 from travel_agent.domain.planning import (
     GenerationIntent,
+    GenerationStatus,
     SolverRun,
     Trip,
     TripDraft,
@@ -71,11 +72,38 @@ class InMemoryGenerationIntentRepository:
             raise GenerationIntentConflictError
         self._records[intent.generation_intent_id] = intent
 
-    def save(self, intent: GenerationIntent, *, expected_status: str) -> None:
+    def save(
+        self, intent: GenerationIntent, *, expected_status: str,
+        expected_updated_at: datetime | None = None,
+    ) -> None:
         current = self._records.get(intent.generation_intent_id)
-        if current is None or current.status.value != expected_status:
+        if (
+            current is None or current.status.value != expected_status
+            or (expected_updated_at is not None and current.updated_at != expected_updated_at)
+        ):
             raise ValueError("generation intent status conflict")
         self._records[intent.generation_intent_id] = intent
+
+    def list_queued(self, *, limit: int) -> tuple[GenerationIntent, ...]:
+        return tuple(
+            sorted(
+                (intent for intent in self._records.values() if intent.status.value == "queued"),
+                key=lambda intent: (intent.submitted_at, intent.generation_intent_id),
+            )[:limit]
+        )
+
+    def recover_stale_running(self, *, before: datetime) -> int:
+        recovered = 0
+        for intent_id, intent in self._records.items():
+            if intent.status.value == "running" and intent.updated_at < before:
+                self._records[intent_id] = replace(
+                    intent,
+                    status=GenerationStatus.QUEUED,
+                    failure_code=None,
+                    updated_at=before,
+                )
+                recovered += 1
+        return recovered
 
 
 class _InMemoryAddRepository[T]:

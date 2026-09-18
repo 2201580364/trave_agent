@@ -172,6 +172,17 @@ def test_plan_share_intent_cannot_be_reused_for_another_revision() -> None:
         )
 
 
+def test_fixture_weather_is_not_promoted_to_public_forecast() -> None:
+    store = _store()
+    snapshot = store.trip_revisions['revision_1'].result_snapshot
+    cast(dict[str, object], snapshot['provenance'])['weather_basis'] = 'deterministic_local_fixture'
+    created = CreatePlanShareHandler(
+        InMemoryUnitOfWork(store), FixedClock(), SequenceIdGenerator(), _tokens()
+    ).handle(CreatePlanShare('principal_owner', 'share_fixture', 'trip_1', 'revision_1'))
+    weather = cast(dict[str, Any], created.share.share_snapshot)['days'][0]['weather']
+    assert weather == {'condition': None, 'basis': 'deterministic_local_fixture'}
+
+
 def test_reference_copy_keeps_attractions_but_drops_private_travel_facts() -> None:
     store = _store()
     ids = SequenceIdGenerator()

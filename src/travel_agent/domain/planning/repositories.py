@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from .entities import GenerationIntent, SolverRun, Trip, TripDraft, TripRevision
@@ -18,7 +19,14 @@ class GenerationIntentRepository(Protocol):
 
     def add(self, intent: GenerationIntent) -> None: ...
 
-    def save(self, intent: GenerationIntent, *, expected_status: str) -> None: ...
+    def save(
+        self, intent: GenerationIntent, *, expected_status: str,
+        expected_updated_at: datetime | None = None,
+    ) -> None: ...
+
+    def list_queued(self, *, limit: int) -> tuple[GenerationIntent, ...]: ...
+
+    def recover_stale_running(self, *, before: datetime) -> int: ...
 
 
 class TripRepository(Protocol):

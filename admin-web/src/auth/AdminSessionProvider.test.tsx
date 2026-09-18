@@ -1,5 +1,5 @@
 import { App as AntApp } from 'antd'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 
 import { AdminSessionProvider, useAdminSession } from './AdminSessionProvider'
 
@@ -65,6 +65,21 @@ function LogoutProbe() {
 }
 
 describe('AdminSessionProvider session persistence', () => {
+  it('does not restore a late /me response after logout (ADR-0029)', async () => {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, 'active-token')
+    let resolveMe!: (response: Response) => void
+    vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveMe = resolve }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    render(<AntApp><AdminSessionProvider><PrincipalProbe /><LogoutProbe /></AdminSessionProvider></AntApp>)
+    await act(async () => { screen.getByRole('button', { name: '退出登录' }).click() })
+    await act(async () => {
+      resolveMe(new Response(JSON.stringify({ login_name: 'stale-reviewer', permissions: [], expires_at: new Date(Date.now() + 3600000).toISOString() })))
+    })
+    expect(screen.getByTestId('principal').textContent).toBe('anonymous')
+    expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+  })
+
   it('restores the principal from sessionStorage via /me on mount', async () => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, 'stored-token')
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(

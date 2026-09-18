@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react'
 
 import './index.css'
 
-import type { Attraction, GenerationIntent } from '@/entities/planning/types'
+import type { Attraction } from '@/entities/planning/types'
 import { usePlanningStore } from '@/features/trip-draft/store'
+import { useDurableGeneration } from '@/features/trip-draft/use-durable-generation'
 import { apiRequest } from '@/shared/api/client'
 import { PageAction } from '@/shared/ui/PageAction'
 
@@ -17,7 +18,8 @@ export default function AttractionReplacePage() {
   const [items, setItems] = useState<Attraction[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [keyword, setKeyword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const generation = useDurableGeneration('replacement')
+  const loading = generation.loading
   const [error, setError] = useState('')
 
   useDidShow(() => {
@@ -40,37 +42,13 @@ export default function AttractionReplacePage() {
 
   const submit = async () => {
     if (!store.token || !store.tripId || !store.revisionId || !selectedId) return
-    setLoading(true)
-    setError('')
-    try {
-      const intent = await apiRequest<GenerationIntent>(
-        `/api/v1/trips/${store.tripId}/revisions/${store.revisionId}/attraction-replacements`,
-        {
-          method: 'POST',
-          token: store.token,
-          data: {
-            generation_intent_id: `intent_${Date.now()}`,
-            old_attraction_id: oldAttractionId,
-            new_attraction_id: selectedId
-          }
-        }
-      )
-      if (intent.status !== 'completed' || !intent.trip_id || !intent.trip_revision_id) {
-        throw new Error(intent.failure_code ? `重新规划失败：${intent.failure_code}` : '行程仍在重新规划，请稍后重试。')
-      }
-      if (intent.replacement_draft_id && intent.replacement_draft_version) {
-        store.setDraft(intent.replacement_draft_id, intent.replacement_draft_version)
-      }
-      store.setSelectedAttractions(
-        store.selectedAttractionIds.map((id) => id === oldAttractionId ? selectedId : id)
-      )
-      store.setTrip(intent.trip_id, intent.trip_revision_id)
-      Taro.redirectTo({ url: '/pages/trip-detail/index' })
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '暂时无法替换景点。')
-    } finally {
-      setLoading(false)
-    }
+    const intentId = `intent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    await generation.run({
+      kind: 'replacement', intentId,
+      path: `/api/v1/trips/${store.tripId}/revisions/${store.revisionId}/attraction-replacements`,
+      data: { generation_intent_id: intentId, old_attraction_id: oldAttractionId, new_attraction_id: selectedId },
+      selectedAttractionIds: store.selectedAttractionIds.map((id) => id === oldAttractionId ? selectedId : id)
+    })
   }
 
   return (
@@ -90,7 +68,8 @@ export default function AttractionReplacePage() {
           />
         </View>
 
-        {error && <View className='error'>{error}</View>}
+        {(error || generation.error) && <View className='error'>{error || generation.error}</View>}
+        {loading && <View className='notice'>正在重新规划，刷新后会继续恢复同一任务。</View>}
         {!items.length && !error && <View className='notice'>正在读取可替换景点…</View>}
         {!!items.length && !candidates.length && (
           <View className='notice'>当前没有符合条件的候选，请修改搜索词或返回原行程。</View>
@@ -119,8 +98,8 @@ export default function AttractionReplacePage() {
           })}
         </View>
       </View>
-      <PageAction loading={loading} disabled={!selectedId} onClick={submit}>
-        替换并重新规划
+      <PageAction loading={loading} disabled={!selectedId && !store.pendingGeneration} onClick={() => store.pendingGeneration ? generation.run() : submit()}>
+        {store.pendingGeneration ? '继续等待当前任务' : '替换并重新规划'}
       </PageAction>
     </View>
   )

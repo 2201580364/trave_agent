@@ -1,7 +1,8 @@
 FROM ghcr.io/astral-sh/uv:0.8.15 AS uv-bin
 
 FROM python:3.12.11-slim AS runtime
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src PATH=/app/.venv/bin:$PATH
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src PATH=/app/.venv/bin:$PATH \
+    UV_SYSTEM_CERTS=1 UV_HTTP_TIMEOUT=120 UV_HTTP_RETRIES=5
 WORKDIR /app
 RUN useradd --create-home --uid 10001 appuser
 COPY pyproject.toml uv.lock alembic.ini ./

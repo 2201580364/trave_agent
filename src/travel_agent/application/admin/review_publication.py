@@ -169,14 +169,16 @@ class PublicationService(ReviewSupport):
                 projection, projection_hash=canonical_projection_sha256(projection)
             )
             context = ProjectionPublicationContext(
-                place,
-                revision,
-                evidence.source_records,
-                evidence.geometries,
-                evidence.access_points,
-                evidence.time_rules,
-                evidence.relations,
-                projection,
+                place=place,
+                revision=revision,
+                source_records=evidence.source_records,
+                geometries=evidence.geometries,
+                access_points=evidence.access_points,
+                time_rules=evidence.time_rules,
+                closures=evidence.closures,
+                date_exceptions=evidence.date_exceptions,
+                relations=evidence.relations,
+                projection=projection,
             )
             reasons = evaluate_projection_publication(context)
             if not reasons:

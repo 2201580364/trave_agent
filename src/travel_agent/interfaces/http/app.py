@@ -247,12 +247,14 @@ def create_app(container: HttpContainer) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        from travel_agent.application.common.error_messages import admin_error_message
+
         code = "authentication_required" if exc.status_code == 401 else "http_error"
         return _error_response(
             request,
             exc.status_code,
             code,
-            str(exc.detail),
+            admin_error_message(code) if exc.status_code == 401 else str(exc.detail),
             retryable=False,
         )
 

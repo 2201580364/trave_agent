@@ -99,3 +99,21 @@ def test_openapi_exposes_nested_readiness_and_both_fixed_session_identifiers(
     assert "time_rule_id" in models["RegularSessionPreview"]["required"]
     assert "date_exception_id" in models["OverrideSessionPreview"]["required"]
     assert models["PlaceRevision"]["additionalProperties"] is False
+
+
+def test_all_admin_json_success_responses_have_structured_schemas(
+    admin_context: AdminTestContext,
+) -> None:
+    """S8: do not regress management endpoints to unconstrained dictionaries."""
+    app = admin_context.client.app
+    assert isinstance(app, FastAPI)
+    for path, operations in app.openapi()["paths"].items():
+        if not path.startswith("/api/v1/admin/"):
+            continue
+        for operation in operations.values():
+            for status_code, response in operation.get("responses", {}).items():
+                if not status_code.startswith("2"):
+                    continue
+                payload = response.get("content", {}).get("application/json")
+                if payload is not None:
+                    assert "$ref" in payload["schema"], (path, status_code)
